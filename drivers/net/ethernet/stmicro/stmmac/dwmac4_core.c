@@ -51,8 +51,8 @@ static void dwmac4_core_init(struct mac_device_info *hw, int mtu)
 
 	writel(value, ioaddr + GMAC_CONFIG);
 
-	/* Mask GMAC interrupts */
-	value = GMAC_INT_DEFAULT_MASK;
+	/* Enable GMAC interrupts */
+	value = GMAC_INT_DEFAULT_ENABLE;
 	if (hw->pmt)
 		value |= GMAC_INT_PMT_EN;
 	if (hw->pcs)
