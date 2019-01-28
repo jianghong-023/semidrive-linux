@@ -24,7 +24,7 @@
 
 	memory@30000000 {
 		device_type = "memory";
-		reg = <0 0x30000000 0 0x100000000>;
+		reg = <0 0x30000000 0 0xc0000000>;
 	};
 
 	chosen {
