@@ -22,7 +22,12 @@
  * Use the current timer as a cycle counter since this is what we use for
  * the delay loop.
  */
+#ifdef CONFIG_SDRV_TIMER
+extern u64 sdrv_timer_get_cnt(void);
+#define get_cycles()	sdrv_timer_get_cnt()
+#else
 #define get_cycles()	arch_counter_get_cntvct()
+#endif
 
 #include <asm-generic/timex.h>
 

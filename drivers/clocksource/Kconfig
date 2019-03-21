@@ -614,5 +614,9 @@ config CLKSRC_ST_LPC
 	help
 	  Enable this option to use the Low Power controller timer
 	  as clocksource.
+config SDRV_TIMER
+        bool
+        help
+          Enable the sdrv timer.
 
 endmenu

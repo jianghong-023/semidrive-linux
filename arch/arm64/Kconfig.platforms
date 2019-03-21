@@ -267,6 +267,7 @@ config ARCH_ZYNQMP
 
 config ARCH_SEMIDRIVE_KUNLUN
 	bool "Semidrive Kunlun SOC Family"
+	select SDRV_TIMER
 	help
 	  This enables support for Semidrive kunlun SOC  Family
 endmenu

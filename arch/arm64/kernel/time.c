@@ -72,8 +72,13 @@ void __init time_init(void)
 	timer_probe();
 
 	tick_setup_hrtimer_broadcast();
-
+#ifdef CONFIG_SDRV_TIMER
+	extern u32 kunlun_arch_timer_get_rate(void);
+	arch_timer_rate = kunlun_arch_timer_get_rate();
+#else
 	arch_timer_rate = arch_timer_get_rate();
+#endif
+	//arch_timer_rate = arch_timer_get_rate();
 	if (!arch_timer_rate)
 		panic("Unable to initialise architected timer.\n");
 
