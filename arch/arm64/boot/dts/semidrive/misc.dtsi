@@ -46,6 +46,19 @@
 			clock-frequency = <24000000>;
 			status = "disabled";
 		};
-
+                gpu0@34c00000 {
+                        compatible = "imagination,pvr-9446";
+                        reg = <0x0 0x34c00000 0x0 0x80000>;
+                        interrupts = <0 168 4>;
+                        clock-frequency = <800000000>;
+                        status = "okay";
+                };
+                gpu1@34e00000 {
+                        compatible = "imagination,pvr-9226";
+                        reg = <0x0 0x34e00000 0x0 0x80000>;
+                        interrupts = <0 177 4>;
+                        clock-frequency = <800000000>;
+                        status = "okay";
+                };
 	};
 };
