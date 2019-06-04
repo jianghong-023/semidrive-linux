@@ -1,0 +1,27 @@
+config DRM_KUNLUN
+	tristate "DRM Support for Semidrive"
+	depends on DRM
+	select DRM_GEM_CMA_HELPER
+	select DRM_KMS_HELPER
+	select DRM_PANEL
+	select VIDEOMODE_HELPERS
+	select DRM_KUNLUN_CRTC
+	help
+	  Choose this option if you have a Semidrive soc chipset.
+	  This driver provides kernel mode setting and buffer
+	  management to userspace. This driver does not provide
+	  2D or 3D acceleration; acceleration is performed by other
+	  IP found on the SoC.
+if DRM_KUNLUN
+config DRM_KUNLUN_RGB
+	bool "Semidrive specific extensions for RGB parallel"
+	help
+		This selects support for Semidrive SoC specific extensions
+		for the RGB parallel dirver. If you want to  enable RGB
+		parallel, you should select this option.
+
+config DRM_KUNLUN_CRTC
+	bool "Semidrive DRM CRTC"
+config DRM_KUNLUN_DC
+	bool "Semidrive DC"
+endif

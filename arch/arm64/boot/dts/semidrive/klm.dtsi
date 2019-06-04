@@ -63,4 +63,59 @@
 		cpu_off		= <0x84000002>;
 		cpu_suspend	= <0xc4000001>;
 	};
+
+	dc0: dc@30440000 {
+		compatible = "semidrive,kunlun-dc";
+		reg = <0x0 0x30440000 0 0x10000>;
+		interrupts = <0 33 4>;
+		status = "okay";
+			
+		dc0_out: port {
+			dc0_out_parallel: endpoint@0 {
+				remote-endpoint = <&parallel_in_dc0>;
+			};
+		};
+	};
+
+	display@0 {
+		compatible = "semdrive,dc-subsystem";
+		ports = <&dc0_out>;
+		status = "okay";
+	};
+
+	parallel: parallel@0 {
+		compatible = "semidrive, kunlun-display-parallel";
+		status = "okay";
+
+		ports {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			parallel_in: port@0 {
+				parallel_in_dc0: endpoint@0 {
+					remote-endpoint = <&dc0_out_parallel>;
+				};
+			};
+
+			parallel_out: port@1 {
+				#address-cells = <1>;
+				#size-cells = <0>;
+				reg = <1>;
+				parallel_out_timing: endpoint@0 {
+					reg = <0>;
+					remote-endpoint = <&parall_panel1_in>;
+				};
+			};
+		};
+	};
+
+	parallel-timings {
+		compatible = "semidrive,panel-simple";
+		port {
+			parall_panel1_in: endpoint {
+				remote-endpoint = <&parallel_out_timing>;
+			};
+		};
+	};
+
+
 };
