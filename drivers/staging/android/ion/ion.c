@@ -451,6 +451,7 @@ int ion_alloc(size_t len, unsigned int heap_id_mask, unsigned int flags)
 
 	return fd;
 }
+EXPORT_SYMBOL(ion_alloc);
 
 int ion_query_heaps(struct ion_heap_query *query)
 {
