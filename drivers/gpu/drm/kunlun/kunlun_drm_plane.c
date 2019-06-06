@@ -271,11 +271,8 @@ const uint32_t gp_lite_formats[] = {
 	DRM_FORMAT_NV12,
 	DRM_FORMAT_NV21,
 	DRM_FORMAT_YUV420,
-	DRM_FORMAT_YVU420,
 	DRM_FORMAT_YUV422,
-	DRM_FORMAT_YVU422,
 	DRM_FORMAT_YUV444,
-	DRM_FORMAT_YVU444
 };
 
 const uint32_t gp_big_formats[] = {
@@ -314,11 +311,8 @@ const uint32_t gp_big_formats[] = {
 	DRM_FORMAT_NV12,
 	DRM_FORMAT_NV21,
 	DRM_FORMAT_YUV420,
-	DRM_FORMAT_YVU420,
 	DRM_FORMAT_YUV422,
-	DRM_FORMAT_YVU422,
 	DRM_FORMAT_YUV444,
-	DRM_FORMAT_YVU444
 };
 const uint32_t gp_mid_formats[] = {
 	DRM_FORMAT_XRGB8888,
@@ -356,11 +350,8 @@ const uint32_t gp_mid_formats[] = {
 	DRM_FORMAT_NV12,
 	DRM_FORMAT_NV21,
 	DRM_FORMAT_YUV420,
-	DRM_FORMAT_YVU420,
 	DRM_FORMAT_YUV422,
-	DRM_FORMAT_YVU422,
 	DRM_FORMAT_YUV444,
-	DRM_FORMAT_YVU444
 };
 
 static const struct kunlun_pipe_data sp_data = {
@@ -372,7 +363,7 @@ static const struct kunlun_pipe_data sp_data = {
 static const struct kunlun_pipe_data gp_lite_data = {
 	.formats = gp_lite_formats,
 	.nformats = ARRAY_SIZE(gp_lite_formats),
-	.data.sp = &dc_gp,
+	.data.gp = &dc_gp,
 };
 
 static const struct kunlun_pipe_data gp_big_data = {
@@ -427,7 +418,7 @@ const struct kunlun_plane_data kunlun_dp_planes[] = {
 	}
 };
 
-uint32_t get_l_addr(uint64_t addr)
+static uint32_t get_l_addr(uint64_t addr)
 {
 	uint32_t addr_l;
 
@@ -435,75 +426,307 @@ uint32_t get_l_addr(uint64_t addr)
 	return addr_l;
 }
 
-uint32_t get_h_addr(uint64_t addr)
+static uint32_t get_h_addr(uint64_t addr)
 {
 	uint32_t addr_h;
 
 	addr_h = (uint32_t)((addr & 0xFFFFFFFF00000000) >> 32);
 	return addr_h;
 }
-static enum kunlun_data_format to_kunlun_format(uint32_t format)
-{
-	switch (format) {
-		case DRM_FORMAT_XRGB8888:
-		case DRM_FORMAT_ARGB8888:
-		case DRM_FORMAT_XBGR8888:
-			return KUNLUN_DATA_ARGB8888;
-		case DRM_FORMAT_ABGR8888:
-			return KUNLUN_DATA_ARGB8888;
-		case DRM_FORMAT_RGB888:
-		case DRM_FORMAT_BGR888:
-			return KUNLUN_DATA_RGB888;
-		case DRM_FORMAT_RGB565:
-		case DRM_FORMAT_BGR565:
-			return KUNLUN_DATA_RGB565;
-		case DRM_FORMAT_NV12:
-			return KUNLUN_DATA_NV12;
-		case DRM_FORMAT_NV21:
-			return KUNLUN_DATA_NV21;
-		default:
-			DRM_ERROR("unsupported format[%08x]\n", format);
-		return -EINVAL;
-	}
-}
 
 static int kunlun_plane_frm_comp_set(struct kunlun_crtc *kcrtc,
-		uint32_t chn_base, const struct kunlun_pipe_pix_comp *comp,
+		uint32_t chn_base,
+		const struct kunlun_pipe_pix_comp *comp,
+		const struct kunlun_pipe_frm_ctrl *ctrl,
+		const struct kunlun_gp_yuvup_ctrl *yuvup_ctrl,
+		const struct kunlun_csc_ctrl *csc_ctrl,
 		uint32_t format)
 {
-	uint16_t bpa, bpy, bpu, bpv;
+	uint8_t bpa, bpy, bpu, bpv;
+	uint8_t swap;
+	uint8_t uvswap = 0;
+	uint8_t is_yuv = 0;
+	uint8_t uvmode = 0;
+	uint8_t buf_fmt = 0;
+	char *format_string;
 
 	switch (format) {
-		case KUNLUN_DATA_ARGB8888:
+		case DRM_FORMAT_XRGB8888:
 			bpa = bpy = bpu = bpv = 8;
+			swap = SWAP_A_RGB;
+			format_string = "DRM_FORMAT_XRGB8888";
 			break;
-		case KUNLUN_DATA_RGB888:
+		case DRM_FORMAT_XBGR8888:
+			bpa = bpy = bpu = bpv = 8;
+			swap = SWAP_A_RBG;
+			format_string = "DRM_FORMAT_XBGR8888";
+			break;
+		case DRM_FORMAT_BGRX8888:
+			bpa = bpy = bpu = bpv = 8;
+			swap = SWAP_B_GRA;
+			format_string = "DRM_FORMAT_BGRX8888";
+			break;
+		case DRM_FORMAT_ARGB8888:
+			bpa = bpy = bpu = bpv = 8;
+			swap = SWAP_A_RGB;
+			format_string = "DRM_FORMAT_ARGB8888";
+			break;
+		case DRM_FORMAT_ABGR8888:
+			bpa = bpy = bpu = bpv = 8;
+			swap = SWAP_A_BGR;
+			format_string = "DRM_FORMAT_ABGR8888";
+			break;
+		case DRM_FORMAT_BGRA8888:
+			bpa = bpy = bpu = bpv = 8;
+			swap = SWAP_B_GRA;
+			format_string = "DRM_FORMAT_BGRA8888";
+			break;
+		case DRM_FORMAT_RGB888:
 			bpa = 0;
 			bpy = bpu = bpv = 8;
+			swap = SWAP_A_RGB;
+			format_string = "DRM_FORMAT_RGB888";
 			break;
-		case KUNLUN_DATA_RGB565:
+		case DRM_FORMAT_BGR888:
+			bpa = 0;
+			bpy = bpu = bpv = 8;
+			swap = SWAP_A_BGR;
+			format_string = "DRM_FORMAT_BGR888";
+			break;
+		case DRM_FORMAT_RGB565:
 			bpa = 0;
 			bpy = bpv = 5;
 			bpu = 6;
+			swap = SWAP_A_RGB;
+			format_string = "DRM_FORMAT_RGB565";
 			break;
-		case KUNLUN_DATA_NV12:
-		case KUNLUN_DATA_NV21:
+		case DRM_FORMAT_BGR565:
+			bpa = 0;
+			bpy = bpv = 5;
+			bpu = 6;
+			swap = SWAP_A_BGR;
+			format_string = "DRM_FORMAT_BGR565";
+			break;
+		case DRM_FORMAT_XRGB4444:
+			bpa = bpy = bpu = bpv = 4;
+			swap = SWAP_A_RGB;
+			format_string = "DRM_FORMAT_XRGB4444";
+			break;
+		case DRM_FORMAT_XBGR4444:
+			bpa = bpy = bpu = bpv = 4;
+			swap = SWAP_A_BGR;
+			format_string = "DRM_FORMAT_XBGR4444";
+			break;
+		case DRM_FORMAT_BGRX4444:
+			bpa = bpy = bpu = bpv = 4;
+			swap = SWAP_B_GRA;
+			format_string = "DRM_FORMAT_BGRX4444";
+			break;
+		case DRM_FORMAT_ARGB4444:
+			bpa = bpy = bpu = bpv = 4;
+			swap = SWAP_A_RGB;
+			format_string = "DRM_FORMAT_ARGB4444";
+			break;
+		case DRM_FORMAT_ABGR4444:
+			bpa = bpy = bpu = bpv = 4;
+			swap = SWAP_A_BGR;
+			format_string = "DRM_FORMAT_ABGR4444";
+			break;
+		case DRM_FORMAT_BGRA4444:
+			bpa = bpy = bpu = bpv = 4;
+			swap = SWAP_B_GRA;
+			format_string = "DRM_FORMAT_BGRA4444";
+			break;
+		case DRM_FORMAT_XRGB1555:
+			bpa = 1;
+			bpy = bpu = bpv = 5;
+			swap = SWAP_A_RGB;
+			format_string = "DRM_FORMAT_XRGB1555";
+			break;
+		case DRM_FORMAT_XBGR1555:
+			bpa = 1;
+			bpy = bpu = bpv = 5;
+			swap = SWAP_A_BGR;
+			format_string = "DRM_FORMAT_XBGR1555";
+			break;
+		case DRM_FORMAT_BGRX5551:
+			bpa = 1;
+			bpy = bpu = bpv = 5;
+			swap = SWAP_B_GRA;
+			format_string = "DRM_FORMAT_BGRX5551";
+			break;
+		case DRM_FORMAT_ARGB1555:
+			bpa = 1;
+			bpy = bpu = bpv = 5;
+			swap = SWAP_A_RGB;
+			format_string = "DRM_FORMAT_ARGB1555";
+			break;
+		case DRM_FORMAT_ABGR1555:
+			bpa = 1;
+			bpy = bpu = bpv = 5;
+			swap = SWAP_A_BGR;
+			format_string = "DRM_FORMAT_ABGR1555";
+			break;
+		case DRM_FORMAT_BGRA5551:
+			bpa = 1;
+			bpy = bpu = bpv = 5;
+			swap = SWAP_B_GRA;
+			format_string = "DRM_FORMAT_BGRA5551";
+			break;
+		case DRM_FORMAT_XRGB2101010:
+			bpa = 2;
+			bpy = bpu = bpv = 10;
+			swap = SWAP_A_RGB;
+			format_string = "DRM_FORMAT_XRGB2101010";
+			break;
+		case DRM_FORMAT_XBGR2101010:
+			bpa = 2;
+			bpy = bpu = bpv = 10;
+			swap = SWAP_A_BGR;
+			format_string = "DRM_FORMAT_XBGR2101010";
+			break;
+		case DRM_FORMAT_BGRX1010102:
+			bpa = 2;
+			bpy = bpu = bpv = 10;
+			swap = SWAP_B_GRA;
+			format_string = "DRM_FORMAT_BGRX1010102";
+			break;
+		case DRM_FORMAT_ARGB2101010:
+			bpa = 2;
+			bpy = bpu = bpv = 10;
+			swap = SWAP_A_RGB;
+			format_string = "DRM_FORMAT_ARGB2101010";
+			break;
+		case DRM_FORMAT_ABGR2101010:
+			bpa = 2;
+			bpy = bpu = bpv = 10;
+			swap = SWAP_A_BGR;
+			format_string = "DRM_FORMAT_ABGR2101010";
+			break;
+		case DRM_FORMAT_BGRA1010102:
+			bpa = 2;
+			bpy = bpu = bpv = 10;
+			swap = SWAP_B_GRA;
+			format_string = "DRM_FORMAT_BGRA1010102";
+			break;
+		case DRM_FORMAT_R8:
+			bpy = 8;
+			bpa = bpu = bpv = 0;
+			swap = SWAP_A_RGB;
+			format_string = "DRM_FORMAT_R8";
+			break;
+		case DRM_FORMAT_YUYV:
 			bpa = bpv = 0;
 			bpy = bpu = 8;
+			swap = SWAP_A_RGB;
+			is_yuv = 1;
+			format_string = "DRM_FORMAT_YUYV";
 			break;
+		case DRM_FORMAT_YVYU:
+			bpa = bpv = 0;
+			bpy = bpu = 8;
+			swap = SWAP_A_RGB;
+			uvswap = 1;
+			is_yuv = 1;
+			format_string = "DRM_FORMAT_YVYU";
+			break;
+		case DRM_FORMAT_AYUV:
+			bpa = bpy = bpu = bpv = 8;
+			swap = SWAP_A_RGB;
+			is_yuv = 1;
+			format_string = "DRM_FORMAT_AYUV";
+			break;
+		case DRM_FORMAT_NV12:
+			bpa = bpv = 0;
+			bpy = bpu = 8;
+			swap = SWAP_A_RGB;
+			uvswap = 1;
+			is_yuv = 1;
+			uvmode = UV_YUV420;
+			buf_fmt = FMT_SEMI_PLANAR;
+			format_string = "DRM_FORMAT_NV12";
+			break;
+		case DRM_FORMAT_NV21:
+			bpa = bpv = 0;
+			bpy = bpu = 8;
+			swap = SWAP_A_RGB;
+			is_yuv = 1;
+			uvmode = UV_YUV420;
+			buf_fmt = FMT_SEMI_PLANAR;
+			format_string = "DRM_FORMAT_NV21";
+			break;
+		case DRM_FORMAT_YUV420:
+			bpa = 0;
+			bpy = bpu = bpv = 8;
+			swap = SWAP_A_RGB;
+			is_yuv = 1;
+			uvmode = UV_YUV420;
+			buf_fmt = FMT_PLANAR;
+			format_string = "DRM_FORMAT_YUV420";
+			break;
+		case DRM_FORMAT_YUV422:
+			bpa = 0;
+			bpy = bpu = bpv = 8;
+			swap = SWAP_A_RGB;
+			is_yuv = 1;
+			uvmode = UV_YUV420;
+			buf_fmt = FMT_PLANAR;
+			format_string = "DRM_FORMAT_YUV422";
+			break;
+		case DRM_FORMAT_YUV444:
+			bpa = 0;
+			bpy = bpu = bpv = 8;
+			swap = SWAP_A_RGB;
+			is_yuv = 1;
+			buf_fmt = FMT_PLANAR;
+			format_string = "DRM_FORMAT_YUV444";
+			break;
+
 		default:
 			DRM_ERROR("unsupported format[%08x]\n", format);
 			return -EINVAL;
 	}
+	//pr_info("format = %s", format_string);
+	/*config pixel components*/
 	DU_PIPE_ELEM_SET(kcrtc, chn_base, comp, bpv, bpv);
 	DU_PIPE_ELEM_SET(kcrtc, chn_base, comp, bpu, bpu);
 	DU_PIPE_ELEM_SET(kcrtc, chn_base, comp, bpy, bpy);
 	DU_PIPE_ELEM_SET(kcrtc, chn_base, comp, bpa, bpa);
 
+	/*config component swap mode*/
+	DU_PIPE_ELEM_SET(kcrtc, chn_base, ctrl, comp_swap, swap);
+	DU_PIPE_ELEM_SET(kcrtc, chn_base, ctrl, rgb_yuv, is_yuv);
+	DU_PIPE_ELEM_SET(kcrtc, chn_base, ctrl, uv_swap, uvswap);
+	DU_PIPE_ELEM_SET(kcrtc, chn_base, ctrl, uv_mode, uvmode);
+	DU_PIPE_ELEM_SET(kcrtc, chn_base, ctrl, fmt, buf_fmt);
+
+	if ((yuvup_ctrl != NULL) && (csc_ctrl != NULL)) {
+		if (is_yuv) {
+			DU_PIPE_ELEM_SET(kcrtc, chn_base, yuvup_ctrl, bypass, 0);
+			DU_PIPE_ELEM_SET(kcrtc, chn_base, csc_ctrl, bypass, 0);
+		} else {
+			DU_PIPE_ELEM_SET(kcrtc, chn_base, yuvup_ctrl, bypass, 1);
+			DU_PIPE_ELEM_SET(kcrtc, chn_base, csc_ctrl, bypass, 1);
+		}
+	}
+
 	return 0;
 }
 
-int get_du_mlc_sf_index(uint32_t layer_id)
+static bool kunlun_format_global_alpha(uint32_t format)
+{
+	int i;
+	for (i = 0; i < sizeof(format); i++) {
+		char tmp = (format >> (8 * i)) & 0xff;
+
+		if (tmp == 'A')
+			return false;
+	}
+
+	return true;
+}
+
+static int get_du_mlc_sf_index(uint32_t layer_id)
 {
 	uint32_t i;
 	switch (layer_id) {
@@ -652,7 +875,10 @@ static void kunlun_plane_atomic_update(struct drm_plane *plane,
 	const struct kunlun_sp_data *sp_data = NULL;
 	const struct kunlun_gp_data *gp_data = NULL;
 	const struct kunlun_pipe_pix_comp *pix_comp;
+	const struct kunlun_pipe_frm_ctrl *frm_ctrl;
 	const struct kunlun_pipe_frm_data *frm_data;
+	const struct kunlun_gp_yuvup_ctrl *yuvup_ctrl;
+	const struct kunlun_csc_ctrl *csc_ctrl = NULL;
 	const struct kunlun_mlc_data *mlc = kcrtc->data->mlc;
 	int i;
 	/*
@@ -666,6 +892,8 @@ static void kunlun_plane_atomic_update(struct drm_plane *plane,
 		return;
 	}
 
+	format = fb->format->format;
+	nplanes = fb->format->num_planes;
 	/*src values are in Q16 fixed point, convert to integer:*/
 	off_x = src->x1 >> 16;
 	off_y = src->y1 >> 16;
@@ -683,22 +911,24 @@ static void kunlun_plane_atomic_update(struct drm_plane *plane,
 	addr_h = get_h_addr(dma_addr);
 	pitch = fb->pitches[0] - 1;
 
-	format = to_kunlun_format(fb->format->format);
-	nplanes = fb->format->num_planes;
-
 	if ((layer_id == DC_SPIPE) ||
 		(layer_id == DP_SPIPE0) ||
 		(layer_id == DP_SPIPE1)) {
 		sp_data = klp->data->hwpipe->data.sp;
 		pix_comp = sp_data->pix_comp;
+		frm_ctrl = sp_data->frm_ctrl;
 		frm_data = sp_data->frm_info;
 	} else {
 		gp_data = klp->data->hwpipe->data.gp;
 		pix_comp = gp_data->pix_comp;
+		frm_ctrl = gp_data->frm_ctrl;
 		frm_data = gp_data->frm_info;
+		yuvup_ctrl = gp_data->yuvup_ctrl;
+		csc_ctrl = gp_data->csc_ctrl;
 	}
 
-	kunlun_plane_frm_comp_set(kcrtc, chn_base, pix_comp, format);
+	kunlun_plane_frm_comp_set(kcrtc, chn_base, pix_comp, frm_ctrl,
+			yuvup_ctrl, csc_ctrl, format);
 	DU_PIPE_ELEM_SET(kcrtc, chn_base, frm_data, height, src_h);
 	DU_PIPE_ELEM_SET(kcrtc, chn_base, frm_data, width, src_w);
 	DU_PIPE_ELEM_SET(kcrtc, chn_base, frm_data, y_baddr_l, addr_l);
@@ -751,10 +981,13 @@ static void kunlun_plane_atomic_update(struct drm_plane *plane,
 	DU_MLC_LAYER_SET(kcrtc, mlc, i, v_pos, crtc_y);
 	DU_MLC_LAYER_SET(kcrtc, mlc, i, h_size, src_w);
 	DU_MLC_LAYER_SET(kcrtc, mlc, i, v_size, src_h);
+	if (kunlun_format_global_alpha(format)) {
+		DU_MLC_LAYER_SET(kcrtc, mlc, i, g_alpha_en, 1);
+	} else {
+		DU_MLC_LAYER_SET(kcrtc, mlc, i, g_alpha_en, 0);
+	}
 	/*set the 'enable layer' bit*/
 	DU_MLC_LAYER_SET(kcrtc, mlc, i, sf_en, 1);
-
-
 }
 
 static void kunlun_plane_atomic_disable(struct drm_plane *plane,

@@ -50,46 +50,52 @@ enum {
 /*Kunlun DC&DP layer comp swip*/
 enum {
 	SWAP_A_RGB          = 0b0000,
-    SWAP_A_RBG          = 0b0001,
-    SWAP_A_GBR          = 0b0010,
-    SWAP_A_GRB          = 0b0011,
-    SWAP_A_BGR          = 0b0100,
-    SWAP_A_BRG          = 0b0101,
-    SWAP_B_ARG          = 0b1000,
-    SWAP_B_AGR          = 0b1001,
-    SWAP_B_RGA          = 0b1010,
-    SWAP_B_RAG          = 0b1011,
-    SWAP_B_GRA          = 0b1100,
-    SWAP_B_GAR          = 0b1101
+	SWAP_A_RBG          = 0b0001,
+	SWAP_A_GBR          = 0b0010,
+	SWAP_A_GRB          = 0b0011,
+	SWAP_A_BGR          = 0b0100,
+	SWAP_A_BRG          = 0b0101,
+	SWAP_B_ARG          = 0b1000,
+	SWAP_B_AGR          = 0b1001,
+	SWAP_B_RGA          = 0b1010,
+	SWAP_B_RAG          = 0b1011,
+	SWAP_B_GRA          = 0b1100,
+	SWAP_B_GAR          = 0b1101
 };
 
-enum kunlun_data_format {
-	KUNLUN_DATA_YUV420_3P,
-	KUNLUN_DATA_NV12,
-	KUNLUN_DATA_NV21,
-	KUNLUN_DATA_YUV422,
-	KUNLUN_DATA_YUV440,
-	KUNLUN_DATA_YUV444,
-	KUNLUN_DATA_AYUV4444,
-	KUNLUN_DATA_ARGB8888,
-	KUNLUN_DATA_ARGB2101010,
-	KUNLUN_DATA_RGB888,
-	KUNLUN_DATA_RGB666,
-	KUNLUN_DATA_RGB565,
-	KUNLUN_DATA_ARGB1555,
-	KUNLUN_DATA_ARGB4444,
-	KUNLUN_DATA_YONLY1,
-	KUNLUN_DATA_YONLY2,
-	KUNLUN_DATA_YONLY3,
-	KUNLUN_DATA_YONLY4,
-	KUNLUN_DATA_YONLY5,
-	KUNLUN_DATA_YONLY6,
-	KUNLUN_DATA_YONLY7,
-	KUNLUN_DATA_YONLY8,
-	KUNLUN_DATA_YONLY9,
-	KUNLUN_DATA_YONLY10,
-	KUNLUN_DATA_YUV420_10_16PACK,
-	KUNLUN_DATA_MAX
+/*Kunlun DC&DP layer formart uv mode*/
+enum {
+	UV_YUV444_RGB       = 0b00,
+	UV_YUV422           = 0b01,
+	UV_YUV440           = 0b10,
+	UV_YUV420           = 0b11
+};
+
+/*Kunlun DC&DP layer formart memory mode*/
+typedef enum {
+	LINEAR_MODE             = 0b000,
+	RLE_COMPR_MODE          = 0b001,
+	GPU_RAW_TILE_MODE       = 0b010,
+	GPU_CPS_TILE_MODE       = 0b011,
+	VPU_RAW_TILE_MODE       = 0b100,
+	VPU_CPS_TILE_MODE       = 0b101,
+	VPU_RAW_TILE_988_MODE   = 0b110,
+};
+
+/*Kunlun DC&DP layer formart planar mode*/
+typedef enum {
+	FMT_INTERLEAVED     = 0b00,
+	FMT_MONOTONIC       = 0b01,
+	FMT_SEMI_PLANAR     = 0b10,
+	FMT_PLANAR          = 0b11
+};
+
+/*Kunlun DC&DP layer formart rotation mode*/
+typedef enum {
+	ROT_DEFAULT         = 0b000,
+	ROT_ROT             = 0b001,
+	ROT_VFLIP           = 0b010,
+	ROT_HFLIP           = 0b100
 };
 
 struct kunlun_pipe_pix_comp {
