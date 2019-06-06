@@ -118,6 +118,34 @@
 				remote-endpoint = <&parallel_out_timing>;
 			};
 		};
+
+		display-timings {
+			native-mode = <&hd1280x720>;
+
+			svga800x600: vesa_800x600@60 {
+				clock-frequency = <40000000>;
+				hactive = <800>;
+				vactive = <600>;
+				hback-porch = <88>;
+				hfront-porch = <40>;
+				vback-porch = <23>;
+				vfront-porch = <1>;
+				hsync-len = <128>;
+				vsync-len = <4>;
+			};
+
+			hd1280x720: vesa_1280x720@60 {
+				clock-frequency = <74250000>;
+				hactive = <1280>;
+				vactive = <720>;
+				hback-porch = <220>;
+				hfront-porch = <110>;
+				vback-porch = <20>;
+				vfront-porch = <5>;
+				hsync-len = <40>;
+				vsync-len = <5>;
+			};
+		};
 	};
 
 

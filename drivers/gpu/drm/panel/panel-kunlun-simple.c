@@ -19,9 +19,11 @@
 #include <drm/drm_panel.h>
 
 #include <video/of_videomode.h>
+#include <video/of_display_timing.h>
 #include <video/videomode.h>
 
 struct kpanel {
+	struct device *dev;
 	struct drm_panel panel;
 	struct videomode vm;
 };
@@ -76,23 +78,23 @@ static const struct drm_display_mode default_mode = {
 static int kpanel_get_modes(struct drm_panel *panel)
 {
 	struct drm_connector *connector = panel->connector;
+	struct kpanel *ctx = panel_to_kpanel(panel);
 	struct drm_display_mode *mode;
 
-	mode = drm_mode_duplicate(panel->drm, &default_mode);
+	mode = drm_mode_create(connector->dev);
 	if (!mode) {
-		dev_err(panel->drm->dev, "failed to add mode %ux%ux@%u\n",
-			default_mode.hdisplay, default_mode.vdisplay,
-			default_mode.vrefresh);
+		dev_err(ctx->dev, "failed to create a new display mode\n");
 		return -ENOMEM;
 	}
 
-	drm_mode_set_name(mode);
+	drm_display_mode_from_videomode(&ctx->vm, mode);
+	drm_bus_flags_from_videomode(&ctx->vm, &connector->display_info.bus_flags);
 
 	mode->type = DRM_MODE_TYPE_DRIVER | DRM_MODE_TYPE_PREFERRED;
 	drm_mode_probed_add(connector, mode);
 
-	panel->connector->display_info.width_mm = 61;
-	panel->connector->display_info.height_mm = 103;
+	connector->display_info.width_mm = 61;
+	connector->display_info.height_mm = 103;
 
 	return 1;
 }
@@ -106,13 +108,21 @@ static const struct drm_panel_funcs kpanel_drm_funcs = {
 static int kpanel_probe(struct platform_device *pdev)
 {
 	struct kpanel *ctx;
+	struct device *dev = &pdev->dev;
+	struct device_node *np = dev->of_node;
+	int ret;
 
 	ctx = devm_kzalloc(&pdev->dev, sizeof(*ctx), GFP_KERNEL);
 	if (!ctx)
 		return -ENOMEM;
 
+	ret = of_get_videomode(np, &ctx->vm, OF_USE_NATIVE_MODE);
+	if(ret < 0)
+		return ret;
+
 	drm_panel_init(&ctx->panel);
-	ctx->panel.dev = &pdev->dev;
+	ctx->dev = dev;
+	ctx->panel.dev = dev;
 	ctx->panel.funcs = &kpanel_drm_funcs;
 
 	platform_set_drvdata(pdev, ctx);
