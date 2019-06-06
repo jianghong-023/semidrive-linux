@@ -366,37 +366,35 @@ const uint32_t gp_mid_formats[] = {
 static const struct kunlun_pipe_data sp_data = {
 	.formats = sp_formats,
 	.nformats = ARRAY_SIZE(sp_formats),
-	.pipe_type = PIPE_TYPE_DU_SP,
 	.data.sp = &dc_sp,
 };
 
 static const struct kunlun_pipe_data gp_lite_data = {
 	.formats = gp_lite_formats,
 	.nformats = ARRAY_SIZE(gp_lite_formats),
-	.pipe_type = PIPE_TYPE_DC_GP,
 	.data.sp = &dc_gp,
 };
 
 static const struct kunlun_pipe_data gp_big_data = {
 	.formats = gp_big_formats,
 	.nformats = ARRAY_SIZE(gp_big_formats),
-	.pipe_type = PIPE_TYPE_DP_B_GP,
 };
 
 static const struct kunlun_pipe_data gp_mid_data = {
 	.formats = gp_mid_formats,
 	.nformats = ARRAY_SIZE(gp_mid_formats),
-	.pipe_type = PIPE_TYPE_DP_L_GP,
 };
 
 const struct kunlun_plane_data kunlun_dc_planes[] = {
 	{
 		.chn_base = DC_SP_CHN_BASE,
+		.id = DC_SPIPE,
 		.type = DRM_PLANE_TYPE_PRIMARY,
 		.hwpipe = &sp_data,
 	},
 	{
 		.chn_base = DC_GP_CHN_BASE,
+		.id = DC_GPIPE,
 		.type = DRM_PLANE_TYPE_OVERLAY,
 		.hwpipe = &gp_lite_data,
 	}
@@ -405,21 +403,25 @@ const struct kunlun_plane_data kunlun_dc_planes[] = {
 const struct kunlun_plane_data kunlun_dp_planes[] = {
 	{
 		.chn_base = DP_GP0_CHN_BASE,
+		.id = DP_GPIPE0,
 		.type = DRM_PLANE_TYPE_OVERLAY,
 		.hwpipe = &gp_big_data,
 	},
 	{
 		.chn_base = DP_GP1_CHN_BASE,
+		.id = DP_GPIPE1,
 		.type = DRM_PLANE_TYPE_OVERLAY,
 		.hwpipe = &gp_mid_data,
 	},
 	{
 		.chn_base = DP_SP0_CHN_BASE,
+		.id = DP_SPIPE0,
 		.type = DRM_PLANE_TYPE_PRIMARY,
 		.hwpipe = &sp_data,
 	},
 	{
 		.chn_base = DP_SP1_CHN_BASE,
+		.id = DP_SPIPE1,
 		.type = DRM_PLANE_TYPE_OVERLAY,
 		.hwpipe = &sp_data,
 	}
@@ -501,17 +503,43 @@ static int kunlun_plane_frm_comp_set(struct kunlun_crtc *kcrtc,
 	return 0;
 }
 
+int get_du_mlc_sf_index(uint32_t layer_id)
+{
+	uint32_t i;
+	switch (layer_id) {
+		case DC_SPIPE:
+		case DP_GPIPE0:
+			i = 0;
+			break;
+		case DC_GPIPE:
+		case DP_GPIPE1:
+			i = 1;
+			break;
+		case DP_SPIPE0:
+			i = 2;
+			break;
+		case DP_SPIPE1:
+			i = 3;
+			break;
+		default:
+			DRM_ERROR("unsupported layer id [%d]\n", layer_id);
+			return -EINVAL;
+	}
+	return i;
+}
 void kunlun_planes_init(struct kunlun_crtc *kcrtc, struct kunlun_crtc_data *data)
 {
 	int i;
 	uint32_t chn_base;
-	enum kunlun_pipe_type pipetype;
+	int layer_id;
 	const struct kunlun_sp_data *sp_data;
 	const struct kunlun_gp_data *gp_data;
 
 	for(i = 0; i < data->num_planes; i++) {
-		pipetype = data->planes[i].hwpipe->pipe_type;
-		if (pipetype == PIPE_TYPE_DU_SP) {
+		layer_id = data->planes[i].id;
+		if ((layer_id == DC_SPIPE) ||
+			(layer_id == DP_SPIPE0) ||
+			(layer_id == DP_SPIPE1)) {
 			chn_base = data->planes[i].chn_base;
 			sp_data = data->planes[i].hwpipe->data.sp;
 
@@ -521,7 +549,7 @@ void kunlun_planes_init(struct kunlun_crtc *kcrtc, struct kunlun_crtc_data *data
 			DU_PIPE_ELEM_SET(kcrtc, chn_base, sp_data->clut_data->v_data, bypass, 1);
 			DU_PIPE_ELEM_SET(kcrtc, chn_base, sp_data, sdw_trig, 1);
 		}
-		if (pipetype == PIPE_TYPE_DC_GP) {
+		if (layer_id == DC_GPIPE) {
 			chn_base = data->planes[i].chn_base;
 			gp_data = data->planes[i].hwpipe->data.gp;
 
@@ -568,7 +596,7 @@ static int kunlun_plane_atomic_check(struct drm_plane *plane,
 	int min_scale = DRM_PLANE_HELPER_NO_SCALING;
 	int max_scale = DRM_PLANE_HELPER_NO_SCALING;
 
-	if (kpd->hwpipe->pipe_type ==  PIPE_TYPE_DP_B_GP) {
+	if (kpd->id ==  DP_GPIPE0) {
 		min_scale = FRAC_16_16(1, 8);
 		max_scale = FRAC_16_16(8, 1);
 	}
@@ -607,7 +635,7 @@ static void kunlun_plane_atomic_update(struct drm_plane *plane,
 	struct kunlun_plane *klp = to_kunlun_plane(plane);
 //	const struct kunlun_plane_data *kpd = klp->data;
 	uint32_t chn_base = klp->data->chn_base;
-	enum kunlun_pipe_type pipetype = klp->data->hwpipe->pipe_type;
+	uint32_t layer_id = klp->data->id;
 	struct kunlun_crtc *kcrtc = to_kunlun_crtc(state->crtc);
 	struct drm_framebuffer *fb = state->fb;
 	struct drm_rect *src = &state->src;
@@ -619,12 +647,14 @@ static void kunlun_plane_atomic_update(struct drm_plane *plane,
 	uint32_t addr_l, addr_h;
 	uint32_t src_w, src_h;
 	uint32_t off_x, off_y;
+	uint32_t crtc_x, crtc_y;
 	uint32_t nplanes;
 	const struct kunlun_sp_data *sp_data = NULL;
 	const struct kunlun_gp_data *gp_data = NULL;
 	const struct kunlun_pipe_pix_comp *pix_comp;
 	const struct kunlun_pipe_frm_data *frm_data;
-
+	const struct kunlun_mlc_data *mlc = kcrtc->data->mlc;
+	int i;
 	/*
 	 * can't update plane when du is disabled.
 	 */
@@ -642,6 +672,9 @@ static void kunlun_plane_atomic_update(struct drm_plane *plane,
 	src_w = (drm_rect_width(src) >> 16) - 1;
 	src_h = (drm_rect_height(src) >> 16) - 1;
 
+	crtc_x = state->crtc_x;
+	crtc_y = state->crtc_y;
+
 	obj = drm_gem_fb_get_obj(fb, 0);
 	gem_obj = to_kunlun_obj(obj);
 
@@ -653,7 +686,9 @@ static void kunlun_plane_atomic_update(struct drm_plane *plane,
 	format = to_kunlun_format(fb->format->format);
 	nplanes = fb->format->num_planes;
 
-	if (pipetype == PIPE_TYPE_DU_SP) {
+	if ((layer_id == DC_SPIPE) ||
+		(layer_id == DP_SPIPE0) ||
+		(layer_id == DP_SPIPE1)) {
 		sp_data = klp->data->hwpipe->data.sp;
 		pix_comp = sp_data->pix_comp;
 		frm_data = sp_data->frm_info;
@@ -699,11 +734,27 @@ static void kunlun_plane_atomic_update(struct drm_plane *plane,
 		DU_PIPE_ELEM_SET(kcrtc, chn_base, frm_data, v_baddr_h, addr_h);
 		DU_PIPE_ELEM_SET(kcrtc, chn_base, frm_data, v_stride, pitch);
 	}
-	if (pipetype == PIPE_TYPE_DU_SP) {
+
+	if ((layer_id == DC_SPIPE) ||
+		(layer_id == DP_SPIPE0) ||
+		(layer_id == DP_SPIPE1)) {
 		DU_PIPE_ELEM_SET(kcrtc, chn_base, sp_data, sdw_trig, 1);
 	} else {
 		DU_PIPE_ELEM_SET(kcrtc, chn_base, gp_data, sdw_trig, 1);
 	}
+
+	i = get_du_mlc_sf_index(layer_id);
+	if (i < 0)
+		return;
+
+	DU_MLC_LAYER_SET(kcrtc, mlc, i, h_pos, crtc_x);
+	DU_MLC_LAYER_SET(kcrtc, mlc, i, v_pos, crtc_y);
+	DU_MLC_LAYER_SET(kcrtc, mlc, i, h_size, src_w);
+	DU_MLC_LAYER_SET(kcrtc, mlc, i, v_size, src_h);
+	/*set the 'enable layer' bit*/
+	DU_MLC_LAYER_SET(kcrtc, mlc, i, sf_en, 1);
+
+
 }
 
 static void kunlun_plane_atomic_disable(struct drm_plane *plane,
@@ -711,21 +762,31 @@ static void kunlun_plane_atomic_disable(struct drm_plane *plane,
 {
 	struct kunlun_plane *klp = to_kunlun_plane(plane);
 	struct kunlun_crtc *kcrtc = to_kunlun_crtc(old_state->crtc);
+	const struct kunlun_mlc_data *mlc = kcrtc->data->mlc;
 	const struct kunlun_sp_data *sp_data;
 	const struct kunlun_gp_data *gp_data;
 	uint32_t chn_base = klp->data->chn_base;
-	enum kunlun_pipe_type pipetype = klp->data->hwpipe->pipe_type;
+	int layer_id = klp->data->id;
+	int i;
 
 	if (!old_state->crtc)
 		return;
 
-	if (pipetype == PIPE_TYPE_DU_SP) {
+	if ((layer_id == DC_SPIPE) ||
+		(layer_id == DP_SPIPE0) ||
+		(layer_id == DP_SPIPE1)) {
 		sp_data = klp->data->hwpipe->data.sp;
 		DU_PIPE_ELEM_SET(kcrtc, chn_base, sp_data, sdw_trig, 1);
 	} else {
 		gp_data = klp->data->hwpipe->data.gp;
 		DU_PIPE_ELEM_SET(kcrtc, chn_base, gp_data, sdw_trig, 1);
 	}
+
+	i = get_du_mlc_sf_index(layer_id);
+	if (i < 0)
+		return;
+	/*clear the 'enable layer' bit*/
+	DU_MLC_LAYER_SET(kcrtc, mlc, i, sf_en, 0);
 }
 
 static void kunlun_plane_destroy(struct drm_plane *plane)

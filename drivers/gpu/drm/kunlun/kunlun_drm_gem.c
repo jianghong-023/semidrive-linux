@@ -12,6 +12,7 @@
 #include <drm/drm_gem.h>
 #include <drm/drm_vma_manager.h>
 #include <linux/iommu.h>
+#include <linux/dma-buf.h>
 
 #include "kunlun_drm_drv.h"
 #include "kunlun_drm_gem.h"
@@ -157,7 +158,9 @@ err_kunlun_put_pages:
 static void kunlun_gem_free_iommu(struct kunlun_gem_object *kg_obj)
 {
 	kunlun_gem_iommu_unmap(kg_obj);
-	kunlun_gem_put_pages(kg_obj);
+
+	if(kg_obj->pages)
+		kunlun_gem_put_pages(kg_obj);
 }
 
 static int kunlun_gem_alloc_dma(struct kunlun_gem_object *kg_obj)
@@ -167,6 +170,7 @@ static int kunlun_gem_alloc_dma(struct kunlun_gem_object *kg_obj)
 
 	kg_obj->vaddr = dma_alloc_wc(drm->dev, gem_obj->size,
 			&kg_obj->paddr, GFP_KERNEL | __GFP_NOWARN);
+	pr_info("##%s, %d, size: %d, addr: %p\n", __func__, __LINE__, gem_obj->size, kg_obj->vaddr);
 	if(!kg_obj->vaddr) {
 		DRM_DEV_ERROR(drm->dev, "failed to allocate buffer of size %zu\n",
 				gem_obj->size);
@@ -186,7 +190,11 @@ static void kunlun_gem_free_dma(struct kunlun_gem_object *kg_obj)
 
 static void kunlun_gem_free_buf(struct kunlun_gem_object *kg_obj)
 {
-	if(kg_obj->pages)
+	struct drm_gem_object *gem_obj = &kg_obj->base;
+	struct drm_device *drm = gem_obj->dev;
+	struct kunlun_drm_data *kdrm = drm->dev_private;
+
+	if(kdrm->iommu_enable)
 		kunlun_gem_free_iommu(kg_obj);
 	else
 		kunlun_gem_free_dma(kg_obj);
@@ -322,6 +330,46 @@ err_free:
 	return NULL;
 }
 
+struct drm_gem_object *kunlun_gem_prime_import_sg_table(struct drm_device *drm,
+		struct dma_buf_attachment *attach, struct sg_table *sgt)
+{
+	struct kunlun_drm_data *kdrm = drm->dev_private;
+	size_t size = attach->dmabuf->size;
+	struct kunlun_gem_object *kg_obj;
+	struct drm_gem_object *gem_obj;
+	int ret;
+
+	kg_obj = kzalloc(sizeof(*kg_obj), GFP_KERNEL);
+	if(!kg_obj)
+		return ERR_PTR(-ENOMEM);
+
+	gem_obj = &kg_obj->base;
+
+	ret = drm_gem_object_init(drm, gem_obj, size);
+	if(ret)
+		goto err_free;
+
+	kg_obj->sgt = sgt;
+
+	if(kdrm->iommu_enable) {
+		ret = kunlun_gem_iommu_map(kg_obj);
+		if(ret)
+			goto err_free;
+		return gem_obj;
+	}
+
+	if(sgt->nents != 1) {
+		ret = -EINVAL;
+		goto err_free;
+	}
+
+	kg_obj->paddr = sg_dma_address(sgt->sgl);
+	return gem_obj;
+
+err_free:
+	kfree(kg_obj);
+	return ERR_PTR(ret);
+}
 
 void kunlun_gem_prime_vunmap(struct drm_gem_object *obj, void *addr)
 {
@@ -366,7 +414,7 @@ void *kunlun_gem_prime_vmap(struct drm_gem_object *obj)
 
 err_vmap_count:
 	kg_obj->vmap_count--;
-	return PTR_ERR(ret);
+	return ERR_PTR(ret);
 }
 
 static int kunlun_drm_gem_mmap_iommu_obj(struct kunlun_gem_object *kg_obj,

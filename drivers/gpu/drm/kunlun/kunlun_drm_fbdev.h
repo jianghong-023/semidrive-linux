@@ -15,12 +15,12 @@
 int kunlun_drm_fbdev_init(struct drm_device *drm);
 void kunlun_drm_fbdev_fini(struct drm_device *drm);
 #else
-int kunlun_drm_fbdev_init(struct drm_device *drm)
+static inline int kunlun_drm_fbdev_init(struct drm_device *drm)
 {
 	return 0;
 }
 
-void kunlun_drm_fbdev_fini(struct drm_device *drm)
+static inline void kunlun_drm_fbdev_fini(struct drm_device *drm)
 {
 
 }

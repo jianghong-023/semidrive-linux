@@ -23,6 +23,7 @@ struct kunlun_du_reg {
 
 #define DC_INT_MSK                       0x20
 #define DC_INT_ST                        0x24
+#define DC_SAFE_INT_MSK                  0x120
 #define DC_INT_MASK                      0xFFFFFFF
 
 #define RDMA_SHIFT                       0UL

@@ -54,11 +54,10 @@ static void kunlun_crtc_atomic_flush(struct drm_crtc *crtc,
 	spin_unlock_irq(&crtc->dev->event_lock);
 
 	old_state = to_kunlun_crtc_state(old_crtc_state);
-//	if(state->plane_mask != old_state->plane_mask) {
-		ret = kunlun_mlc_update_plane(kcrtc, state->plane_mask);
-		if(ret)
-			return;
-//	}
+	state->plane_mask = crtc->state->plane_mask;
+	ret = kunlun_mlc_update_plane(kcrtc, state->plane_mask);
+	if(ret)
+		return;
 
 	ret = kunlun_mlc_update_trig(kcrtc);
 	if(ret)
@@ -342,6 +341,9 @@ int kunlun_crtc_get_resource(struct kunlun_crtc *kcrtc)
 		return -ENOENT;
 	}
 	kcrtc->base.port = port;
+
+	DRM_DEV_INFO(dev, "Base: 0x%p, IRQ: %d, vblank_enable: %x\n",
+			kcrtc->regs, kcrtc->irq, kcrtc->vblank_enable);
 
 	return 0;
 }

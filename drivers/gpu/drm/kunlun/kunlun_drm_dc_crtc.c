@@ -25,6 +25,7 @@ extern const struct kunlun_plane_data kunlun_dc_planes[];
 static const struct kunlun_irq_data dc_irq = {
 	.int_mask = DU_REG(DC_INT_MSK, DC_INT_MASK, 0),
 	.int_stat = DU_REG(DC_INT_ST, DC_INT_MASK, 0),
+	.safe_int_mask = DU_REG(DC_SAFE_INT_MSK, DC_INT_MASK, 0),
 	.rdma_int_mask = DU_REG(RDMA_INT_MSK, RDMA_INT_MASK, 0),
 	.rdma_int_stat = DU_REG(RDMA_INT_ST, RDMA_INT_MASK, 0),
 	.mlc_int_mask = DU_REG(MLC_INT_MSK, MLC_INT_MSK_MASK, 0),
@@ -256,13 +257,6 @@ int kunlun_mlc_update_plane(struct kunlun_crtc *kcrtc, unsigned int mask)
 
 	if(!mask)
 		return -EINVAL;
-	
-	for(i = 0; i < mlc->num_layer; i++) {
-		if(mask & (1 << i))
-			DU_MLC_LAYER_SET(kcrtc, mlc, i, sf_en, 1);
-		else
-			DU_MLC_LAYER_SET(kcrtc, mlc, i, sf_en, 0);
-	}
 
 	for (i = 0; i < mlc->num_path; i++) {
 		if (mask & (1 << i)) {
@@ -302,9 +296,20 @@ void kunlun_irq_init(struct kunlun_crtc *kcrtc,
 		const struct kunlun_irq_data *irq_data)
 {
 	DU_IRQ_CLR(kcrtc, irq_data, int_mask, 0xFFFFFFF); 
+	DU_IRQ_CLR(kcrtc, irq_data, safe_int_mask, 0xFFFFFFF); 
 	DU_IRQ_CLR(kcrtc, irq_data, rdma_int_mask, 0x7F); 
 	DU_IRQ_CLR(kcrtc, irq_data, mlc_int_mask, 0x1FFF); 
 	DU_IRQ_CLR(kcrtc, irq_data, crc32_int_mask, 0xFFFF); 
+}
+
+void kunlun_tcon_init(struct kunlun_crtc *kcrtc,
+		const struct kunlun_tcon_data *tcon_data)
+{
+	const struct kunlun_tcon_csc *csc = tcon_data->csc;
+	const struct kunlun_tcon_gamma *gamma = tcon_data->gamma;
+
+	DU_REG_SET(kcrtc, csc, bypass, 1);
+	DU_REG_SET(kcrtc, gamma, bypass, 1);
 }
 
 void kunlun_rdma_init(struct kunlun_crtc *kcrtc,
@@ -369,7 +374,7 @@ int kunlun_tcon_set_timings(struct kunlun_crtc *kcrtc,
 	DU_TIMING_REG_SET(kcrtc, tcon, hact, mode->hdisplay);
 	DU_TIMING_REG_SET(kcrtc, tcon, htot, mode->htotal);
 
-	tmp = mode->htotal - mode->hsync_end;
+	tmp = mode->htotal - mode->hsync_start;
 	DU_TIMING_REG_SET(kcrtc, tcon, hbp, tmp);
 	tmp = mode->hsync_end - mode->hsync_start;
 	DU_TIMING_REG_SET(kcrtc, tcon, hsync, tmp);
@@ -377,7 +382,7 @@ int kunlun_tcon_set_timings(struct kunlun_crtc *kcrtc,
 	DU_TIMING_REG_SET(kcrtc, tcon, vact, mode->vdisplay);
 	DU_TIMING_REG_SET(kcrtc, tcon, vtot, mode->vtotal);
 
-	tmp = mode->vtotal - mode->vsync_end;
+	tmp = mode->vtotal - mode->vsync_start;
 	DU_TIMING_REG_SET(kcrtc, tcon, vbp, tmp);
 	tmp = mode->vsync_end - mode->vsync_start;
 	DU_TIMING_REG_SET(kcrtc, tcon, vsync, tmp);
@@ -459,6 +464,8 @@ static int kunlun_dc_crtc_init(struct kunlun_crtc *dc)
 	kunlun_irq_init(dc, dc_data->irq);
 
 	kunlun_rdma_init(dc, dc_data->rdma);
+
+	kunlun_tcon_init(dc, dc_data->tcon);
 
 	kunlun_mlc_init(dc, dc_data->mlc);
 

@@ -37,12 +37,30 @@ static const uint32_t csc_param[4][15] = {
 	}
 };
 
-enum kunlun_pipe_type {
-	PIPE_TYPE_DU_SP,
-	PIPE_TYPE_DC_GP,
-	PIPE_TYPE_DP_B_GP,
-	PIPE_TYPE_DP_L_GP,
-	PIPE_TYPE_MAX
+/*Kunlun DC&DP layer IDs*/
+enum {
+	DC_SPIPE = BIT(0),
+	DC_GPIPE = BIT(1),
+	DP_GPIPE0 = BIT(2),
+	DP_GPIPE1 = BIT(3),
+	DP_SPIPE0 = BIT(4),
+	DP_SPIPE1 = BIT(5),
+};
+
+/*Kunlun DC&DP layer comp swip*/
+enum {
+	SWAP_A_RGB          = 0b0000,
+    SWAP_A_RBG          = 0b0001,
+    SWAP_A_GBR          = 0b0010,
+    SWAP_A_GRB          = 0b0011,
+    SWAP_A_BGR          = 0b0100,
+    SWAP_A_BRG          = 0b0101,
+    SWAP_B_ARG          = 0b1000,
+    SWAP_B_AGR          = 0b1001,
+    SWAP_B_RGA          = 0b1010,
+    SWAP_B_RAG          = 0b1011,
+    SWAP_B_GRA          = 0b1100,
+    SWAP_B_GAR          = 0b1101
 };
 
 enum kunlun_data_format {
@@ -299,7 +317,6 @@ struct kunlun_sp_data {
 struct kunlun_pipe_data {
 	const uint32_t *formats;
 	uint32_t nformats;
-	enum kunlun_pipe_type pipe_type;
 	union {
 		struct kunlun_sp_data *sp;
 		struct kunlun_gp_data *gp;
@@ -308,6 +325,7 @@ struct kunlun_pipe_data {
 
 struct kunlun_plane_data {
 	uint32_t chn_base;
+	uint32_t id; /*layer ID*/
 	enum drm_plane_type type;
 	const struct kunlun_pipe_data *hwpipe;
 };

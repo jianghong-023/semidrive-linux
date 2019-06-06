@@ -63,6 +63,7 @@ static inline void kunlun_reg_set(void __iomem *base,
 struct kunlun_irq_data {
 	struct kunlun_du_reg int_mask;
 	struct kunlun_du_reg int_stat;
+	struct kunlun_du_reg safe_int_mask;
 	struct kunlun_du_reg rdma_int_mask;
 	struct kunlun_du_reg rdma_int_stat;
 	struct kunlun_du_reg mlc_int_mask;
