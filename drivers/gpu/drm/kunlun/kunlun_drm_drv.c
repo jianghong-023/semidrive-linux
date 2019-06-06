@@ -293,29 +293,39 @@ static int add_components_dsd(struct device *master, struct device_node *np,
 static int add_display_components(struct device *dev,
 		struct component_match **matchptr)
 {
-	struct device_node *port;
-	int ret, i;
+	struct device_node *np;
+	const struct kunlun_drm_device_info *kdd_info;
+	int ret;
 
-	for(i =0; ;i++) {
-		port = of_parse_phandle(dev->of_node, "ports", i);
-		if(!port)
-			break;
+	kdd_info = of_device_get_match_data(dev);
+	if(!kdd_info || !kdd_info->match)
+		return -ENODEV;
 
-		if(!of_device_is_available(port->parent)) {
-				of_node_put(port);
-				continue;
-		}
-
-		drm_of_component_match_add(dev, matchptr, compare_of, port->parent);
-		DRM_DEV_DEBUG(dev, "Add component %s", port->parent->name);
-
-		ret = add_components_dsd(dev, port->parent, matchptr);
-		if(ret) {
-			break;
-		}
-		of_node_put(port);
+	ret = of_platform_populate(dev->of_node, NULL, NULL, dev);
+	if(ret) {
+		DRM_DEV_ERROR(dev, "failed to populate dp/dc devices\n");
+		return ret;
 	}
 
+	for_each_child_of_node(dev->of_node, np) {
+		if(!kdd_info->match(np)) {
+			DRM_DEV_INFO(dev, "OF node %s not match\n", np->name);
+			continue;
+		}
+
+		drm_of_component_match_add(dev, matchptr, compare_of, np);
+		DRM_DEV_INFO(dev, "Add component %s", np->name);
+
+		ret = add_components_dsd(dev, np, matchptr);
+		if(ret) {
+			goto err_depopulate;
+		}
+	}
+
+	return ret;
+
+err_depopulate:
+	of_platform_depopulate(dev);
 	return ret;
 }
 
@@ -347,14 +357,14 @@ static int kunlun_drm_remove(struct platform_device *pdev)
 	return 0;
 }
 
-static int compare_name_dp(struct device *dev, void *data)
+static int compare_name_dp(struct device_node *np)
 {
-	return strstr(dev_name(dev), "dp") != NULL;
+	return strstr(np->name, "dp") != NULL;
 }
 
-static int compare_name_dc(struct device *dev, void *data)
+static int compare_name_dc(struct device_node *np)
 {
-	return strstr(dev_name(dev), "dc") != NULL;
+	return strstr(np->name, "dc") != NULL;
 }
 
 static const struct kunlun_drm_device_info kunlun_dps_info = {

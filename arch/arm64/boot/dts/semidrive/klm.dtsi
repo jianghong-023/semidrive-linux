@@ -64,23 +64,26 @@
 		cpu_suspend	= <0xc4000001>;
 	};
 
-	dc0: dc@30440000 {
-		compatible = "semidrive,kunlun-dc";
-		reg = <0x0 0x30440000 0 0x10000>;
-		interrupts = <0 33 4>;
-		status = "okay";
-			
-		dc0_out: port {
-			dc0_out_parallel: endpoint@0 {
-				remote-endpoint = <&parallel_in_dc0>;
-			};
-		};
-	};
 
 	display@0 {
+		#address-cells = <2>;
+		#size-cells = <2>;
 		compatible = "semdrive,dc-subsystem";
-		ports = <&dc0_out>;
+		ranges;
 		status = "okay";
+
+		dc0: dc@30440000 {
+			compatible = "semidrive,kunlun-dc";
+			reg = <0x0 0x30440000 0 0x10000>;
+			interrupts = <0 33 4>;
+			status = "okay";
+			
+			dc0_out: port {
+				dc0_out_parallel: endpoint@0 {
+					remote-endpoint = <&parallel_in_dc0>;
+				};
+			};
+		};
 	};
 
 	parallel: parallel@0 {

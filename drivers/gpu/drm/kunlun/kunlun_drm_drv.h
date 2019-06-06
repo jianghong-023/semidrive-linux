@@ -27,7 +27,7 @@ enum kunlun_drm_type {
 
 struct kunlun_drm_device_info {
 	enum kunlun_drm_type type;
-	int (*match)(struct device *dev, void *data);
+	int (*match)(struct device_node *np);
 };
 
 struct kunlun_drm_data {

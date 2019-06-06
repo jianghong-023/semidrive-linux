@@ -170,19 +170,6 @@ static uint32_t kunlun_drm_find_possible_crtcs(struct drm_device *dev,
 		remote = of_graph_get_remote_port(ep);
 		if(!remote) {
 			of_node_put(ep);
-			continue;
-		}
-
-		possible_crtcs |= drm_crtc_port_mask(dev, remote);
-
-		of_node_put(remote);
-	}
-
-/*
-	for_each_endpoint_of_node(port, ep) {
-		remote = of_graph_get_remote_port(ep);
-		if(!remote) {
-			of_node_put(ep);
 			return 0;
 		}
 		parent = of_get_next_parent(remote);
@@ -193,7 +180,7 @@ static uint32_t kunlun_drm_find_possible_crtcs(struct drm_device *dev,
 		of_node_put(parent);
 		of_node_put(remote);
 	}
-*/
+
 	return possible_crtcs;
 }
 
