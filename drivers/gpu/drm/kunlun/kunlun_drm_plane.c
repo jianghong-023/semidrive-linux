@@ -30,13 +30,13 @@ static const struct kunlun_pipe_pix_comp gp_pix_comp = {
 	.bpv = DU_REG(GP_PIX_COMP, BPV_MASK, BPV_SHIFT),
 	.bpu = DU_REG(GP_PIX_COMP, BPU_MASK, BPU_SHIFT),
 	.bpy = DU_REG(GP_PIX_COMP, BPY_MASK, BPY_SHIFT),
-	.bpa = DU_REG(GP_PIX_COMP, BPY_MASK, BPY_SHIFT),
+	.bpa = DU_REG(GP_PIX_COMP, BPA_MASK, BPA_SHIFT),
 };
 static const struct kunlun_pipe_pix_comp sp_pix_comp = {
 	.bpv = DU_REG(SP_PIX_COMP, BPV_MASK, BPV_SHIFT),
 	.bpu = DU_REG(SP_PIX_COMP, BPU_MASK, BPU_SHIFT),
 	.bpy = DU_REG(SP_PIX_COMP, BPY_MASK, BPY_SHIFT),
-	.bpa = DU_REG(SP_PIX_COMP, BPY_MASK, BPY_SHIFT),
+	.bpa = DU_REG(SP_PIX_COMP, BPA_MASK, BPA_SHIFT),
 };
 static const struct kunlun_pipe_frm_ctrl gp_frm_ctrl = {
 	.endia_ctrl = DU_REG(GP_FRM_CTRL, ENDIAN_CTRL_MASK, ENDIAN_CTRL_SHIFT),
