@@ -385,7 +385,7 @@ static inline uint32_t kunlun_reg_get(void __iomem *base,
 
 
 extern void kunlun_planes_init(struct kunlun_crtc *kcrtc,
-		struct kunlun_crtc_data *data);
+		const struct kunlun_crtc_data *data);
 extern void kunlun_planes_fini(struct kunlun_crtc *kcrtc);
 extern void kunlun_crtc_planes_fini(struct kunlun_crtc *kcrtc);
 extern int kunlun_drm_crtc_probe(struct platform_device *pdev);

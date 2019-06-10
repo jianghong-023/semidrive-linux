@@ -750,7 +750,8 @@ static int get_du_mlc_sf_index(uint32_t layer_id)
 	}
 	return i;
 }
-void kunlun_planes_init(struct kunlun_crtc *kcrtc, struct kunlun_crtc_data *data)
+void kunlun_planes_init(struct kunlun_crtc *kcrtc,
+		const struct kunlun_crtc_data *data)
 {
 	int i;
 	uint32_t chn_base;
@@ -877,7 +878,7 @@ static void kunlun_plane_atomic_update(struct drm_plane *plane,
 	const struct kunlun_pipe_pix_comp *pix_comp;
 	const struct kunlun_pipe_frm_ctrl *frm_ctrl;
 	const struct kunlun_pipe_frm_data *frm_data;
-	const struct kunlun_gp_yuvup_ctrl *yuvup_ctrl;
+	const struct kunlun_gp_yuvup_ctrl *yuvup_ctrl = NULL;
 	const struct kunlun_csc_ctrl *csc_ctrl = NULL;
 	const struct kunlun_mlc_data *mlc = kcrtc->data->mlc;
 	int i;

@@ -72,7 +72,7 @@ enum {
 };
 
 /*Kunlun DC&DP layer formart memory mode*/
-typedef enum {
+enum {
 	LINEAR_MODE             = 0b000,
 	RLE_COMPR_MODE          = 0b001,
 	GPU_RAW_TILE_MODE       = 0b010,
@@ -83,7 +83,7 @@ typedef enum {
 };
 
 /*Kunlun DC&DP layer formart planar mode*/
-typedef enum {
+enum {
 	FMT_INTERLEAVED     = 0b00,
 	FMT_MONOTONIC       = 0b01,
 	FMT_SEMI_PLANAR     = 0b10,
@@ -91,7 +91,7 @@ typedef enum {
 };
 
 /*Kunlun DC&DP layer formart rotation mode*/
-typedef enum {
+enum {
 	ROT_DEFAULT         = 0b000,
 	ROT_ROT             = 0b001,
 	ROT_VFLIP           = 0b010,
@@ -324,8 +324,8 @@ struct kunlun_pipe_data {
 	const uint32_t *formats;
 	uint32_t nformats;
 	union {
-		struct kunlun_sp_data *sp;
-		struct kunlun_gp_data *gp;
+		const struct kunlun_sp_data *sp;
+		const struct kunlun_gp_data *gp;
 	} data;
 };
 

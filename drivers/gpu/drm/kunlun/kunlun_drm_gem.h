@@ -40,6 +40,8 @@ void kunlun_gem_free_object(struct drm_gem_object *obj);
 int kunlun_gem_dumb_create(struct drm_file *file_priv,
 		struct drm_device *drm, struct drm_mode_create_dumb *args);
 struct sg_table *kunlun_gem_prime_get_sg_table(struct drm_gem_object *obj);
+struct drm_gem_object *kunlun_gem_prime_import_sg_table(struct drm_device *drm,
+		struct dma_buf_attachment *attach, struct sg_table *sgt);
 void kunlun_gem_prime_vunmap(struct drm_gem_object *obj, void *addr);
 void *kunlun_gem_prime_vmap(struct drm_gem_object *obj);
 int kunlun_gem_prime_mmap(struct drm_gem_object *obj,

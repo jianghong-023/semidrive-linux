@@ -87,6 +87,7 @@ static struct drm_driver kunlun_drm_driver = {
 	.gem_prime_import			= drm_gem_prime_import,
 	.gem_prime_export			= drm_gem_prime_export,
 	.gem_prime_get_sg_table		= kunlun_gem_prime_get_sg_table,
+	.gem_prime_import_sg_table	= kunlun_gem_prime_import_sg_table,
 	.gem_prime_vmap				= kunlun_gem_prime_vmap,
 	.gem_prime_vunmap			= kunlun_gem_prime_vunmap,
 	.gem_prime_mmap				= kunlun_gem_prime_mmap,
@@ -338,7 +339,7 @@ static int kunlun_drm_probe(struct platform_device *pdev)
 	if(ret)
 		return ret;
 
-	ret = dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(32));
+	ret = dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(40));
 	if(ret)
 		return ret;
 

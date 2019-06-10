@@ -170,7 +170,6 @@ static int kunlun_gem_alloc_dma(struct kunlun_gem_object *kg_obj)
 
 	kg_obj->vaddr = dma_alloc_wc(drm->dev, gem_obj->size,
 			&kg_obj->paddr, GFP_KERNEL | __GFP_NOWARN);
-	pr_info("##%s, %d, size: %d, addr: %p\n", __func__, __LINE__, gem_obj->size, kg_obj->vaddr);
 	if(!kg_obj->vaddr) {
 		DRM_DEV_ERROR(drm->dev, "failed to allocate buffer of size %zu\n",
 				gem_obj->size);

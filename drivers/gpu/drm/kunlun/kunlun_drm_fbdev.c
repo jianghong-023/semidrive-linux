@@ -46,7 +46,6 @@ static int kunlun_drm_fbdev_create(struct drm_fb_helper *helper,
 {
 	struct drm_device *drm = helper->dev;
 	struct kunlun_drm_data *kdrm = drm->dev_private;
-	struct drm_mode_fb_cmd2 cmd = { 0 };
 	struct kunlun_gem_object *kg_obj;
 	unsigned int bytes_per_pixel, pitches;
 	struct drm_framebuffer *fb;
