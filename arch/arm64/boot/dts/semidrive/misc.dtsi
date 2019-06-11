@@ -60,12 +60,13 @@
                         clock-frequency = <800000000>;
                         status = "okay";
                 };
+				/*
 				display@30440000 {
 					compatible = "semidrive,sd-disp";
 					reg = <0x0 0x30440000 0x0 0x20000>;
 					interrupts = <0 65 4>;
 					status = "okay";
-				};
+				};*/
 
 	};
 };
