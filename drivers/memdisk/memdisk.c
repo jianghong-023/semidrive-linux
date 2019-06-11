@@ -24,7 +24,7 @@ module_param(hardsect_size, int, 0);
  */
 #define KERNEL_SECTOR_SIZE 512
 #define MEMDISK_MINORS	16
-#define MEMDISKS_COUNT 3
+#define MEMDISKS_COUNT 4
 /*
  * The internal representation of our device.
  */
@@ -38,13 +38,16 @@ struct memdisk_dev {
 
 /* default addr & size if not found in dts */
 #define MEMDISK_SYSTEM_PHYS    0x80000000
-#define MEMDISK_SYSTEM_SIZE    0x70000000  // 1.8G
+#define MEMDISK_SYSTEM_SIZE    0x48000000  // 1.1G
 
-#define MEMDISK_USERDATA_PHYS  0xf0000000  // haps backdoor only 32bit
-#define MEMDISK_USERDATA_SIZE  0x10000000  // 256M
+#define MEMDISK_USERDATA_PHYS  0xc9000000  // haps backdoor only 32bit
+#define MEMDISK_USERDATA_SIZE  0x20000000  // 512M
 
-#define MEMDISK_VENDOR_PHYS    0x100000000  // haps issue
-#define MEMDISK_VENDOR_SIZE    0x010000000  // 256M
+#define MEMDISK_VENDOR_PHYS    0xea000000  //
+#define MEMDISK_VENDOR_SIZE    0x07000000  // 128M
+
+#define MEMDISK_CACHE_PHYS     0xf2000000  // use this partition as xfer space
+#define MEMDISK_CACHE_SIZE     0x04000000  // 64M
 
 static struct memdisk_dev memdisks[] = {
 	[0] = {
@@ -59,6 +62,10 @@ static struct memdisk_dev memdisks[] = {
 		.data    = MEMDISK_VENDOR_PHYS,
 		.size    = MEMDISK_VENDOR_SIZE,
 	},
+	[3] = {
+		.data    = MEMDISK_CACHE_PHYS,
+		.size    = MEMDISK_CACHE_SIZE,
+        },
 };
 
 /*
