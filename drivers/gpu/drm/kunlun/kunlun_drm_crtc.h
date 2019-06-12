@@ -16,49 +16,60 @@
 static inline void kunlun_reg_set(void __iomem *base,
 		uint32_t offset, uint32_t mask, uint32_t shift, uint32_t val);
 
-#define DU_REG_SET(crtc, du, name, val) kunlun_reg_set(crtc->regs, \
+#define DU_REG_SET(base, du, name, val) kunlun_reg_set(base, \
 		du->name.offset, du->name.mask, du->name.shift, val)
 
-#define DC_CTRL_SET(crtc, du, name, val) kunlun_reg_set(crtc->regs, \
+#define DC_CTRL_SET(base, du, name, val) kunlun_reg_set(base, \
 		du->u.dc.name.offset, du->u.dc.name.mask, du->u.dc.name.shift, val)
-#define DP_CTRL_SET(crtc, du, name, val) kunlun_reg_set(crtc->regs, \
+#define DP_CTRL_SET(base, du, name, val) kunlun_reg_set(base, \
 		du->u.dp.name.offset, du->u.dp.name.mask, du->u.dp.name.shift, val)
 
-#define DU_RDMA_CHAN_SET(crtc, rdma, i, name, val) kunlun_reg_set(crtc->regs, \
+#define DU_RDMA_CHAN_SET(base, rdma, i, name, val) kunlun_reg_set(base, \
 		rdma->chan->name.offset + (i) * RDMA_CHN_JMP, \
 		rdma->chan->name.mask, rdma->chan->name.shift, val);
 
-#define DU_TIMING_REG_SET(crtc, du, name, val) kunlun_reg_set(crtc->regs, \
+#define DU_TIMING_REG_SET(base, du, name, val) kunlun_reg_set(base, \
 		du->name.offset, du->name.mask, du->name.shift, val - 1)
 
-#define DU_TCON_KLAYER_REG_SET(crtc, tcon, i, name, val) \
-	kunlun_reg_set(crtc->regs, \
+#define DU_TCON_KLAYER_REG_SET(base, tcon, i, name, val) \
+	kunlun_reg_set(base, \
 			tcon->klayer->name.offset + (i) * KICK_LAYER_JMP, \
 			tcon->klayer->name.mask, tcon->klayer->name.shift, val)
 
-#define DU_MLC_LAYER_SET(crtc, mlc, i, name, val) kunlun_reg_set(crtc->regs, \
+#define DU_MLC_LAYER_SET(base, mlc, i, name, val) kunlun_reg_set(base, \
 		mlc->layer->name.offset + (i) * MLC_LAYER_JMP, \
 		mlc->layer->name.mask, mlc->layer->name.shift, val)
 
-#define DU_MLC_TIMING_SET(crtc, mlc, i, name, val) kunlun_reg_set(crtc->regs, \
+#define DU_MLC_TIMING_SET(base, mlc, i, name, val) kunlun_reg_set(base, \
 		mlc->layer->name.offset + (i) * MLC_LAYER_JMP, \
 		mlc->layer->name.mask, mlc->layer->name.shift, val - 1)
 
-#define DU_MLC_PATH_SET(crtc, mlc, i, name, val) kunlun_reg_set(crtc->regs, \
+#define DU_MLC_PATH_SET(base, mlc, i, name, val) kunlun_reg_set(base, \
 		mlc->path->name.offset + (i) * MLC_PATH_JMP, \
 		mlc->path->name.mask, mlc->path->name.shift, val)
 
-#define DU_IRQ_SET(crtc, reg, name, i, val) kunlun_reg_set(crtc->regs, \
+#define DU_IRQ_SET(base, reg, name, i, val) kunlun_reg_set(base, \
 			reg->name.offset, 1 << (i), (i), val)
 
-#define DU_REG_GET(crtc, du, name) kunlun_reg_get(crtc->regs, \
+#define DU_REG_GET(base, du, name) kunlun_reg_get(base, \
 			du->name.offset, du->name.mask, du->name.shift)
 
-#define DU_IRQ_GET(crtc, reg, name) kunlun_reg_get(crtc->regs, \
+#define DU_IRQ_GET(base, reg, name) kunlun_reg_get(base, \
 		reg->name.offset, 0xFFFFFFFF, 0)
 
-#define DU_IRQ_CLR(crtc, reg, name, val) kunlun_reg_writel(crtc->regs, \
+#define DU_IRQ_CLR(base, reg, name, val) kunlun_reg_writel(base, \
 		reg->name.offset, val)
+
+enum {
+	CRTC_DC,
+	CRTC_DP0,
+	CRTC_DP1
+};
+
+enum {
+	PLANE_DISABLE,
+	PLANE_ENABLE
+};
 
 struct kunlun_irq_data {
 	struct kunlun_du_reg int_mask;
@@ -287,6 +298,64 @@ struct kunlun_tcon_data {
 	struct kunlun_du_reg enable;
 };
 
+struct kunlun_fbdc_ctrl {
+	struct kunlun_du_reg sw_rst;
+	struct kunlun_du_reg inva_sw_en;
+	struct kunlun_du_reg hdr_bypass;
+	struct kunlun_du_reg mode_v3_1_en;
+	struct kunlun_du_reg en;
+};
+
+struct kunlun_fbdc_cr_inval {
+	struct kunlun_du_reg requester_i;
+	struct kunlun_du_reg context_i;
+	struct kunlun_du_reg pengding_i;
+	struct kunlun_du_reg notify;
+	struct kunlun_du_reg override;
+	struct kunlun_du_reg requester_o;
+	struct kunlun_du_reg context_o;
+	struct kunlun_du_reg pengding_o;
+};
+
+struct kunlun_fbdc_cr_val {
+	struct kunlun_du_reg uv0;
+	struct kunlun_du_reg y0;
+	struct kunlun_du_reg uv1;
+	struct kunlun_du_reg y1;
+};
+
+struct kunlun_fbdc_cr_ch0123 {
+	struct kunlun_du_reg val0;
+	struct kunlun_du_reg val1;
+};
+
+struct kunlun_fbdc_filter {
+	struct kunlun_du_reg clear_3;
+	struct kunlun_du_reg clear_2;
+	struct kunlun_du_reg clear_1;
+	struct kunlun_du_reg clear_0;
+	struct kunlun_du_reg en;
+	struct kunlun_du_reg status;
+};
+
+struct kunlun_fbdc_cr_core {
+	struct kunlun_du_reg id_b;
+	struct kunlun_du_reg id_p;
+	struct kunlun_du_reg id_n;
+	struct kunlun_du_reg id_v;
+	struct kunlun_du_reg id_c;
+	struct kunlun_du_reg ip_clist;
+};
+
+struct kunlun_fbdc_data {
+	const struct kunlun_fbdc_ctrl *ctrl;
+	const struct kunlun_fbdc_cr_inval *cr_inval;
+	const struct kunlun_fbdc_cr_val *cr_val;
+	const struct kunlun_fbdc_cr_ch0123 *cr_ch0123;
+	const struct kunlun_fbdc_filter *filter;
+	const struct kunlun_fbdc_cr_core *cr_core;
+};
+
 struct kunlun_crtc;
 struct kunlun_du_ops {
 	int (*vblank_enable)(struct kunlun_crtc *kcrtc, bool enable);
@@ -296,16 +365,24 @@ struct kunlun_plane {
 	struct drm_plane base;
 	const struct kunlun_plane_data *data;
 	struct kunlun_crtc *kcrtc;
+	uint8_t du_owner;
+	uint8_t plane_status;
 };
 
-struct kunlun_crtc_data {
+struct kunlun_crtc_du_data {
 	const struct kunlun_irq_data *irq;
 	const struct kunlun_ctrl_data *ctrl;
 	const struct kunlun_rdma_data *rdma;
 	const struct kunlun_mlc_data *mlc;
 	const struct kunlun_tcon_data *tcon;
 	const struct kunlun_plane_data *planes;
+	const struct kunlun_fbdc_data *fbdcs;
 	unsigned int num_planes;
+};
+
+struct kunlun_crtc_data {
+	const struct kunlun_crtc_du_data *dc_data;
+	const struct kunlun_crtc_du_data *dp_data;
 	const struct component_ops *cmpt_ops;
 	const struct kunlun_du_ops *du_ops;
 };
@@ -316,12 +393,18 @@ struct kunlun_crtc {
 	struct drm_device *drm;
 	const struct kunlun_crtc_data *data;
 
-	void __iomem *regs;
+	int dc_nums;
+	int dp_nums;
+	void __iomem *dc_regs;
+	void __iomem *dp_regs[2];
 	unsigned int irq;
 
-	spinlock_t irq_lock;
+	spinlock_t dc_irq_lock;
+	spinlock_t dp_irq_lock[2];
 
 	unsigned int num_planes;
+	unsigned int num_dc_planes;
+	unsigned int num_dp_planes;
 	struct kunlun_plane *planes;
 
 	bool enabled;
@@ -350,6 +433,7 @@ static inline void
 kunlun_reg_writel(void __iomem *base, uint32_t offset, uint32_t val)
 {
 	writel(val, base + offset);
+	//pr_info("val = 0x%08x, read:0x%08x = 0x%08x\n", val, base + offset, readl(base+offset));
 }
 
 static inline uint32_t kunlun_reg_readl(void __iomem *base, uint32_t offset)
@@ -383,26 +467,9 @@ static inline uint32_t kunlun_reg_get(void __iomem *base,
 	return reg;
 }
 
-
-extern void kunlun_planes_init(struct kunlun_crtc *kcrtc,
-		const struct kunlun_crtc_data *data);
+extern void kunlun_planes_init(struct kunlun_crtc *kcrtc);
 extern void kunlun_planes_fini(struct kunlun_crtc *kcrtc);
-extern void kunlun_crtc_planes_fini(struct kunlun_crtc *kcrtc);
-extern int kunlun_drm_crtc_probe(struct platform_device *pdev);
-extern int kunlun_drm_crtc_remove(struct platform_device *pdev);
-extern int kunlun_crtc_planes_init(struct kunlun_crtc *kcrtc);
-extern int kunlun_crtc_get_resource(struct kunlun_crtc *kcrtc);
-extern int kunlun_tcon_set_timings(struct kunlun_crtc *kcrtc,
-		struct drm_display_mode *mode, u32 bus_flags);
-extern int kunlun_mlc_set_timings(struct kunlun_crtc *kcrtc,
-		struct drm_display_mode *mode);
-extern int kunlun_mlc_update_plane(struct kunlun_crtc *kcrtc,
-		unsigned int mask);
-extern int kunlun_mlc_update_trig(struct kunlun_crtc *kcrtc);
-
 extern int kunlun_planes_init_primary(struct kunlun_crtc *kcrtc,
 		struct drm_plane **primary, struct drm_plane **cursor);
 extern int kunlun_planes_init_overlay(struct kunlun_crtc *kcrtc);
-extern void kunlun_crtc_handle_vblank(struct kunlun_crtc *kcrtc);
-
 #endif

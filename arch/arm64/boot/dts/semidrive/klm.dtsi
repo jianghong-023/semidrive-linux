@@ -68,16 +68,21 @@
 	display@0 {
 		#address-cells = <2>;
 		#size-cells = <2>;
-		compatible = "semdrive,dc-subsystem";
+		compatible = "semdrive,display-subsystem";
 		ranges;
 		status = "okay";
 
-		dc0: dc@30440000 {
-			compatible = "semidrive,kunlun-dc";
-			reg = <0x0 0x30440000 0 0x10000>;
+		crtc0: crtc@30440000 {
+			compatible = "semidrive,kunlun-crtc";
+			reg = <0x0 0x30440000 0 0x10000>,
+				  <0x0 0x30500000 0 0x10000>;
+			reg-names = "dc-base", "dp0-base";
 			interrupts = <0 33 4>;
+			interrupt-names = "dc-irq";
+			dc_nums = <1>;
+			dp_nums = <1>;
 			status = "okay";
-			
+
 			dc0_out: port {
 				dc0_out_parallel: endpoint@0 {
 					remote-endpoint = <&parallel_in_dc0>;

@@ -20,13 +20,7 @@
 
 #define MAX_CRTC			8
 
-enum kunlun_drm_type {
-	KUNLUN_DRM_DP,
-	KUNLUN_DRM_DC,
-};
-
 struct kunlun_drm_device_info {
-	enum kunlun_drm_type type;
 	int (*match)(struct device_node *np);
 };
 

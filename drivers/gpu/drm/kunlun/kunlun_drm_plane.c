@@ -19,7 +19,8 @@
 #include "kunlun_drm_drv.h"
 #include "kunlun_drm_gem.h"
 #include "kunlun_drm_crtc.h"
-#include "kunlun_drm_reg.h"
+#include "kunlun_drm_dc_reg.h"
+#include "kunlun_drm_dp_reg.h"
 
 #define to_kunlun_plane(x) container_of(x, struct kunlun_plane, base)
 #define to_kunlun_crtc(x) container_of(x, struct kunlun_crtc, base)
@@ -91,6 +92,47 @@ static const struct kunlun_gp_yuvup_ctrl gp_yuvup_data = {
 	.uph_bypass = DU_REG(GP_YUVUP_CTRL, GP_YUVUP_UPH_BYPASS_MASK, GP_YUVUP_UPH_BYPASS_SHIFT),
 	.bypass = DU_REG(GP_YUVUP_CTRL, GP_YUVUP_BYPASS_MASK, GP_YUVUP_BYPASS_SHIFT),
 };
+
+static const struct kunlun_gp_crop_ctrl gp_crop_data = {
+	.bypass = DU_REG(GP_CROP_CTRL, GP_CROP_BYPASS_MASK, GP_CROP_BYPASS_SHIFT),
+	.start_x = DU_REG(GP_CROP_UL_POS, GP_CROP_UL_POS_X_MASK, GP_CROP_UL_POS_X_SHIFT),
+	.start_y = DU_REG(GP_CROP_UL_POS, GP_CROP_UL_POS_Y_MASK, GP_CROP_UL_POS_Y_SHIFT),
+	.vsize = DU_REG(GP_CROP_SIZE, GP_CROP_SIZE_V_MASK, GP_CROP_SIZE_V_SHIFT),
+	.hsize = DU_REG(GP_CROP_SIZE, GP_CROP_SIZE_H_MASK, GP_CROP_SIZE_H_SHIFT),
+	.err_st = DU_REG(GP_CROP_PAR_ERR, GP_CROP_PAR_STATUS_MASK, GP_CROP_PAR_STATUS_SHIFT),
+};
+
+static const struct kunlun_hscaler_data gp_hs_data = {
+	.nor_para = DU_REG(GP_HS_CTRL, GP_HS_CTRL_NOR_PARA_MASK, GP_HS_CTRL_NOR_PARA_SHIFT),
+	.apb_rd = DU_REG(GP_HS_CTRL, GP_HS_CTRL_APB_RD_MASK, GP_HS_CTRL_APB_RD_SHIFT),
+	.filter_en_v = DU_REG(GP_HS_CTRL, GP_HS_CTRL_FILTER_EN_V_MASK, GP_HS_CTRL_FILTER_EN_V_SHIFT),
+	.filter_en_u = DU_REG(GP_HS_CTRL, GP_HS_CTRL_FILTER_EN_U_MASK, GP_HS_CTRL_FILTER_EN_U_SHIFT),
+	.filter_en_y = DU_REG(GP_HS_CTRL, GP_HS_CTRL_FILTER_EN_Y_MASK, GP_HS_CTRL_FILTER_EN_Y_SHIFT),
+	.filter_en_a = DU_REG(GP_HS_CTRL, GP_HS_CTRL_FILTER_EN_A_MASK, GP_HS_CTRL_FILTER_EN_A_SHIFT),
+	.pola = DU_REG(GP_HS_INI, GP_HS_INI_POLA_MASK, GP_HS_INI_POLA_SHIFT),
+	.fra = DU_REG(GP_HS_INI, GP_HS_INI_FRA_MASK, GP_HS_INI_FRA_SHIFT),
+	.ratio_int = DU_REG(GP_HS_RATIO, GP_HS_RATIO_INT_MASK, GP_HS_RATIO_INT_SHIFT),
+	.ratio_fra = DU_REG(GP_HS_RATIO, GP_HS_RATIO_FRA_MASK, GP_HS_RATIO_FRA_SHIFT),
+	.out_hsize = DU_REG(GP_HS_WIDTH, GP_HS_WIDTH_OUT_MASK, GP_HS_WIDTH_OUT_SHIFT),
+};
+static const struct kunlun_vscaler_data gp_vs_data = {
+	.init_phase_o = DU_REG(GP_VS_CTRL, GP_VS_CTRL_INIT_PHASE_O_MASK, GP_VS_CTRL_INIT_PHASE_O_SHIFT),
+	.init_pos_o = DU_REG(GP_VS_CTRL, GP_VS_CTRL_INIT_POS_O_MASK, GP_VS_CTRL_INIT_POS_O_SHIFT),
+	.init_phase_e = DU_REG(GP_VS_CTRL, GP_VS_CTRL_INIT_PHASE_E_MASK, GP_VS_CTRL_INIT_PHASE_E_SHIFT),
+	.init_pos_e = DU_REG(GP_VS_CTRL, GP_VS_CTRL_INIT_POS_E_MASK, GP_VS_CTRL_INIT_POS_E_SHIFT),
+	.norm = DU_REG(GP_VS_CTRL, GP_VS_CTRL_NORM_MASK, GP_VS_CTRL_NORM_SHIFT),
+	.parity = DU_REG(GP_VS_CTRL, GP_VS_CTRL_PARITY_MASK, GP_VS_CTRL_PARITY_SHIFT),
+	.pxl_mode = DU_REG(GP_VS_CTRL, GP_VS_CTRL_PXL_MODE_MASK, GP_VS_CTRL_PXL_MODE_SHIFT),
+	.vs_mode = DU_REG(GP_VS_CTRL, GP_VS_CTRL_VS_MODE_MASK, GP_VS_CTRL_VS_MODE_SHIFT),
+	.out_vsize = DU_REG(GP_VS_RESV, GP_VS_RESV_VSIZE_MASK, GP_VS_RESV_VSIZE_SHIFT),
+	.ratio_inc = DU_REG(GP_VS_INC, GP_VS_INC_INC_MASK, GP_VS_INC_INC_SHIFT),
+};
+
+static const struct kunlun_gp_scaler_data gp_scaler_data = {
+	.hs_data = &gp_hs_data,
+	.vs_data = &gp_vs_data,
+};
+
 static const struct kunlun_csc_ctrl gp_csc_data = {
 	.alpha = DU_REG(GP_CSC_CTRL, CSC_ALPHA_MASK, CSC_ALPHA_SHIFT),
 	.sbup_conv = DU_REG(GP_CSC_CTRL, CSC_SBUP_CONV_MASK, CSC_SBUP_CONV_SHIFT),
@@ -110,6 +152,18 @@ static const struct kunlun_csc_ctrl gp_csc_data = {
 	.c0 = DU_REG(GP_CSC_COEF7, COEF7_C0_MASK, COEF7_C0_SHIFT),
 	.c1 = DU_REG(GP_CSC_COEF7, COEF7_C1_MASK, COEF7_C1_SHIFT),
 	.c2 = DU_REG(GP_CSC_COEF8, COEF8_C2_MASK, COEF8_C2_SHIFT),
+};
+
+static const struct kunlun_gp_fbdc_ctrl dp_fbdc_data = {
+	.m_id = DU_REG(GP_FBDC_CTRL, GP_FBDC_CTRL_M_ID_MASK, GP_FBDC_CTRL_M_ID_SHIFT),
+	.context = DU_REG(GP_FBDC_CTRL, GP_FBDC_CTRL_CONTEXT_MASK, GP_FBDC_CTRL_CONTEXT_SHIFT),
+	.hdr_encoding = DU_REG(GP_FBDC_CTRL, GP_FBDC_CTRL_HDR_ENCODING_MASK, GP_FBDC_CTRL_HDR_ENCODING_SHIFT),
+	.twiddle_mode = DU_REG(GP_FBDC_CTRL, GP_FBDC_CTRL_TWIDDLE_MODE_MASK, GP_FBDC_CTRL_TWIDDLE_MODE_SHIFT),
+	.meml = DU_REG(GP_FBDC_CTRL, GP_FBDC_CTRL_MEML_MASK, GP_FBDC_CTRL_MEML_SHIFT),
+	.fmt = DU_REG(GP_FBDC_CTRL, GP_FBDC_CTRL_FMT_MASK, GP_FBDC_CTRL_FMT_SHIFT),
+	.en = DU_REG(GP_FBDC_CTRL, GP_FBDC_CTRL_EN_MASK, GP_FBDC_CTRL_EN_SHIFT),
+	.clear0_color = DU_REG(GP_FBDC_FBDC_CLEAR_0, GP_FBDC_FBDC_CLEAR_0_COLOR_MASK, GP_FBDC_FBDC_CLEAR_0_COLOR_SHIFT),
+	.clear1_color = DU_REG(GP_FBDC_FBDC_CLEAR_1, GP_FBDC_FBDC_CLEAR_1_COLOR_MASK, GP_FBDC_FBDC_CLEAR_1_COLOR_SHIFT),
 };
 
 static const struct kunlun_rle_int_data rle_int_mask = {
@@ -202,6 +256,29 @@ static const struct kunlun_sp_data dc_sp = {
 	.clut_data = &sp_clut_data,
 	.sw_rst = DU_REG(SP_SWT_RST, SW_RST_MASK, SW_RST_SHIFT),
 	.sdw_trig = DU_REG(SP_SDW_TRIG, SDW_CTRL_TRIG_MASK, SDW_CTRL_TRIG_SHIFT),
+};
+
+static const struct kunlun_gp_data dp_gp0 = {
+	.pix_comp  = &gp_pix_comp,
+	.frm_ctrl = &gp_frm_ctrl,
+	.frm_info = &gp_frm_data,
+	.yuvup_ctrl = &gp_yuvup_data,
+	.crop_ctrl = &gp_crop_data,
+	.scaler = &gp_scaler_data,
+	.csc_ctrl = &gp_csc_data,
+	.fbdc_ctrl = &dp_fbdc_data,
+	.sw_rst = DU_REG(GP_SWT_RST, SW_RST_MASK, SW_RST_SHIFT),
+	.sdw_trig = DU_REG(GP_SDW_TRIG, SDW_CTRL_TRIG_MASK, SDW_CTRL_TRIG_SHIFT),
+};
+
+static const struct kunlun_gp_data dp_gp1 = {
+	.pix_comp  = &gp_pix_comp,
+	.frm_ctrl = &gp_frm_ctrl,
+	.frm_info = &gp_frm_data,
+	.crop_ctrl = &gp_crop_data,
+	.fbdc_ctrl = &dp_fbdc_data,
+	.sw_rst = DU_REG(GP_SWT_RST, SW_RST_MASK, SW_RST_SHIFT),
+	.sdw_trig = DU_REG(GP_SDW_TRIG, SDW_CTRL_TRIG_MASK, SDW_CTRL_TRIG_SHIFT),
 };
 
 const uint32_t sp_formats[] = {
@@ -369,18 +446,20 @@ static const struct kunlun_pipe_data gp_lite_data = {
 static const struct kunlun_pipe_data gp_big_data = {
 	.formats = gp_big_formats,
 	.nformats = ARRAY_SIZE(gp_big_formats),
+	.data.gp = &dp_gp0,
 };
 
 static const struct kunlun_pipe_data gp_mid_data = {
 	.formats = gp_mid_formats,
 	.nformats = ARRAY_SIZE(gp_mid_formats),
+	.data.gp = &dp_gp1,
 };
 
 const struct kunlun_plane_data kunlun_dc_planes[] = {
 	{
 		.chn_base = DC_SP_CHN_BASE,
 		.id = DC_SPIPE,
-		.type = DRM_PLANE_TYPE_PRIMARY,
+		.type = DRM_PLANE_TYPE_OVERLAY,
 		.hwpipe = &sp_data,
 	},
 	{
@@ -395,7 +474,7 @@ const struct kunlun_plane_data kunlun_dp_planes[] = {
 	{
 		.chn_base = DP_GP0_CHN_BASE,
 		.id = DP_GPIPE0,
-		.type = DRM_PLANE_TYPE_OVERLAY,
+		.type = DRM_PLANE_TYPE_PRIMARY,
 		.hwpipe = &gp_big_data,
 	},
 	{
@@ -407,7 +486,7 @@ const struct kunlun_plane_data kunlun_dp_planes[] = {
 	{
 		.chn_base = DP_SP0_CHN_BASE,
 		.id = DP_SPIPE0,
-		.type = DRM_PLANE_TYPE_PRIMARY,
+		.type = DRM_PLANE_TYPE_OVERLAY,
 		.hwpipe = &sp_data,
 	},
 	{
@@ -434,7 +513,7 @@ static uint32_t get_h_addr(uint64_t addr)
 	return addr_h;
 }
 
-static int kunlun_plane_frm_comp_set(struct kunlun_crtc *kcrtc,
+static int kunlun_plane_frm_comp_set(void __iomem *regs,
 		uint32_t chn_base,
 		const struct kunlun_pipe_pix_comp *comp,
 		const struct kunlun_pipe_frm_ctrl *ctrl,
@@ -688,25 +767,25 @@ static int kunlun_plane_frm_comp_set(struct kunlun_crtc *kcrtc,
 	}
 	//pr_info("format = %s", format_string);
 	/*config pixel components*/
-	DU_PIPE_ELEM_SET(kcrtc, chn_base, comp, bpv, bpv);
-	DU_PIPE_ELEM_SET(kcrtc, chn_base, comp, bpu, bpu);
-	DU_PIPE_ELEM_SET(kcrtc, chn_base, comp, bpy, bpy);
-	DU_PIPE_ELEM_SET(kcrtc, chn_base, comp, bpa, bpa);
+	DU_PIPE_ELEM_SET(regs, chn_base, comp, bpv, bpv);
+	DU_PIPE_ELEM_SET(regs, chn_base, comp, bpu, bpu);
+	DU_PIPE_ELEM_SET(regs, chn_base, comp, bpy, bpy);
+	DU_PIPE_ELEM_SET(regs, chn_base, comp, bpa, bpa);
 
 	/*config component swap mode*/
-	DU_PIPE_ELEM_SET(kcrtc, chn_base, ctrl, comp_swap, swap);
-	DU_PIPE_ELEM_SET(kcrtc, chn_base, ctrl, rgb_yuv, is_yuv);
-	DU_PIPE_ELEM_SET(kcrtc, chn_base, ctrl, uv_swap, uvswap);
-	DU_PIPE_ELEM_SET(kcrtc, chn_base, ctrl, uv_mode, uvmode);
-	DU_PIPE_ELEM_SET(kcrtc, chn_base, ctrl, fmt, buf_fmt);
+	DU_PIPE_ELEM_SET(regs, chn_base, ctrl, comp_swap, swap);
+	DU_PIPE_ELEM_SET(regs, chn_base, ctrl, rgb_yuv, is_yuv);
+	DU_PIPE_ELEM_SET(regs, chn_base, ctrl, uv_swap, uvswap);
+	DU_PIPE_ELEM_SET(regs, chn_base, ctrl, uv_mode, uvmode);
+	DU_PIPE_ELEM_SET(regs, chn_base, ctrl, fmt, buf_fmt);
 
 	if ((yuvup_ctrl != NULL) && (csc_ctrl != NULL)) {
 		if (is_yuv) {
-			DU_PIPE_ELEM_SET(kcrtc, chn_base, yuvup_ctrl, bypass, 0);
-			DU_PIPE_ELEM_SET(kcrtc, chn_base, csc_ctrl, bypass, 0);
+			DU_PIPE_ELEM_SET(regs, chn_base, yuvup_ctrl, bypass, 0);
+			DU_PIPE_ELEM_SET(regs, chn_base, csc_ctrl, bypass, 0);
 		} else {
-			DU_PIPE_ELEM_SET(kcrtc, chn_base, yuvup_ctrl, bypass, 1);
-			DU_PIPE_ELEM_SET(kcrtc, chn_base, csc_ctrl, bypass, 1);
+			DU_PIPE_ELEM_SET(regs, chn_base, yuvup_ctrl, bypass, 1);
+			DU_PIPE_ELEM_SET(regs, chn_base, csc_ctrl, bypass, 1);
 		}
 	}
 
@@ -750,60 +829,117 @@ static int get_du_mlc_sf_index(uint32_t layer_id)
 	}
 	return i;
 }
-void kunlun_planes_init(struct kunlun_crtc *kcrtc,
-		const struct kunlun_crtc_data *data)
+
+static void __iomem *kunlun_get_regs_byplane(struct kunlun_crtc *kcrtc,
+		struct kunlun_plane *klp)
 {
-	int i;
-	uint32_t chn_base;
-	int layer_id;
+	switch (klp->du_owner) {
+		case CRTC_DP0:
+			return kcrtc->dp_regs[0];
+		case CRTC_DP1:
+			return kcrtc->dp_regs[1];
+		case CRTC_DC:
+		default:
+			return kcrtc->dc_regs;
+	}
+}
+static void kunlun_spipe_init(const struct kunlun_sp_data *sp_data,
+		void __iomem *regs, uint32_t chn_base)
+{
+	DU_PIPE_ELEM_SET(regs, chn_base, sp_data->clut_data->a_data, bypass, 1);
+	DU_PIPE_ELEM_SET(regs, chn_base, sp_data->clut_data->y_data, bypass, 1);
+	DU_PIPE_ELEM_SET(regs, chn_base, sp_data->clut_data->u_data, bypass, 1);
+	DU_PIPE_ELEM_SET(regs, chn_base, sp_data->clut_data->v_data, bypass, 1);
+	DU_PIPE_ELEM_SET(regs, chn_base, sp_data, sdw_trig, 1);
+}
+
+static void kunlun_gpipe_init(const struct kunlun_gp_data *gp_data,
+		void __iomem *regs, uint32_t chn_base, int type)
+{
+	if (type == DC_GPIPE || type == DP_GPIPE0) {
+		DU_PIPE_ELEM_SET(regs, chn_base, gp_data->yuvup_ctrl, bypass, 1);
+		DU_PIPE_ELEM_SET(regs, chn_base, gp_data->csc_ctrl, bypass, 1);
+		DU_PIPE_ELEM_SET(regs, chn_base, gp_data->csc_ctrl, a00, csc_param[0][0]);
+		DU_PIPE_ELEM_SET(regs, chn_base, gp_data->csc_ctrl, a01, csc_param[0][1]);
+		DU_PIPE_ELEM_SET(regs, chn_base, gp_data->csc_ctrl, a02, csc_param[0][2]);
+		DU_PIPE_ELEM_SET(regs, chn_base, gp_data->csc_ctrl, a10, csc_param[0][3]);
+		DU_PIPE_ELEM_SET(regs, chn_base, gp_data->csc_ctrl, a11, csc_param[0][4]);
+		DU_PIPE_ELEM_SET(regs, chn_base, gp_data->csc_ctrl, a12, csc_param[0][5]);
+		DU_PIPE_ELEM_SET(regs, chn_base, gp_data->csc_ctrl, a20, csc_param[0][6]);
+		DU_PIPE_ELEM_SET(regs, chn_base, gp_data->csc_ctrl, a21, csc_param[0][7]);
+		DU_PIPE_ELEM_SET(regs, chn_base, gp_data->csc_ctrl, a22, csc_param[0][8]);
+		DU_PIPE_ELEM_SET(regs, chn_base, gp_data->csc_ctrl, b0, csc_param[0][9]);
+		DU_PIPE_ELEM_SET(regs, chn_base, gp_data->csc_ctrl, b1, csc_param[0][10]);
+		DU_PIPE_ELEM_SET(regs, chn_base, gp_data->csc_ctrl, b2, csc_param[0][11]);
+		DU_PIPE_ELEM_SET(regs, chn_base, gp_data->csc_ctrl, c0, csc_param[0][12]);
+		DU_PIPE_ELEM_SET(regs, chn_base, gp_data->csc_ctrl, c1, csc_param[0][13]);
+		DU_PIPE_ELEM_SET(regs, chn_base, gp_data->csc_ctrl, c2, csc_param[0][14]);
+	}
+	if (type == DP_GPIPE0) {
+		DU_PIPE_ELEM_SET(regs, chn_base, gp_data->crop_ctrl, bypass, 1);
+		DU_PIPE_ELEM_SET(regs, chn_base, gp_data->scaler->hs_data, nor_para, 0);
+		DU_PIPE_ELEM_SET(regs, chn_base, gp_data->scaler->vs_data, norm, 0);
+	}
+
+	if ((type == DP_GPIPE0) || (type == DP_GPIPE1)) {
+		DU_PIPE_ELEM_SET(regs, chn_base, gp_data->fbdc_ctrl, en, 0);
+	}
+
+	DU_PIPE_ELEM_SET(regs, chn_base, gp_data, sdw_trig, 1);
+}
+
+void kunlun_planes_init(struct kunlun_crtc *kcrtc)
+{
+	const struct kunlun_crtc_du_data *dc_data = kcrtc->data->dc_data;
+	const struct kunlun_crtc_du_data *dp_data = kcrtc->data->dp_data;
 	const struct kunlun_sp_data *sp_data;
 	const struct kunlun_gp_data *gp_data;
+	void __iomem *regs;
+	uint32_t chn_base;
+	int layer_id;
+	int index = 0;
+	int i, j;
 
-	for(i = 0; i < data->num_planes; i++) {
-		layer_id = data->planes[i].id;
-		if ((layer_id == DC_SPIPE) ||
-			(layer_id == DP_SPIPE0) ||
-			(layer_id == DP_SPIPE1)) {
-			chn_base = data->planes[i].chn_base;
-			sp_data = data->planes[i].hwpipe->data.sp;
+	for (i = 0; i < kcrtc->num_dc_planes; i++) {
+		regs = kcrtc->dc_regs;
+		layer_id = dc_data->planes[i].id;
+		chn_base = dc_data->planes[i].chn_base;
 
-			DU_PIPE_ELEM_SET(kcrtc, chn_base, sp_data->clut_data->a_data, bypass, 1);
-			DU_PIPE_ELEM_SET(kcrtc, chn_base, sp_data->clut_data->y_data, bypass, 1);
-			DU_PIPE_ELEM_SET(kcrtc, chn_base, sp_data->clut_data->u_data, bypass, 1);
-			DU_PIPE_ELEM_SET(kcrtc, chn_base, sp_data->clut_data->v_data, bypass, 1);
-			DU_PIPE_ELEM_SET(kcrtc, chn_base, sp_data, sdw_trig, 1);
+		if (layer_id == DC_SPIPE) {
+			sp_data = dc_data->planes[i].hwpipe->data.sp;
+
+			kunlun_spipe_init(sp_data, regs, chn_base);
 		}
+
 		if (layer_id == DC_GPIPE) {
-			chn_base = data->planes[i].chn_base;
-			gp_data = data->planes[i].hwpipe->data.gp;
+			gp_data = dc_data->planes[i].hwpipe->data.gp;
 
-			DU_PIPE_ELEM_SET(kcrtc, chn_base, gp_data->yuvup_ctrl, bypass, 1);
-			DU_PIPE_ELEM_SET(kcrtc, chn_base, gp_data->csc_ctrl, bypass, 1);
-			DU_PIPE_ELEM_SET(kcrtc, chn_base, gp_data->csc_ctrl, a00, csc_param[0][0]);
-			DU_PIPE_ELEM_SET(kcrtc, chn_base, gp_data->csc_ctrl, a01, csc_param[0][1]);
-			DU_PIPE_ELEM_SET(kcrtc, chn_base, gp_data->csc_ctrl, a02, csc_param[0][2]);
-			DU_PIPE_ELEM_SET(kcrtc, chn_base, gp_data->csc_ctrl, a10, csc_param[0][3]);
-			DU_PIPE_ELEM_SET(kcrtc, chn_base, gp_data->csc_ctrl, a11, csc_param[0][4]);
-			DU_PIPE_ELEM_SET(kcrtc, chn_base, gp_data->csc_ctrl, a12, csc_param[0][5]);
-			DU_PIPE_ELEM_SET(kcrtc, chn_base, gp_data->csc_ctrl, a20, csc_param[0][6]);
-			DU_PIPE_ELEM_SET(kcrtc, chn_base, gp_data->csc_ctrl, a21, csc_param[0][7]);
-			DU_PIPE_ELEM_SET(kcrtc, chn_base, gp_data->csc_ctrl, a22, csc_param[0][8]);
-			DU_PIPE_ELEM_SET(kcrtc, chn_base, gp_data->csc_ctrl, b0, csc_param[0][9]);
-			DU_PIPE_ELEM_SET(kcrtc, chn_base, gp_data->csc_ctrl, b1, csc_param[0][10]);
-			DU_PIPE_ELEM_SET(kcrtc, chn_base, gp_data->csc_ctrl, b2, csc_param[0][11]);
-			DU_PIPE_ELEM_SET(kcrtc, chn_base, gp_data->csc_ctrl, c0, csc_param[0][12]);
-			DU_PIPE_ELEM_SET(kcrtc, chn_base, gp_data->csc_ctrl, c1, csc_param[0][13]);
-			DU_PIPE_ELEM_SET(kcrtc, chn_base, gp_data->csc_ctrl, c2, csc_param[0][14]);
-
-			DU_PIPE_ELEM_SET(kcrtc, chn_base, gp_data, sdw_trig, 1);
+			kunlun_gpipe_init(gp_data, regs, chn_base, layer_id);
 		}
-		/*
-		if (pipetype == PIPE_TYPE_DP_B_GP) {
+	}
 
+	for (i = 0; i < kcrtc->num_dp_planes; i++) {
+		index = (i < dp_data->num_planes) ? 0 : 1;
+		if (index) {
+			j = i - dp_data->num_planes;
+		} else {
+			j = i;
 		}
-		if (pipetype == PIPE_TYPE_DP_L_GP) {
+		regs = kcrtc->dp_regs[index];
+		layer_id = dp_data->planes[j].id;
+		chn_base = dp_data->planes[j].chn_base;
 
-		}*/
+		if ((layer_id == DP_SPIPE0) || (layer_id == DP_SPIPE1)) {
+			sp_data = dp_data->planes[j].hwpipe->data.sp;
+
+			kunlun_spipe_init(sp_data, regs, chn_base);
+		}
+
+		if ((layer_id == DP_GPIPE0) || (layer_id == DP_GPIPE1)) {
+			gp_data = dp_data->planes[j].hwpipe->data.gp;
+
+			kunlun_gpipe_init(gp_data, regs, chn_base, layer_id);
+		}
 	}
 }
 
@@ -880,7 +1016,10 @@ static void kunlun_plane_atomic_update(struct drm_plane *plane,
 	const struct kunlun_pipe_frm_data *frm_data;
 	const struct kunlun_gp_yuvup_ctrl *yuvup_ctrl = NULL;
 	const struct kunlun_csc_ctrl *csc_ctrl = NULL;
-	const struct kunlun_mlc_data *mlc = kcrtc->data->mlc;
+	const struct kunlun_mlc_data *dc_mlc = kcrtc->data->dc_data->mlc;
+	const struct kunlun_mlc_data *dp_mlc = kcrtc->data->dp_data->mlc;
+	struct kunlun_mlc_data *mlc;
+	void __iomem *regs;
 	int i;
 	/*
 	 * can't update plane when du is disabled.
@@ -890,6 +1029,12 @@ static void kunlun_plane_atomic_update(struct drm_plane *plane,
 
 	if (!state->visible) {
 		kunlun_plane_atomic_disable(plane, old_state);
+		return;
+	}
+
+	regs = kunlun_get_regs_byplane(kcrtc, klp);
+	if (!regs) {
+		pr_err("This plane's regs is NULL\n");
 		return;
 	}
 
@@ -928,15 +1073,15 @@ static void kunlun_plane_atomic_update(struct drm_plane *plane,
 		csc_ctrl = gp_data->csc_ctrl;
 	}
 
-	kunlun_plane_frm_comp_set(kcrtc, chn_base, pix_comp, frm_ctrl,
+	kunlun_plane_frm_comp_set(regs, chn_base, pix_comp, frm_ctrl,
 			yuvup_ctrl, csc_ctrl, format);
-	DU_PIPE_ELEM_SET(kcrtc, chn_base, frm_data, height, src_h);
-	DU_PIPE_ELEM_SET(kcrtc, chn_base, frm_data, width, src_w);
-	DU_PIPE_ELEM_SET(kcrtc, chn_base, frm_data, y_baddr_l, addr_l);
-	DU_PIPE_ELEM_SET(kcrtc, chn_base, frm_data, y_baddr_h, addr_h);
-	DU_PIPE_ELEM_SET(kcrtc, chn_base, frm_data, y_stride, pitch);
-	DU_PIPE_ELEM_SET(kcrtc, chn_base, frm_data, offset_x, off_x);
-	DU_PIPE_ELEM_SET(kcrtc, chn_base, frm_data, offset_y, off_y);
+	DU_PIPE_ELEM_SET(regs, chn_base, frm_data, height, src_h);
+	DU_PIPE_ELEM_SET(regs, chn_base, frm_data, width, src_w);
+	DU_PIPE_ELEM_SET(regs, chn_base, frm_data, y_baddr_l, addr_l);
+	DU_PIPE_ELEM_SET(regs, chn_base, frm_data, y_baddr_h, addr_h);
+	DU_PIPE_ELEM_SET(regs, chn_base, frm_data, y_stride, pitch);
+	DU_PIPE_ELEM_SET(regs, chn_base, frm_data, offset_x, off_x);
+	DU_PIPE_ELEM_SET(regs, chn_base, frm_data, offset_y, off_y);
 
 	if (nplanes > 1) {
 		obj = drm_gem_fb_get_obj(fb, 1);
@@ -947,9 +1092,9 @@ static void kunlun_plane_atomic_update(struct drm_plane *plane,
 		addr_h = get_h_addr(dma_addr);
 		pitch = fb->pitches[1];
 
-		DU_PIPE_ELEM_SET(kcrtc, chn_base, frm_data, u_baddr_l, addr_l);
-		DU_PIPE_ELEM_SET(kcrtc, chn_base, frm_data, u_baddr_h, addr_h);
-		DU_PIPE_ELEM_SET(kcrtc, chn_base, frm_data, u_stride, pitch);
+		DU_PIPE_ELEM_SET(regs, chn_base, frm_data, u_baddr_l, addr_l);
+		DU_PIPE_ELEM_SET(regs, chn_base, frm_data, u_baddr_h, addr_h);
+		DU_PIPE_ELEM_SET(regs, chn_base, frm_data, u_stride, pitch);
 	}
 
 	if (nplanes > 2) {
@@ -961,34 +1106,53 @@ static void kunlun_plane_atomic_update(struct drm_plane *plane,
 		addr_h = get_h_addr(dma_addr);
 		pitch = fb->pitches[1];
 
-		DU_PIPE_ELEM_SET(kcrtc, chn_base, frm_data, v_baddr_l, addr_l);
-		DU_PIPE_ELEM_SET(kcrtc, chn_base, frm_data, v_baddr_h, addr_h);
-		DU_PIPE_ELEM_SET(kcrtc, chn_base, frm_data, v_stride, pitch);
+		DU_PIPE_ELEM_SET(regs, chn_base, frm_data, v_baddr_l, addr_l);
+		DU_PIPE_ELEM_SET(regs, chn_base, frm_data, v_baddr_h, addr_h);
+		DU_PIPE_ELEM_SET(regs, chn_base, frm_data, v_stride, pitch);
 	}
 
-	if ((layer_id == DC_SPIPE) ||
-		(layer_id == DP_SPIPE0) ||
-		(layer_id == DP_SPIPE1)) {
-		DU_PIPE_ELEM_SET(kcrtc, chn_base, sp_data, sdw_trig, 1);
+	if (layer_id == DP_GPIPE0) {
+		/*hscaler*/
+		DU_PIPE_ELEM_SET(regs, chn_base, gp_data->scaler->hs_data, out_hsize, src_w);
+		/*crop*/
+		DU_PIPE_ELEM_SET(regs, chn_base, gp_data->crop_ctrl, hsize, src_w);
+		DU_PIPE_ELEM_SET(regs, chn_base, gp_data->crop_ctrl, vsize, src_h);
+		/*vscaler*/
+		DU_PIPE_ELEM_SET(regs, chn_base, gp_data->scaler->vs_data, out_vsize, src_h);
+		DU_PIPE_ELEM_SET(regs, chn_base, gp_data, sdw_trig, 1);
+	} else if (layer_id == DP_GPIPE1) {
+		DU_PIPE_ELEM_SET(regs, chn_base, gp_data->crop_ctrl, hsize, src_w);
+		DU_PIPE_ELEM_SET(regs, chn_base, gp_data->crop_ctrl, vsize, src_h);
+		DU_PIPE_ELEM_SET(regs, chn_base, gp_data, sdw_trig, 1);
+	} else if (layer_id == DC_GPIPE) {
+		DU_PIPE_ELEM_SET(regs, chn_base, gp_data, sdw_trig, 1);
 	} else {
-		DU_PIPE_ELEM_SET(kcrtc, chn_base, gp_data, sdw_trig, 1);
+		DU_PIPE_ELEM_SET(regs, chn_base, sp_data, sdw_trig, 1);
+	}
+
+	if (klp->du_owner == CRTC_DC) {
+		mlc = dc_mlc;
+	} else {
+		mlc = dp_mlc;
 	}
 
 	i = get_du_mlc_sf_index(layer_id);
 	if (i < 0)
 		return;
-
-	DU_MLC_LAYER_SET(kcrtc, mlc, i, h_pos, crtc_x);
-	DU_MLC_LAYER_SET(kcrtc, mlc, i, v_pos, crtc_y);
-	DU_MLC_LAYER_SET(kcrtc, mlc, i, h_size, src_w);
-	DU_MLC_LAYER_SET(kcrtc, mlc, i, v_size, src_h);
+	DU_MLC_LAYER_SET(regs, mlc, i, h_pos, crtc_x);
+	DU_MLC_LAYER_SET(regs, mlc, i, v_pos, crtc_y);
+	DU_MLC_LAYER_SET(regs, mlc, i, h_size, src_w);
+	DU_MLC_LAYER_SET(regs, mlc, i, v_size, src_h);
 	if (kunlun_format_global_alpha(format)) {
-		DU_MLC_LAYER_SET(kcrtc, mlc, i, g_alpha_en, 1);
+		DU_MLC_LAYER_SET(regs, mlc, i, g_alpha_en, 1);
 	} else {
-		DU_MLC_LAYER_SET(kcrtc, mlc, i, g_alpha_en, 0);
+		DU_MLC_LAYER_SET(regs, mlc, i, g_alpha_en, 0);
 	}
 	/*set the 'enable layer' bit*/
-	DU_MLC_LAYER_SET(kcrtc, mlc, i, sf_en, 1);
+	DU_MLC_LAYER_SET(regs, mlc, i, sf_en, 1);
+
+	if (klp->plane_status != PLANE_ENABLE)
+		klp->plane_status = PLANE_ENABLE;
 }
 
 static void kunlun_plane_atomic_disable(struct drm_plane *plane,
@@ -996,31 +1160,46 @@ static void kunlun_plane_atomic_disable(struct drm_plane *plane,
 {
 	struct kunlun_plane *klp = to_kunlun_plane(plane);
 	struct kunlun_crtc *kcrtc = to_kunlun_crtc(old_state->crtc);
-	const struct kunlun_mlc_data *mlc = kcrtc->data->mlc;
+	const struct kunlun_mlc_data *dc_mlc = kcrtc->data->dc_data->mlc;
+	const struct kunlun_mlc_data *dp_mlc = kcrtc->data->dp_data->mlc;
 	const struct kunlun_sp_data *sp_data;
 	const struct kunlun_gp_data *gp_data;
 	uint32_t chn_base = klp->data->chn_base;
 	int layer_id = klp->data->id;
+	void __iomem *regs;
 	int i;
 
 	if (!old_state->crtc)
 		return;
 
+	regs = kunlun_get_regs_byplane(kcrtc, klp);
+	if (!regs) {
+		pr_err("This plane's regs is NULL\n");
+		return;
+	}
+
 	if ((layer_id == DC_SPIPE) ||
 		(layer_id == DP_SPIPE0) ||
 		(layer_id == DP_SPIPE1)) {
 		sp_data = klp->data->hwpipe->data.sp;
-		DU_PIPE_ELEM_SET(kcrtc, chn_base, sp_data, sdw_trig, 1);
+		DU_PIPE_ELEM_SET(regs, chn_base, sp_data, sdw_trig, 1);
 	} else {
 		gp_data = klp->data->hwpipe->data.gp;
-		DU_PIPE_ELEM_SET(kcrtc, chn_base, gp_data, sdw_trig, 1);
+		DU_PIPE_ELEM_SET(regs, chn_base, gp_data, sdw_trig, 1);
 	}
 
 	i = get_du_mlc_sf_index(layer_id);
 	if (i < 0)
 		return;
 	/*clear the 'enable layer' bit*/
-	DU_MLC_LAYER_SET(kcrtc, mlc, i, sf_en, 0);
+	if (klp->du_owner == CRTC_DC) {
+		DU_MLC_LAYER_SET(regs, dc_mlc, i, sf_en, 0);
+	} else {
+		DU_MLC_LAYER_SET(regs, dp_mlc, i, sf_en, 0);
+	}
+
+	if (klp->plane_status != PLANE_DISABLE)
+		klp->plane_status = PLANE_DISABLE;
 }
 
 static void kunlun_plane_destroy(struct drm_plane *plane)
@@ -1055,15 +1234,28 @@ void kunlun_planes_fini(struct kunlun_crtc *kcrtc)
 int kunlun_planes_init_primary(struct kunlun_crtc *kcrtc,
 		struct drm_plane **primary, struct drm_plane **cursor)
 {
-	const struct kunlun_crtc_data *data = kcrtc->data;
-	struct kunlun_plane *plane;
+	const struct kunlun_crtc_du_data *dc_data = kcrtc->data->dc_data;
+	const struct kunlun_crtc_du_data *dp_data = kcrtc->data->dp_data;
 	const struct kunlun_plane_data *plane_data;
-	unsigned int i;
+	struct kunlun_plane *plane;
+	int index;
 	int ret;
+	int i, j;
 
 	for(i = 0; i < kcrtc->num_planes; i++) {
 		plane = &kcrtc->planes[i];
-		plane_data = &data->planes[i];
+		if (i < kcrtc->num_dp_planes) {
+			index = (i < dp_data->num_planes) ? 0 : 1;
+			if (index) {
+				j = i - dp_data->num_planes;
+			} else {
+				j = i;
+			}
+			plane_data = &dp_data->planes[j];
+		} else {
+			j = i - kcrtc->num_dp_planes;
+			plane_data = &dc_data->planes[j];
+		}
 
 		if(plane_data->type != DRM_PLANE_TYPE_PRIMARY &&
 				plane_data->type != DRM_PLANE_TYPE_CURSOR)
@@ -1095,21 +1287,35 @@ err_planes_fini:
 
 int kunlun_planes_init_overlay(struct kunlun_crtc *kcrtc)
 {
-	const struct kunlun_crtc_data *data = kcrtc->data;
-	struct kunlun_plane *plane;
+	const struct kunlun_crtc_du_data *dc_data = kcrtc->data->dc_data;
+	const struct kunlun_crtc_du_data *dp_data = kcrtc->data->dp_data;
 	const struct kunlun_plane_data *plane_data;
-	unsigned int i;
+	struct kunlun_plane *plane;
+	int index;
 	int ret;
+	int i, j;
 
 	for(i = 0; i < kcrtc->num_planes; i++) {
 		plane = &kcrtc->planes[i];
-		plane_data = &data->planes[i];
+		if (i < kcrtc->num_dp_planes) {
+			index = (i < dp_data->num_planes) ? 0 : 1;
+			if (index) {
+				j = i - dp_data->num_planes;
+			} else {
+				j = i;
+			}
+			plane_data = &dp_data->planes[j];
+		} else {
+			j = i - kcrtc->num_dp_planes;
+			plane_data = &dc_data->planes[j];
+		}
 
 		if(plane_data->type != DRM_PLANE_TYPE_OVERLAY)
 			continue;
 
 		ret = drm_universal_plane_init(kcrtc->drm, &plane->base,
-				0, &kunlun_plane_funcs, plane_data->hwpipe->formats,
+				(1 << drm_crtc_index(&kcrtc->base)),
+				&kunlun_plane_funcs, plane_data->hwpipe->formats,
 				plane_data->hwpipe->nformats, NULL,
 				plane_data->type, NULL);
 		if(ret) {

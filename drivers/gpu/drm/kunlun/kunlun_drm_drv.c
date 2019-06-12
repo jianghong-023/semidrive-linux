@@ -285,7 +285,7 @@ static int add_components_dsd(struct device *master, struct device_node *np,
 		intf = of_graph_get_remote_port_parent(ep_node);
 		if(!intf)
 			continue;
-		
+
 		drm_of_component_match_add(master, matchptr, compare_of, intf);
 		DRM_DEV_DEBUG(master, "Add component %s", intf->name);
 		of_node_put(intf);
@@ -361,29 +361,17 @@ static int kunlun_drm_remove(struct platform_device *pdev)
 	return 0;
 }
 
-static int compare_name_dp(struct device_node *np)
+static int compare_name_crtc(struct device_node *np)
 {
-	return strstr(np->name, "dp") != NULL;
+	return strstr(np->name, "crtc") != NULL;
 }
 
-static int compare_name_dc(struct device_node *np)
-{
-	return strstr(np->name, "dc") != NULL;
-}
-
-static const struct kunlun_drm_device_info kunlun_dps_info = {
-	.type = KUNLUN_DRM_DP,
-	.match = compare_name_dp,
-};
-
-static const struct kunlun_drm_device_info kunlun_dcs_info = {
-	.type = KUNLUN_DRM_DC,
-	.match = compare_name_dc,
+static const struct kunlun_drm_device_info kunlun_display_info = {
+	.match = compare_name_crtc,
 };
 
 static const struct of_device_id kunlun_drm_of_table[] = {
-	{.compatible = "semdrive,dp-subsystem", .data = &kunlun_dps_info },
-	{.compatible = "semdrive,dc-subsystem", .data = &kunlun_dcs_info },
+	{.compatible = "semdrive,display-subsystem", .data = &kunlun_display_info },
 	{},
 };
 MODULE_DEVICE_TABLE(of, kunlun_drm_of_table);

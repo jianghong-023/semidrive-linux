@@ -13,7 +13,7 @@
 #include <drm/drm_plane.h>
 #include "kunlun_drm_reg.h"
 
-#define DU_PIPE_ELEM_SET(crtc, chn_base, elem, name, val) kunlun_reg_set(crtc->regs, \
+#define DU_PIPE_ELEM_SET(base, chn_base, elem, name, val) kunlun_reg_set(base, \
 		chn_base + elem->name.offset, elem->name.mask, elem->name.shift, val)
 
 static const uint32_t csc_param[4][15] = {

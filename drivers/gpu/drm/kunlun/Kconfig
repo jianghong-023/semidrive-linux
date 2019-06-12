@@ -17,11 +17,13 @@ config DRM_KUNLUN_RGB
 	bool "Semidrive specific extensions for RGB parallel"
 	help
 		This selects support for Semidrive SoC specific extensions
-		for the RGB parallel dirver. If you want to  enable RGB
+		for the RGB parallel driver. If you want to  enable RGB
 		parallel, you should select this option.
 
 config DRM_KUNLUN_CRTC
 	bool "Semidrive DRM CRTC"
-config DRM_KUNLUN_DC
-	bool "Semidrive DC"
+	help
+		This selects support for Semidrive SoC specific extensions
+		for the CRTC driver. If you want to  enable CRTC, you should
+		select this option.
 endif

@@ -14,6 +14,4 @@ kunlun-drm-crtc-objs := \
 	kunlun_drm_crtc.o \
 	kunlun_drm_plane.o
 
-kunlun-drm-crtc-$(CONFIG_DRM_KUNLUN_DC) += kunlun_drm_dc_crtc.o
-
 obj-$(CONFIG_DRM_KUNLUN_CRTC) += kunlun-drm-crtc.o
