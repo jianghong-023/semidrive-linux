@@ -44,9 +44,9 @@ struct memdisk_dev {
 #define MEMDISK_USERDATA_SIZE  0x20000000  // 512M
 
 #define MEMDISK_VENDOR_PHYS    0xea000000  //
-#define MEMDISK_VENDOR_SIZE    0x07000000  // 128M
+#define MEMDISK_VENDOR_SIZE    0x10000000  // 256M
 
-#define MEMDISK_CACHE_PHYS     0xf2000000  // use this partition as xfer space
+#define MEMDISK_CACHE_PHYS     0xfb000000  // use this partition as xfer space
 #define MEMDISK_CACHE_SIZE     0x04000000  // 64M
 
 static struct memdisk_dev memdisks[] = {
