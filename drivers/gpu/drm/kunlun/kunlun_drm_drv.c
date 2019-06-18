@@ -143,6 +143,9 @@ static int kunlun_drm_init_iommu(struct drm_device *drm)
 
 	kdrm->iommu_enable = true;
 
+	of_node_put(iommu);
+	return ret;
+
 err_free_mm:
 	kfree(kdrm->mm);
 err_domain:
