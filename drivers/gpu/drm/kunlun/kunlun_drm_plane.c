@@ -459,7 +459,7 @@ const struct kunlun_plane_data kunlun_dc_planes[] = {
 	{
 		.chn_base = DC_SP_CHN_BASE,
 		.id = DC_SPIPE,
-		.type = DRM_PLANE_TYPE_OVERLAY,
+		.type = DRM_PLANE_TYPE_PRIMARY,
 		.hwpipe = &sp_data,
 	},
 	{

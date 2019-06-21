@@ -1197,12 +1197,12 @@ static int kunlun_crtc_get_resource(struct kunlun_crtc *kcrtc)
 		dev_err(dev, "dc_nums is not specified\n");
 		return -EINVAL;
 	}
-
+	/*
 	ret = of_property_read_u32(dev->of_node, "dp_nums", &kcrtc->dp_nums);
 	if (ret) {
 		dev_err(dev, "dp_nums is not specified\n");
 		return -EINVAL;
-	}
+	}*/
 
 	if ((kcrtc->dc_nums == 0) && (kcrtc->dp_nums == 0)) {
 		dev_err(dev, "crtc have no hardware support!\n");
