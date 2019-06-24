@@ -1,4 +1,4 @@
-dtb-$(CONFIG_ARCH_SEMIDRIVE_KUNLUN) += kunlun.dtb
+dtb-$(CONFIG_ARCH_SEMIDRIVE_KUNLUN) += x9.dtb
 
 always		:= $(dtb-y)
 subdir-y	:= $(dts-dirs)
