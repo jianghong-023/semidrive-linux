@@ -265,9 +265,9 @@ config ARCH_ZYNQMP
 	help
 	  This enables support for Xilinx ZynqMP Family
 
-config ARCH_SEMIDRIVE_KUNLUN
-	bool "Semidrive Kunlun SOC Family"
+config ARCH_SEMIDRIVE_X9
+	bool "Semidrive X9 SOC Family"
 	select SDRV_TIMER
 	help
-	  This enables support for Semidrive kunlun SOC  Family
+	  This enables support for Semidrive x9 SOC  Family
 endmenu
