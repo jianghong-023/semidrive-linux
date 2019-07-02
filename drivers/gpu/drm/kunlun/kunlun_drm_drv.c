@@ -20,6 +20,7 @@
 #include <linux/console.h>
 #include <linux/iommu.h>
 #include <linux/of_platform.h>
+#include <linux/bitops.h>
 
 #include "kunlun_drm_drv.h"
 #include "kunlun_drm_fbdev.h"
@@ -108,7 +109,8 @@ static int kunlun_drm_init_iommu(struct drm_device *drm)
 {
 	struct kunlun_drm_data *kdrm = drm->dev_private;
 	struct device *dev = drm->dev;
-	struct device_node *iommu;
+	struct device_node *iommu = NULL;
+	struct property *prop = NULL;
 	struct iommu_domain_geometry *geometry;
 	u64 start, end;
 	int ret = 0;
@@ -116,7 +118,16 @@ static int kunlun_drm_init_iommu(struct drm_device *drm)
 	kdrm->iommu_enable = false;
 	iommu = of_parse_phandle(dev->of_node, "iommus", 0);
 	if(!iommu) {
-		DRM_DEV_DEBUG(dev, "iommu disabled\n");
+		DRM_DEV_DEBUG(dev, "iommu not specified\n");
+		return ret;
+	}
+	if (!of_device_is_available(iommu)) {
+		DRM_DEV_DEBUG(dev, "smmu disabled\n");
+		return ret;
+	}
+	prop = of_find_property(dev->of_node, "smmu", NULL);
+	if(!prop) {
+		DRM_DEV_DEBUG(dev, "smmu bypassed\n");
 		return ret;
 	}
 
@@ -126,7 +137,7 @@ static int kunlun_drm_init_iommu(struct drm_device *drm)
 		goto err_domain;
 	}
 
-	kdrm->domain = iommu_domain_alloc(&platform_bus_type);
+	kdrm->domain = iommu_get_domain_for_dev(drm->dev);
 	if(!kdrm->domain) {
 		ret = -ENOMEM;
 		goto err_free_mm;;
@@ -134,7 +145,7 @@ static int kunlun_drm_init_iommu(struct drm_device *drm)
 
 	geometry = &kdrm->domain->geometry;
 	start = geometry->aperture_start;
-	end = geometry->aperture_end;
+	end = GENMASK(37, 0);
 
 	DRM_DEV_DEBUG(dev, "IOMMU context initialized: %#llx - %#llx\n",
 			start, end);

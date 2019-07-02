@@ -381,4 +381,10 @@ config QCOM_IOMMU
 	help
 	  Support for IOMMU on certain Qualcomm SoCs.
 
+config SCR4K_SID
+	bool "SID pre-setting for masters"
+	# Note: Temporary option for setting SCR4k
+	help
+	  Support setting SID on Linux.
+
 endif # IOMMU_SUPPORT

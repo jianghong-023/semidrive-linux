@@ -93,6 +93,7 @@ int of_dma_configure(struct device *dev, struct device_node *np)
 	unsigned long offset;
 	const struct iommu_ops *iommu;
 	u64 mask;
+	struct property *prop = NULL;
 
 	ret = of_dma_get_range(np, &dma_addr, &paddr, &size);
 	if (ret < 0) {
@@ -134,7 +135,7 @@ int of_dma_configure(struct device *dev, struct device_node *np)
 	 * setup the correct supported mask.
 	 */
 	if (!dev->coherent_dma_mask)
-		dev->coherent_dma_mask = DMA_BIT_MASK(32);
+		dev->coherent_dma_mask = DMA_BIT_MASK(38);
 	/*
 	 * Set it to coherent_dma_mask by default if the architecture
 	 * code has not set it.
@@ -163,10 +164,19 @@ int of_dma_configure(struct device *dev, struct device_node *np)
 	if (IS_ERR(iommu) && PTR_ERR(iommu) == -EPROBE_DEFER)
 		return -EPROBE_DEFER;
 
-	dev_dbg(dev, "device is%sbehind an iommu\n",
+	dev_dbg(dev, "device %s is%sbehind an iommu\n",
+		dev_name(dev),
 		iommu ? " " : " not ");
 
-	arch_setup_dma_ops(dev, dma_addr, size, iommu, coherent);
+	prop = of_find_property(dev->of_node, "smmu", NULL);
+	if (iommu && prop) {
+		arch_setup_dma_ops(dev, dma_addr, size, iommu, coherent);
+		dev_dbg(dev, "device %s use iommu map ops\n", dev_name(dev));
+	}
+	else {
+		arch_setup_dma_ops(dev, dma_addr, size, NULL, coherent);
+		dev_dbg(dev, "device %s use default dma map ops\n", dev_name(dev));
+	}
 
 	return 0;
 }

@@ -1002,6 +1002,7 @@ struct iommu_group *iommu_group_get_for_dev(struct device *dev)
 	const struct iommu_ops *ops = dev->bus->iommu_ops;
 	struct iommu_group *group;
 	int ret;
+	struct property *prop = NULL;
 
 	group = iommu_group_get(dev);
 	if (group)
@@ -1024,7 +1025,16 @@ struct iommu_group *iommu_group_get_for_dev(struct device *dev)
 	if (!group->default_domain) {
 		struct iommu_domain *dom;
 
-		dom = __iommu_domain_alloc(dev->bus, iommu_def_domain_type);
+		prop = of_find_property(dev->of_node, "smmu", NULL);
+		if (prop) {
+			dev_warn(dev, "device %s use iommu dma domain\n", dev_name(dev));
+			dom = __iommu_domain_alloc(dev->bus, iommu_def_domain_type);
+		}
+		else {
+			dev_warn(dev, "device %s use identity domain\n", dev_name(dev));
+			dom = __iommu_domain_alloc(dev->bus, IOMMU_DOMAIN_IDENTITY);
+		}
+
 		if (!dom && iommu_def_domain_type != IOMMU_DOMAIN_DMA) {
 			dev_warn(dev,
 				 "failed to allocate default IOMMU domain of type %u; falling back to IOMMU_DOMAIN_DMA",

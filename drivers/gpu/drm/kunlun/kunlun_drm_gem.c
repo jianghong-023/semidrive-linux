@@ -35,7 +35,7 @@ static int kunlun_gem_iommu_map(struct kunlun_gem_object *kg_obj)
 	mutex_lock(&kdrm->mm_lock);
 
 	ret = drm_mm_insert_node_generic(kdrm->mm, kg_obj->mm,
-			gem_obj->size, PAGE_SIZE, 0, 0);
+			gem_obj->size, PAGE_SIZE, 0, DRM_MM_INSERT_BEST);
 	if(ret < 0) {
 		DRM_DEV_ERROR(drm->dev, "out of I/O virtual memory:%zd\n", ret);
 		goto err_free_mm;
@@ -44,7 +44,7 @@ static int kunlun_gem_iommu_map(struct kunlun_gem_object *kg_obj)
 	kg_obj->paddr = kg_obj->mm->start;
 
 	ret = iommu_map_sg(kdrm->domain, kg_obj->paddr,
-			kg_obj->sgt->sgl, kg_obj->sgt->nents, prot);
+				kg_obj->sgt->sgl, kg_obj->sgt->nents, prot);
 	if((ret < 0) || (ret < gem_obj->size)) {
 		DRM_DEV_ERROR(drm->dev, "failed to map buffer: %zd,request: %zd\n",
 				ret, gem_obj->size);
@@ -53,6 +53,14 @@ static int kunlun_gem_iommu_map(struct kunlun_gem_object *kg_obj)
 	}
 
 	kg_obj->size = ret;
+
+	kg_obj->vaddr = vmap(kg_obj->pages, kg_obj->num_pages, VM_MAP,
+				pgprot_writecombine(PAGE_KERNEL));
+	if(!kg_obj->vaddr) {
+		dev_err(drm->dev, "failed to vmap framebuffer\n");
+		ret = -ENOMEM;
+		goto err_remove_node;
+	}
 
 	mutex_unlock(&kdrm->mm_lock);
 
