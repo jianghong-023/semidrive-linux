@@ -91,6 +91,7 @@ static int i2c_dw_init_master(struct dw_i2c_dev *dev)
 		hcnt = dev->ss_hcnt;
 		lcnt = dev->ss_lcnt;
 	} else {
+#if 0
 		hcnt = i2c_dw_scl_hcnt(i2c_dw_clk_rate(dev),
 					4000,	/* tHD;STA = tHIGH = 4.0 us */
 					sda_falling_time,
@@ -100,6 +101,10 @@ static int i2c_dw_init_master(struct dw_i2c_dev *dev)
 					4700,	/* tLOW = 4.7 us */
 					scl_falling_time,
 					0);	/* No offset */
+#endif
+		/* FIXME:  will be removed after clock driver ready */
+		hcnt = 0x20;
+		lcnt = 0x20;
 	}
 	dw_writel(dev, hcnt, DW_IC_SS_SCL_HCNT);
 	dw_writel(dev, lcnt, DW_IC_SS_SCL_LCNT);
@@ -113,6 +118,7 @@ static int i2c_dw_init_master(struct dw_i2c_dev *dev)
 		hcnt = dev->fs_hcnt;
 		lcnt = dev->fs_lcnt;
 	} else {
+#if 0
 		hcnt = i2c_dw_scl_hcnt(i2c_dw_clk_rate(dev),
 					600,	/* tHD;STA = tHIGH = 0.6 us */
 					sda_falling_time,
@@ -122,6 +128,10 @@ static int i2c_dw_init_master(struct dw_i2c_dev *dev)
 					1300,	/* tLOW = 1.3 us */
 					scl_falling_time,
 					0);	/* No offset */
+#endif
+		/* FIXME:  will be removed after clock driver ready */
+                hcnt = 0x20;
+                lcnt = 0x20;
 	}
 	dw_writel(dev, hcnt, DW_IC_FS_SCL_HCNT);
 	dw_writel(dev, lcnt, DW_IC_FS_SCL_LCNT);

@@ -19,6 +19,89 @@
 
 #include "adv7511.h"
 
+static void dumpregs(struct adv7511 *adv7511)
+{
+
+	unsigned int val;
+	int ret;
+
+	ret = regmap_read(adv7511->regmap, 0x41, &val);
+	dev_dbg(&(adv7511->i2c_main->dev), "[ADV7511] 0x41: [0x%02x], \n", val);
+	ret = regmap_read(adv7511->regmap, 0x98, &val);
+	dev_dbg(&(adv7511->i2c_main->dev), "[ADV7511] 0x98: [0x%02x], \n", val);
+	ret = regmap_read(adv7511->regmap, 0x9A, &val);
+	dev_dbg(&(adv7511->i2c_main->dev), "[ADV7511] 0x9A: [0x%02x], \n", val);
+	ret = regmap_read(adv7511->regmap, 0x9C, &val);
+	dev_dbg(&(adv7511->i2c_main->dev), "[ADV7511] 0x9C: [0x%02x], \n", val);
+	ret = regmap_read(adv7511->regmap, 0x9D, &val);
+	dev_dbg(&(adv7511->i2c_main->dev), "[ADV7511] 0x9D: [0x%02x], \n", val);
+	ret = regmap_read(adv7511->regmap, 0xA2, &val);
+	dev_dbg(&(adv7511->i2c_main->dev), "[ADV7511] 0xA2: [0x%02x], \n", val);
+	ret = regmap_read(adv7511->regmap, 0xA3, &val);
+	dev_dbg(&(adv7511->i2c_main->dev), "[ADV7511] 0xA3: [0x%02x], \n", val);
+	ret = regmap_read(adv7511->regmap, 0xE0, &val);
+	dev_dbg(&(adv7511->i2c_main->dev), "[ADV7511] 0xE0: [0x%02x], \n", val);
+	ret = regmap_read(adv7511->regmap, 0x55, &val);
+	dev_dbg(&(adv7511->i2c_main->dev), "[ADV7511] 0x55: [0x%02x], \n", val);
+	ret = regmap_read(adv7511->regmap, 0xF9, &val);
+	dev_dbg(&(adv7511->i2c_main->dev), "[ADV7511] 0xF9: [0x%02x], \n", val);
+	ret = regmap_read(adv7511->regmap, 0x15, &val);
+	dev_dbg(&(adv7511->i2c_main->dev), "[ADV7511] 0x15: [0x%02x], \n", val);
+	ret = regmap_read(adv7511->regmap, 0x48, &val);
+	dev_dbg(&(adv7511->i2c_main->dev), "[ADV7511] 0x48: [0x%02x], \n", val);
+	ret = regmap_read(adv7511->regmap, 0x16, &val);
+	dev_dbg(&(adv7511->i2c_main->dev), "[ADV7511] 0x16: [0x%02x], \n", val);
+	ret = regmap_read(adv7511->regmap, 0x17, &val);
+	dev_dbg(&(adv7511->i2c_main->dev), "[ADV7511] 0x17: [0x%02x], \n", val);
+	ret = regmap_read(adv7511->regmap, 0x18, &val);
+	dev_dbg(&(adv7511->i2c_main->dev), "[ADV7511] 0x18: [0x%02x], \n", val);
+	ret = regmap_read(adv7511->regmap, 0xAF, &val);
+	dev_dbg(&(adv7511->i2c_main->dev), "[ADV7511] 0xAF: [0x%02x], \n", val);
+	ret = regmap_read(adv7511->regmap, 0x4C, &val);
+	dev_dbg(&(adv7511->i2c_main->dev), "[ADV7511] 0x4C: [0x%02x], \n", val);
+	ret = regmap_read(adv7511->regmap, 0x40, &val);
+	dev_dbg(&(adv7511->i2c_main->dev), "[ADV7511] 0x40: [0x%02x], \n", val);
+
+
+}
+
+static const struct reg_sequence adv7511_all_registers[] = {
+	{ 0x41, 0x00 },
+	{ 0x98, 0x03 },
+	{ 0x9A, 0xE0 },
+	{ 0x9C, 0x30 },
+	{ 0x9D, 0x61 },
+	{ 0xA2, 0xA4 },
+	{ 0xA3, 0xA4 },
+	{ 0xE0, 0xD0 },
+	{ 0x55, 0x12 },
+	{ 0xF9, 0x00 },
+	{ 0x9D, 0x61 },
+	{ 0x15, 0x00 },
+	{ 0x48, 0x00 },
+	{ 0x16, 0x36 },
+	{ 0x17, 0x00 },
+	{ 0x18, 0x00 },
+	{ 0xAF, 0x06 },
+	{ 0x4C, 0x00 },
+	{ 0x40, 0x00 },
+};
+
+int flush_all_I2C_data(struct adv7511 *adv7511,
+                                        const struct reg_sequence *regs,
+                                        int num_regs)
+{
+	unsigned int val;
+	int i =0;
+
+	for (i = 0; i < num_regs; i++) {
+		regmap_write(adv7511->regmap, regs[i].reg, regs[i].def);
+		regmap_read(adv7511->regmap, regs[i].reg, &val);
+		dev_dbg(&(adv7511->i2c_main->dev), "[ADV7511] reg: [0x%02x], write: [0x%02x], read: [0x%02x]\n", regs[i].reg, regs[i].def, val);
+	}
+	return 0;
+}
+
 /* ADI recommended values for proper operation. */
 static const struct reg_sequence adv7511_fixed_registers[] = {
 	{ 0x98, 0x03 },
@@ -29,7 +112,8 @@ static const struct reg_sequence adv7511_fixed_registers[] = {
 	{ 0xa3, 0xa4 },
 	{ 0xe0, 0xd0 },
 	{ 0xf9, 0x00 },
-	{ 0x55, 0x02 },
+	{ 0x55, 0x12 },   /* 0x02  -> 0x12 */
+	{ 0x4c, 0x00 },
 };
 
 /* -----------------------------------------------------------------------------
@@ -373,10 +457,14 @@ static void adv7511_power_on(struct adv7511 *adv7511)
 static void __adv7511_power_off(struct adv7511 *adv7511)
 {
 	/* TODO: setup additional power down modes */
+
+	/* FIXME: unmark after DRM bridge works */
+#if 0
 	regmap_update_bits(adv7511->regmap, ADV7511_REG_POWER,
 			   ADV7511_POWER_POWER_DOWN,
 			   ADV7511_POWER_POWER_DOWN);
 	regcache_mark_dirty(adv7511->regmap);
+#endif
 }
 
 static void adv7511_power_off(struct adv7511 *adv7511)
@@ -1069,11 +1157,19 @@ static int adv7511_probe(struct i2c_client *i2c, const struct i2c_device_id *id)
 		goto uninit_regulators;
 	dev_dbg(dev, "Rev. %d\n", val);
 
-	if (adv7511->type == ADV7511)
+	adv7511_power_on(adv7511);
+
+	if (adv7511->type == ADV7511) {
+		/* FIXME: regmap_register_patch not works */
+#if 0
 		ret = regmap_register_patch(adv7511->regmap,
 					    adv7511_fixed_registers,
 					    ARRAY_SIZE(adv7511_fixed_registers));
-	else
+#endif
+		ret = flush_all_I2C_data(adv7511,
+					    adv7511_fixed_registers,
+					    ARRAY_SIZE(adv7511_fixed_registers));
+	} else
 		ret = adv7533_patch_registers(adv7511);
 	if (ret)
 		goto uninit_regulators;
@@ -1115,8 +1211,6 @@ static int adv7511_probe(struct i2c_client *i2c, const struct i2c_device_id *id)
 	regmap_write(adv7511->regmap, ADV7511_REG_CEC_CTRL,
 		     ADV7511_CEC_CTRL_POWER_DOWN);
 
-	adv7511_power_off(adv7511);
-
 	i2c_set_clientdata(i2c, adv7511);
 
 	if (adv7511->type == ADV7511)
@@ -1128,6 +1222,11 @@ static int adv7511_probe(struct i2c_client *i2c, const struct i2c_device_id *id)
 	drm_bridge_add(&adv7511->bridge);
 
 	adv7511_audio_init(dev, adv7511);
+
+	ret = flush_all_I2C_data(adv7511, adv7511_all_registers,
+					ARRAY_SIZE(adv7511_all_registers));
+
+	dumpregs(adv7511);
 
 	return 0;
 
