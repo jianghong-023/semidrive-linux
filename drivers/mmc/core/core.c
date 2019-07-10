@@ -50,6 +50,8 @@
 #include "sd_ops.h"
 #include "sdio_ops.h"
 
+#define DEBUG 1
+
 /* If the device is not responding */
 #define MMC_CORE_TIMEOUT_MS	(10 * 60 * 1000) /* 10 minute timeout */
 
@@ -2447,7 +2449,7 @@ static int mmc_rescan_try_freq(struct mmc_host *host, unsigned freq)
 
 	pr_debug("%s: %s: trying to init card at %u Hz\n",
 		mmc_hostname(host), __func__, host->f_init);
-
+	//host->ocr_avail = 0x80;yxy
 	mmc_power_up(host, host->ocr_avail);
 
 	/*
@@ -2558,14 +2560,19 @@ void mmc_rescan(struct work_struct *work)
 {
 	struct mmc_host *host =
 		container_of(work, struct mmc_host, detect.work);
+	dev_err(host->parent,
+			"yxy:mmc_rescan in \n");
 	int i;
 
 	if (host->rescan_disable)
 		return;
-
+	dev_err(host->parent,
+			"yxy:mmc_rescan step 1\n");
 	/* If there is a non-removable card registered, only scan once */
 	if (!mmc_card_is_removable(host) && host->rescan_entered)
 		return;
+	dev_err(host->parent,
+			"yxy:mmc_rescan step 2\n");
 	host->rescan_entered = 1;
 
 	if (host->trigger_card_event && host->ops->card_event) {
@@ -2574,7 +2581,8 @@ void mmc_rescan(struct work_struct *work)
 		mmc_release_host(host);
 		host->trigger_card_event = false;
 	}
-
+	dev_err(host->parent,
+			"yxy:mmc_rescan step 3\n");
 	mmc_bus_get(host);
 
 	/*
@@ -2583,7 +2591,8 @@ void mmc_rescan(struct work_struct *work)
 	 */
 	if (host->bus_ops && !host->bus_dead && mmc_card_is_removable(host))
 		host->bus_ops->detect(host);
-
+	dev_err(host->parent,
+			"yxy:mmc_rescan step 4\n");
 	host->detect_change = 0;
 
 	/*
@@ -2592,7 +2601,8 @@ void mmc_rescan(struct work_struct *work)
 	 */
 	mmc_bus_put(host);
 	mmc_bus_get(host);
-
+	dev_err(host->parent,
+			"yxy:mmc_rescan step 5\n");
 	/* if there still is a card present, stop here */
 	if (host->bus_ops != NULL) {
 		mmc_bus_put(host);
@@ -2604,7 +2614,8 @@ void mmc_rescan(struct work_struct *work)
 	 * release the lock here.
 	 */
 	mmc_bus_put(host);
-
+	dev_err(host->parent,
+			"yxy:mmc_rescan step 6\n");
 	mmc_claim_host(host);
 	if (mmc_card_is_removable(host) && host->ops->get_cd &&
 			host->ops->get_cd(host) == 0) {
@@ -2612,15 +2623,19 @@ void mmc_rescan(struct work_struct *work)
 		mmc_release_host(host);
 		goto out;
 	}
-
+	dev_err(host->parent,
+			"yxy:mmc_rescan step 7\n");
 	for (i = 0; i < ARRAY_SIZE(freqs); i++) {
 		if (!mmc_rescan_try_freq(host, max(freqs[i], host->f_min)))
 			break;
 		if (freqs[i] <= host->f_min)
 			break;
 	}
+	dev_err(host->parent,
+			"yxy:mmc_rescan step 8 i = %d\n", i);
 	mmc_release_host(host);
-
+	dev_err(host->parent,
+			"yxy:mmc_rescan step 8 i = %d\n", i);
  out:
 	if (host->caps & MMC_CAP_NEEDS_POLL)
 		mmc_schedule_delayed_work(&host->detect, HZ);
@@ -2633,13 +2648,22 @@ void mmc_start_host(struct mmc_host *host)
 	host->ios.power_mode = MMC_POWER_UNDEFINED;
 
 	if (!(host->caps2 & MMC_CAP2_NO_PRESCAN_POWERUP)) {
+		dev_err(host->parent,
+			"MMC_CAP2_NO_PRESCAN_POWERUP in\n");
 		mmc_claim_host(host);
+		//host->ocr_avail = 0x80;yxy
 		mmc_power_up(host, host->ocr_avail);
 		mmc_release_host(host);
+		dev_err(host->parent,
+			"MMC_CAP2_NO_PRESCAN_POWERUP out\n");
 	}
 
 	mmc_gpiod_request_cd_irq(host);
+	dev_err(host->parent,
+			"mmc_gpiod_request_cd_irq out\n");
 	_mmc_detect_change(host, 0, false);
+	dev_err(host->parent,
+			"mmc_start_host yxy out\n");
 }
 
 void mmc_stop_host(struct mmc_host *host)

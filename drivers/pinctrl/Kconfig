@@ -6,7 +6,6 @@ config PINCTRL
 	bool
 
 menu "Pin controllers"
-	depends on PINCTRL
 
 config GENERIC_PINCTRL_GROUPS
 	bool
@@ -353,6 +352,7 @@ source "drivers/pinctrl/aspeed/Kconfig"
 source "drivers/pinctrl/bcm/Kconfig"
 source "drivers/pinctrl/berlin/Kconfig"
 source "drivers/pinctrl/freescale/Kconfig"
+source "drivers/pinctrl/semidrive/Kconfig"
 source "drivers/pinctrl/intel/Kconfig"
 source "drivers/pinctrl/mvebu/Kconfig"
 source "drivers/pinctrl/nomadik/Kconfig"
