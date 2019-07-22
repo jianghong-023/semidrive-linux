@@ -342,8 +342,8 @@ const uint32_t gp_lite_formats[] = {
 	DRM_FORMAT_ABGR2101010,
 	DRM_FORMAT_BGRA1010102,
 	DRM_FORMAT_R8,
-	DRM_FORMAT_YUYV,
-	DRM_FORMAT_YVYU,
+	DRM_FORMAT_UYVY,
+	DRM_FORMAT_VYUY,
 	DRM_FORMAT_AYUV,
 	DRM_FORMAT_NV12,
 	DRM_FORMAT_NV21,
@@ -382,8 +382,8 @@ const uint32_t gp_big_formats[] = {
 	DRM_FORMAT_ABGR2101010,
 	DRM_FORMAT_BGRA1010102,
 	DRM_FORMAT_R8,
-	DRM_FORMAT_YUYV,
-	DRM_FORMAT_YVYU,
+	DRM_FORMAT_UYVY,
+	DRM_FORMAT_VYUY,
 	DRM_FORMAT_AYUV,
 	DRM_FORMAT_NV12,
 	DRM_FORMAT_NV21,
@@ -421,8 +421,8 @@ const uint32_t gp_mid_formats[] = {
 	DRM_FORMAT_ABGR2101010,
 	DRM_FORMAT_BGRA1010102,
 	DRM_FORMAT_R8,
-	DRM_FORMAT_YUYV,
-	DRM_FORMAT_YVYU,
+	DRM_FORMAT_UYVY,
+	DRM_FORMAT_VYUY,
 	DRM_FORMAT_AYUV,
 	DRM_FORMAT_NV12,
 	DRM_FORMAT_NV21,
@@ -694,20 +694,22 @@ static int kunlun_plane_frm_comp_set(void __iomem *regs,
 			swap = SWAP_A_RGB;
 			format_string = "DRM_FORMAT_R8";
 			break;
-		case DRM_FORMAT_YUYV:
+		case DRM_FORMAT_UYVY:
 			bpa = bpv = 0;
 			bpy = bpu = 8;
 			swap = SWAP_A_RGB;
 			is_yuv = 1;
-			format_string = "DRM_FORMAT_YUYV";
+			uvmode = UV_YUV422;
+			format_string = "DRM_FORMAT_UYVY";
 			break;
-		case DRM_FORMAT_YVYU:
+		case DRM_FORMAT_VYUY:
 			bpa = bpv = 0;
 			bpy = bpu = 8;
 			swap = SWAP_A_RGB;
 			uvswap = 1;
 			is_yuv = 1;
-			format_string = "DRM_FORMAT_YVYU";
+			uvmode = UV_YUV422;
+			format_string = "DRM_FORMAT_VYUY";
 			break;
 		case DRM_FORMAT_AYUV:
 			bpa = bpy = bpu = bpv = 8;

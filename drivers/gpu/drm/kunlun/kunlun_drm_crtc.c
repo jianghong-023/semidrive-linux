@@ -641,6 +641,15 @@ static void kunlun_dc_mlc_init(struct kunlun_crtc *kcrtc,
 	DU_REG_SET(dc_regs, mlc, ratio, 0xFFFF);
 }
 
+static void kunlun_dc_dither_init(struct kunlun_crtc *kcrtc,
+		const struct kunlun_tcon_dither *dither)
+{
+	void __iomem *dc_regs = kcrtc->dc_regs;
+
+	DU_REG_SET(dc_regs, dither, mode_12b, 1);
+	DU_REG_SET(dc_regs, dither, bypass, 1);
+}
+
 static void __iomem *kunlun_get_dp_regs(struct kunlun_crtc *kcrtc, int index)
 {
 	if ((index < 0) || (index > 2)) {
@@ -791,6 +800,7 @@ static int kunlun_crtc_init(struct kunlun_crtc *kcrtc)
 		kunlun_dc_rdma_init(kcrtc, dc_data->rdma);
 		kunlun_tcon_init(kcrtc, dc_data->tcon);
 		kunlun_dc_mlc_init(kcrtc, dc_data->mlc);
+		kunlun_dc_dither_init(kcrtc, dc_data->tcon->dither);
 	}
 
 	for (i = 0; i < kcrtc->dp_nums; i++) {
