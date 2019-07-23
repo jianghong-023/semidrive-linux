@@ -34,6 +34,7 @@
 
 #define cls_dev_to_mmc_host(d)	container_of(d, struct mmc_host, class_dev)
 
+
 static DEFINE_IDA(mmc_host_ida);
 
 static void mmc_host_classdev_release(struct device *dev)
@@ -419,19 +420,34 @@ int mmc_add_host(struct mmc_host *host)
 		!host->ops->enable_sdio_irq);
 
 	err = device_add(&host->class_dev);
+	dev_err(host->parent,
+			"device_add out ret = %d\n",
+			err);
 	if (err)
 		return err;
 
 	led_trigger_register_simple(dev_name(&host->class_dev), &host->led);
-
+	dev_err(host->parent,
+			"led_trigger_register_simple out ret = %d\n",
+			err);
 #ifdef CONFIG_DEBUG_FS
 	mmc_add_host_debugfs(host);
+	dev_err(host->parent,
+			"mmc_add_host_debugfs out ret = %d\n",
+			err);
 #endif
 
 	mmc_start_host(host);
+	dev_err(host->parent,
+			"mmc_start_host out ret = %d\n",
+			err);
+
 	if (!(host->pm_flags & MMC_PM_IGNORE_PM_NOTIFY))
 		mmc_register_pm_notifier(host);
-
+	/* yxy	*/
+	dev_err(host->parent,
+			"mmc_add_host out ret = %d\n",
+			err);
 	return 0;
 }
 

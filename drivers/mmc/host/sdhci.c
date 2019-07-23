@@ -47,7 +47,7 @@
 
 #define MAX_TUNING_LOOP 40
 
-static unsigned int debug_quirks = 0;
+static unsigned int debug_quirks = 1;
 static unsigned int debug_quirks2;
 
 static void sdhci_finish_data(struct sdhci_host *);
@@ -190,7 +190,7 @@ void sdhci_reset(struct sdhci_host *host, u8 mask)
 	}
 
 	/* Wait max 100 ms */
-	timeout = ktime_add_ms(ktime_get(), 100);
+	timeout = ktime_add_ms(ktime_get(), 1000);
 
 	/* hw clears the bit when it's done */
 	while (sdhci_readb(host, SDHCI_SOFTWARE_RESET) & mask) {
@@ -600,6 +600,7 @@ static void sdhci_adma_table_pre(struct sdhci_host *host,
 
 	for_each_sg(data->sg, sg, host->sg_count, i) {
 		addr = sg_dma_address(sg);
+
 		len = sg_dma_len(sg);
 
 		/*
@@ -1414,7 +1415,6 @@ void sdhci_enable_clk(struct sdhci_host *host, u16 clk)
 
 	clk |= SDHCI_CLOCK_INT_EN;
 	sdhci_writew(host, clk, SDHCI_CLOCK_CONTROL);
-
 	/* Wait max 20 ms */
 	timeout = ktime_add_ms(ktime_get(), 20);
 	while (!((clk = sdhci_readw(host, SDHCI_CLOCK_CONTROL))
@@ -1430,9 +1430,11 @@ void sdhci_enable_clk(struct sdhci_host *host, u16 clk)
 
 	clk |= SDHCI_CLOCK_CARD_EN;
 	sdhci_writew(host, clk, SDHCI_CLOCK_CONTROL);
+	//sdhci_dumpregs(host);
 }
 EXPORT_SYMBOL_GPL(sdhci_enable_clk);
 
+extern int hispeed_flag;
 void sdhci_set_clock(struct sdhci_host *host, unsigned int clock)
 {
 	u16 clk;
@@ -1445,6 +1447,11 @@ void sdhci_set_clock(struct sdhci_host *host, unsigned int clock)
 		return;
 
 	clk = sdhci_calc_clk(host, clock, &host->mmc->actual_clock);
+	if (hispeed_flag){
+		printk("please change haps clock......\n");
+		msleep(1000);
+		hispeed_flag = 0;
+	}
 	sdhci_enable_clk(host, clk);
 }
 EXPORT_SYMBOL_GPL(sdhci_set_clock);
@@ -2773,7 +2780,6 @@ static irqreturn_t sdhci_irq(int irq, void *dev_id)
 
 	do {
 		DBG("IRQ status 0x%08x\n", intmask);
-
 		if (host->ops->irq) {
 			intmask = host->ops->irq(host, intmask);
 			if (!intmask)
@@ -3631,14 +3637,21 @@ int sdhci_setup_host(struct sdhci_host *host)
 	    mmc_gpio_get_cd(host->mmc) < 0)
 		mmc->caps |= MMC_CAP_NEEDS_POLL;
 
-	/* If vqmmc regulator and no 1.8V signalling, then there's no UHS */
 	if (!IS_ERR(mmc->supply.vqmmc)) {
 		ret = regulator_enable(mmc->supply.vqmmc);
+
+		/* If vqmmc provides no 1.8V signalling, then there's no UHS */
 		if (!regulator_is_supported_voltage(mmc->supply.vqmmc, 1700000,
 						    1950000))
 			host->caps1 &= ~(SDHCI_SUPPORT_SDR104 |
 					 SDHCI_SUPPORT_SDR50 |
 					 SDHCI_SUPPORT_DDR50);
+
+		/* In eMMC case vqmmc might be a fixed 1.8V regulator */
+		if (!regulator_is_supported_voltage(mmc->supply.vqmmc, 2700000,
+						    3600000))
+			host->flags &= ~SDHCI_SIGNALING_330;
+
 		if (ret) {
 			pr_warn("%s: Failed to enable vqmmc regulator: %d\n",
 				mmc_hostname(mmc), ret);
@@ -3938,6 +3951,7 @@ int __sdhci_add_host(struct sdhci_host *host)
 	mmiowb();
 
 	ret = mmc_add_host(mmc);
+	//sdhci_dumpregs(host);
 	if (ret)
 		goto unled;
 

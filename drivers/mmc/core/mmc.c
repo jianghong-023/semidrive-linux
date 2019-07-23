@@ -656,6 +656,18 @@ out:
 	return err;
 }
 
+inline void print_array_hex(u8 *buf, u32 len)
+{
+	u32 i;
+	printk("point 0x%lx %d bytes data start:\n", (unsigned long)buf, len);
+	for(i = 0; i < len; i++){
+		printk("0x%2x ", buf[i]);
+		if(i%16 == 0xf)
+			printk("\n");
+	}
+	printk("point 0x%lx %d bytes data end.\n", (unsigned long)buf, len);
+}
+
 static int mmc_read_ext_csd(struct mmc_card *card)
 {
 	u8 *ext_csd;
@@ -995,6 +1007,8 @@ static int mmc_select_bus_width(struct mmc_card *card)
 	unsigned idx, bus_width = 0;
 	int err = 0;
 
+	dev_err(host->parent,
+			"yxy:host->caps = %d \n", host->caps);
 	if (!mmc_can_ext_csd(card) ||
 	    !(host->caps & (MMC_CAP_4_BIT_DATA | MMC_CAP_8_BIT_DATA)))
 		return 0;
@@ -1030,11 +1044,15 @@ static int mmc_select_bus_width(struct mmc_card *card)
 		 * compare ext_csd previously read in 1 bit mode
 		 * against ext_csd at new bus width
 		 */
-		if (!(host->caps & MMC_CAP_BUS_WIDTH_TEST))
+		if (!(host->caps & MMC_CAP_BUS_WIDTH_TEST)){
 			err = mmc_compare_ext_csds(card, bus_width);
-		else
+			dev_err(host->parent,
+			"yxy:mmc_compare_ext_csds ret = %d \n", err);
+		}else{
 			err = mmc_bus_test(card, bus_width);
-
+			dev_err(host->parent,
+				"yxy:mmc_bus_test ret = %d \n", err);
+		}
 		if (!err) {
 			err = bus_width;
 			break;
@@ -1464,7 +1482,7 @@ err:
 	}
 	return err;
 }
-
+int hispeed_flag = 0;
 /*
  * Activate High Speed, HS200 or HS400ES mode if supported.
  */
@@ -1490,6 +1508,7 @@ bus_speed:
 	 * Set the bus speed to the selected bus timing.
 	 * If timing is not selected, backward compatible is the default.
 	 */
+	hispeed_flag = 1;
 	mmc_set_bus_speed(card);
 	return 0;
 }
@@ -1545,6 +1564,9 @@ static int mmc_init_card(struct mmc_host *host, u32 ocr,
 
 	/* The extra bit indicates that we support high capacity */
 	err = mmc_send_op_cond(host, ocr | (1 << 30), &rocr);
+	dev_err(host->parent,
+			"mmc_init_card mmc_send_op_cond out ret = %d ocr = 0x%x\n",
+			err, rocr);
 	if (err)
 		goto err;
 
@@ -1552,7 +1574,11 @@ static int mmc_init_card(struct mmc_host *host, u32 ocr,
 	 * For SPI, enable CRC as appropriate.
 	 */
 	if (mmc_host_is_spi(host)) {
+		dev_err(host->parent,
+			"mmc_host_is_spi\n");
 		err = mmc_spi_set_crc(host, use_spi_crc);
+		dev_err(host->parent,
+			"mmc_spi_set_crc ret = %d\n", err);
 		if (err)
 			goto err;
 	}
@@ -1724,6 +1750,7 @@ static int mmc_init_card(struct mmc_host *host, u32 ocr,
 
 	if (mmc_card_hs200(card)) {
 		err = mmc_hs200_tuning(card);
+		printk("mmc_card_hs200 is true ret = %d\n", err);
 		if (err)
 			goto free_card;
 
@@ -1740,6 +1767,7 @@ static int mmc_init_card(struct mmc_host *host, u32 ocr,
 		}
 	}
 
+	printk("yxy ok!\n");
 	/*
 	 * Choose the power class with selected bus interface
 	 */
@@ -1787,6 +1815,7 @@ static int mmc_init_card(struct mmc_host *host, u32 ocr,
 		}
 	}
 
+	printk("yxy ok 111!\n");
 	/*
 	 * In some cases (e.g. RPMB or mmc_test), the Command Queue must be
 	 * disabled for a time, so a flag is needed to indicate to re-enable the
@@ -2123,6 +2152,8 @@ static const struct mmc_bus_ops mmc_ops = {
  */
 int mmc_attach_mmc(struct mmc_host *host)
 {
+	dev_err(host->parent,
+			"mmc_attach_mmc in\n");
 	int err;
 	u32 ocr, rocr;
 
@@ -2133,6 +2164,9 @@ int mmc_attach_mmc(struct mmc_host *host)
 		mmc_set_bus_mode(host, MMC_BUSMODE_OPENDRAIN);
 
 	err = mmc_send_op_cond(host, 0, &ocr);
+	dev_err(host->parent,
+			"mmc_send_op_cond out ret = %d ocr = 0x%x\n",
+			err, ocr);
 	if (err)
 		return err;
 
@@ -2150,6 +2184,9 @@ int mmc_attach_mmc(struct mmc_host *host)
 	}
 
 	rocr = mmc_select_voltage(host, ocr);
+	dev_err(host->parent,
+			"mmc_select_voltage out ret = %d\n",
+			rocr);
 
 	/*
 	 * Can we support the voltage of the card?
@@ -2163,11 +2200,17 @@ int mmc_attach_mmc(struct mmc_host *host)
 	 * Detect and init the card.
 	 */
 	err = mmc_init_card(host, rocr, NULL);
+	dev_err(host->parent,
+			"mmc_init_card out ret = %d\n",
+			err);
 	if (err)
 		goto err;
 
 	mmc_release_host(host);
 	err = mmc_add_card(host->card);
+	dev_err(host->parent,
+			"mmc_add_card out ret = %d\n",
+			err);
 	if (err)
 		goto remove_card;
 
