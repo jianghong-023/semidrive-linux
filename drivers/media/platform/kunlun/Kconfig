@@ -1,0 +1,13 @@
+config VIDEO_SEMIDRIVE
+	tristate "Semidrive V4L2 Camera Subsystem driver"
+	depends on VIDEO_V4L2 && VIDEO_V4L2_SUBDEV_API && HAS_DMA
+	select VIDEOBUF2_DMA_SG
+	select V4L2_FWNODE
+
+config VIDEO_SEMIDRIVE_PARALLEL
+	tristate "Semidrive Camera parallel interface"
+	depends on VIDEO_SEMIDRIVE
+
+config VIDEO_SEMIDRIVE_OV5640
+	tristate "Ov5640 for Semidrive"
+	depends on VIDEO_SEMIDRIVE
