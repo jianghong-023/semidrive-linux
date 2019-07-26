@@ -33,7 +33,8 @@
 #include <asm/system_misc.h>
 #include <asm/smp_plat.h>
 #include <asm/suspend.h>
-
+#include <linux/io.h>
+#include <linux/delay.h>
 /*
  * While a 64-bit OS can make calls with SMC32 calling conventions, for some
  * calls it is necessary to use SMC64 to pass or return 64-bit values.
@@ -132,6 +133,77 @@ static unsigned long __invoke_psci_fn_smc(unsigned long function_id,
 	arm_smccc_smc(function_id, arg0, arg1, arg2, 0, 0, 0, 0, &res);
 	return res.a0;
 }
+/**/
+static void rstgen_sec_module_rst(unsigned int idx, unsigned int rst_b)
+{
+	unsigned int value;
+	int count = 100;
+	void __iomem *iobase = ioremap(0x38400000, 0x100000);
+
+	value = readl(iobase+((0x100+(0x4*idx))<<10));
+	value &=  ~3;
+	value |= 0x2 | (rst_b&0x1);
+	writel(value, iobase+((0x100+(0x4*idx))<<10));
+	while (count-- > 0) {
+		value = readl(iobase+((0x100+(0x4*idx))<<10));
+		if ((value & (1<<30)) == ((rst_b&0x1)<<30))
+			break;
+		udelay(1);
+	}
+	iounmap(iobase);
+}
+void arm_smccc_native(unsigned long function_id,
+			unsigned long arg0, unsigned long arg1,
+			unsigned long arg2, struct arm_smccc_res *res)
+{
+	int cpunum = arg0;
+	uint32_t value;
+	void __iomem *iobase;
+	unsigned long pbootbase = arg1;
+
+	/*cpu on*/
+	if (function_id == 0xc4000003) {
+		unsigned long offsethigh, offsetlow;
+
+		iobase = ioremap(0x38200000, 0x200000);
+		if (cpunum < 4) {
+			offsethigh = ((0x410+8*cpunum) << 10);
+			offsetlow = ((0x40c+8*cpunum) << 10);
+		} else {
+			offsethigh = ((0x464+8*(cpunum-4)) << 10);
+			offsetlow = ((0x460+8*(cpunum-4)) << 10);
+		}
+		/*30~39*/
+		value = readl(iobase + offsethigh);
+		value &=  ~(0x3ff);
+		value |= (((pbootbase>>2)>>28) & 0x3ff);
+		writel(value, iobase + offsethigh);
+		/*29~2*/
+		value = readl(iobase + offsetlow);
+		value &=  ~(0xfffffff);
+		value |= ((pbootbase>>2) & 0xfffffff);
+		writel(value, iobase + offsetlow);
+
+		rstgen_sec_module_rst(cpunum+21, 1);
+	} else if (function_id == 0x84000002) {/*cpu off*/
+		rstgen_sec_module_rst(cpunum+21, 0);
+	} else{
+		pr_err("not implement current function 0x%lx\n", function_id);
+	}
+	res->a0 = 0;
+	iounmap(iobase);
+
+}
+static unsigned long __invoke_psci_fn_native(unsigned long function_id,
+			unsigned long arg0, unsigned long arg1,
+			unsigned long arg2)
+{
+	struct arm_smccc_res res;
+
+	arm_smccc_native(function_id, arg0, arg1, arg2, &res);
+
+	return res.a0;
+}
 
 static int psci_to_linux_errno(int errno)
 {
@@ -222,6 +294,9 @@ static void set_conduit(enum psci_conduit conduit)
 	case PSCI_CONDUIT_SMC:
 		invoke_psci_fn = __invoke_psci_fn_smc;
 		break;
+	case PSCI_CONDUIT_NONE:
+		invoke_psci_fn = __invoke_psci_fn_native;
+		break;
 	default:
 		WARN(1, "Unexpected PSCI conduit %d\n", conduit);
 	}
@@ -244,6 +319,8 @@ static int get_set_conduit_method(struct device_node *np)
 		set_conduit(PSCI_CONDUIT_HVC);
 	} else if (!strcmp("smc", method)) {
 		set_conduit(PSCI_CONDUIT_SMC);
+	} else if (!strcmp("native", method)) {
+		set_conduit(PSCI_CONDUIT_NONE);
 	} else {
 		pr_warn("invalid \"method\" property: %s\n", method);
 		return -EINVAL;
@@ -521,6 +598,7 @@ static void __init psci_init_smccc(void)
 
 	if (feature != PSCI_RET_NOT_SUPPORTED) {
 		u32 ret;
+
 		ret = invoke_psci_fn(ARM_SMCCC_VERSION_FUNC_ID, 0, 0, 0);
 		if (ret == ARM_SMCCC_VERSION_1_1) {
 			psci_ops.smccc_version = SMCCC_VERSION_1_1;

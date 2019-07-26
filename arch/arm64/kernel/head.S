@@ -383,20 +383,49 @@ ENTRY(kimage_vaddr)
  * Returns either BOOT_CPU_MODE_EL1 or BOOT_CPU_MODE_EL2 in w0 if
  * booted in EL1 or EL2 respectively.
  */
+
+#define CurrentEL_EL3		(0xc)
 ENTRY(el2_setup)
 	msr	SPsel, #1			// We want to use SP_EL{1,2}
 	mrs	x0, CurrentEL
 	cmp	x0, #CurrentEL_EL2
-	b.eq	1f
+	b.eq	2f
+	cmp     x0, #CurrentEL_EL3
+	b.eq   3f
+
+	mrs     x0, sctlr_el1
+CPU_BE( orr     x0, x0, #(3 << 24)      )       // Set the EE and E0E bits for EL1
+CPU_LE( bic     x0, x0, #(3 << 24)      )       // Clear the EE and E0E bits for EL1
+	msr     sctlr_el1, x0
+	mov     w0, #BOOT_CPU_MODE_EL1          // This cpu booted in EL1
+	isb
+	ret
+3:
+	/* set EL1 to 64bit */
+	mrs x0, scr_el3
+	orr x0, x0, #(1<<10)
+	msr scr_el3, x0
+
+
+	adr x0, .target
+	msr elr_el3, x0
+
+	mov x0, #((0b1111 << 6) | (0b0101)) /* EL1h runlevel */
+	msr spsr_el3, x0
+
 	mrs	x0, sctlr_el1
 CPU_BE(	orr	x0, x0, #(3 << 24)	)	// Set the EE and E0E bits for EL1
 CPU_LE(	bic	x0, x0, #(3 << 24)	)	// Clear the EE and E0E bits for EL1
 	msr	sctlr_el1, x0
 	mov	w0, #BOOT_CPU_MODE_EL1		// This cpu booted in EL1
 	isb
+
+	eret
+
+.target:
 	ret
 
-1:	mrs	x0, sctlr_el2
+2:	mrs	x0, sctlr_el2
 CPU_BE(	orr	x0, x0, #(1 << 25)	)	// Set the EE bit for EL2
 CPU_LE(	bic	x0, x0, #(1 << 25)	)	// Clear the EE bit for EL2
 	msr	sctlr_el2, x0
@@ -567,7 +596,7 @@ ENTRY(__boot_cpu_mode)
  * with MMU turned off.
  */
 ENTRY(__early_cpu_boot_status)
-	.long 	0
+	.long	0
 
 	.popsection
 
