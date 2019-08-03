@@ -496,8 +496,12 @@ static int kunlun_csi_probe(struct platform_device *pdev)
 			0, dev_name(dev), csi);
 	if(ret < 0) {
 		dev_err(dev, "Request IRQ failed: %d\n", ret);
-		goto err_register_subdevs;;
+		goto err_register_subdevs;
 	}
+
+	ret = dma_set_mask_and_coherent(dev, DMA_BIT_MASK(40));
+	if(ret)
+		goto err_register_subdevs;
 
 	dev_info(dev, "CSI driver probed.\n");
 	return 0;
