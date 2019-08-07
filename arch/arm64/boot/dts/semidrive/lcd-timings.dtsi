@@ -1,0 +1,103 @@
+&dtimings0 {
+	native-mode = <&hd1280x720>;
+
+	svga800x600: vesa_800x600@60 {
+		clock-frequency = <40000000>;
+		hactive = <800>;
+		vactive = <600>;
+		hback-porch = <88>;
+		hfront-porch = <40>;
+		vback-porch = <23>;
+		vfront-porch = <1>;
+		hsync-len = <128>;
+		vsync-len = <4>;
+	};
+
+	hd1280x720: vesa_1280x720@60 {
+		clock-frequency = <74250000>;
+		hactive = <1280>;
+		vactive = <720>;
+		hback-porch = <220>;
+		hfront-porch = <110>;
+		vback-porch = <20>;
+		vfront-porch = <5>;
+		hsync-len = <40>;
+		vsync-len = <5>;
+	};
+
+	fhd1920x1080: z1_1920x1080@60 {
+		clock-frequency = <126460000>;
+		hactive = <1920>;
+		vactive = <1080>;
+		hback-porch = <2>;
+		hfront-porch = <2>;
+		vback-porch = <12>;
+		vfront-porch = <2>;
+		hsync-len = <21>;
+		vsync-len = <2>;
+	};
+
+	qxga2560x1600: z1_2560x1600@60 {
+		clock-frequency =  <257180000>;
+		hactive = <2560>;
+		vactive = <1600>;
+		hback-porch = <20>;
+		hfront-porch = <2>;
+		vback-porch = <15>;
+		vfront-porch = <2>;
+		hsync-len = <40>;
+		vsync-len = <38>;
+	};
+};
+
+&dtimings1 {
+	native-mode = <&hd1280x720_1>;
+
+	svga800x600_1: vesa_800x600@60 {
+		clock-frequency = <40000000>;
+		hactive = <800>;
+		vactive = <600>;
+		hback-porch = <88>;
+		hfront-porch = <40>;
+		vback-porch = <23>;
+		vfront-porch = <1>;
+		hsync-len = <128>;
+		vsync-len = <4>;
+	};
+
+	hd1280x720_1: vesa_1280x720@60 {
+		clock-frequency = <74250000>;
+		hactive = <1280>;
+		vactive = <720>;
+		hback-porch = <220>;
+		hfront-porch = <110>;
+		vback-porch = <20>;
+		vfront-porch = <5>;
+		hsync-len = <40>;
+		vsync-len = <5>;
+	};
+
+	fhd1920x1080_1: z1_1920x1080@60 {
+		clock-frequency = <126460000>;
+		hactive = <1920>;
+		vactive = <1080>;
+		hback-porch = <2>;
+		hfront-porch = <2>;
+		vback-porch = <12>;
+		vfront-porch = <2>;
+		hsync-len = <21>;
+		vsync-len = <2>;
+	};
+
+	qxga2560x1600_1: z1_2560x1600@60 {
+		clock-frequency =  <257180000>;
+		hactive = <2560>;
+		vactive = <1600>;
+		hback-porch = <20>;
+		hfront-porch = <2>;
+		vback-porch = <15>;
+		vfront-porch = <2>;
+		hsync-len = <40>;
+		vsync-len = <38>;
+	};
+};
