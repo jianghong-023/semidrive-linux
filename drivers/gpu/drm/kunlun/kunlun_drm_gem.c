@@ -282,6 +282,9 @@ void kunlun_gem_free_object(struct drm_gem_object *obj)
 
 	kg_obj = to_kunlun_obj(obj);
 
+	if (obj->import_attach)
+		drm_prime_gem_destroy(obj, kg_obj->sgt);
+
 	kunlun_gem_free_buf(kg_obj);
 
 	kunlun_gem_release_object(kg_obj);
