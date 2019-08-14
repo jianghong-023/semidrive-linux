@@ -61,14 +61,20 @@ static inline void kunlun_reg_set(void __iomem *base,
 		reg->name.offset, val)
 
 enum {
-	CRTC_DC,
-	CRTC_DP0,
-	CRTC_DP1
+	PLANE_DISABLE,
+	PLANE_ENABLE
+};
+
+enum kunlun_plane_property {
+	PLANE_PROP_ALPHA,
+	PLANE_PROP_BLEND_MODE,
+	PLANE_PROP_MAX_NUM
 };
 
 enum {
-	PLANE_DISABLE,
-	PLANE_ENABLE
+	DRM_MODE_BLEND_PIXEL_NONE = 0,
+	DRM_MODE_BLEND_PREMULTI,
+	DRM_MODE_BLEND_COVERAGE
 };
 
 struct kunlun_irq_data {
@@ -185,7 +191,13 @@ struct kunlun_mlc_bg {
 };
 
 struct kunlun_mlc_path {
+	struct kunlun_du_reg pma_en;
+	struct kunlun_du_reg pd_out_sel;
+	struct kunlun_du_reg pd_mode;
 	struct kunlun_du_reg alpha_bld_idx;
+	struct kunlun_du_reg pd_out_idx;
+	struct kunlun_du_reg pd_des_idx;
+	struct kunlun_du_reg pd_src_idx;
 	struct kunlun_du_reg layer_out_idx;
 };
 
@@ -365,8 +377,10 @@ struct kunlun_plane {
 	struct drm_plane base;
 	const struct kunlun_plane_data *data;
 	struct kunlun_crtc *kcrtc;
-	uint8_t du_owner;
 	uint8_t plane_status;
+	struct drm_property *plane_property[PLANE_PROP_MAX_NUM];
+	uint8_t alpha;
+	uint8_t blend_mode;
 };
 
 struct kunlun_crtc_du_data {
@@ -393,20 +407,16 @@ struct kunlun_crtc {
 	struct drm_device *drm;
 	const struct kunlun_crtc_data *data;
 
-	int dc_nums;
-	int dp_nums;
+	int ctrl_unit;/*0:dc, 1:dp*/
 	void __iomem *dc_regs;
-	void __iomem *dp_regs[2];
+	void __iomem *dp_regs;
 	unsigned int irq;
 
 	spinlock_t dc_irq_lock;
-	spinlock_t dp_irq_lock[2];
+	spinlock_t dp_irq_lock;
 
 	unsigned int num_planes;
-	unsigned int num_dc_planes;
-	unsigned int num_dp_planes;
 	struct kunlun_plane *planes;
-
 	bool enabled;
 	bool vblank_enable;
 	bool pending;

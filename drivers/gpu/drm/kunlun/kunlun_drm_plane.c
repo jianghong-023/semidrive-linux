@@ -49,6 +49,18 @@ static const struct kunlun_pipe_frm_ctrl gp_frm_ctrl = {
 	.mode = DU_REG(GP_FRM_CTRL, MODE_MASK, MODE_SHIFT),
 	.fmt = DU_REG(GP_FRM_CTRL, FMT_MASK, FMT_SHIFT),
 };
+
+static const struct kunlun_pipe_frm_ctrl dp_gp_frm_ctrl = {
+	.endia_ctrl = DU_REG(GP_FRM_CTRL, DP_ENDIAN_CTRL_MASK, DP_ENDIAN_CTRL_SHIFT),
+	.comp_swap = DU_REG(GP_FRM_CTRL, DP_COMP_SWAP_MASK, DP_COMP_SWAP_SHIFT),
+	.rot = DU_REG(GP_FRM_CTRL, DP_ROT_MASK, DP_ROT_SHIFT),
+	.rgb_yuv = DU_REG(GP_FRM_CTRL, DP_RGB_YUV_MASK, DP_RGB_YUV_SHIFT),
+	.uv_swap = DU_REG(GP_FRM_CTRL, DP_UV_SWAP_MASK, DP_UV_SWAP_SHIFT),
+	.uv_mode = DU_REG(GP_FRM_CTRL, DP_UV_MODE_MASK, DP_UV_MODE_SHIFT),
+	.mode = DU_REG(GP_FRM_CTRL, DP_MODE_MASK, DP_MODE_SHIFT),
+	.fmt = DU_REG(GP_FRM_CTRL, DP_FMT_MASK, DP_FMT_SHIFT),
+};
+
 static const struct kunlun_pipe_frm_ctrl sp_frm_ctrl = {
 	.endia_ctrl = DU_REG(SP_FRM_CTRL, ENDIAN_CTRL_MASK, ENDIAN_CTRL_SHIFT),
 	.comp_swap = DU_REG(SP_FRM_CTRL, COMP_SWAP_MASK, COMP_SWAP_SHIFT),
@@ -260,7 +272,7 @@ static const struct kunlun_sp_data dc_sp = {
 
 static const struct kunlun_gp_data dp_gp0 = {
 	.pix_comp  = &gp_pix_comp,
-	.frm_ctrl = &gp_frm_ctrl,
+	.frm_ctrl = &dp_gp_frm_ctrl,
 	.frm_info = &gp_frm_data,
 	.yuvup_ctrl = &gp_yuvup_data,
 	.crop_ctrl = &gp_crop_data,
@@ -273,7 +285,7 @@ static const struct kunlun_gp_data dp_gp0 = {
 
 static const struct kunlun_gp_data dp_gp1 = {
 	.pix_comp  = &gp_pix_comp,
-	.frm_ctrl = &gp_frm_ctrl,
+	.frm_ctrl = &dp_gp_frm_ctrl,
 	.frm_info = &gp_frm_data,
 	.crop_ctrl = &gp_crop_data,
 	.fbdc_ctrl = &dp_fbdc_data,
@@ -832,19 +844,6 @@ static int get_du_mlc_sf_index(uint32_t layer_id)
 	return i;
 }
 
-static void __iomem *kunlun_get_regs_byplane(struct kunlun_crtc *kcrtc,
-		struct kunlun_plane *klp)
-{
-	switch (klp->du_owner) {
-		case CRTC_DP0:
-			return kcrtc->dp_regs[0];
-		case CRTC_DP1:
-			return kcrtc->dp_regs[1];
-		case CRTC_DC:
-		default:
-			return kcrtc->dc_regs;
-	}
-}
 static void kunlun_spipe_init(const struct kunlun_sp_data *sp_data,
 		void __iomem *regs, uint32_t chn_base)
 {
@@ -899,50 +898,60 @@ void kunlun_planes_init(struct kunlun_crtc *kcrtc)
 	void __iomem *regs;
 	uint32_t chn_base;
 	int layer_id;
-	int index = 0;
-	int i, j;
+	int i;
 
-	for (i = 0; i < kcrtc->num_dc_planes; i++) {
-		regs = kcrtc->dc_regs;
-		layer_id = dc_data->planes[i].id;
-		chn_base = dc_data->planes[i].chn_base;
+	for (i = 0; i < kcrtc->num_planes; i++) {
+		if (kcrtc->ctrl_unit) {
+			regs = kcrtc->dp_regs;
+			layer_id = dp_data->planes[i].id;
+			chn_base = dp_data->planes[i].chn_base;
+			if ((layer_id == DP_SPIPE0) || (layer_id == DP_SPIPE1)) {
+				sp_data = dp_data->planes[i].hwpipe->data.sp;
 
-		if (layer_id == DC_SPIPE) {
-			sp_data = dc_data->planes[i].hwpipe->data.sp;
+				kunlun_spipe_init(sp_data, regs, chn_base);
+			}
 
-			kunlun_spipe_init(sp_data, regs, chn_base);
-		}
+			if ((layer_id == DP_GPIPE0) || (layer_id == DP_GPIPE1)) {
+				gp_data = dp_data->planes[i].hwpipe->data.gp;
 
-		if (layer_id == DC_GPIPE) {
-			gp_data = dc_data->planes[i].hwpipe->data.gp;
-
-			kunlun_gpipe_init(gp_data, regs, chn_base, layer_id);
-		}
-	}
-
-	for (i = 0; i < kcrtc->num_dp_planes; i++) {
-		index = (i < dp_data->num_planes) ? 0 : 1;
-		if (index) {
-			j = i - dp_data->num_planes;
+				kunlun_gpipe_init(gp_data, regs, chn_base, layer_id);
+			}
 		} else {
-			j = i;
-		}
-		regs = kcrtc->dp_regs[index];
-		layer_id = dp_data->planes[j].id;
-		chn_base = dp_data->planes[j].chn_base;
+			regs = kcrtc->dc_regs;
+			layer_id = dc_data->planes[i].id;
+			chn_base = dc_data->planes[i].chn_base;
+			if (layer_id == DC_SPIPE) {
+				sp_data = dc_data->planes[i].hwpipe->data.sp;
 
-		if ((layer_id == DP_SPIPE0) || (layer_id == DP_SPIPE1)) {
-			sp_data = dp_data->planes[j].hwpipe->data.sp;
+				kunlun_spipe_init(sp_data, regs, chn_base);
+			}
 
-			kunlun_spipe_init(sp_data, regs, chn_base);
-		}
+			if (layer_id == DC_GPIPE) {
+				gp_data = dc_data->planes[i].hwpipe->data.gp;
 
-		if ((layer_id == DP_GPIPE0) || (layer_id == DP_GPIPE1)) {
-			gp_data = dp_data->planes[j].hwpipe->data.gp;
-
-			kunlun_gpipe_init(gp_data, regs, chn_base, layer_id);
+				kunlun_gpipe_init(gp_data, regs, chn_base, layer_id);
+			}
 		}
 	}
+}
+
+static int kunlun_plane_format_check(struct drm_plane *plane,
+				uint32_t format)
+{
+	uint32_t i;
+	struct kunlun_plane *klp = to_kunlun_plane(plane);
+	const struct kunlun_plane_data *kpd = klp->data;
+
+	for (i = 0; i < kpd->hwpipe->nformats; i++) {
+		if (format == kpd->hwpipe->formats[i])
+			break;
+	}
+	if (i == kpd->hwpipe->nformats) {
+		DRM_ERROR("unsupported format[%08x]\n", format);
+		return -EINVAL;
+	}
+
+	return 0;
 }
 
 static int kunlun_plane_atomic_check(struct drm_plane *plane,
@@ -983,6 +992,10 @@ static int kunlun_plane_atomic_check(struct drm_plane *plane,
 
 	if (!state->visible)
 		return -EINVAL;
+
+	ret = kunlun_plane_format_check(plane, fb->format->format);
+	if (ret)
+		return ret;
 
 	return 0;
 }
@@ -1034,7 +1047,10 @@ static void kunlun_plane_atomic_update(struct drm_plane *plane,
 		return;
 	}
 
-	regs = kunlun_get_regs_byplane(kcrtc, klp);
+	if (kcrtc->ctrl_unit)
+		regs = kcrtc->dp_regs;
+	else
+		regs = kcrtc->dc_regs;
 	if (!regs) {
 		pr_err("This plane's regs is NULL\n");
 		return;
@@ -1092,7 +1108,7 @@ static void kunlun_plane_atomic_update(struct drm_plane *plane,
 		dma_addr = gem_obj->paddr + fb->offsets[1];
 		addr_l = get_l_addr(dma_addr);
 		addr_h = get_h_addr(dma_addr);
-		pitch = fb->pitches[1];
+		pitch = fb->pitches[1] - 1;
 
 		DU_PIPE_ELEM_SET(regs, chn_base, frm_data, u_baddr_l, addr_l);
 		DU_PIPE_ELEM_SET(regs, chn_base, frm_data, u_baddr_h, addr_h);
@@ -1106,7 +1122,7 @@ static void kunlun_plane_atomic_update(struct drm_plane *plane,
 		dma_addr = gem_obj->paddr + fb->offsets[2];
 		addr_l = get_l_addr(dma_addr);
 		addr_h = get_h_addr(dma_addr);
-		pitch = fb->pitches[1];
+		pitch = fb->pitches[2] - 1;
 
 		DU_PIPE_ELEM_SET(regs, chn_base, frm_data, v_baddr_l, addr_l);
 		DU_PIPE_ELEM_SET(regs, chn_base, frm_data, v_baddr_h, addr_h);
@@ -1132,11 +1148,10 @@ static void kunlun_plane_atomic_update(struct drm_plane *plane,
 		DU_PIPE_ELEM_SET(regs, chn_base, sp_data, sdw_trig, 1);
 	}
 
-	if (klp->du_owner == CRTC_DC) {
-		mlc = dc_mlc;
-	} else {
+	if (kcrtc->ctrl_unit)
 		mlc = dp_mlc;
-	}
+	else
+		mlc = dc_mlc;
 
 	i = get_du_mlc_sf_index(layer_id);
 	if (i < 0)
@@ -1145,11 +1160,7 @@ static void kunlun_plane_atomic_update(struct drm_plane *plane,
 	DU_MLC_LAYER_SET(regs, mlc, i, v_pos, crtc_y);
 	DU_MLC_LAYER_SET(regs, mlc, i, h_size, src_w);
 	DU_MLC_LAYER_SET(regs, mlc, i, v_size, src_h);
-	if (kunlun_format_global_alpha(format)) {
-		DU_MLC_LAYER_SET(regs, mlc, i, g_alpha_en, 1);
-	} else {
-		DU_MLC_LAYER_SET(regs, mlc, i, g_alpha_en, 0);
-	}
+
 	/*set the 'enable layer' bit*/
 	DU_MLC_LAYER_SET(regs, mlc, i, sf_en, 1);
 
@@ -1174,7 +1185,11 @@ static void kunlun_plane_atomic_disable(struct drm_plane *plane,
 	if (!old_state->crtc)
 		return;
 
-	regs = kunlun_get_regs_byplane(kcrtc, klp);
+	if (kcrtc->ctrl_unit)
+		regs = kcrtc->dp_regs;
+	else
+		regs = kcrtc->dc_regs;
+
 	if (!regs) {
 		pr_err("This plane's regs is NULL\n");
 		return;
@@ -1194,11 +1209,10 @@ static void kunlun_plane_atomic_disable(struct drm_plane *plane,
 	if (i < 0)
 		return;
 	/*clear the 'enable layer' bit*/
-	if (klp->du_owner == CRTC_DC) {
-		DU_MLC_LAYER_SET(regs, dc_mlc, i, sf_en, 0);
-	} else {
+	if (kcrtc->ctrl_unit)
 		DU_MLC_LAYER_SET(regs, dp_mlc, i, sf_en, 0);
-	}
+	else
+		DU_MLC_LAYER_SET(regs, dc_mlc, i, sf_en, 0);
 
 	if (klp->plane_status != PLANE_DISABLE)
 		klp->plane_status = PLANE_DISABLE;
@@ -1207,6 +1221,134 @@ static void kunlun_plane_atomic_disable(struct drm_plane *plane,
 static void kunlun_plane_destroy(struct drm_plane *plane)
 {
 	drm_plane_cleanup(plane);
+}
+
+static void kunlun_plane_install_rotation_property(struct drm_plane *plane)
+{
+	struct kunlun_plane *klp = to_kunlun_plane(plane);
+	uint32_t layer_type = klp->data->id;
+
+	if ((layer_type == DP_GPIPE0) || (layer_type == DP_GPIPE1)) {
+		drm_plane_create_rotation_property(plane,
+						DRM_MODE_ROTATE_0,
+						DRM_MODE_ROTATE_0 |
+						DRM_MODE_ROTATE_90 |
+						DRM_MODE_ROTATE_180 |
+						DRM_MODE_ROTATE_270 |
+						DRM_MODE_REFLECT_X |
+						DRM_MODE_REFLECT_Y);
+	}
+}
+
+static void kunlun_plane_install_zpos_property(struct drm_plane *plane)
+{
+	struct kunlun_plane *klp = to_kunlun_plane(plane);
+	uint32_t num_planes = klp->kcrtc->num_planes;
+
+	drm_plane_create_zpos_property(plane, 0, 0, num_planes - 1);
+}
+
+static void kunlun_plane_install_properties(struct drm_plane *plane,
+				struct drm_mode_object *obj)
+{
+	struct drm_device *dev = plane->dev;
+	struct kunlun_plane *klp = to_kunlun_plane(plane);
+	struct drm_property *prop;
+
+	static const struct drm_prop_enum_list blend_mode_prop_enum_list[] = {
+		{ DRM_MODE_BLEND_PIXEL_NONE, "None" },
+		{ DRM_MODE_BLEND_PREMULTI, "Pre-multiplied" },
+		{ DRM_MODE_BLEND_COVERAGE, "Coverage" },
+	};
+
+#define INSTALL_PROPERTY(name, NAME, init_val, fnc, ...) do { \
+		prop = klp->plane_property[PLANE_PROP_##NAME]; \
+		if (!prop) { \
+			prop = drm_property_##fnc(dev, 0, #name, \
+					##__VA_ARGS__); \
+			if (!prop) { \
+				pr_err("Create property %s failed\n", #name); \
+				return; \
+			} \
+			klp->plane_property[PLANE_PROP_##NAME] = prop; \
+		} \
+		drm_object_attach_property(&plane->base, prop, init_val); \
+	} while (0)
+
+#define INSTALL_RANGE_PROPERTY(name, NAME, min, max, init_val) \
+		INSTALL_PROPERTY(name, NAME, init_val, \
+				create_range, min, max)
+
+#define INSTALL_ENUM_PROPERTY(name, NAME, init_val) \
+		INSTALL_PROPERTY(name, NAME, init_val, \
+				create_enum, name##_prop_enum_list, \
+				ARRAY_SIZE(name##_prop_enum_list))
+
+	INSTALL_RANGE_PROPERTY(alpha, ALPHA, 0, 255, 255);
+	INSTALL_ENUM_PROPERTY(blend_mode, BLEND_MODE, DRM_MODE_BLEND_PIXEL_NONE);
+
+	kunlun_plane_install_rotation_property(plane);
+	kunlun_plane_install_zpos_property(plane);
+
+#undef INSTALL_RANGE_PROPERTY
+#undef INSTALL_ENUM_PROPERTY
+#undef INSTALL_PROPERTY
+}
+
+static int kunlun_plane_atomic_set_property(struct drm_plane *plane,
+				struct drm_plane_state *state, struct drm_property *property,
+				uint64_t val)
+{
+	struct kunlun_plane *klp = to_kunlun_plane(plane);
+	int ret = 0;
+
+#define SET_PROPERTY(name, NAME, type) do { \
+		if (klp->plane_property[PLANE_PROP_##NAME] == property) { \
+			klp->name = (type)val; \
+			goto done; \
+		} \
+	} while (0)
+
+	SET_PROPERTY(alpha, ALPHA, uint8_t);
+	SET_PROPERTY(blend_mode, BLEND_MODE, uint8_t);
+
+	pr_err("Invalid property\n");
+	ret = -EINVAL;
+done:
+	return ret;
+#undef SET_PROPERTY
+}
+
+static int kunlun_plane_atomic_get_property(struct drm_plane *plane,
+				const struct drm_plane_state *state,
+				struct drm_property *property, uint64_t *val)
+{
+	struct kunlun_plane *klp = to_kunlun_plane(plane);
+	int ret = 0;
+
+#define GET_PROPERTY(name, NAME, type) do { \
+		if (klp->plane_property[PLANE_PROP_##NAME] == property) { \
+			*val = klp->name; \
+			goto done; \
+		} \
+	} while (0)
+
+	GET_PROPERTY(alpha, ALPHA, uint8_t);
+	GET_PROPERTY(blend_mode, BLEND_MODE, uint8_t);
+
+	pr_err("Invalid property\n");
+	ret = -EINVAL;
+done:
+	return ret;
+#undef GET_PROPERTY
+}
+
+static void kunlun_plane_reset(struct drm_plane *plane)
+{
+	struct kunlun_plane *klp = to_kunlun_plane(plane);
+
+	klp->alpha = 0xFF;
+	drm_atomic_helper_plane_reset(plane);
 }
 
 static const struct drm_plane_helper_funcs kunlun_plane_helper_funcs = {
@@ -1219,7 +1361,9 @@ static const struct drm_plane_funcs kunlun_plane_funcs = {
 	.update_plane	= drm_atomic_helper_update_plane,
 	.disable_plane	= drm_atomic_helper_disable_plane,
 	.destroy = kunlun_plane_destroy,
-	.reset = drm_atomic_helper_plane_reset,
+	.atomic_set_property = kunlun_plane_atomic_set_property,
+	.atomic_get_property = kunlun_plane_atomic_get_property,
+	.reset = kunlun_plane_reset,
 	.atomic_duplicate_state = drm_atomic_helper_plane_duplicate_state,
 	.atomic_destroy_state = drm_atomic_helper_plane_destroy_state,
 };
@@ -1240,26 +1384,17 @@ int kunlun_planes_init_primary(struct kunlun_crtc *kcrtc,
 	const struct kunlun_crtc_du_data *dp_data = kcrtc->data->dp_data;
 	const struct kunlun_plane_data *plane_data;
 	struct kunlun_plane *plane;
-	int index;
 	int ret;
-	int i, j;
+	int i;
 
 	for(i = 0; i < kcrtc->num_planes; i++) {
 		plane = &kcrtc->planes[i];
-		if (i < kcrtc->num_dp_planes) {
-			index = (i < dp_data->num_planes) ? 0 : 1;
-			if (index) {
-				j = i - dp_data->num_planes;
-			} else {
-				j = i;
-			}
-			plane_data = &dp_data->planes[j];
-		} else {
-			j = i - kcrtc->num_dp_planes;
-			plane_data = &dc_data->planes[j];
-		}
+		if (kcrtc->ctrl_unit)
+			plane_data = &dp_data->planes[i];
+		else
+			plane_data = &dc_data->planes[i];
 
-		if(plane_data->type != DRM_PLANE_TYPE_PRIMARY &&
+		if (plane_data->type != DRM_PLANE_TYPE_PRIMARY &&
 				plane_data->type != DRM_PLANE_TYPE_CURSOR)
 			continue;
 
@@ -1273,6 +1408,8 @@ int kunlun_planes_init_primary(struct kunlun_crtc *kcrtc,
 		}
 
 		drm_plane_helper_add(&plane->base, &kunlun_plane_helper_funcs);
+
+		kunlun_plane_install_properties(&plane->base, &plane->base.base);
 
 		if(plane_data->type == DRM_PLANE_TYPE_PRIMARY)
 			*primary = &plane->base;
@@ -1299,18 +1436,10 @@ int kunlun_planes_init_overlay(struct kunlun_crtc *kcrtc)
 
 	for(i = 0; i < kcrtc->num_planes; i++) {
 		plane = &kcrtc->planes[i];
-		if (i < kcrtc->num_dp_planes) {
-			index = (i < dp_data->num_planes) ? 0 : 1;
-			if (index) {
-				j = i - dp_data->num_planes;
-			} else {
-				j = i;
-			}
-			plane_data = &dp_data->planes[j];
-		} else {
-			j = i - kcrtc->num_dp_planes;
-			plane_data = &dc_data->planes[j];
-		}
+		if (kcrtc->ctrl_unit)
+			plane_data = &dp_data->planes[i];
+		else
+			plane_data = &dc_data->planes[i];
 
 		if(plane_data->type != DRM_PLANE_TYPE_OVERLAY)
 			continue;
@@ -1326,6 +1455,8 @@ int kunlun_planes_init_overlay(struct kunlun_crtc *kcrtc)
 		}
 
 		drm_plane_helper_add(&plane->base, &kunlun_plane_helper_funcs);
+
+		kunlun_plane_install_properties(&plane->base, &plane->base.base);
 	}
 
 	return 0;

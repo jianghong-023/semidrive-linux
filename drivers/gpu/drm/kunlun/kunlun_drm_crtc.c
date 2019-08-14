@@ -112,8 +112,14 @@ static const struct kunlun_mlc_layer mlc_layer = {
 };
 
 static const struct kunlun_mlc_path mlc_path = {
+	.pma_en = DU_REG(MLC_PATH_CTRL, PMA_EN_MASK, PMA_EN_SHIFT),
+	.pd_out_sel = DU_REG(MLC_PATH_CTRL, PD_OUT_SEL_MASK, PD_OUT_SEL_SHIFT),
+	.pd_mode = DU_REG(MLC_PATH_CTRL, PD_MODE_MASK, PD_MODE_SHIFT),
 	.alpha_bld_idx = DU_REG(MLC_PATH_CTRL, ALPHA_BLD_IDX_MASK,
 			ALPHA_BLD_IDX_SHIFT),
+	.pd_out_idx = DU_REG(MLC_PATH_CTRL, PD_OUT_IDX_MASK, PD_OUT_IDX_SHIFT),
+	.pd_des_idx = DU_REG(MLC_PATH_CTRL, PD_DES_IDX_MASK, PD_DES_IDX_SHIFT),
+	.pd_src_idx = DU_REG(MLC_PATH_CTRL, PD_SRC_IDX_MASK, PD_SRC_IDX_SHIFT),
 	.layer_out_idx = DU_REG(MLC_PATH_CTRL, LAYER_OUT_IDX_MASK,
 			LAYER_OUT_IDX_SHIFT),
 };
@@ -354,83 +360,69 @@ static int kunlun_mlc_update_plane(struct kunlun_crtc *kcrtc, unsigned int mask)
 	const struct kunlun_crtc_du_data *dp_data = kcrtc->data->dp_data;
 	const struct kunlun_mlc_data *dc_mlc = dc_data->mlc;
 	const struct kunlun_mlc_data *dp_mlc = dp_data->mlc;
+	const struct kunlun_mlc_data *mlc;
+	const struct kunlun_ctrl_data *ctrl;
+	struct drm_device *dev = kcrtc->base.dev;
+	int total_planes = dev->mode_config.num_total_plane;
 	void __iomem *regs;
+	unsigned int num_planes = kcrtc->num_planes;
 	unsigned int nums = 0;
-	unsigned int dp_mask[2] = {0, 0};
-	int i, j;
+	unsigned int zpos;
+	uint8_t blend_mode;
+	int i, j, flag = 0;
 
 	if(!mask)
 		return -EINVAL;
 
-	if (kcrtc->num_dp_planes) {
-		regs = kcrtc->dp_regs[0];
-		for (i = 0; i < dp_data->num_planes; i++) {
-			if (mask & (1 << i)) {
-				DU_MLC_PATH_SET(regs, dp_mlc, i + 1 , alpha_bld_idx, i + 1);
-				DU_MLC_PATH_SET(regs, dp_mlc, i + 1, layer_out_idx, i + 1);
-			} else {
-				DU_MLC_PATH_SET(regs, dp_mlc, i + 1, alpha_bld_idx, 0xF);
-				DU_MLC_PATH_SET(regs, dp_mlc, i + 1, layer_out_idx, 0xF);
-			}
-			nums += (mask & (1 << i)) ? 1 : 0;
-		}
-		if (nums)
-			dp_mask[0] = 1;
-
-		DU_REG_SET(regs, dp_data->ctrl, di_trig, 1);
-	}
-
-	if (kcrtc->num_dp_planes > dp_data->num_planes) {
-		regs = kcrtc->dp_regs[1];
-		for (i = dp_data->num_planes, j = 0; i < kcrtc->num_dp_planes; i++, j++) {
-			if (mask & (1 << i)) {
-				DU_MLC_PATH_SET(regs, dp_mlc, j + 1, alpha_bld_idx, j + 1);
-				DU_MLC_PATH_SET(regs, dp_mlc, j + 1, layer_out_idx, j + 1);
-			} else {
-				DU_MLC_PATH_SET(regs, dp_mlc, j + 1, alpha_bld_idx, 0xF);
-				DU_MLC_PATH_SET(regs, dp_mlc, j + 1, layer_out_idx, 0xF);
-			}
-			nums += (mask & (1 << i)) ? 1 : 0;
-		}
-		if (nums)
-			dp_mask[1] = 1;
-
-		DU_REG_SET(regs, dp_data->ctrl, di_trig, 1);
-	}
-
-	for (i = kcrtc->num_dp_planes, j = 0; i < kcrtc->num_planes; i++, j++) {
+	if (kcrtc->ctrl_unit) {
+		regs = kcrtc->dp_regs;
+		mlc = dp_mlc;
+		ctrl = dp_data->ctrl;
+	} else {
 		regs = kcrtc->dc_regs;
-		if (mask & (1 << i)) {
-			DU_MLC_PATH_SET(regs, dc_mlc, j + 1, alpha_bld_idx, j + 1);
-			DU_MLC_PATH_SET(regs, dc_mlc, j + 1, layer_out_idx, j + 1);
-		} else {
-			DU_MLC_PATH_SET(regs, dc_mlc, j + 1, alpha_bld_idx, 0xF);
-			DU_MLC_PATH_SET(regs, dc_mlc, j + 1, layer_out_idx, 0xF);
+		mlc = dc_mlc;
+		ctrl = dc_data->ctrl;
+	}
+
+	for (i = 0; i < mlc->num_path; i++)
+		writel(0, regs + MLC_PATH_CTRL);
+
+	for (i = 0; i < num_planes; i++) {
+		j = ((kcrtc->base.index == 1) ? (total_planes - num_planes): 0) + i ;
+		if (mask & (1 << j)) {
+			blend_mode = kcrtc->planes[i].blend_mode;
+			zpos = kcrtc->planes[i].base.state->zpos;
+
+			DU_MLC_PATH_SET(regs, mlc, i + 1, layer_out_idx, zpos);
+			DU_MLC_PATH_SET(regs, mlc, zpos , alpha_bld_idx, i + 1);
+
+			switch (blend_mode) {
+				case DRM_MODE_BLEND_PIXEL_NONE:
+					DU_MLC_LAYER_SET(regs, mlc, i, g_alpha_en, 1);
+					break;
+				case DRM_MODE_BLEND_PREMULTI:
+					DU_MLC_LAYER_SET(regs, mlc, i, g_alpha_en, 0);
+					DU_MLC_PATH_SET(regs, mlc, zpos , pma_en, 1);
+					break;
+				case DRM_MODE_BLEND_COVERAGE:
+					DU_MLC_LAYER_SET(regs, mlc, i, g_alpha_en, 0);
+					break;
+				default:
+					DU_MLC_LAYER_SET(regs, mlc, i, g_alpha_en, 1);
+					break;
+			}
 		}
 	}
 
-	if (kcrtc->dc_nums) {
+	DU_REG_SET(regs, ctrl, di_trig, 1);
+
+
+	if (kcrtc->ctrl_unit) {
 		regs = kcrtc->dc_regs;
 
-		if (dp_mask[0]) {
-			DU_MLC_LAYER_SET(regs, dc_mlc, 2, sf_en, 1);
-			DU_MLC_PATH_SET(regs, dc_mlc, 3, alpha_bld_idx, 3);
-			DU_MLC_PATH_SET(regs, dc_mlc, 3, layer_out_idx, 3);
-		} else {
-			DU_MLC_LAYER_SET(regs, dc_mlc, 2, sf_en, 0);
-			DU_MLC_PATH_SET(regs, dc_mlc, 3, alpha_bld_idx, 0xF);
-			DU_MLC_PATH_SET(regs, dc_mlc, 3, layer_out_idx, 0xF);
-		}
-
-		if (dp_mask[1]) {
-			DU_MLC_LAYER_SET(regs, dc_mlc, 3, sf_en, 1);
-			DU_MLC_PATH_SET(regs, dc_mlc, 4, alpha_bld_idx, 4);
-			DU_MLC_PATH_SET(regs, dc_mlc, 4, layer_out_idx, 4);
-		} else {
-			DU_MLC_LAYER_SET(regs, dc_mlc, 3, sf_en, 0);
-			DU_MLC_PATH_SET(regs, dc_mlc, 4, alpha_bld_idx, 0xF);
-			DU_MLC_PATH_SET(regs, dc_mlc, 4, layer_out_idx, 0xF);
-		}
+		DU_MLC_LAYER_SET(regs, dc_mlc, 2, sf_en, 1);
+		DU_MLC_PATH_SET(regs, dc_mlc, 3, alpha_bld_idx, 3);
+		DU_MLC_PATH_SET(regs, dc_mlc, 3, layer_out_idx, 3);
 
 		DU_REG_SET(regs, dc_data->ctrl, di_trig, 1);
 	}
@@ -442,21 +434,11 @@ static int kunlun_mlc_update_trig(struct kunlun_crtc *kcrtc, unsigned int mask)
 {
 	const struct kunlun_crtc_du_data *dc_data = kcrtc->data->dc_data;
 	const struct kunlun_crtc_du_data *dp_data = kcrtc->data->dp_data;
-	void __iomem *regs;
-	if (kcrtc->num_dp_planes) {
-		regs = kcrtc->dp_regs[0];
-		DU_REG_SET(regs, dp_data->ctrl, flc_trig, 1);
-	}
 
-	if (kcrtc->num_dp_planes > dp_data->num_planes) {
-		regs = kcrtc->dp_regs[1];
-		DU_REG_SET(regs, dp_data->ctrl, flc_trig, 1);
-	}
+	if (kcrtc->ctrl_unit)
+		DU_REG_SET(kcrtc->dp_regs, dp_data->ctrl, flc_trig, 1);
 
-	if (kcrtc->dc_nums) {
-		regs = kcrtc->dc_regs;
-		DU_REG_SET(regs, dc_data->ctrl, flc_trig, 1);
-	}
+	DU_REG_SET(kcrtc->dc_regs, dc_data->ctrl, flc_trig, 1);
 
 	return 0;
 }
@@ -650,30 +632,20 @@ static void kunlun_dc_dither_init(struct kunlun_crtc *kcrtc,
 	DU_REG_SET(dc_regs, dither, bypass, 1);
 }
 
-static void __iomem *kunlun_get_dp_regs(struct kunlun_crtc *kcrtc, int index)
-{
-	if ((index < 0) || (index > 2)) {
-		pr_err("No support index = %d\n", index);
-		return NULL;
-	}
-
-	return kcrtc->dp_regs[index];
-}
-
 static void kunlun_dp_set_size(struct kunlun_crtc *kcrtc,
-		uint32_t width, uint32_t height, int index)
+		uint32_t width, uint32_t height)
 {
 	const struct kunlun_ctrl_data *ctrl = kcrtc->data->dp_data->ctrl;
-	void __iomem *dp_regs = kcrtc->dp_regs[index];
+	void __iomem *dp_regs = kcrtc->dp_regs;
 
 	DP_CTRL_SET(dp_regs, ctrl, h_size, width - 1);
 	DP_CTRL_SET(dp_regs, ctrl, v_size, height - 1);
 }
 
 static void kunlun_dp_sw_reset(struct kunlun_crtc *kcrtc,
-		const struct kunlun_ctrl_data *ctrl, int index)
+		const struct kunlun_ctrl_data *ctrl)
 {
-	void __iomem *dp_regs = kcrtc->dp_regs[index];
+	//void __iomem *dp_regs = kcrtc->dp_regs;
 
 	//	DP_CTRL_SET(dp_regs, ctrl, reset, 1);
 	//	usleep_range(1, 2);
@@ -681,9 +653,9 @@ static void kunlun_dp_sw_reset(struct kunlun_crtc *kcrtc,
 }
 
 static void kunlun_dp_irq_init(struct kunlun_crtc *kcrtc,
-		const struct kunlun_irq_data *irq_data, int index)
+		const struct kunlun_irq_data *irq_data)
 {
-	void __iomem *dp_regs = kcrtc->dp_regs[index];
+	void __iomem *dp_regs = kcrtc->dp_regs;
 
 	DU_IRQ_CLR(dp_regs, irq_data, int_mask, 0x7F);
 	DU_IRQ_CLR(dp_regs, irq_data, rdma_int_mask, 0x7F);
@@ -691,18 +663,18 @@ static void kunlun_dp_irq_init(struct kunlun_crtc *kcrtc,
 }
 
 static void kunlun_dp_ctrl_init(struct kunlun_crtc *kcrtc,
-		const struct kunlun_ctrl_data *ctrl, int index)
+		const struct kunlun_ctrl_data *ctrl)
 {
-	void __iomem *dp_regs = kcrtc->dp_regs[index];
+	void __iomem *dp_regs = kcrtc->dp_regs;
 
 	DP_CTRL_SET(dp_regs, ctrl, re_type, 1);
 	DP_CTRL_SET(dp_regs, ctrl, enable, 1);
 }
 
 static void kunlun_dp_rdma_init(struct kunlun_crtc *kcrtc,
-		const struct kunlun_rdma_data *rdma, int index)
+		const struct kunlun_rdma_data *rdma)
 {
-	void __iomem *dp_regs = kcrtc->dp_regs[index];
+	void __iomem *dp_regs = kcrtc->dp_regs;
 	const struct kunlun_irq_data *irq_data = kcrtc->data->dp_data->irq;
 	/*
 	const uint16_t wml_cfg[] = {128, 64, 64, 128, 64, 64, 96, 96, 64};
@@ -730,23 +702,23 @@ static void kunlun_dp_rdma_init(struct kunlun_crtc *kcrtc,
 		DU_RDMA_CHAN_SET(dp_regs, rdma, i, prio0, p0_cfg[i]);
 		DU_RDMA_CHAN_SET(dp_regs, rdma, i, burst_mode, burst_mode_cfg[i]);
 		DU_RDMA_CHAN_SET(dp_regs, rdma, i, burst_len, burst_len_cfg[i]);
-		spin_lock_irqsave(&kcrtc->dp_irq_lock[index], flags);
+		spin_lock_irqsave(&kcrtc->dp_irq_lock, flags);
 		DU_IRQ_SET(dp_regs, irq_data, rdma_int_mask, i, 0);
-		spin_unlock_irqrestore(&kcrtc->dp_irq_lock[index], flags);
+		spin_unlock_irqrestore(&kcrtc->dp_irq_lock, flags);
 	}
 
-	spin_lock_irqsave(&kcrtc->dp_irq_lock[index], flags);
+	spin_lock_irqsave(&kcrtc->dp_irq_lock, flags);
 //	DU_IRQ_SET(dp_regs, irq_data, int_mask, RDMA_SHIFT, 0);
-	spin_unlock_irqrestore(&kcrtc->dp_irq_lock[index], flags);
+	spin_unlock_irqrestore(&kcrtc->dp_irq_lock, flags);
 
 	DU_REG_SET(dp_regs, rdma, cfg_load, 1);
 	DU_REG_SET(dp_regs, rdma, arb_sel, 1);
 }
 
 static void kunlun_dp_mlc_init(struct kunlun_crtc *kcrtc,
-		const struct kunlun_mlc_data *mlc, int index)
+		const struct kunlun_mlc_data *mlc)
 {
-	void __iomem *dp_regs = kcrtc->dp_regs[index];
+	void __iomem *dp_regs = kcrtc->dp_regs;
 	const struct kunlun_irq_data *irq_data = kcrtc->data->dp_data->irq;
 	const uint8_t prot_val[] = {0x07, 0x07, 0x07, 0x07};
 	const uint32_t aflu_time[] = {0x7FFF, 0x7FFF, 0x7FFF, 0x7FFF};
@@ -768,10 +740,10 @@ static void kunlun_dp_mlc_init(struct kunlun_crtc *kcrtc,
 	for(i = 0; i < mlc->num_path; i++) {
 		DU_MLC_PATH_SET(dp_regs, mlc, i, alpha_bld_idx, alpha_bld[i]);
 		DU_MLC_PATH_SET(dp_regs, mlc, i, layer_out_idx, layer_out[i]);
-		spin_lock_irqsave(&kcrtc->dp_irq_lock[index], flags);
+		spin_lock_irqsave(&kcrtc->dp_irq_lock, flags);
 		DU_IRQ_SET(dp_regs, irq_data, mlc_int_mask, i + MLC_FLU_L_0_SHIFT, 0);
 		DU_IRQ_SET(dp_regs, irq_data, mlc_int_mask, i + MLC_E_L_0_SHIFT, 0);
-		spin_unlock_irqrestore(&kcrtc->dp_irq_lock[index], flags);
+		spin_unlock_irqrestore(&kcrtc->dp_irq_lock, flags);
 	}
 
 	DU_REG_SET(dp_regs, mlc->bg, fstart_sel, fstart_val);
@@ -781,10 +753,10 @@ static void kunlun_dp_mlc_init(struct kunlun_crtc *kcrtc,
 }
 
 static void kunlun_dp_fbdc_init(struct kunlun_crtc *kcrtc,
-		const struct kunlun_fbdc_data *fbdc, int index)
+		const struct kunlun_fbdc_data *fbdc)
 {
 	const struct kunlun_fbdc_ctrl *ctrl = kcrtc->data->dp_data->fbdcs->ctrl;
-	void __iomem *dp_regs = kcrtc->dp_regs[index];
+	void __iomem *dp_regs = kcrtc->dp_regs;
 
 	DU_REG_SET(dp_regs, ctrl, en, 0);
 }
@@ -792,24 +764,22 @@ static int kunlun_crtc_init(struct kunlun_crtc *kcrtc)
 {
 	const struct kunlun_crtc_du_data *dc_data = kcrtc->data->dc_data;
 	const struct kunlun_crtc_du_data *dp_data = kcrtc->data->dp_data;
-	int i;
-	/*init dc*/
-	if (kcrtc->dc_nums) {
-		kunlun_dc_sw_reset(kcrtc, dc_data->ctrl);
-		kunlun_dc_irq_init(kcrtc, dc_data->irq);
-		kunlun_dc_rdma_init(kcrtc, dc_data->rdma);
-		kunlun_tcon_init(kcrtc, dc_data->tcon);
-		kunlun_dc_mlc_init(kcrtc, dc_data->mlc);
-		kunlun_dc_dither_init(kcrtc, dc_data->tcon->dither);
-	}
 
-	for (i = 0; i < kcrtc->dp_nums; i++) {
-		kunlun_dp_sw_reset(kcrtc, dp_data->ctrl, i);
-		kunlun_dp_irq_init(kcrtc, dp_data->irq, i);
-		kunlun_dp_ctrl_init(kcrtc, dp_data->ctrl, i);
-		kunlun_dp_rdma_init(kcrtc, dp_data->rdma, i);
-		kunlun_dp_mlc_init(kcrtc, dp_data->mlc, i);
-		kunlun_dp_fbdc_init(kcrtc, dp_data->fbdcs, i);
+	/*init dc*/
+	kunlun_dc_sw_reset(kcrtc, dc_data->ctrl);
+	kunlun_dc_irq_init(kcrtc, dc_data->irq);
+	kunlun_dc_rdma_init(kcrtc, dc_data->rdma);
+	kunlun_tcon_init(kcrtc, dc_data->tcon);
+	kunlun_dc_mlc_init(kcrtc, dc_data->mlc);
+	kunlun_dc_dither_init(kcrtc, dc_data->tcon->dither);
+
+	if (kcrtc->ctrl_unit) {
+		kunlun_dp_sw_reset(kcrtc, dp_data->ctrl);
+		kunlun_dp_irq_init(kcrtc, dp_data->irq);
+		kunlun_dp_ctrl_init(kcrtc, dp_data->ctrl);
+		kunlun_dp_rdma_init(kcrtc, dp_data->rdma);
+		kunlun_dp_mlc_init(kcrtc, dp_data->mlc);
+		kunlun_dp_fbdc_init(kcrtc, dp_data->fbdcs);
 	}
 
 	return 0;
@@ -922,7 +892,6 @@ static void kunlun_crtc_mode_set_nofb(struct drm_crtc *crtc)
 	const struct kunlun_crtc_du_data *dc_data = kcrtc->data->dc_data;
 	struct kunlun_crtc_state *state = to_kunlun_crtc_state(crtc->state);
 	struct drm_display_mode *mode = &crtc->state->adjusted_mode;
-	int i;
 
 	DRM_DEV_INFO(kcrtc->dev,
 			"set mode: %d:\"%s\" %d %d %d %d %d %d %d %d %d %d 0x%x 0x%x",
@@ -938,9 +907,8 @@ static void kunlun_crtc_mode_set_nofb(struct drm_crtc *crtc)
 		kunlun_tcon_set_timings(kcrtc, mode, state->bus_flags);
 
 	/*set dp out size*/
-	for (i = 0; i < kcrtc->dp_nums; i++) {
-		kunlun_dp_set_size(kcrtc, mode->hdisplay, mode->vdisplay, i);
-	}
+	if (kcrtc->ctrl_unit)
+		kunlun_dp_set_size(kcrtc, mode->hdisplay, mode->vdisplay);
 }
 
 static void kunlun_crtc_atomic_enable(struct drm_crtc *crtc,
@@ -1116,49 +1084,29 @@ static int kunlun_crtc_planes_init(struct kunlun_crtc *kcrtc)
 	struct drm_plane *primary = NULL, *cursor = NULL;
 	struct kunlun_plane *plane;
 	unsigned int size;
-	unsigned int dc_planes_nums = 0;
-	unsigned int dp_planes_nums = 0;
 	unsigned int planes_nums;
 	int ret;
-	int i, j;
+	int i;
 
-	if (kcrtc->dc_nums) {
-		dc_planes_nums = dc_data->num_planes;
-	}
+	if (kcrtc->ctrl_unit)
+		planes_nums = dp_data->num_planes;
+	else
+		planes_nums = dc_data->num_planes;
 
-	for (i = 0; i < kcrtc->dp_nums; i++) {
-		dp_planes_nums += dp_data->num_planes;
-	}
-
-	planes_nums = dc_planes_nums + dp_planes_nums;
 	size = planes_nums * sizeof(struct kunlun_plane);
 	kcrtc->planes = devm_kzalloc(kcrtc->dev, size, GFP_KERNEL);
 	if(!kcrtc->planes)
 		return -ENOMEM;
 
-	for (i = 0; i < dp_planes_nums; i++) {
-		if (i < dp_data->num_planes) {
-			j = i;
-		} else {
-			j = i - dp_data->num_planes;
-		}
+	for (i = 0; i < planes_nums; i++) {
 		plane = &kcrtc->planes[i];
-		plane->data = &dp_data->planes[j];
-		//plane->mlc_plane.base = ;
-		//plane->mlc_plane.layer = data->mlc->mlc_layer;
+		if (kcrtc->ctrl_unit)
+			plane->data = &dp_data->planes[i];
+		else
+			plane->data = &dc_data->planes[i];
 		plane->kcrtc = kcrtc;
-
-		plane->du_owner = (i < dp_data->num_planes) ? CRTC_DP0 : CRTC_DP1;
 	}
 
-	for (i = dp_planes_nums; i < planes_nums; i++) {
-		plane = &kcrtc->planes[i];
-		plane->data = &dc_data->planes[i - dp_planes_nums];
-		plane->kcrtc = kcrtc;
-		plane->du_owner = CRTC_DC;
-	}
-	kcrtc->num_dc_planes = dc_planes_nums;
-	kcrtc->num_dp_planes = dp_planes_nums;
 	kcrtc->num_planes = planes_nums;
 
 	kunlun_planes_init(kcrtc);
@@ -1202,47 +1150,26 @@ static int kunlun_crtc_get_resource(struct kunlun_crtc *kcrtc)
 	int irq;
 	int ret;
 
-	ret = of_property_read_u32(dev->of_node, "dc_nums", &kcrtc->dc_nums);
+	ret = of_property_read_u32(dev->of_node, "ctrl_unit", &kcrtc->ctrl_unit);
 	if (ret) {
-		dev_err(dev, "dc_nums is not specified\n");
-		return -EINVAL;
-	}
-	/*
-	ret = of_property_read_u32(dev->of_node, "dp_nums", &kcrtc->dp_nums);
-	if (ret) {
-		dev_err(dev, "dp_nums is not specified\n");
-		return -EINVAL;
-	}*/
-
-	if ((kcrtc->dc_nums == 0) && (kcrtc->dp_nums == 0)) {
-		dev_err(dev, "crtc have no hardware support!\n");
+		dev_err(dev, "ctrl_unit is not specified\n");
 		return -EINVAL;
 	}
 
-	if (kcrtc->dc_nums) {
-		regs = platform_get_resource_byname(pdev, IORESOURCE_MEM, "dc-base");
-		kcrtc->dc_regs = devm_ioremap_resource(dev, regs);
-		if(IS_ERR(kcrtc->dc_regs)) {
-			dev_err(dev, "Cannot find dc regs\n");
-			return PTR_ERR(kcrtc->dc_regs);
-		}
+	/*Only Linux Os, we always need dc.*/
+	regs = platform_get_resource_byname(pdev, IORESOURCE_MEM, "dc-base");
+	kcrtc->dc_regs = devm_ioremap_resource(dev, regs);
+	if(IS_ERR(kcrtc->dc_regs)) {
+		dev_err(dev, "Cannot find dc regs\n");
+		return PTR_ERR(kcrtc->dc_regs);
 	}
 
-	if (kcrtc->dp_nums) {
-		regs = platform_get_resource_byname(pdev, IORESOURCE_MEM, "dp0-base");
-		kcrtc->dp_regs[0] = devm_ioremap_resource(dev, regs);
-		if(IS_ERR(kcrtc->dp_regs[0])) {
-			dev_err(dev, "Cannot find dp0 regs\n");
-			return PTR_ERR(kcrtc->dp_regs[0]);
-		}
-	}
-
-	if (kcrtc->dp_nums == 2) {
-		regs = platform_get_resource_byname(pdev, IORESOURCE_MEM, "dp1-base");
-		kcrtc->dp_regs[1] = devm_ioremap_resource(dev, regs);
-		if(IS_ERR(kcrtc->dp_regs[1])) {
-			dev_err(dev, "Cannot find dp1 regs\n");
-			return PTR_ERR(kcrtc->dp_regs[1]);
+	if (kcrtc->ctrl_unit) {
+		regs = platform_get_resource_byname(pdev, IORESOURCE_MEM, "dp-base");
+		kcrtc->dp_regs = devm_ioremap_resource(dev, regs);
+		if(IS_ERR(kcrtc->dp_regs)) {
+			dev_err(dev, "Cannot find dp regs\n");
+			return PTR_ERR(kcrtc->dp_regs);
 		}
 	}
 
@@ -1254,8 +1181,7 @@ static int kunlun_crtc_get_resource(struct kunlun_crtc *kcrtc)
 	kcrtc->irq = (unsigned int)irq;
 
 	spin_lock_init(&kcrtc->dc_irq_lock);
-	spin_lock_init(&kcrtc->dp_irq_lock[0]);
-	spin_lock_init(&kcrtc->dp_irq_lock[1]);
+	spin_lock_init(&kcrtc->dp_irq_lock);
 
 	if(of_property_read_bool(dev->of_node,"vblank-disable"))
 		kcrtc->vblank_enable = false;
@@ -1269,9 +1195,8 @@ static int kunlun_crtc_get_resource(struct kunlun_crtc *kcrtc)
 	}
 	kcrtc->base.port = port;
 
-	DRM_DEV_INFO(dev, "dc:0x%p, dp0:0x%p, dp1:0x%p, IRQ: %d, vblank_enable: %x\n",
-		kcrtc->dc_regs, kcrtc->dp_regs[0], kcrtc->dp_regs[1], kcrtc->irq,
-		kcrtc->vblank_enable);
+	DRM_DEV_INFO(dev, "dc:0x%p, dp:0x%p, IRQ: %d, vblank_enable: %x\n",
+		kcrtc->dc_regs, kcrtc->dp_regs, kcrtc->irq, kcrtc->vblank_enable);
 
 	return 0;
 }

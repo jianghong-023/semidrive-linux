@@ -357,8 +357,20 @@ struct kunlun_du_reg {
 #define AFLU_TIMER_MASK            0xFFFFFFFF << AFLU_TIMER_SHIFT
 
 #define MLC_PATH_CTRL              0x7200
+#define PMA_EN_SHIFT               29UL
+#define PMA_EN_MASK                0x1 << PMA_EN_SHIFT
+#define PD_OUT_SEL_SHIFT           28UL
+#define PD_OUT_SEL_MASK            0x1 << PD_OUT_SEL_SHIFT
+#define PD_MODE_SHIFT              20UL
+#define PD_MODE_MASK               0x1F << PD_MODE_SHIFT
 #define ALPHA_BLD_IDX_SHIFT        16UL
 #define ALPHA_BLD_IDX_MASK         0xF << ALPHA_BLD_IDX_SHIFT
+#define PD_OUT_IDX_SHIFT           12UL
+#define PD_OUT_IDX_MASK            0x7 << PD_OUT_IDX_SHIFT
+#define PD_DES_IDX_SHIFT           8UL
+#define PD_DES_IDX_MASK            0x7 << PD_DES_IDX_SHIFT
+#define PD_SRC_IDX_SHIFT           4UL
+#define PD_SRC_IDX_MASK            0x7 << PD_SRC_IDX_SHIFT
 #define LAYER_OUT_IDX_SHIFT        0UL
 #define LAYER_OUT_IDX_MASK         0xF << LAYER_OUT_IDX_SHIFT
 
