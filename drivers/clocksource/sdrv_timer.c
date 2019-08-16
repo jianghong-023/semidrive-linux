@@ -99,7 +99,7 @@ u32 sdrv_tmr_init(int id, void __iomem *iobase, int irq, u32 freq)
 
 	tmr_ctx->inited = true;
 
-	tmr_ctx->cnt_per_ms = (tmr_ctx->freq / tmr_ctx->div) / 1000;
+	tmr_ctx->cnt_per_ms = (tmr_ctx->freq / (tmr_ctx->div + 1)) / 1000;
 	tmr_ctx->cnt_per_us = tmr_ctx->cnt_per_ms / 1000;
 	pr_info("init finished cnt per ms %d, cnt per us %d\n",
 		tmr_ctx->cnt_per_ms, tmr_ctx->cnt_per_us);
@@ -323,7 +323,7 @@ static void __init add_clocksource(struct device_node *source_timer)
 	 * register of the clocksource timer.
 	 */
 	//sched_io_base = iobase + 0x04;
-	sched_rate = rate / tmr_ctx->div;
+	sched_rate = rate / (tmr_ctx->div + 1);
 }
 static u64 notrace read_sched_clock(void)
 {
