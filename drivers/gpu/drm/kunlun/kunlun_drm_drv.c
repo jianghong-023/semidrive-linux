@@ -206,6 +206,7 @@ static int kunlun_drm_bind(struct device *dev)
 	drm->mode_config.max_width = 4096;
 	drm->mode_config.max_height = 4096;
 
+	drm->mode_config.allow_fb_modifiers = true;
 	drm->mode_config.funcs = &kunlun_mode_config_funcs;
 
 	ret = kunlun_drm_init_iommu(drm);

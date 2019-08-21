@@ -68,6 +68,8 @@ enum {
 enum kunlun_plane_property {
 	PLANE_PROP_ALPHA,
 	PLANE_PROP_BLEND_MODE,
+	PLANE_PROP_FBDC_HSIZE_Y,
+	PLANE_PROP_FBDC_HSIZE_UV,
 	PLANE_PROP_MAX_NUM
 };
 
@@ -373,14 +375,35 @@ struct kunlun_du_ops {
 	int (*vblank_enable)(struct kunlun_crtc *kcrtc, bool enable);
 	int (*du_enable)(struct kunlun_crtc *kcrtc, bool enable);
 };
+
+struct plane_tile_ctx {
+	bool is_tile_mode;
+	uint32_t data_mode;
+	bool is_fbdc_cps;
+	uint32_t tile_hsize;
+	uint32_t tile_vsize;
+	uint32_t tile_hsize_value;
+	uint32_t tile_vsize_value;
+	uint32_t fbdc_fmt;
+	uint32_t x1;
+	uint32_t y1;
+	uint32_t x2;
+	uint32_t y2;
+	uint32_t width;
+	uint32_t height;
+};
+
 struct kunlun_plane {
 	struct drm_plane base;
 	const struct kunlun_plane_data *data;
 	struct kunlun_crtc *kcrtc;
 	uint8_t plane_status;
 	struct drm_property *plane_property[PLANE_PROP_MAX_NUM];
+	struct plane_tile_ctx tile_ctx;
 	uint8_t alpha;
 	uint8_t blend_mode;
+	uint32_t fbdc_hsize_y;
+	uint32_t fbdc_hsize_uv;
 };
 
 struct kunlun_crtc_du_data {

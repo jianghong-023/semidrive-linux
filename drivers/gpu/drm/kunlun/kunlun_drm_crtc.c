@@ -366,10 +366,9 @@ static int kunlun_mlc_update_plane(struct kunlun_crtc *kcrtc, unsigned int mask)
 	int total_planes = dev->mode_config.num_total_plane;
 	void __iomem *regs;
 	unsigned int num_planes = kcrtc->num_planes;
-	unsigned int nums = 0;
 	unsigned int zpos;
 	uint8_t blend_mode;
-	int i, j, flag = 0;
+	int i, j;
 
 	if(!mask)
 		return -EINVAL;
@@ -439,6 +438,38 @@ static int kunlun_mlc_update_trig(struct kunlun_crtc *kcrtc, unsigned int mask)
 		DU_REG_SET(kcrtc->dp_regs, dp_data->ctrl, flc_trig, 1);
 
 	DU_REG_SET(kcrtc->dc_regs, dc_data->ctrl, flc_trig, 1);
+
+	return 0;
+}
+
+static int kunlun_fbdc_update(struct kunlun_crtc *kcrtc, uint32_t mask)
+{
+	const struct kunlun_fbdc_data *fbdc_data = kcrtc->data->dp_data->fbdcs;
+	const struct kunlun_fbdc_ctrl *ctrl = fbdc_data->ctrl;
+	const struct kunlun_fbdc_cr_inval *cr_inval = fbdc_data->cr_inval;
+	int total_planes = kcrtc->base.dev->mode_config.num_total_plane;
+	unsigned int num_planes = kcrtc->num_planes;
+	void __iomem *dp_regs = kcrtc->dp_regs;
+	bool is_fbdc_cps = false;
+	int i, j;
+
+	for (i = 0; i < num_planes; i++) {
+		j = ((kcrtc->base.index == 1) ? (total_planes - num_planes): 0) + i ;
+		if ((mask & (1 << j)) &&
+			(kcrtc->planes[i].tile_ctx.is_fbdc_cps == true)) {
+			is_fbdc_cps = true;
+			break;
+		}
+	}
+
+	if (is_fbdc_cps) {
+		DU_REG_SET(dp_regs, cr_inval, notify, 1);
+		DU_REG_SET(dp_regs, cr_inval, requester_o, 0xF);
+		DU_REG_SET(dp_regs, cr_inval, pengding_o, 1);
+		DU_REG_SET(dp_regs, ctrl, en, 1);
+	} else {
+		DU_REG_SET(dp_regs, ctrl, en, 0);
+	}
 
 	return 0;
 }
@@ -758,6 +789,8 @@ static void kunlun_dp_fbdc_init(struct kunlun_crtc *kcrtc,
 	const struct kunlun_fbdc_ctrl *ctrl = kcrtc->data->dp_data->fbdcs->ctrl;
 	void __iomem *dp_regs = kcrtc->dp_regs;
 
+	DU_REG_SET(dp_regs, ctrl, hdr_bypass, 0);
+	DU_REG_SET(dp_regs, ctrl, mode_v3_1_en, 1);
 	DU_REG_SET(dp_regs, ctrl, en, 0);
 }
 static int kunlun_crtc_init(struct kunlun_crtc *kcrtc)
@@ -862,7 +895,7 @@ static void kunlun_crtc_atomic_flush(struct drm_crtc *crtc,
 //	if(WARN_ON(kcrtc->enabled))
 //		return;
 
-	if(!state->base.active)
+	if (!state->base.active)
 		return;
 
 	spin_lock_irq(&crtc->dev->event_lock);
@@ -878,11 +911,15 @@ static void kunlun_crtc_atomic_flush(struct drm_crtc *crtc,
 	old_state = to_kunlun_crtc_state(old_crtc_state);
 	state->plane_mask = crtc->state->plane_mask;
 	ret = kunlun_mlc_update_plane(kcrtc, state->plane_mask);
-	if(ret)
+	if (ret)
+		return;
+
+	ret = kunlun_fbdc_update(kcrtc, state->plane_mask);
+	if (ret)
 		return;
 
 	ret = kunlun_mlc_update_trig(kcrtc, state->plane_mask);
-	if(ret)
+	if (ret)
 		return;
 }
 
@@ -1100,6 +1137,8 @@ static int kunlun_crtc_planes_init(struct kunlun_crtc *kcrtc)
 
 	for (i = 0; i < planes_nums; i++) {
 		plane = &kcrtc->planes[i];
+		plane->tile_ctx.is_tile_mode = false;
+		plane->tile_ctx.is_fbdc_cps = false;
 		if (kcrtc->ctrl_unit)
 			plane->data = &dp_data->planes[i];
 		else

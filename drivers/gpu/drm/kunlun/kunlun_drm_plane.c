@@ -145,6 +145,16 @@ static const struct kunlun_gp_scaler_data gp_scaler_data = {
 	.vs_data = &gp_vs_data,
 };
 
+static const struct kunlun_gp_tile_ctrl gp_tile_data = {
+	.tr_req_cnt_fi = DU_REG(GP_TILE_CTRL, GP_TILE_TR_REQ_CNT_FI_MASK, GP_TILE_TR_REQ_CNT_FI_SHIFT),
+	.tr_req_cnt = DU_REG(GP_TILE_CTRL, GP_TILE_TR_REQ_CNT_MASK, GP_TILE_TR_REQ_CNT_SHIFT),
+	.re_buf_wml = DU_REG(GP_TILE_CTRL, GP_TILE_TR_BUF_WML_MASK, GP_TILE_TR_BUF_WML_SHIFT),
+	.re_fifo_byps = DU_REG(GP_TILE_CTRL, GP_TILE_CTRL_RE_FIEO_BYPS_MASK, GP_TILE_CTRL_RE_FIEO_BYPS_SHIFT),
+	.re_mode = DU_REG(GP_TILE_CTRL, GP_TILE_CTRL_RE_MODE_MASK, GP_TILE_CTRL_RE_MODE_SHIFT),
+	.vsize = DU_REG(GP_TILE_CTRL, GP_TILE_CTRL_VSIZE_MASK, GP_TILE_CTRL_VSIZE_SHIFT),
+	.hsize = DU_REG(GP_TILE_CTRL, GP_TILE_CTRL_HSIZE_MASK, GP_TILE_CTRL_HSIZE_SHIFT),
+};
+
 static const struct kunlun_csc_ctrl gp_csc_data = {
 	.alpha = DU_REG(GP_CSC_CTRL, CSC_ALPHA_MASK, CSC_ALPHA_SHIFT),
 	.sbup_conv = DU_REG(GP_CSC_CTRL, CSC_SBUP_CONV_MASK, CSC_SBUP_CONV_SHIFT),
@@ -274,6 +284,7 @@ static const struct kunlun_gp_data dp_gp0 = {
 	.pix_comp  = &gp_pix_comp,
 	.frm_ctrl = &dp_gp_frm_ctrl,
 	.frm_info = &gp_frm_data,
+	.tile_ctrl = &gp_tile_data,
 	.yuvup_ctrl = &gp_yuvup_data,
 	.crop_ctrl = &gp_crop_data,
 	.scaler = &gp_scaler_data,
@@ -287,6 +298,7 @@ static const struct kunlun_gp_data dp_gp1 = {
 	.pix_comp  = &gp_pix_comp,
 	.frm_ctrl = &dp_gp_frm_ctrl,
 	.frm_info = &gp_frm_data,
+	.tile_ctrl = &gp_tile_data,
 	.crop_ctrl = &gp_crop_data,
 	.fbdc_ctrl = &dp_fbdc_data,
 	.sw_rst = DU_REG(GP_SWT_RST, SW_RST_MASK, SW_RST_SHIFT),
@@ -525,6 +537,316 @@ static uint32_t get_h_addr(uint64_t addr)
 	return addr_h;
 }
 
+static int get_tile_hsize(uint32_t select)
+{
+	int value;
+	switch (select) {
+		case TILE_HSIZE_1:
+			value = 1;
+			break;
+		case TILE_HSIZE_8:
+			value = 8;
+			break;
+		case TILE_HSIZE_16:
+			value = 16;
+			break;
+		case TILE_HSIZE_32:
+			value = 32;
+			break;
+		case TILE_HSIZE_64:
+			value = 64;
+			break;
+		case TILE_HSIZE_128:
+			value = 128;
+			break;
+		default:
+			value = 0;
+			break;
+	}
+	return value;
+}
+
+static int get_tile_vsize(uint32_t select)
+{
+	int value;
+	switch (select) {
+		case TILE_VSIZE_1:
+			value = 1;
+			break;
+		case TILE_VSIZE_2:
+			value = 2;
+			break;
+		case TILE_VSIZE_4:
+			value = 4;
+			break;
+		case TILE_VSIZE_8:
+			value = 8;
+			break;
+		case TILE_VSIZE_16:
+			value = 16;
+			break;
+		default:
+			value = 0;
+			break;
+	}
+	return value;
+}
+
+static int kunlun_plane_get_tile_ctx(struct drm_plane *plane)
+{
+	struct kunlun_plane *klp = to_kunlun_plane(plane);
+	struct drm_plane_state *state = plane->state;
+	struct plane_tile_ctx *ctx = &klp->tile_ctx;
+	struct drm_framebuffer *fb = state->fb;
+	struct drm_rect *src = &state->src;
+	uint32_t format = fb->format->format;
+	uint32_t x1, y1, x2, y2;
+
+	switch (format) {
+		case DRM_FORMAT_XRGB8888:
+		case DRM_FORMAT_XBGR8888:
+		case DRM_FORMAT_BGRX8888:
+		case DRM_FORMAT_ARGB8888:
+		case DRM_FORMAT_ABGR8888:
+		case DRM_FORMAT_BGRA8888:
+			switch (fb->modifier) {
+				case DRM_FORMAT_MOD_SEMIDRIVE_8X8_TILE:
+					ctx->tile_hsize = TILE_HSIZE_8;
+					ctx->tile_vsize = TILE_VSIZE_8;
+					ctx->data_mode = GPU_RAW_TILE_MODE;
+				break;
+				case DRM_FORMAT_MOD_SEMIDRIVE_16X4_TILE:
+					ctx->tile_hsize = TILE_HSIZE_16;
+					ctx->tile_vsize = TILE_VSIZE_4;
+					ctx->data_mode = GPU_RAW_TILE_MODE;
+					break;
+				case DRM_FORMAT_MOD_SEMIDRIVE_32X2_TILE:
+					ctx->tile_hsize = TILE_HSIZE_32;
+					ctx->tile_vsize = TILE_VSIZE_2;
+					ctx->data_mode = GPU_RAW_TILE_MODE;
+					break;
+				case DRM_FORMAT_MOD_SEMIDRIVE_8X8_FBDC_TILE:
+					ctx->tile_hsize = TILE_HSIZE_8;
+					ctx->tile_vsize = TILE_VSIZE_8;
+					ctx->data_mode = GPU_CPS_TILE_MODE;
+					ctx->fbdc_fmt = FBDC_U8U8U8U8;
+					break;
+				case DRM_FORMAT_MOD_SEMIDRIVE_16X4_FBDC_TILE:
+					ctx->tile_hsize = TILE_HSIZE_16;
+					ctx->tile_vsize = TILE_VSIZE_4;
+					ctx->data_mode = GPU_CPS_TILE_MODE;
+					ctx->fbdc_fmt = FBDC_U8U8U8U8;
+					break;
+				case DRM_FORMAT_MOD_SEMIDRIVE_32X2_FBDC_TILE:
+					ctx->tile_hsize = TILE_HSIZE_32;
+					ctx->tile_vsize = TILE_VSIZE_2;
+					ctx->data_mode = GPU_CPS_TILE_MODE;
+					ctx->fbdc_fmt = FBDC_U8U8U8U8;
+					break;
+				default:
+					ctx->data_mode = LINEAR_MODE;
+					break;
+			}
+			break;
+		case DRM_FORMAT_RGB565:
+		case DRM_FORMAT_BGR565:
+			switch (fb->modifier) {
+				case DRM_FORMAT_MOD_SEMIDRIVE_16X8_TILE:
+					ctx->tile_hsize = TILE_HSIZE_16;
+					ctx->tile_vsize = TILE_VSIZE_8;
+					ctx->data_mode = GPU_RAW_TILE_MODE;
+					break;
+				case DRM_FORMAT_MOD_SEMIDRIVE_32X4_TILE:
+					ctx->tile_hsize = TILE_HSIZE_32;
+					ctx->tile_vsize = TILE_VSIZE_4;
+					ctx->data_mode = GPU_RAW_TILE_MODE;
+					break;
+				case DRM_FORMAT_MOD_SEMIDRIVE_64X2_TILE:
+					ctx->tile_hsize = TILE_HSIZE_64;
+					ctx->tile_vsize = TILE_VSIZE_2;
+					ctx->data_mode = GPU_RAW_TILE_MODE;
+					break;
+				case DRM_FORMAT_MOD_SEMIDRIVE_16X8_FBDC_TILE:
+					ctx->tile_hsize = TILE_HSIZE_16;
+					ctx->tile_vsize = TILE_VSIZE_8;
+					ctx->data_mode = GPU_CPS_TILE_MODE;
+					ctx->fbdc_fmt = FBDC_U16;
+					break;
+				case DRM_FORMAT_MOD_SEMIDRIVE_32X4_FBDC_TILE:
+					ctx->tile_hsize = TILE_HSIZE_32;
+					ctx->tile_vsize = TILE_VSIZE_4;
+					ctx->data_mode = GPU_CPS_TILE_MODE;
+					ctx->fbdc_fmt = FBDC_U16;
+					break;
+				case DRM_FORMAT_MOD_SEMIDRIVE_64X2_FBDC_TILE:
+					ctx->tile_hsize = TILE_HSIZE_64;
+					ctx->tile_vsize = TILE_VSIZE_2;
+					ctx->data_mode = GPU_CPS_TILE_MODE;
+					ctx->fbdc_fmt = FBDC_U16;
+					break;
+				default:
+					ctx->data_mode = LINEAR_MODE;
+					break;
+			}
+			break;
+		case DRM_FORMAT_R8:
+			switch (fb->modifier) {
+				case DRM_FORMAT_MOD_SEMIDRIVE_32X8_TILE:
+					ctx->tile_hsize = TILE_HSIZE_32;
+					ctx->tile_vsize = TILE_VSIZE_8;
+					ctx->data_mode = GPU_RAW_TILE_MODE;
+					break;
+				case DRM_FORMAT_MOD_SEMIDRIVE_64X4_TILE:
+					ctx->tile_hsize = TILE_HSIZE_64;
+					ctx->tile_vsize = TILE_VSIZE_4;
+					ctx->data_mode = GPU_RAW_TILE_MODE;
+					break;
+				case DRM_FORMAT_MOD_SEMIDRIVE_128X2_TILE:
+					ctx->tile_hsize = TILE_HSIZE_128;
+					ctx->tile_vsize = TILE_VSIZE_2;
+					ctx->data_mode = GPU_RAW_TILE_MODE;
+					break;
+				case DRM_FORMAT_MOD_SEMIDRIVE_32X8_FBDC_TILE:
+					ctx->tile_hsize = TILE_HSIZE_32;
+					ctx->tile_vsize = TILE_VSIZE_8;
+					ctx->data_mode = GPU_CPS_TILE_MODE;
+					ctx->fbdc_fmt = FBDC_U8;
+					break;
+				case DRM_FORMAT_MOD_SEMIDRIVE_64X4_FBDC_TILE:
+					ctx->tile_hsize = TILE_HSIZE_64;
+					ctx->tile_vsize = TILE_VSIZE_4;
+					ctx->data_mode = GPU_CPS_TILE_MODE;
+					ctx->fbdc_fmt = FBDC_U8;
+					break;
+				case DRM_FORMAT_MOD_SEMIDRIVE_128X2_FBDC_TILE:
+					ctx->tile_hsize = TILE_HSIZE_128;
+					ctx->tile_vsize = TILE_VSIZE_2;
+					ctx->data_mode = GPU_CPS_TILE_MODE;
+					ctx->fbdc_fmt = FBDC_U8;
+					break;
+				default:
+					ctx->data_mode = LINEAR_MODE;
+					break;
+			}
+			break;
+		case DRM_FORMAT_NV12:
+		case DRM_FORMAT_NV21:
+			switch (fb->modifier) {
+				case DRM_FORMAT_MOD_SEMIDRIVE_CODA_16X16_TILE:
+					ctx->tile_hsize = TILE_HSIZE_16;
+					ctx->tile_vsize = TILE_VSIZE_16;
+					ctx->data_mode = VPU_RAW_TILE_988_MODE;
+					break;
+				case DRM_FORMAT_MOD_SEMIDRIVE_WAVE_32X8_TILE:
+					ctx->tile_hsize = TILE_HSIZE_32;
+					ctx->tile_vsize = TILE_VSIZE_8;
+					ctx->data_mode = VPU_RAW_TILE_MODE;
+					break;
+				case DRM_FORMAT_MOD_SEMIDRIVE_WAVE_32X8_FBDC_TILE:
+					ctx->tile_hsize = TILE_HSIZE_32;
+					ctx->tile_vsize = TILE_VSIZE_8;
+					ctx->data_mode = VPU_CPS_TILE_MODE;
+					ctx->fbdc_fmt = FBDC_NV21;
+					break;
+				/*case DRM_FORMAT_MOD_SEMIDRIVE_WAVE_16X8_FBDC_TILE:
+					ctx->tile_hsize = TILE_HSIZE_16;
+					ctx->tile_vsize = TILE_VSIZE_8;
+					ctx->data_mode = GPU_CPS_TILE_MODE;
+					ctx->fbdc_fmt = FBDC_YUV420_16PACK;
+					break;*/
+				default:
+					ctx->data_mode = LINEAR_MODE;
+					break;
+			}
+			break;
+		default:
+			ctx->data_mode = LINEAR_MODE;
+			break;
+	}
+
+	x1 = src->x1 >> 16;
+	y1 = src->y1 >> 16;
+	x2 = src->x2 >> 16;
+	y2 = src->y2 >> 16;
+
+	ctx->tile_hsize_value = get_tile_hsize(ctx->tile_hsize);
+	ctx->tile_vsize_value = get_tile_vsize(ctx->tile_vsize);
+
+	ctx->x1 = ALIGN_DOWN(x1, ctx->tile_hsize_value);
+	ctx->y1 = ALIGN_DOWN(y1, ctx->tile_vsize_value);
+
+	ctx->x2 = ALIGN(x2, ctx->tile_hsize_value);
+	ctx->y2 = ALIGN(y2, ctx->tile_vsize_value);
+
+	ctx->width = ctx->x2 - ctx->x1;
+	ctx->height = ctx->y2 - ctx->y1;
+
+	if ((ctx->data_mode == GPU_RAW_TILE_MODE) ||
+		(ctx->data_mode == GPU_CPS_TILE_MODE) ||
+		(ctx->data_mode == VPU_RAW_TILE_MODE) ||
+		(ctx->data_mode == VPU_CPS_TILE_MODE) ||
+		(ctx->data_mode == VPU_RAW_TILE_988_MODE))
+		ctx->is_tile_mode = true;
+	else
+		ctx->is_tile_mode = false;
+
+	if ((ctx->data_mode == GPU_CPS_TILE_MODE) ||
+		(ctx->data_mode == VPU_CPS_TILE_MODE))
+		ctx->is_fbdc_cps = true;
+	else
+		ctx->is_fbdc_cps = false;
+
+	return 0;
+}
+
+static int kunlun_plane_set_tile_cfg(struct drm_plane *plane)
+{
+	struct drm_plane_state *state = plane->state;
+	struct kunlun_crtc *kcrtc = to_kunlun_crtc(state->crtc);
+	struct kunlun_plane *klp = to_kunlun_plane(plane);
+	struct plane_tile_ctx *ctx = &klp->tile_ctx;
+	struct drm_framebuffer *fb = state->fb;
+	const struct kunlun_gp_data *gp_data = klp->data->hwpipe->data.gp;
+	const struct kunlun_gp_tile_ctrl *tile_ctrl = gp_data->tile_ctrl;
+	const struct kunlun_gp_fbdc_ctrl *fbdc_ctrl = gp_data->fbdc_ctrl;
+	const struct kunlun_pipe_frm_ctrl *frm_ctrl = gp_data->frm_ctrl;
+	void __iomem *regs = kcrtc->dp_regs;
+	uint32_t chn_base = klp->data->chn_base;
+	uint32_t format = fb->format->format;
+	uint32_t cnt;
+
+	DU_PIPE_ELEM_SET(regs, chn_base, frm_ctrl, mode, ctx->data_mode);
+
+	if (ctx->is_tile_mode) {
+		if ((format == DRM_FORMAT_NV12) || (format == DRM_FORMAT_NV21)) {
+			DU_PIPE_ELEM_SET(regs, chn_base, tile_ctrl, tr_req_cnt_fi, 1);
+
+			/*Need add rotation judje*/
+			/*tr_req_cnt = width / (horizontal direction tile number) - 1*/
+			cnt = ctx->width / ctx->tile_hsize_value - 1;
+			DU_PIPE_ELEM_SET(regs, chn_base, tile_ctrl, tr_req_cnt, cnt);
+		} else {
+			DU_PIPE_ELEM_SET(regs, chn_base, tile_ctrl, tr_req_cnt_fi, 0);
+			DU_PIPE_ELEM_SET(regs, chn_base, tile_ctrl, tr_req_cnt, 0);
+		}
+
+		DU_PIPE_ELEM_SET(regs, chn_base, tile_ctrl, re_fifo_byps, 0);
+		DU_PIPE_ELEM_SET(regs, chn_base, tile_ctrl, vsize, ctx->tile_vsize);
+		DU_PIPE_ELEM_SET(regs, chn_base, tile_ctrl, hsize, ctx->tile_hsize);
+	}else {
+		DU_PIPE_ELEM_SET(regs, chn_base, tile_ctrl, vsize, 0);
+		DU_PIPE_ELEM_SET(regs, chn_base, tile_ctrl, hsize, 0);
+	}
+
+	if (ctx->is_fbdc_cps) {
+		DU_PIPE_ELEM_SET(regs, chn_base, fbdc_ctrl, fmt, ctx->fbdc_fmt);
+		DU_PIPE_ELEM_SET(regs, chn_base, fbdc_ctrl, en, 1);
+	} else {
+		DU_PIPE_ELEM_SET(regs, chn_base, fbdc_ctrl, en, 0);
+	}
+
+	return 0;
+}
 static int kunlun_plane_frm_comp_set(void __iomem *regs,
 		uint32_t chn_base,
 		const struct kunlun_pipe_pix_comp *comp,
@@ -806,19 +1128,6 @@ static int kunlun_plane_frm_comp_set(void __iomem *regs,
 	return 0;
 }
 
-static bool kunlun_format_global_alpha(uint32_t format)
-{
-	int i;
-	for (i = 0; i < sizeof(format); i++) {
-		char tmp = (format >> (8 * i)) & 0xff;
-
-		if (tmp == 'A')
-			return false;
-	}
-
-	return true;
-}
-
 static int get_du_mlc_sf_index(uint32_t layer_id)
 {
 	uint32_t i;
@@ -883,6 +1192,7 @@ static void kunlun_gpipe_init(const struct kunlun_gp_data *gp_data,
 	}
 
 	if ((type == DP_GPIPE0) || (type == DP_GPIPE1)) {
+		DU_PIPE_ELEM_SET(regs, chn_base, gp_data->tile_ctrl, re_buf_wml, 0xe);
 		DU_PIPE_ELEM_SET(regs, chn_base, gp_data->fbdc_ctrl, en, 0);
 	}
 
@@ -1017,6 +1327,7 @@ static void kunlun_plane_atomic_update(struct drm_plane *plane,
 //	struct drm_rect *dest = &state->dst;
 	struct drm_gem_object *obj;
 	struct kunlun_gem_object *gem_obj;
+	struct plane_tile_ctx *ctx = &klp->tile_ctx;
 	uint32_t pitch, format;
 	dma_addr_t dma_addr;
 	uint32_t addr_l, addr_h;
@@ -1033,7 +1344,7 @@ static void kunlun_plane_atomic_update(struct drm_plane *plane,
 	const struct kunlun_csc_ctrl *csc_ctrl = NULL;
 	const struct kunlun_mlc_data *dc_mlc = kcrtc->data->dc_data->mlc;
 	const struct kunlun_mlc_data *dp_mlc = kcrtc->data->dp_data->mlc;
-	struct kunlun_mlc_data *mlc;
+	const struct kunlun_mlc_data *mlc;
 	void __iomem *regs;
 	int i;
 	/*
@@ -1067,10 +1378,15 @@ static void kunlun_plane_atomic_update(struct drm_plane *plane,
 	crtc_x = state->crtc_x;
 	crtc_y = state->crtc_y;
 
+	if ((layer_id == DP_GPIPE0) || (layer_id == DP_GPIPE1))
+		kunlun_plane_get_tile_ctx(plane);
+
 	obj = drm_gem_fb_get_obj(fb, 0);
 	gem_obj = to_kunlun_obj(obj);
 
 	dma_addr = gem_obj->paddr + fb->offsets[0];
+	if (ctx->is_fbdc_cps)
+		dma_addr += klp->fbdc_hsize_y;
 	addr_l = get_l_addr(dma_addr);
 	addr_h = get_h_addr(dma_addr);
 	pitch = fb->pitches[0] - 1;
@@ -1093,19 +1409,30 @@ static void kunlun_plane_atomic_update(struct drm_plane *plane,
 
 	kunlun_plane_frm_comp_set(regs, chn_base, pix_comp, frm_ctrl,
 			yuvup_ctrl, csc_ctrl, format);
-	DU_PIPE_ELEM_SET(regs, chn_base, frm_data, height, src_h);
-	DU_PIPE_ELEM_SET(regs, chn_base, frm_data, width, src_w);
+
+	if (ctx->is_tile_mode) {
+		DU_PIPE_ELEM_SET(regs, chn_base, frm_data, height, ctx->height - 1);
+		DU_PIPE_ELEM_SET(regs, chn_base, frm_data, width, ctx->width - 1);
+		DU_PIPE_ELEM_SET(regs, chn_base, frm_data, offset_x, ctx->x1);
+		DU_PIPE_ELEM_SET(regs, chn_base, frm_data, offset_y, ctx->y1);
+	} else {
+		DU_PIPE_ELEM_SET(regs, chn_base, frm_data, height, src_h);
+		DU_PIPE_ELEM_SET(regs, chn_base, frm_data, width, src_w);
+		DU_PIPE_ELEM_SET(regs, chn_base, frm_data, offset_x, off_x);
+		DU_PIPE_ELEM_SET(regs, chn_base, frm_data, offset_y, off_y);
+	}
 	DU_PIPE_ELEM_SET(regs, chn_base, frm_data, y_baddr_l, addr_l);
 	DU_PIPE_ELEM_SET(regs, chn_base, frm_data, y_baddr_h, addr_h);
 	DU_PIPE_ELEM_SET(regs, chn_base, frm_data, y_stride, pitch);
-	DU_PIPE_ELEM_SET(regs, chn_base, frm_data, offset_x, off_x);
-	DU_PIPE_ELEM_SET(regs, chn_base, frm_data, offset_y, off_y);
+
 
 	if (nplanes > 1) {
 		obj = drm_gem_fb_get_obj(fb, 1);
 		gem_obj = to_kunlun_obj(obj);
 
 		dma_addr = gem_obj->paddr + fb->offsets[1];
+		if (ctx->is_fbdc_cps)
+			dma_addr += klp->fbdc_hsize_uv;
 		addr_l = get_l_addr(dma_addr);
 		addr_h = get_h_addr(dma_addr);
 		pitch = fb->pitches[1] - 1;
@@ -1130,15 +1457,53 @@ static void kunlun_plane_atomic_update(struct drm_plane *plane,
 	}
 
 	if (layer_id == DP_GPIPE0) {
-		/*hscaler*/
-		DU_PIPE_ELEM_SET(regs, chn_base, gp_data->scaler->hs_data, out_hsize, src_w);
+		if (ctx->is_tile_mode) {
+			/*hscaler*/
+			DU_PIPE_ELEM_SET(regs, chn_base, gp_data->scaler->hs_data,
+				out_hsize, ctx->width - 1);
+			/*crop*/
+			DU_PIPE_ELEM_SET(regs, chn_base, gp_data->crop_ctrl,
+				start_x, off_x);
+			DU_PIPE_ELEM_SET(regs, chn_base, gp_data->crop_ctrl,
+				start_y, off_y);
+			DU_PIPE_ELEM_SET(regs, chn_base, gp_data->crop_ctrl,
+				bypass, 0);
+		} else {
+			/*hscaler*/
+			DU_PIPE_ELEM_SET(regs, chn_base, gp_data->scaler->hs_data,
+				out_hsize, src_w);
+			/*crop*/
+			DU_PIPE_ELEM_SET(regs, chn_base, gp_data->crop_ctrl,
+				start_x, 0);
+			DU_PIPE_ELEM_SET(regs, chn_base, gp_data->crop_ctrl,
+				start_y, 0);
+			DU_PIPE_ELEM_SET(regs, chn_base, gp_data->crop_ctrl,
+				bypass, 1);
+		}
 		/*crop*/
 		DU_PIPE_ELEM_SET(regs, chn_base, gp_data->crop_ctrl, hsize, src_w);
 		DU_PIPE_ELEM_SET(regs, chn_base, gp_data->crop_ctrl, vsize, src_h);
 		/*vscaler*/
-		DU_PIPE_ELEM_SET(regs, chn_base, gp_data->scaler->vs_data, out_vsize, src_h);
+		DU_PIPE_ELEM_SET(regs, chn_base, gp_data->scaler->vs_data,
+			out_vsize, src_h);
 		DU_PIPE_ELEM_SET(regs, chn_base, gp_data, sdw_trig, 1);
 	} else if (layer_id == DP_GPIPE1) {
+		if (ctx->is_tile_mode) {
+			/*crop*/
+			DU_PIPE_ELEM_SET(regs, chn_base, gp_data->crop_ctrl,
+				start_x, off_x);
+			DU_PIPE_ELEM_SET(regs, chn_base, gp_data->crop_ctrl,
+				start_y, off_y);
+			DU_PIPE_ELEM_SET(regs, chn_base, gp_data->crop_ctrl,
+				bypass, 0);
+		} else {
+			DU_PIPE_ELEM_SET(regs, chn_base, gp_data->crop_ctrl,
+				start_x, 0);
+			DU_PIPE_ELEM_SET(regs, chn_base, gp_data->crop_ctrl,
+				start_y, 0);
+			DU_PIPE_ELEM_SET(regs, chn_base, gp_data->crop_ctrl,
+				bypass, 1);
+		}
 		DU_PIPE_ELEM_SET(regs, chn_base, gp_data->crop_ctrl, hsize, src_w);
 		DU_PIPE_ELEM_SET(regs, chn_base, gp_data->crop_ctrl, vsize, src_h);
 		DU_PIPE_ELEM_SET(regs, chn_base, gp_data, sdw_trig, 1);
@@ -1147,6 +1512,8 @@ static void kunlun_plane_atomic_update(struct drm_plane *plane,
 	} else {
 		DU_PIPE_ELEM_SET(regs, chn_base, sp_data, sdw_trig, 1);
 	}
+
+	kunlun_plane_set_tile_cfg(plane);
 
 	if (kcrtc->ctrl_unit)
 		mlc = dp_mlc;
@@ -1253,6 +1620,7 @@ static void kunlun_plane_install_properties(struct drm_plane *plane,
 {
 	struct drm_device *dev = plane->dev;
 	struct kunlun_plane *klp = to_kunlun_plane(plane);
+	uint32_t layer_type = klp->data->id;
 	struct drm_property *prop;
 
 	static const struct drm_prop_enum_list blend_mode_prop_enum_list[] = {
@@ -1287,6 +1655,11 @@ static void kunlun_plane_install_properties(struct drm_plane *plane,
 	INSTALL_RANGE_PROPERTY(alpha, ALPHA, 0, 255, 255);
 	INSTALL_ENUM_PROPERTY(blend_mode, BLEND_MODE, DRM_MODE_BLEND_PIXEL_NONE);
 
+	if ((layer_type == DP_GPIPE0) || (layer_type == DP_GPIPE1)) {
+		INSTALL_RANGE_PROPERTY(fbdc_hsize_y, FBDC_HSIZE_Y, 0, UINT_MAX, 0);
+		INSTALL_RANGE_PROPERTY(fbdc_hsize_uv, FBDC_HSIZE_UV, 0, UINT_MAX, 0);
+	}
+
 	kunlun_plane_install_rotation_property(plane);
 	kunlun_plane_install_zpos_property(plane);
 
@@ -1300,6 +1673,7 @@ static int kunlun_plane_atomic_set_property(struct drm_plane *plane,
 				uint64_t val)
 {
 	struct kunlun_plane *klp = to_kunlun_plane(plane);
+	uint32_t layer_type = klp->data->id;
 	int ret = 0;
 
 #define SET_PROPERTY(name, NAME, type) do { \
@@ -1311,6 +1685,11 @@ static int kunlun_plane_atomic_set_property(struct drm_plane *plane,
 
 	SET_PROPERTY(alpha, ALPHA, uint8_t);
 	SET_PROPERTY(blend_mode, BLEND_MODE, uint8_t);
+
+	if ((layer_type == DP_GPIPE0) || (layer_type == DP_GPIPE1)) {
+		SET_PROPERTY(fbdc_hsize_y, FBDC_HSIZE_Y, uint32_t);
+		SET_PROPERTY(fbdc_hsize_uv, FBDC_HSIZE_UV, uint32_t);
+	}
 
 	pr_err("Invalid property\n");
 	ret = -EINVAL;
@@ -1324,6 +1703,7 @@ static int kunlun_plane_atomic_get_property(struct drm_plane *plane,
 				struct drm_property *property, uint64_t *val)
 {
 	struct kunlun_plane *klp = to_kunlun_plane(plane);
+	uint32_t layer_type = klp->data->id;
 	int ret = 0;
 
 #define GET_PROPERTY(name, NAME, type) do { \
@@ -1335,6 +1715,11 @@ static int kunlun_plane_atomic_get_property(struct drm_plane *plane,
 
 	GET_PROPERTY(alpha, ALPHA, uint8_t);
 	GET_PROPERTY(blend_mode, BLEND_MODE, uint8_t);
+
+	if ((layer_type == DP_GPIPE0) || (layer_type == DP_GPIPE1)) {
+		GET_PROPERTY(fbdc_hsize_y, FBDC_HSIZE_Y, uint32_t);
+		GET_PROPERTY(fbdc_hsize_uv, FBDC_HSIZE_UV, uint32_t);
+	}
 
 	pr_err("Invalid property\n");
 	ret = -EINVAL;
@@ -1430,9 +1815,8 @@ int kunlun_planes_init_overlay(struct kunlun_crtc *kcrtc)
 	const struct kunlun_crtc_du_data *dp_data = kcrtc->data->dp_data;
 	const struct kunlun_plane_data *plane_data;
 	struct kunlun_plane *plane;
-	int index;
 	int ret;
-	int i, j;
+	int i;
 
 	for(i = 0; i < kcrtc->num_planes; i++) {
 		plane = &kcrtc->planes[i];

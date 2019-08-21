@@ -183,6 +183,7 @@ extern "C" {
 #define DRM_FORMAT_MOD_VENDOR_QCOM    0x05
 #define DRM_FORMAT_MOD_VENDOR_VIVANTE 0x06
 #define DRM_FORMAT_MOD_VENDOR_BROADCOM 0x07
+#define DRM_FORMAT_MOD_VENDOR_SEMIDRIVE 0x08
 /* add more to the end as needed */
 
 #define DRM_FORMAT_RESERVED	      ((1ULL << 56) - 1)
@@ -402,6 +403,56 @@ extern "C" {
  *   tiles) or right-to-left (odd rows of 4k tiles).
  */
 #define DRM_FORMAT_MOD_BROADCOM_VC4_T_TILED fourcc_mod_code(BROADCOM, 1)
+
+
+/* SEMIDRIVE frame buffer modifiers */
+
+/* Semidrive 32 bpp 8x8 tiling layout */
+#define DRM_FORMAT_MOD_SEMIDRIVE_8X8_TILE        fourcc_mod_code(SEMIDRIVE, 1)
+/* Semidrive 32 bpp 16x4 tiling layout */
+#define DRM_FORMAT_MOD_SEMIDRIVE_16X4_TILE       fourcc_mod_code(SEMIDRIVE, 2)
+/* Semidrive 32 bpp 32x2 tiling layout */
+#define DRM_FORMAT_MOD_SEMIDRIVE_32X2_TILE       fourcc_mod_code(SEMIDRIVE, 3)
+/* Semidrive 16 bpp 16x8 tiling layout */
+#define DRM_FORMAT_MOD_SEMIDRIVE_16X8_TILE       fourcc_mod_code(SEMIDRIVE, 4)
+/* Semidrive 16 bpp 32x4 tiling layout */
+#define DRM_FORMAT_MOD_SEMIDRIVE_32X4_TILE       fourcc_mod_code(SEMIDRIVE, 5)
+/* Semidrive 16 bpp 64x2 tiling layout */
+#define DRM_FORMAT_MOD_SEMIDRIVE_64X2_TILE       fourcc_mod_code(SEMIDRIVE, 6)
+/* Semidrive 8 bpp 32x8 tiling layout */
+#define DRM_FORMAT_MOD_SEMIDRIVE_32X8_TILE       fourcc_mod_code(SEMIDRIVE, 7)
+/* Semidrive 8 bpp 64x4 tiling layout */
+#define DRM_FORMAT_MOD_SEMIDRIVE_64X4_TILE       fourcc_mod_code(SEMIDRIVE, 8)
+/* Semidrive 8 bpp 128x2 tiling layout */
+#define DRM_FORMAT_MOD_SEMIDRIVE_128X2_TILE      fourcc_mod_code(SEMIDRIVE, 9)
+
+/* Semidrive 32 bpp 8x8 tiling layout with fbdc compress */
+#define DRM_FORMAT_MOD_SEMIDRIVE_8X8_FBDC_TILE   fourcc_mod_code(SEMIDRIVE, 11)
+/* Semidrive 32 bpp 16x4 tiling layout with fbdc compress */
+#define DRM_FORMAT_MOD_SEMIDRIVE_16X4_FBDC_TILE  fourcc_mod_code(SEMIDRIVE, 12)
+/* Semidrive 32 bpp 32x2 tiling layout with fbdc compress */
+#define DRM_FORMAT_MOD_SEMIDRIVE_32X2_FBDC_TILE  fourcc_mod_code(SEMIDRIVE, 13)
+/* Semidrive 16 bpp 16x8 tiling layout with fbdc compress */
+#define DRM_FORMAT_MOD_SEMIDRIVE_16X8_FBDC_TILE  fourcc_mod_code(SEMIDRIVE, 14)
+/* Semidrive 16 bpp 32x4 tiling layout with fbdc compress */
+#define DRM_FORMAT_MOD_SEMIDRIVE_32X4_FBDC_TILE  fourcc_mod_code(SEMIDRIVE, 15)
+/* Semidrive 16 bpp 64x2 tiling layout with fbdc compresswith fbdc compress */
+#define DRM_FORMAT_MOD_SEMIDRIVE_64X2_FBDC_TILE  fourcc_mod_code(SEMIDRIVE, 16)
+/* Semidrive 8 bpp 32x8 tiling layout with fbdc compress */
+#define DRM_FORMAT_MOD_SEMIDRIVE_32X8_FBDC_TILE  fourcc_mod_code(SEMIDRIVE, 17)
+/* Semidrive 8 bpp 64x4 tiling layout with fbdc compress */
+#define DRM_FORMAT_MOD_SEMIDRIVE_64X4_FBDC_TILE  fourcc_mod_code(SEMIDRIVE, 18)
+/* Semidrive 8 bpp 128x2 tiling layout with fbdc compress */
+#define DRM_FORMAT_MOD_SEMIDRIVE_128X2_FBDC_TILE fourcc_mod_code(SEMIDRIVE, 19)
+
+/* Semidrive coda988 16x16 tiling layout */
+#define DRM_FORMAT_MOD_SEMIDRIVE_CODA_16X16_TILE fourcc_mod_code(SEMIDRIVE, 21)
+/* Semidrive wave412 32x8 tiling layout */
+#define DRM_FORMAT_MOD_SEMIDRIVE_WAVE_32X8_TILE  fourcc_mod_code(SEMIDRIVE, 22)
+/* Semidrive wave412 32x8 tiling layout with fbdc compress */
+#define DRM_FORMAT_MOD_SEMIDRIVE_WAVE_32X8_FBDC_TILE fourcc_mod_code(SEMIDRIVE, 31)
+/* Semidrive wave412 16x8 tiling layout with fbdc compress */
+#define DRM_FORMAT_MOD_SEMIDRIVE_WAVE_16X8_FBDC_TILE fourcc_mod_code(SEMIDRIVE, 32)
 
 #if defined(__cplusplus)
 }

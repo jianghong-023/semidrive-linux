@@ -63,7 +63,7 @@ enum {
 	SWAP_B_GAR          = 0b1101
 };
 
-/*Kunlun DC&DP layer formart uv mode*/
+/*Kunlun DC&DP layer format uv mode*/
 enum {
 	UV_YUV444_RGB       = 0b00,
 	UV_YUV422           = 0b01,
@@ -71,7 +71,7 @@ enum {
 	UV_YUV420           = 0b11
 };
 
-/*Kunlun DC&DP layer formart memory mode*/
+/*Kunlun DC&DP layer format memory mode*/
 enum {
 	LINEAR_MODE             = 0b000,
 	RLE_COMPR_MODE          = 0b001,
@@ -82,7 +82,7 @@ enum {
 	VPU_RAW_TILE_988_MODE   = 0b110,
 };
 
-/*Kunlun DC&DP layer formart planar mode*/
+/*Kunlun DC&DP layer format planar mode*/
 enum {
 	FMT_INTERLEAVED     = 0b00,
 	FMT_MONOTONIC       = 0b01,
@@ -90,12 +90,41 @@ enum {
 	FMT_PLANAR          = 0b11
 };
 
-/*Kunlun DC&DP layer formart rotation mode*/
+/*Kunlun DC&DP layer format rotation mode*/
 enum {
 	ROT_DEFAULT         = 0b000,
 	ROT_ROT             = 0b001,
 	ROT_VFLIP           = 0b010,
 	ROT_HFLIP           = 0b100
+};
+
+/*Kunlun DP layer format TILE vsize*/
+enum {
+	TILE_VSIZE_1       = 0b000,
+	TILE_VSIZE_2       = 0b001,
+	TILE_VSIZE_4       = 0b010,
+	TILE_VSIZE_8       = 0b011,
+	TILE_VSIZE_16      = 0b100,
+};
+
+/*Kunlun DP layer format TILE hsize*/
+enum {
+	TILE_HSIZE_1       = 0b000,
+	TILE_HSIZE_8       = 0b001,
+	TILE_HSIZE_16      = 0b010,
+	TILE_HSIZE_32      = 0b011,
+	TILE_HSIZE_64      = 0b100,
+	TILE_HSIZE_128     = 0b101,
+};
+
+/**/
+enum {
+	FBDC_U8U8U8U8      = 0xc,
+	FBDC_U16           = 0x9,
+	FBDC_R5G6B5        = 0x5,
+	FBDC_U8            = 0x0,
+	FBDC_NV21          = 0x37,
+	FBDC_YUV420_16PACK = 0x65
 };
 
 struct kunlun_pipe_pix_comp {
@@ -133,6 +162,7 @@ struct kunlun_pipe_frm_data {
 };
 
 struct kunlun_gp_tile_ctrl {
+	struct kunlun_du_reg tr_req_cnt_fi;
 	struct kunlun_du_reg tr_req_cnt;
 	struct kunlun_du_reg re_buf_wml;
 	struct kunlun_du_reg re_fifo_byps;
@@ -209,8 +239,8 @@ struct kunlun_vscaler_data {
 };
 
 struct kunlun_gp_scaler_data {
-	struct kunlun_hscaler_data *hs_data;
-	struct kunlun_vscaler_data *vs_data;
+	const struct kunlun_hscaler_data *hs_data;
+	const struct kunlun_vscaler_data *vs_data;
 };
 
 struct kunlun_gp_re_status {
