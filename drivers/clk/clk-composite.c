@@ -75,7 +75,8 @@ static int clk_composite_determine_rate(struct clk_hw *hw,
 	} else if (rate_hw && rate_ops && rate_ops->round_rate &&
 		   mux_hw && mux_ops && mux_ops->set_parent) {
 		req->best_parent_hw = NULL;
-
+		__clk_hw_set_clk(rate_hw, hw);
+		__clk_hw_set_clk(mux_hw, hw);
 		if (clk_hw_get_flags(hw) & CLK_SET_RATE_NO_REPARENT) {
 			parent = clk_hw_get_parent(mux_hw);
 			req->best_parent_hw = parent;
