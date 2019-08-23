@@ -2155,7 +2155,107 @@ static const struct file_operations possible_parents_fops = {
 	.llseek		= seq_lseek,
 	.release	= single_release,
 };
+#ifdef CONFIG_ARCH_SEMIDRIVE_X9
+static ssize_t sdrv_gate_read(struct file *filp, char __user *buffer,
+		size_t count, loff_t *ppos)
+{
+	struct clk_core *pdata = filp->private_data;
+	unsigned int value;
+	char tmp[32];
+	size_t size;
 
+	value = __clk_is_enabled(pdata->hw->clk);
+	size = sprintf(tmp, "%u\n", value);
+
+	return simple_read_from_buffer(buffer, count, ppos, tmp, size);
+}
+
+static ssize_t sdrv_gate_write(struct file *filp,
+			const char __user *buffer,
+			size_t count, loff_t *ppos)
+{
+	struct clk_core *pdata = filp->private_data;
+	unsigned int value;
+	int ret = 0;
+
+	ret = kstrtouint_from_user(buffer, count, 0, &value);
+	if (ret)
+		return -EFAULT;
+
+	if (value)
+		clk_prepare_enable(pdata->hw->clk);
+	else
+		clk_disable_unprepare(pdata->hw->clk);
+	return count;
+}
+
+static const struct file_operations sdrv_gate_ops = {
+	.owner = THIS_MODULE,
+	.open = simple_open,
+	.read = sdrv_gate_read,
+	.write = sdrv_gate_write,
+};
+
+static ssize_t sdrv_rate_read(struct file *filp, char __user *buffer,
+		size_t count, loff_t *ppos)
+{
+	struct clk_core *pdata = filp->private_data;
+	unsigned long rate;
+	char tmp[32];
+	size_t size;
+
+	rate = clk_get_rate(pdata->hw->clk);
+	size = sprintf(tmp, "%lu\n", rate);
+
+	return simple_read_from_buffer(buffer, count, ppos, tmp, size);
+}
+
+static ssize_t sdrv_rate_write(struct file *filp,
+			const char __user *buffer,
+			size_t count, loff_t *ppos)
+{
+	struct clk_core *pdata = filp->private_data;
+	unsigned int rate;
+	int ret = 0;
+
+	ret = kstrtouint_from_user(buffer, count, 0, &rate);
+	if (ret)
+		return -EFAULT;
+
+	if (rate)
+		clk_set_rate(pdata->hw->clk, rate);
+	return count;
+}
+
+static const struct file_operations sdrv_rate_ops = {
+	.owner = THIS_MODULE,
+	.open = simple_open,
+	.read = sdrv_rate_read,
+	.write = sdrv_rate_write,
+};
+
+void sdrv_clk_create(struct clk_core *core)
+{
+	const struct clk_ops *clk_ops = core->ops;
+
+	if (clk_ops == &clk_gate_ops) {
+		debugfs_create_file("gate", S_IRUSR | S_IWUSR, core->dentry, core,
+			&sdrv_gate_ops);
+	} else if (clk_ops == &clk_mux_ops) {
+		debugfs_create_file("rate", S_IRUSR | S_IWUSR, core->dentry, core,
+			&sdrv_rate_ops);
+	} else if (clk_ops == &clk_divider_ops) {
+		debugfs_create_file("rate", S_IRUSR | S_IWUSR, core->dentry, core,
+			&sdrv_rate_ops);
+	} else {//composite ops
+		debugfs_create_file("gate", S_IRUSR | S_IWUSR, core->dentry, core,
+			&sdrv_gate_ops);
+		debugfs_create_file("rate", S_IRUSR | S_IWUSR, core->dentry, core,
+			&sdrv_rate_ops);
+	}
+}
+
+#endif
 static int clk_debug_create_one(struct clk_core *core, struct dentry *pdentry)
 {
 	struct dentry *d;
@@ -2219,7 +2319,9 @@ static int clk_debug_create_one(struct clk_core *core, struct dentry *pdentry)
 		if (ret)
 			goto err_out;
 	}
-
+	#ifdef CONFIG_ARCH_SEMIDRIVE_X9
+	sdrv_clk_create(core);
+	#endif
 	ret = 0;
 	goto out;
 
