@@ -1628,8 +1628,9 @@ void sdhci_enable_clk(struct sdhci_host *host, u16 clk)
 
 	clk |= SDHCI_CLOCK_INT_EN;
 	sdhci_writew(host, clk, SDHCI_CLOCK_CONTROL);
-	/* Wait max 20 ms */
-	timeout = ktime_add_ms(ktime_get(), 20);
+
+	/* Wait max 150 ms */
+	timeout = ktime_add_ms(ktime_get(), 150);
 	while (1) {
 		bool timedout = ktime_after(ktime_get(), timeout);
 
@@ -1647,7 +1648,6 @@ void sdhci_enable_clk(struct sdhci_host *host, u16 clk)
 
 	clk |= SDHCI_CLOCK_CARD_EN;
 	sdhci_writew(host, clk, SDHCI_CLOCK_CONTROL);
-	//sdhci_dumpregs(host);
 }
 EXPORT_SYMBOL_GPL(sdhci_enable_clk);
 
