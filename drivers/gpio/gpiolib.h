@@ -62,6 +62,11 @@ struct gpio_device {
 	void			*data;
 	struct list_head        list;
 
+#ifdef	CONFIG_GPIO_KUNLUN
+	/* offset of the first pin in pinctrl port */
+	int			pin_offset;
+#endif
+
 #ifdef CONFIG_PINCTRL
 	/*
 	 * If CONFIG_PINCTRL is enabled, then gpio controllers can optionally

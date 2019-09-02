@@ -144,6 +144,9 @@ struct gpio_chip {
 	u16			ngpio;
 	const char		*const *names;
 	bool			can_sleep;
+#ifdef		CONFIG_GPIO_KUNLUN
+	u32				offset;
+#endif
 
 #if IS_ENABLED(CONFIG_GPIO_GENERIC)
 	unsigned long (*read_reg)(void __iomem *reg);
