@@ -132,6 +132,7 @@ struct kstream_device {
 	struct kstream_sensor sensor;
 	enum kstream_state state;
 	bool enabled;
+	bool iommu_enable;
 
 	struct kstream_ops *ops;
 };

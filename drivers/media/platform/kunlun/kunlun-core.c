@@ -228,6 +228,7 @@ static int kunlun_of_parse_ports(struct csi_core *csi)
 		kstream->id = ep.port;
 		kstream->dev = csi->dev;
 		kstream->core = csi;
+		kstream->iommu_enable = false;
 		kstream->base = csi->base + KUNLUN_IMG_REG_BASE(kstream->id);
 		csi->kstream_nums++;
 

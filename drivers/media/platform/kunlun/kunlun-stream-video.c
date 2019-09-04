@@ -24,6 +24,7 @@
 #include <media/v4l2-rect.h>
 #include <media/videobuf2-core.h>
 #include <media/videobuf2-dma-sg.h>
+#include <media/videobuf2-dma-contig.h>
 
 #include "kunlun-csi.h"
 
@@ -704,10 +705,22 @@ static int kstream_buf_init(struct vb2_buffer *vb)
 	struct kstream_buffer *kbuffer = container_of(vbuf,
 			struct kstream_buffer, vbuf);
 	struct kstream_video *video = vb2_get_drv_priv(vb->vb2_queue);
+	struct kstream_device *kstream = container_of(video,
+			struct kstream_device, video);
 	const struct v4l2_pix_format_mplane *format =
 		&video->active_fmt.fmt.pix_mp;
 	struct sg_table *sgt;
 	unsigned int i;
+
+	if(!kstream->iommu_enable) {
+		for(i = 0; i < format->num_planes; i++) {
+			kbuffer->paddr[i] = vb2_dma_contig_plane_dma_addr(vb, i);
+			if(!kbuffer->paddr[i])
+				return -EFAULT;
+		}
+
+		return 0;
+	}
 
 	for(i = 0; i < format->num_planes; i++) {
 		sgt = vb2_dma_sg_plane_desc(vb, i);
@@ -811,7 +824,10 @@ int kunlun_stream_video_register(struct kstream_video *video,
 	spin_lock_init(&video->buf_lock);
 
 	q->drv_priv = video;
-	q->mem_ops = &vb2_dma_sg_memops;
+	if(kstream->iommu_enable)
+		q->mem_ops = &vb2_dma_sg_memops;
+	else
+		q->mem_ops = &vb2_dma_contig_memops;
 	q->ops = &kunlun_video_vb2_q_ops;
 	q->type = V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE;
 	q->io_modes = VB2_DMABUF | VB2_MMAP | VB2_READ;
