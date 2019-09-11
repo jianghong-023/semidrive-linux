@@ -1,0 +1,4 @@
+config ROGUE_KM
+	tristate "rogue gpu support"
+	help
+	  Choose this if you have a rogue gpu.
