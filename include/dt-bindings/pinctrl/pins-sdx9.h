@@ -986,4 +986,9 @@
 #define     X9_IOMUXC_EMMC2_RESET_N__I2S_SC7_SDO_SDI_2                              0x3ac 0x56c 0x06 0x01
 #define     X9_IOMUXC_EMMC2_RESET_N__DFM_MIPI_TX_CLKOUT_GP_1                        0x3ac 0x000 0x07 0x00
 
+#define     X9_IOMUXC_RESERVED 							    						0x000 0x000 0x00 0x00
+
+#define     X9_IOMUXC_OPEN_DRAIN_DISABLE                                            0x0
+#define     X9_IOMUXC_OPEN_DRAIN_ENABLE                                             0x1
+
 #endif /* __DTS_SDX9_PINFUNC_H */

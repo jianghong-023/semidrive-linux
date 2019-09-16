@@ -140,16 +140,27 @@ static unsigned long bgpio_pin2mask_be(struct gpio_chip *gc,
 static int bgpio_get_set(struct gpio_chip *gc, unsigned int gpio)
 {
 	unsigned long pinmask = gc->pin2mask(gc, gpio);
+	int val = 0;
 
-	if (gc->bgpio_dir & pinmask)
-		return !!(gc->read_reg(gc->reg_set) & pinmask);
-	else
-		return !!(gc->read_reg(gc->reg_dat) & pinmask);
+	if (gc->bgpio_dir & pinmask) {
+		val = !!(gc->read_reg(gc->reg_set) & pinmask);
+	} else {
+		val = !!(gc->read_reg(gc->reg_dat) & pinmask);
+	}
+
+	printk(KERN_ERR "bgpio_get_set: gpio[%d], pinmask[%lu], val [0x%8x]\n",
+					gpio, pinmask, val);
+	return val;
 }
 
 static int bgpio_get(struct gpio_chip *gc, unsigned int gpio)
 {
-	return !!(gc->read_reg(gc->reg_dat) & gc->pin2mask(gc, gpio));
+	int val = 0;
+
+	val = !!(gc->read_reg(gc->reg_dat) & gc->pin2mask(gc, gpio));
+	printk(KERN_ERR "bgpio_get: gpio[%d], pinmask[%lu], val[0x%8x]\n",
+			gpio, gc->pin2mask(gc, gpio), val);
+	return val;
 }
 
 static void bgpio_set_none(struct gpio_chip *gc, unsigned int gpio, int val)
