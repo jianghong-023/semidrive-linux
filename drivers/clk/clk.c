@@ -204,6 +204,13 @@ struct clk_hw *clk_hw_get_parent(const struct clk_hw *hw)
 }
 EXPORT_SYMBOL_GPL(clk_hw_get_parent);
 
+void clk_hw_set_parent(const struct clk_hw *hw, struct clk_hw *parent)
+{
+	if (parent)
+		hw->core->parent = parent->core;
+}
+EXPORT_SYMBOL_GPL(clk_hw_set_parent);
+
 static struct clk_core *__clk_lookup_subtree(const char *name,
 					     struct clk_core *core)
 {

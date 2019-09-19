@@ -44,7 +44,7 @@
 
 //intern
 enum SOC_CLKIN SOC_CLK_table_CPU1A[] = {
-	SOC_CLKIN_0, SOC_CLKIN_2, SOC_CLKIN_31, SOC_CLKIN_32, SOC_CLKIN_4
+	SOC_CLKIN_0, SOC_CLKIN_2, SOC_CLKIN_31, SOC_CLKIN_32//, SOC_CLKIN_4
 };
 
 enum SOC_CLKIN SOC_CLK_table_CPU1A_0123[] = {
@@ -57,7 +57,7 @@ enum SOC_CLKIN SOC_CLK_table_CPU1A_m[] = {
 
 
 enum SOC_CLKIN SOC_CLK_table_CPU1B[] = {
-	SOC_CLKIN_0, SOC_CLKIN_2, SOC_CLKIN_31, SOC_CLKIN_32, SOC_CLKIN_7
+	SOC_CLKIN_0, SOC_CLKIN_2, SOC_CLKIN_31, SOC_CLKIN_32//, SOC_CLKIN_7
 };
 
 enum SOC_CLKIN SOC_CLK_table_CPU1B_0123[] = {
@@ -69,7 +69,7 @@ enum SOC_CLKIN SOC_CLK_table_CPU1B_m[] = {
 };
 
 enum SOC_CLKIN SOC_CLK_table_CPU2[] = {
-	SOC_CLKIN_0, SOC_CLKIN_2, SOC_CLKIN_31, SOC_CLKIN_32, SOC_CLKIN_10
+	SOC_CLKIN_0, SOC_CLKIN_2, SOC_CLKIN_31, SOC_CLKIN_32//, SOC_CLKIN_10
 };
 
 enum SOC_CLKIN SOC_CLK_table_CPU2_0123[] = {
@@ -81,7 +81,7 @@ enum SOC_CLKIN SOC_CLK_table_CPU2_m[] = {
 };
 
 enum SOC_CLKIN SOC_CLK_table_GPU1[] = {
-	SOC_CLKIN_0, SOC_CLKIN_2, SOC_CLKIN_31, SOC_CLKIN_32, SOC_CLKIN_13
+	SOC_CLKIN_0, SOC_CLKIN_2, SOC_CLKIN_31, SOC_CLKIN_32//, SOC_CLKIN_13
 };
 
 enum SOC_CLKIN SOC_CLK_table_GPU1_0123[] = {
@@ -93,7 +93,7 @@ enum SOC_CLKIN SOC_CLK_table_GPU1_m[] = {
 };
 
 enum SOC_CLKIN SOC_CLK_table_GPU2[] = {
-	SOC_CLKIN_0, SOC_CLKIN_2, SOC_CLKIN_31, SOC_CLKIN_32, SOC_CLKIN_16
+	SOC_CLKIN_0, SOC_CLKIN_2, SOC_CLKIN_31, SOC_CLKIN_32//, SOC_CLKIN_16
 };
 
 enum SOC_CLKIN SOC_CLK_table_GPU2_0123[] = {
@@ -105,7 +105,7 @@ enum SOC_CLKIN SOC_CLK_table_GPU2_m[] = {
 };
 
 enum SOC_CLKIN SOC_CLK_table_VPU1[] = {
-	SOC_CLKIN_0, SOC_CLKIN_2, SOC_CLKIN_31, SOC_CLKIN_32, SOC_CLKIN_21
+	SOC_CLKIN_0, SOC_CLKIN_2, SOC_CLKIN_31, SOC_CLKIN_32//, SOC_CLKIN_21
 };
 
 enum SOC_CLKIN SOC_CLK_table_VPU1_0123[] = {
@@ -117,7 +117,7 @@ enum SOC_CLKIN SOC_CLK_table_VPU1_m[] = {
 };
 
 enum SOC_CLKIN SOC_CLK_table_MJPEG[] = {
-	SOC_CLKIN_0, SOC_CLKIN_2, SOC_CLKIN_31, SOC_CLKIN_32, SOC_CLKIN_21
+	SOC_CLKIN_0, SOC_CLKIN_2, SOC_CLKIN_31, SOC_CLKIN_32//, SOC_CLKIN_21
 };
 
 enum SOC_CLKIN SOC_CLK_table_MJPEG_0123[] = {
@@ -129,7 +129,7 @@ enum SOC_CLKIN SOC_CLK_table_MJPEG_m[] = {
 };
 
 enum SOC_CLKIN SOC_CLK_table_VPU_BUS[] = {
-	SOC_CLKIN_0, SOC_CLKIN_2, SOC_CLKIN_31, SOC_CLKIN_32, SOC_CLKIN_20
+	SOC_CLKIN_0, SOC_CLKIN_2, SOC_CLKIN_31, SOC_CLKIN_32//, SOC_CLKIN_20
 };
 
 enum SOC_CLKIN SOC_CLK_table_VPU_BUS_0123[] = {
@@ -141,7 +141,7 @@ enum SOC_CLKIN SOC_CLK_table_VPU_BUS_m[] = {
 };
 
 enum SOC_CLKIN SOC_CLK_table_VSN_BUS[] = {
-	SOC_CLKIN_0, SOC_CLKIN_2, SOC_CLKIN_31, SOC_CLKIN_32, SOC_CLKIN_22
+	SOC_CLKIN_0, SOC_CLKIN_2, SOC_CLKIN_31, SOC_CLKIN_32//, SOC_CLKIN_22
 };
 
 enum SOC_CLKIN SOC_CLK_table_VSN_BUS_0123[] = {
@@ -153,15 +153,15 @@ enum SOC_CLKIN SOC_CLK_table_VSN_BUS_m[] = {
 };
 
 enum SOC_CLKIN SOC_CLK_table_DDR[] = {
-	SOC_CLKIN_0, SOC_CLKIN_2, SOC_CLKIN_31, SOC_CLKIN_32, SOC_CLKIN_25
+	SOC_CLKIN_0, SOC_CLKIN_2, SOC_CLKIN_31, SOC_CLKIN_32//, SOC_CLKIN_25
 };
 
 enum SOC_CLKIN SOC_CLK_table_DDR_0123[] = {
-	SOC_CLK_DDR, SOC_CLKIN_25
+	SOC_CLK_DDR, SOC_CLKIN_33
 };
 
 enum SOC_CLKIN SOC_CLK_table_DDR_m[] = {
-	SOC_CLK_DDR_M, SOC_CLKIN_25
+	SOC_CLK_DDR_M, SOC_CLKIN_33
 };
 
 enum SOC_CLKIN SOC_CLK_table_NOC_BUS[] = {
@@ -169,7 +169,7 @@ enum SOC_CLKIN SOC_CLK_table_NOC_BUS[] = {
 };
 
 enum SOC_CLKIN SOC_CLK_table_HIS_BUS[] = {
-	SOC_CLKIN_0, SOC_CLKIN_2, SOC_CLKIN_31, SOC_CLKIN_32, SOC_CLKIN_28
+	SOC_CLKIN_0, SOC_CLKIN_2, SOC_CLKIN_31, SOC_CLKIN_32//, SOC_CLKIN_28
 };
 
 enum SOC_CLKIN SOC_CLK_table_HIS_BUS_0123[] = {
@@ -352,7 +352,7 @@ static void __init sdrv_clk_init(struct device_node *np)
 		return;
 	}
 	pr_debug("reg base %p\n", soc_reg_base);
-	sdrv_register_soc_plls();
+	sdrv_register_soc_plls(clk_base);
 
 	for (i = 0; i < ARRAY_SIZE(intern_clk); i++)
 		clk_base[intern_clk[i].clk_id] = sdrv_register_out_composite(np,

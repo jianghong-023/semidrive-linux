@@ -10,7 +10,6 @@
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation.
  */
-
 #include <linux/slab.h>
 #include <linux/clk.h>
 #include <linux/clk-provider.h>
@@ -18,95 +17,188 @@
 #include <linux/regmap.h>
 #include <linux/reboot.h>
 #include <linux/rational.h>
+#include <linux/of_address.h>
 #include "clk.h"
 #include "clk-soc-pll.h"
 #include "clk-pll.h"
+struct sdrv_pll_rate_table pll_cpu2_rate_table[] = {
+	{
+		.refdiv = 3,
+		.fbdiv = 187,
+		.postdiv = {1, 1},
+		.frac = 0,
+		.div = {2, 4, 0, 0},
+		.isint = true,
+	},
+};
 
 static u64 soc_clkin_freq[SOC_CLKIN_MAX+1] = {
 	24000000,
 	2000000,
 	24000000,
 	32000,
-	1800000000,
-	900000000,
-	450000000,
-	1504000000,
-	752000000,
-	376000000,
-	1600000000,
-	800000000,
-	400000000,
-	800000000,
-	400000000,
-	266666667,
+	1656000000,
+	828000000,
+	414000000,
+	1328000000,
+	664000000,
+	332000000,
+	1496000000,
+	748000000,
+	374000000,
 	800000000,
 	400000000,
 	266666667,
+	728000000,
+	364000000,
+	242666667,
 	2664000000,
 	666000000,
 	532800000,
-	800000000,
-	400000000,
-	266666667,
-	1064000000,
-	532000000,
-	354666667,
+	748000000,
+	374000000,
+	249333333,
+	1896000000,
+	474000000,
+	316000000,
 	1000000000,
 	500000000,
 	333333333,
-	1000000000,
-	799999999,
+	500000000,
+	399999999,
+	1064000000,
+	532000000,
+	354666667,
 };
-
-#define SOC_PLL_CLK(id, base, div_shift, div_width) \
-{	\
-	.clk_id = SOC_CLKIN_ ##id,	\
-	.reg_base = #base,	\
-}
 
 struct sdrv_cgu_pll_clk soc_pll_clk[] = {
-	SOC_PLL_CLK(0, 0, 0, 0),
-	SOC_PLL_CLK(1, 0, 0, 0),
-	SOC_PLL_CLK(2, 0, 0, 0),
-	SOC_PLL_CLK(3, 0, 0, 0),
-	SOC_PLL_CLK(4, 0, 0, 0),
-	SOC_PLL_CLK(5, 0, 0, 0),
-	SOC_PLL_CLK(6, 0, 0, 0),
-	SOC_PLL_CLK(7, 0, 0, 0),
-	SOC_PLL_CLK(8, 0, 0, 0),
-	SOC_PLL_CLK(9, 0, 0, 0),
-	SOC_PLL_CLK(10, 0, 0, 0),
-	SOC_PLL_CLK(11, 0, 0, 0),
-	SOC_PLL_CLK(12, 0, 0, 0),
-	SOC_PLL_CLK(13, 0, 0, 0),
-	SOC_PLL_CLK(14, 0, 0, 0),
-	SOC_PLL_CLK(15, 0, 0, 0),
-	SOC_PLL_CLK(16, 0, 0, 0),
-	SOC_PLL_CLK(17, 0, 0, 0),
-	SOC_PLL_CLK(18, 0, 0, 0),
-	SOC_PLL_CLK(19, 0, 0, 0),
-	SOC_PLL_CLK(20, 0, 0, 0),
-	SOC_PLL_CLK(21, 0, 0, 0),
-	SOC_PLL_CLK(22, 0, 0, 0),
-	SOC_PLL_CLK(23, 0, 0, 0),
-	SOC_PLL_CLK(24, 0, 0, 0),
-	SOC_PLL_CLK(25, 0, 0, 0),
-	SOC_PLL_CLK(26, 0, 0, 0),
-	SOC_PLL_CLK(27, 0, 0, 0),
-	SOC_PLL_CLK(28, 0, 0, 0),
-	SOC_PLL_CLK(29, 0, 0, 0),
-	SOC_PLL_CLK(30, 0, 0, 0),
-	SOC_PLL_CLK(31, 0, 0, 0),
-	SOC_PLL_CLK(32, 0, 0, 0),
+	SDRV_PLL_CLK(SOC, 0, 0, 0, 0),
+	SDRV_PLL_CLK(SOC, 1, 0, 0, 0),
+	SDRV_PLL_CLK(SOC, 2, 0, 0, 0),
+	SDRV_PLL_CLK(SOC, 3, 0, 0, 0),
+	SDRV_PLL_CLK_ROOT(SOC, 4, 0),
+	SDRV_PLL_CLK_DIV(SOC, 5, 0, 4, PLL_DIVA),
+	SDRV_PLL_CLK_DIV(SOC, 6, 0, 4, PLL_DIVB),
+	SDRV_PLL_CLK_ROOT(SOC, 7, 0),
+	SDRV_PLL_CLK_DIV(SOC, 8, 0, 7, PLL_DIVA),
+	SDRV_PLL_CLK_DIV(SOC, 9, 0, 7, PLL_DIVB),
+	//SDRV_PLL_CLK_RATE_TABLE(SOC, 10, 0, pll_cpu2_rate_table),
+	SDRV_PLL_CLK_ROOT(SOC, 10, 0),
+	SDRV_PLL_CLK_DIV(SOC, 11, 0, 10, PLL_DIVA),
+	SDRV_PLL_CLK_DIV(SOC, 12, 0, 10, PLL_DIVB),
+	SDRV_PLL_CLK_ROOT(SOC, 13, 0),
+	SDRV_PLL_CLK_DIV(SOC, 14, 0, 13, PLL_DIVA),
+	SDRV_PLL_CLK_DIV(SOC, 15, 0, 13, PLL_DIVB),
+	SDRV_PLL_CLK_ROOT(SOC, 16, 0),
+	SDRV_PLL_CLK_DIV(SOC, 17, 0, 16, PLL_DIVA),
+	SDRV_PLL_CLK_DIV(SOC, 18, 0, 16, PLL_DIVB),
+	SDRV_PLL_CLK_ROOT(SOC, 19, 0),
+	SDRV_PLL_CLK_DIV(SOC, 20, 0, 19, PLL_DIVA),
+	SDRV_PLL_CLK_DIV(SOC, 21, 0, 19, PLL_DIVB),
+	SDRV_PLL_CLK_ROOT(SOC, 22, 0),
+	SDRV_PLL_CLK_DIV(SOC, 23, 0, 22, PLL_DIVA),
+	SDRV_PLL_CLK_DIV(SOC, 24, 0, 22, PLL_DIVB),
+	SDRV_PLL_CLK_ROOT(SOC, 25, 0),
+	SDRV_PLL_CLK_DIV(SOC, 26, 0, 25, PLL_DIVA),
+	SDRV_PLL_CLK_DIV(SOC, 27, 0, 25, PLL_DIVB),
+	SDRV_PLL_CLK_ROOT(SOC, 28, 0),
+	SDRV_PLL_CLK_DIV(SOC, 29, 0, 28, PLL_DIVA),
+	SDRV_PLL_CLK_DIV(SOC, 30, 0, 28, PLL_DIVB),
+	SDRV_PLL_CLK_DIV_NO_PARENT(SOC, 31, 0, PLL_DIVA),
+	SDRV_PLL_CLK_DIV_NO_PARENT(SOC, 32, 0, PLL_DIVA),
+	SDRV_PLL_CLK_ROOT(SOC, 33, 0),
+	SDRV_PLL_CLK_DIV(SOC, 34, 0, 33, PLL_DIVA),
+	SDRV_PLL_CLK_DIV(SOC, 35, 0, 33, PLL_DIVA),
 };
 
-
-void sdrv_register_soc_plls(void)
+void sdrv_register_soc_plls(struct clk *clkbase[])
 {
-	int i = 0;
+	int i = 0, size;
+	void __iomem *reg_base = 0;
 
-	for (i = 0; i < ARRAY_SIZE(soc_pll_clk); i++)
-		sdrv_register_pll(0, &soc_pll_clk[i], NULL, soc_clk_src_names,
+	/* PLL_CPU1A ROOT/DIVA/B */
+	reg_base = sdrv_get_pll_regbase(soc_clk_src_names[SOC_CLKIN_4]);
+	if (reg_base) {
+		for (i = SOC_CLKIN_4; i <= SOC_CLKIN_6; i++)
+			soc_pll_clk[i].reg_base = reg_base;
+	}
+
+	/* PLL_CPU1B ROOT/DIVA/B */
+	reg_base = sdrv_get_pll_regbase(soc_clk_src_names[SOC_CLKIN_7]);
+	if (reg_base) {
+		for (i = SOC_CLKIN_7; i <= SOC_CLKIN_9; i++)
+			soc_pll_clk[i].reg_base = reg_base;
+	}
+
+	/* PLL_CPU2 ROOT/DIVA/B */
+	reg_base = sdrv_get_pll_regbase(soc_clk_src_names[SOC_CLKIN_10]);
+	if (reg_base) {
+		for (i = SOC_CLKIN_10; i <= SOC_CLKIN_12; i++)
+			soc_pll_clk[i].reg_base = reg_base;
+	}
+
+	/* PLL_GPU1 ROOT/DIVA/B */
+	reg_base = sdrv_get_pll_regbase(soc_clk_src_names[SOC_CLKIN_13]);
+	if (reg_base) {
+		for (i = SOC_CLKIN_13; i <= SOC_CLKIN_15; i++)
+			soc_pll_clk[i].reg_base = reg_base;
+	}
+
+	/* PLL_GPU2 ROOT/DIVA/B */
+	reg_base = sdrv_get_pll_regbase(soc_clk_src_names[SOC_CLKIN_16]);
+	if (reg_base) {
+		for (i = SOC_CLKIN_16; i <= SOC_CLKIN_18; i++)
+			soc_pll_clk[i].reg_base = reg_base;
+	}
+
+	/* PLL_VPU ROOT/DIVA/B */
+	sdrv_get_pll_regbase(soc_clk_src_names[SOC_CLKIN_19]);
+	if (reg_base) {
+		for (i = SOC_CLKIN_19; i <= SOC_CLKIN_21; i++)
+			soc_pll_clk[i].reg_base = reg_base;
+	}
+
+	/* PLL_VSN ROOT/DIVA/B */
+	reg_base = sdrv_get_pll_regbase(soc_clk_src_names[SOC_CLKIN_22]);
+	if (reg_base) {
+		for (i = SOC_CLKIN_22; i <= SOC_CLKIN_24; i++)
+			soc_pll_clk[i].reg_base = reg_base;
+	}
+
+	/* PLL_HPI ROOT/DIVA/B */
+	reg_base = sdrv_get_pll_regbase(soc_clk_src_names[SOC_CLKIN_25]);
+	if (reg_base) {
+		for (i = SOC_CLKIN_25; i <= SOC_CLKIN_27; i++)
+			soc_pll_clk[i].reg_base = reg_base;
+	}
+
+	/* PLL_HIS ROOT/DIVA/B */
+	reg_base = sdrv_get_pll_regbase(soc_clk_src_names[SOC_CLKIN_28]);
+	if (reg_base) {
+		for (i = SOC_CLKIN_28; i <= SOC_CLKIN_30; i++)
+			soc_pll_clk[i].reg_base = reg_base;
+	}
+
+	/* PLL1 DIVA */
+	reg_base = sdrv_get_pll_regbase(soc_clk_src_names[SOC_CLKIN_31]);
+	if (reg_base)
+		soc_pll_clk[SOC_CLKIN_31].reg_base = reg_base;
+
+	/* PLL2 DIVA */
+	reg_base = sdrv_get_pll_regbase(soc_clk_src_names[SOC_CLKIN_32]);
+	if (reg_base)
+		soc_pll_clk[SOC_CLKIN_32].reg_base = reg_base;
+
+	/* PLL_DDR ROOT/DIVA/B */
+	reg_base = sdrv_get_pll_regbase(soc_clk_src_names[SOC_CLKIN_33]);
+	if (reg_base) {
+		for (i = SOC_CLKIN_33; i <= SOC_CLKIN_35; i++)
+			soc_pll_clk[i].reg_base = reg_base;
+	}
+
+	size = ARRAY_SIZE(soc_pll_clk);
+	for (i = 0; i < size; i++)
+		clkbase[soc_pll_clk[i].clk_id] = sdrv_register_pll(0, i, soc_pll_clk, size, NULL, soc_clk_src_names,
 			soc_clkin_freq);
 
 }

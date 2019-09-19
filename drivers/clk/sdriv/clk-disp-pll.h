@@ -14,6 +14,6 @@
 #include "clk-disp.h"
 #ifndef __CLK_DISP_PLL_H
 #define       __CLK_DISP_PLL_H
-void sdrv_register_disp_plls(void);
+void sdrv_register_disp_plls(struct clk *clkbase[]);
 #endif
 
