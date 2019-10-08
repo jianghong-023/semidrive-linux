@@ -244,5 +244,6 @@
 #define DISP_CLK_CSI1 (DISP_CLK_MIPI_CSI3+1)
 #define DISP_CLK_CSI2 (DISP_CLK_CSI1+1)
 #define DISP_CLK_CSI3 (DISP_CLK_CSI2+1)
-
+/*init data*/
+#define SYS_CNT_FREQ 24000000
 #endif
