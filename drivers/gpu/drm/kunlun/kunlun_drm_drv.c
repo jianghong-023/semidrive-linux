@@ -311,21 +311,19 @@ static int add_display_components(struct device *dev,
 {
 	struct device_node *np;
 	const struct kunlun_drm_device_info *kdd_info;
-	int ret;
+	int ret, i;
 
 	kdd_info = of_device_get_match_data(dev);
 	if(!kdd_info || !kdd_info->match)
 		return -ENODEV;
 
-	ret = of_platform_populate(dev->of_node, NULL, NULL, dev);
-	if(ret) {
-		DRM_DEV_ERROR(dev, "failed to populate dp/dc devices\n");
-		return ret;
-	}
+	for (i = 0; ; i++) {
+		np = of_parse_phandle(dev->of_node, "sdriv,crtc", i);
+		if (!np)
+			break;
 
-	for_each_child_of_node(dev->of_node, np) {
-		if(!kdd_info->match(np)) {
-			DRM_DEV_INFO(dev, "OF node %s not match\n", np->name);
+		if(!of_device_is_available(np) || !kdd_info->match(np)) {
+			DRM_DEV_INFO(dev, "OF node %s not available or match\n", np->name);
 			continue;
 		}
 
@@ -334,14 +332,10 @@ static int add_display_components(struct device *dev,
 
 		ret = add_components_dsd(dev, np, matchptr);
 		if(ret) {
-			goto err_depopulate;
+			return ret;
 		}
 	}
 
-	return ret;
-
-err_depopulate:
-	of_platform_depopulate(dev);
 	return ret;
 }
 

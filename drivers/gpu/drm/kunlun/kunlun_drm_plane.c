@@ -1513,7 +1513,8 @@ static void kunlun_plane_atomic_update(struct drm_plane *plane,
 		DU_PIPE_ELEM_SET(regs, chn_base, sp_data, sdw_trig, 1);
 	}
 
-	kunlun_plane_set_tile_cfg(plane);
+	if ((layer_id == DP_GPIPE0) || (layer_id == DP_GPIPE1))
+		kunlun_plane_set_tile_cfg(plane);
 
 	if (kcrtc->ctrl_unit)
 		mlc = dp_mlc;

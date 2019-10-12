@@ -384,7 +384,7 @@ static int kunlun_mlc_update_plane(struct kunlun_crtc *kcrtc, unsigned int mask)
 	}
 
 	for (i = 0; i < mlc->num_path; i++)
-		writel(0, regs + MLC_PATH_CTRL);
+		writel(0xF777F, regs + MLC_PATH_CTRL + MLC_PATH_JMP * i);
 
 	for (i = 0; i < num_planes; i++) {
 		j = ((kcrtc->base.index == 1) ? (total_planes - num_planes): 0) + i ;
@@ -464,7 +464,7 @@ static int kunlun_fbdc_update(struct kunlun_crtc *kcrtc, uint32_t mask)
 
 	if (is_fbdc_cps) {
 		DU_REG_SET(dp_regs, cr_inval, notify, 1);
-		DU_REG_SET(dp_regs, cr_inval, requester_o, 0xF);
+		DU_REG_SET(dp_regs, cr_inval, requester_o, 0x1);/*need expand*/
 		DU_REG_SET(dp_regs, cr_inval, pengding_o, 1);
 		DU_REG_SET(dp_regs, ctrl, en, 1);
 	} else {
@@ -914,9 +914,11 @@ static void kunlun_crtc_atomic_flush(struct drm_crtc *crtc,
 	if (ret)
 		return;
 
-	ret = kunlun_fbdc_update(kcrtc, state->plane_mask);
-	if (ret)
+	if (kcrtc->ctrl_unit) {
+		ret = kunlun_fbdc_update(kcrtc, state->plane_mask);
+		if (ret)
 		return;
+	}
 
 	ret = kunlun_mlc_update_trig(kcrtc, state->plane_mask);
 	if (ret)
