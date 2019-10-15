@@ -58,6 +58,15 @@ include $(TOP)/config_kernel.mk
 PVRSRVKM_NAME := $(PVRSRV_MODNAME)
 bridge_base := $(TOP)/generated
 
+ifeq ($(CONFIG_ANDROID), y)
+ccflags-y += -DANDROID
+endif
+
+ccflags-y += -DPVR_BUILD_DIR=\"$(PVR_BUILD_DIR)\"
+ccflags-y += -DPVRSRV_VZ_NUM_OSID=$(PVRSRV_VZ_NUM_OSID)
+ccflags-y += -DVMM_TYPE=$(VMM_TYPE)
+ccflags-y += -DPVR_SYSTEM=$(PVR_SYSTEM)
+
 ccflags-y += -D__linux__ -include $(TOP)/config_kernel.h \
  -I$(TOP)/include \
  -I$(TOP)/include/public \
@@ -87,10 +96,11 @@ endif
 $(if $($(PVRSRVKM_NAME)-y),,$(warning $(PVRSRVKM_NAME)-y was empty, which could mean that srvkm is missing from $$(KERNEL_COMPONENTS)))
 $(PVRSRVKM_NAME)-y += $(foreach _m,$(INTERNAL_EXTRA_KBUILD_OBJECTS:.o=),$($(_m)-y))
 
-ENABLE_VMM := $(shell ( [ $(PVRSRV_VZ_NUM_OSID) -ge 2 ]) && echo 1 || echo 0)
-
+#ENABLE_VMM := $(shell ( [ $(PVRSRV_VZ_NUM_OSID) -ge 2 ]) && echo 1 || echo 0)
 obj-m += pvrsrvkm.o
 
-ifeq ($(ENABLE_VMM), 1)
-obj-m += xen-gpufrontend.o xen-gpubackend.o
-endif 
+#ifeq ($(ENABLE_VMM), 1)
+ifeq ($(VMM_TYPE), xen)
+$(PVRSRV_MODNAME)-y += xen-gpufrontend.o xen-gpubackend.o
+endif
+#endif
