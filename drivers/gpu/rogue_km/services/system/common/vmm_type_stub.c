@@ -129,9 +129,23 @@ StubVMMGetDevPhysHeapOrigin(PVRSRV_DEVICE_CONFIG *psDevConfig,
 							PVRSRV_DEVICE_PHYS_HEAP eHeapType,
 							PVRSRV_DEVICE_PHYS_HEAP_ORIGIN *peOrigin)
 {
-	*peOrigin = PVRSRV_DEVICE_PHYS_HEAP_ORIGIN_GUEST;
 	PVR_UNREFERENCED_PARAMETER(psDevConfig);
 	PVR_UNREFERENCED_PARAMETER(eHeapType);
+	printk(KERN_ALERT "enter %s, psDevConfig(%p), eHeapType(%d)",
+		__FUNCTION__, psDevConfig, eHeapType);
+
+#ifdef SMMU_SUPPORTED
+	if (eHeapType == PVRSRV_DEVICE_PHYS_HEAP_FW_GUEST) {
+		*peOrigin = PVRSRV_DEVICE_PHYS_HEAP_ORIGIN_HOST;
+	else {
+		*peOrigin = PVRSRV_DEVICE_PHYS_HEAP_ORIGIN_GUEST;
+	}
+#else
+	*peOrigin = PVRSRV_DEVICE_PHYS_HEAP_ORIGIN_GUEST;
+#endif
+        printk(KERN_ALERT "out %s, *peOrigin(%d)",
+                __FUNCTION__, *peOrigin);
+
 	return PVRSRV_OK;
 }
 
@@ -141,11 +155,24 @@ StubVMMGetDevPhysHeapAddrSize(PVRSRV_DEVICE_CONFIG *psDevConfig,
 							  IMG_UINT64 *pui64Size,
 							  IMG_UINT64 *pui64Addr)
 {
+	PVRSRV_ERROR eError = PVRSRV_OK;
 	*pui64Size = 0;
 	*pui64Addr = 0;
 	PVR_UNREFERENCED_PARAMETER(psDevConfig);
 	PVR_UNREFERENCED_PARAMETER(eHeapType);
-	return PVRSRV_OK;
+	printk(KERN_ALERT "enter %s, psDevConfig(%p), eHeapType(%d), pui64Size = %p, pui64Addr = %p",
+		__FUNCTION__, psDevConfig, eHeapType, pui64Size, pui64Addr);
+
+	PHYS_HEAP_CONFIG *psPhysHeapConfig;
+
+	psPhysHeapConfig = SysVzGetPhysHeapConfig(psDevConfig, eHeapType);
+	if (psPhysHeapConfig != NULL && psPhysHeapConfig->pasRegions != NULL) {
+		*pui64Addr = psPhysHeapConfig->pasRegions[0].sStartAddr.uiAddr;
+		*pui64Size = psPhysHeapConfig->pasRegions[0].uiSize;
+	}
+        printk(KERN_ALERT "out %s, *pui64Addr(%p), *pui64Size(%d)",
+                __FUNCTION__, *pui64Addr, *pui64Size);
+	return eError;
 }
 
 static VMM_PVZ_CONNECTION gsStubVmmPvz =
@@ -215,7 +242,7 @@ PVRSRV_ERROR VMMCreatePvzConnection(VMM_PVZ_CONNECTION **psPvzConnection)
 	PVR_LOGR_IF_FALSE((NULL != psPvzConnection), "VMMCreatePvzConnection", PVRSRV_ERROR_INVALID_PARAMS);
 	*psPvzConnection = &gsStubVmmPvz;
 	PVR_DPF((PVR_DBG_ERROR, "Using a stub VM manager type, no runtime VZ support"));
-	return PVRSRV_ERROR_NOT_IMPLEMENTED;
+	return PVRSRV_OK;
 }
 
 void VMMDestroyPvzConnection(VMM_PVZ_CONNECTION *psPvzConnection)

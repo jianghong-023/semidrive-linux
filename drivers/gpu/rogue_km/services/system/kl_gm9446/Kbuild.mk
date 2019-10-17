@@ -57,3 +57,8 @@ ifeq ($(SUPPORT_ION),1)
 $(PVRSRVKM_NAME)-y += services/system/common/env/linux/ion_support_generic.o
 endif
 
+ifeq ($(VMM_TYPE),xen)
+$(PVRSRVKM_NAME)-y += services/system/common/xengpufront.o
+$(PVRSRVKM_NAME)-y += services/system/common/xengpuback.o \
+ services/system/common/xenbus.o
+endif

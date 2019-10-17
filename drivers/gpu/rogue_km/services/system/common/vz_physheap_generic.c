@@ -131,11 +131,16 @@ SysVzCreatePhysHeap(PVRSRV_DEVICE_CONFIG *psDevConfig,
 		psPhysHeapConfig->ui32NumOfRegions++;
 	}
 
+	PVR_DPF((PVR_DBG_ERROR,
+		"%s: psPhysHeapConfig->pasRegions[0].hPrivData == 0x%p.",
+		__FUNCTION__,
+		psPhysHeapConfig->pasRegions[0].hPrivData));
+
 	if (psPhysHeapConfig->pasRegions[0].hPrivData == NULL)
 	{
 		DMA_ALLOC *psDmaAlloc = OSAllocZMem(sizeof(DMA_ALLOC));
 		PVR_LOGG_IF_NOMEM(psDmaAlloc, "OSAllocZMem", eError, e0);
-
+		memset(psDmaAlloc, 0, sizeof(DMA_ALLOC));
 		psDmaAlloc->pvOSDevice = psDevConfig->pvOSDevice;
 		psPhysHeapConfig->pasRegions[0].hPrivData = psDmaAlloc;
 	}
