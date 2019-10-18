@@ -140,7 +140,7 @@ static void __init sdrv_disp_clk_init(struct device_node *np)
 		return;
 	}
 	pr_debug("reg base %p\n", disp_reg_base);
-	sdrv_register_disp_plls();
+	sdrv_register_disp_plls(clk_base);
 
 	for (i = 0; i < ARRAY_SIZE(intern_clk); i++)
 		clk_base[intern_clk[i].clk_id] = sdrv_register_out_composite(np,

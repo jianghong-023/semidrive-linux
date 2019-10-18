@@ -14,7 +14,44 @@
 #ifndef __X9_CLK_H
 #define __X9_CLK_H
 /*SOC*/
-#define SOC_CLK_INTERN_FIRST 33
+#define SOC_CLKIN_0 0
+#define SOC_CLKIN_1 1
+#define SOC_CLKIN_2 2
+#define SOC_CLKIN_3 3
+#define SOC_CLKIN_4 4
+#define SOC_CLKIN_5 5
+#define SOC_CLKIN_6 6
+#define SOC_CLKIN_7 7
+#define SOC_CLKIN_8 8
+#define SOC_CLKIN_9 9
+#define SOC_CLKIN_10 10
+#define SOC_CLKIN_11 11
+#define SOC_CLKIN_12 12
+#define SOC_CLKIN_13 13
+#define SOC_CLKIN_14 14
+#define SOC_CLKIN_15 15
+#define SOC_CLKIN_16 16
+#define SOC_CLKIN_17 17
+#define SOC_CLKIN_18 18
+#define SOC_CLKIN_19 19
+#define SOC_CLKIN_20 20
+#define SOC_CLKIN_21 21
+#define SOC_CLKIN_22 22
+#define SOC_CLKIN_23 23
+#define SOC_CLKIN_24 24
+#define SOC_CLKIN_25 25
+#define SOC_CLKIN_26 26
+#define SOC_CLKIN_27 27
+#define SOC_CLKIN_28 28
+#define SOC_CLKIN_29 29
+#define SOC_CLKIN_30 30
+#define SOC_CLKIN_31 31
+#define SOC_CLKIN_32 32
+#define SOC_CLKIN_33 33
+#define SOC_CLKIN_34 34
+#define SOC_CLKIN_35 35
+
+#define SOC_CLK_INTERN_FIRST 36
 #define SOC_CLK_CPU1A SOC_CLK_INTERN_FIRST
 #define SOC_CLK_CPU1A_MUX (SOC_CLK_CPU1A+1)
 #define SOC_CLK_CPU1B (SOC_CLK_CPU1A_MUX+1)
@@ -125,6 +162,40 @@
 #define SOC_CLK_HIS_BUS_M       (SOC_CLK_DDR_M+1)
 
 /*SEC*/
+#define SEC_CLKIN_0 0
+#define SEC_CLKIN_1 1
+#define SEC_CLKIN_2 2
+#define SEC_CLKIN_3 3
+#define SEC_CLKIN_4 4
+#define SEC_CLKIN_5 5
+#define SEC_CLKIN_6 6
+#define SEC_CLKIN_7 7
+#define SEC_CLKIN_8 8
+#define SEC_CLKIN_9 9
+#define SEC_CLKIN_10 10
+#define SEC_CLKIN_11 11
+#define SEC_CLKIN_12 12
+#define SEC_CLKIN_13 13
+#define SEC_CLKIN_14 14
+#define SEC_CLKIN_15 15
+#define SEC_CLKIN_16 16
+#define SEC_CLKIN_17 17
+#define SEC_CLKIN_18 18
+#define SEC_CLKIN_19 19
+#define SEC_CLKIN_20 20
+#define SEC_CLKIN_21 21
+#define SEC_CLKIN_22 22
+#define SEC_CLKIN_23 23
+#define SEC_CLKIN_24 24
+#define SEC_CLKIN_25 25
+#define SEC_CLKIN_26 26
+#define SEC_CLKIN_27 27
+#define SEC_CLKIN_28 28
+#define SEC_CLKIN_29 29
+#define SEC_CLKIN_30 30
+#define SEC_CLKIN_31 31
+#define SEC_CLKIN_32 32
+
 #define SEC_CLK_INTERN_FIRST 33
 #define SEC_CLK_SEC_PLAT SEC_CLK_INTERN_FIRST
 #define SEC_CLK_MP_PLAT (SEC_CLK_SEC_PLAT+1)
@@ -219,8 +290,26 @@
 
 
 /*DISP*/
-#define DISP_CLK_OUT_FIRST 19
-#define DISP_CLK_MIPI_CSI1_PIX       DISP_CLK_OUT_FIRST
+#define DISP_CLKIN_0 0
+#define DISP_CLKIN_1 1
+#define DISP_CLKIN_2 2
+#define DISP_CLKIN_3 3
+#define DISP_CLKIN_4 4
+#define DISP_CLKIN_5 5
+#define DISP_CLKIN_6 6
+#define DISP_CLKIN_7 7
+#define DISP_CLKIN_8 8
+#define DISP_CLKIN_9 9
+#define DISP_CLKIN_10 10
+#define DISP_CLKIN_11 11
+#define DISP_CLKIN_12 12
+#define DISP_CLKIN_13 13
+#define DISP_CLKIN_14 14
+#define DISP_CLKIN_15 15
+#define DISP_CLKIN_16 16
+#define DISP_CLKIN_17 17
+#define DISP_CLKIN_18 18
+#define DISP_CLK_MIPI_CSI1_PIX       19
 #define DISP_CLK_MIPI_CSI2_PIX       (DISP_CLK_MIPI_CSI1_PIX+1)
 #define DISP_CLK_MIPI_CSI3_PIX       (DISP_CLK_MIPI_CSI2_PIX+1)
 #define DISP_CLK_DP1       (DISP_CLK_MIPI_CSI3_PIX+1)

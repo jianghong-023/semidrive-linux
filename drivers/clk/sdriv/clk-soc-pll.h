@@ -15,6 +15,6 @@
 #ifndef __CLK_SOC_PLL_H
 #define       __CLK_SOC_PLL_H
 
-void sdrv_register_soc_plls(void);
+void sdrv_register_soc_plls(struct clk *clkbase[]);
 #endif
 

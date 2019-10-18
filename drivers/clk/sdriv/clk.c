@@ -22,6 +22,13 @@
 #include "clk.h"
 #include "ckgen.h"
 
+struct clk *sd_clk_register_composite(struct device *dev, const char *name,
+		const char * const *parent_names, int num_parents,
+		struct clk_hw *mux_hw, const struct clk_ops *mux_ops,
+		struct clk_hw *rate_hw, const struct clk_ops *rate_ops,
+		struct clk_hw *gate_hw, const struct clk_ops *gate_ops,
+		unsigned long flags);
+
 typedef union {
 	struct  {
 		u32 cg_en_a:1;
@@ -107,7 +114,6 @@ struct  {
 };
 u32 val;
 } soc_lp_gate_en;
-
 
 static u32 get_soc_core_parent(void __iomem *base, u8 slice_id)
 {
@@ -523,7 +529,7 @@ static int sdclk_divider_set_rate(struct clk_hw *hw, unsigned long rate,
 				unsigned long parent_rate)
 {
 	//struct sdrv_cgu_out_clk *clk = div_to_sdrv_cgu_out_clk(hw);
-	pr_debug("%s name %s rate %ld prate %ld\n", __func__, clk_hw_get_name(hw), rate, parent_rate);
+	pr_debug("name %s set rate %ld prate %ld\n", clk_hw_get_name(hw), rate, parent_rate);
 	return clk_divider_ops.set_rate(hw, rate, parent_rate);
 }
 
@@ -542,16 +548,56 @@ static void sdrv_fill_parent_names(const char **parent, u32 *id, int size, const
 		parent[i] = global_clk_names[id[i]];
 }
 
+static int sdrv_clk_pre_rate_change(struct sdrv_cgu_out_clk *clk,
+					   struct clk_notifier_data *ndata)
+{
+	int ret = 0;
+
+	if (ndata->new_rate < clk->min_rate
+			|| ndata->new_rate > clk->max_rate) {
+		pr_err("want change clk %s freq from %ld to %ld, not allowd, min %ld max %ld\n",
+			clk->name, ndata->old_rate, ndata->new_rate,
+			clk->min_rate, clk->max_rate);
+		ret = -EINVAL;
+	}
+	return ret;
+}
+
+static int sdrv_clk_post_rate_change(struct sdrv_cgu_out_clk *clk,
+					  struct clk_notifier_data *ndata)
+{
+	return 0;
+}
+
+static int sdrv_clk_notifier_cb(struct notifier_block *nb,
+					unsigned long event, void *data)
+{
+	struct clk_notifier_data *ndata = data;
+	struct sdrv_cgu_out_clk *clk = nb_to_sdrv_cgu_out_clk(nb);
+	int ret = 0;
+
+	pr_debug("%s: event %lu, old_rate %lu, new_rate: %lu\n",
+		 __func__, event, ndata->old_rate, ndata->new_rate);
+	if (event == PRE_RATE_CHANGE)
+		ret = sdrv_clk_pre_rate_change(clk, ndata);
+	else if (event == POST_RATE_CHANGE)
+		ret = sdrv_clk_post_rate_change(clk, ndata);
+
+	return notifier_from_errno(ret);
+}
+
 struct clk *sdrv_register_out_composite(struct device_node *np, void __iomem *base, struct sdrv_cgu_out_clk *clk, const char *global_clk_names[])
 {
 	const char *parents[MAX_PARENT_NUM];
 	u32 ctl_offset = 0;
 	struct clk *ret = NULL;
+	u32 min_freq = 0, max_freq = 0;
 
 	clk->name = global_clk_names[clk->clk_id];
 	clk->base = base;
 	clk->lock = kmalloc(sizeof(spinlock_t), GFP_KERNEL);
-	spin_lock_init(clk->lock);
+	if (clk->lock)
+		spin_lock_init(clk->lock);
 
 	switch (clk->type) {
 	case CLK_TYPE_CORE:
@@ -583,42 +629,91 @@ struct clk *sdrv_register_out_composite(struct device_node *np, void __iomem *ba
 	pr_debug("register clk:%s\n", clk->name);
 	if (clk->type == CLK_TYPE_UUU_MUX) {
 		sdrv_fill_parent_names(parents, clk->mux_table, clk->n_parents, global_clk_names);
-		ret = clk_register_composite(NULL, clk->name, parents, clk->n_parents,
+		ret = sd_clk_register_composite(NULL, clk->name, parents, clk->n_parents,
 					&clk->mux_hw, &sdclk_mux_ops,
 					NULL, NULL,
 					NULL, NULL, CLK_IGNORE_UNUSED|CLK_SET_RATE_PARENT);
 	} else if (clk->type == CLK_TYPE_UUU_MUX2) {
 		sdrv_fill_parent_names(parents, clk->mux_table, clk->n_parents, global_clk_names);
-		ret = clk_register_composite(NULL, clk->name, parents, clk->n_parents,
+		ret = sd_clk_register_composite(NULL, clk->name, parents, clk->n_parents,
 					&clk->mux_hw, &sdclk_mux_ops,
 					NULL, NULL,
 					&clk->gate_hw, &sdclk_gate_ops, CLK_IGNORE_UNUSED|CLK_SET_RATE_PARENT);
 	} else if (clk->type == CLK_TYPE_UUU_DIVIDER) {
 		parents[0] = global_clk_names[clk->parent_id];
-		ret = clk_register_composite(NULL, clk->name, parents, 1,
+		ret = sd_clk_register_composite(NULL, clk->name, parents, 1,
 					&clk->mux_hw, &sdclk_mux_ops,
 					&clk->div.hw, &sdclk_divider_ops,
 					&clk->gate_hw, &sdclk_gate_ops, CLK_IGNORE_UNUSED|CLK_SET_RATE_PARENT);
 	} else if (clk->type == CLK_TYPE_GATE) {
 		if (clk->parent_id != -1) {
 			parents[0] = global_clk_names[clk->parent_id];
-			ret = clk_register_composite(NULL, clk->name, parents, 1,
+			ret = sd_clk_register_composite(NULL, clk->name, parents, 1,
 						&clk->mux_hw, &sdclk_mux_ops,
 						NULL, NULL,
 						&clk->gate_hw, &sdclk_gate_ops, CLK_IGNORE_UNUSED|CLK_SET_RATE_PARENT);
 		} else {
-			ret = clk_register_composite(NULL, clk->name, NULL, 0,
+			ret = sd_clk_register_composite(NULL, clk->name, NULL, 0,
 						NULL, NULL,
 						NULL, NULL,
 						&clk->gate_hw, &sdclk_gate_ops, CLK_IGNORE_UNUSED);
 		}
 	} else {
 		sdrv_fill_parent_names(parents, clk->mux_table, clk->n_parents, global_clk_names);
-		ret = clk_register_composite(NULL, clk->name, parents, clk->n_parents,
+		ret = sd_clk_register_composite(NULL, clk->name, parents, clk->n_parents,
 					&clk->mux_hw, &sdclk_mux_ops,
 					&clk->div.hw, &sdclk_divider_ops,
-					&clk->gate_hw, &sdclk_gate_ops, CLK_IGNORE_UNUSED);
+					&clk->gate_hw, &sdclk_gate_ops, CLK_IGNORE_UNUSED | CLK_SET_RATE_PARENT);
 	}
-
+	if (sdrv_get_clk_min_rate(clk->name, &min_freq) == 0) {
+		clk_set_min_rate(ret, min_freq);
+		clk->min_rate = min_freq;
+	} else {
+		clk->min_rate = 0;
+	}
+	if (sdrv_get_clk_max_rate(clk->name, &max_freq) == 0) {
+		clk_set_max_rate(ret, max_freq);
+		clk->max_rate = max_freq;
+	} else {
+		clk->max_rate = ULONG_MAX;
+	}
+	clk->clk_nb.notifier_call = sdrv_clk_notifier_cb;
+	if (clk_notifier_register(ret, &clk->clk_nb)) {
+		pr_err("%s: failed to register clock notifier for %s\n",
+				__func__, clk->name);
+	}
 	return ret;
 }
+
+int sdrv_get_clk_min_rate(const char *name, u32 *min)
+{
+	struct device_node *np = NULL;
+	int ret = -1;
+
+	np = of_find_node_by_name(NULL, name);
+	if (np != NULL) {
+		if (of_device_is_available(np)
+				&& of_property_read_u32(np, "sdrv,min-freq", min) == 0)
+			ret = 0;
+		of_node_put(np);
+		return ret;
+	}
+	return ret;
+}
+
+int sdrv_get_clk_max_rate(const char *name, u32 *max)
+{
+	struct device_node *np = NULL;
+	int ret = -1;
+
+	np = of_find_node_by_name(NULL, name);
+	if (np != NULL) {
+		if (of_device_is_available(np)
+				&& of_property_read_u32(np, "sdrv,max-freq", max) == 0)
+			ret = 0;
+		of_node_put(np);
+		return ret;
+	}
+	return ret;
+}
+

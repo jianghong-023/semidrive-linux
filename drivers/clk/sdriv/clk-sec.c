@@ -289,7 +289,7 @@ static void __init sdrv_sec_clk_init(struct device_node *np)
 		return;
 	}
 	pr_debug("reg base %p\n", sec_reg_base);
-	sdrv_register_sec_plls();
+	sdrv_register_sec_plls(clk_base);
 
 	for (i = 0; i < ARRAY_SIZE(intern_clk); i++)
 		clk_base[intern_clk[i].clk_id] = sdrv_register_out_composite(np,
