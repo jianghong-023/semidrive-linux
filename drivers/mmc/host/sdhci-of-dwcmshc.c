@@ -18,8 +18,30 @@ struct dwcmshc_priv {
 	struct clk	*bus_clk;
 };
 
+static void dwcmshc_set_clock(struct sdhci_host *host, unsigned int clock)
+{
+	struct sdhci_pltfm_host *pltfm_host;
+	pltfm_host = sdhci_priv(host);
+
+	host->mmc->actual_clock = 0;
+
+	sdhci_writew(host, 0, SDHCI_CLOCK_CONTROL);
+
+	if (clock == 0)
+		return;
+
+	if (host->quirks & SDHCI_QUIRK_CAP_CLOCK_BASE_BROKEN) {
+		if (!clk_set_rate(pltfm_host->clk, clock))
+			host->mmc->actual_clock = clk_get_rate(pltfm_host->clk);
+	} else {
+		host->mmc->actual_clock = clock;
+	}
+
+	sdhci_enable_clk(host, 0);
+}
+
 static const struct sdhci_ops sdhci_dwcmshc_ops = {
-	.set_clock		= sdhci_set_clock,
+	.set_clock		= dwcmshc_set_clock,
 	.set_bus_width		= sdhci_set_bus_width,
 	.set_uhs_signaling	= sdhci_set_uhs_signaling,
 	.get_max_clock		= sdhci_pltfm_clk_get_max_clock,
@@ -28,7 +50,7 @@ static const struct sdhci_ops sdhci_dwcmshc_ops = {
 
 static const struct sdhci_pltfm_data sdhci_dwcmshc_pdata = {
 	.ops = &sdhci_dwcmshc_ops,
-	.quirks = SDHCI_QUIRK_CAP_CLOCK_BASE_BROKEN,
+	//.quirks = SDHCI_QUIRK_CAP_CLOCK_BASE_BROKEN,
 };
 
 static int dwcmshc_probe(struct platform_device *pdev)
@@ -45,17 +67,18 @@ static int dwcmshc_probe(struct platform_device *pdev)
 
 	pltfm_host = sdhci_priv(host);
 	priv = sdhci_pltfm_priv(pltfm_host);
-#if 0
+
 	pltfm_host->clk = devm_clk_get(&pdev->dev, "core");
 	if (IS_ERR(pltfm_host->clk)) {
 		err = PTR_ERR(pltfm_host->clk);
 		dev_err(&pdev->dev, "failed to get core clk: %d\n", err);
-		goto free_pltfm;
+	} else {
+		err = clk_prepare_enable(pltfm_host->clk);
+		if (err)
+			goto free_pltfm;
+		host->quirks |= SDHCI_QUIRK_CAP_CLOCK_BASE_BROKEN;
 	}
-	err = clk_prepare_enable(pltfm_host->clk);
-	if (err)
-		goto free_pltfm;
-#endif
+
 	priv->bus_clk = devm_clk_get(&pdev->dev, "bus");
 	if (!IS_ERR(priv->bus_clk))
 		clk_prepare_enable(priv->bus_clk);
@@ -65,10 +88,9 @@ static int dwcmshc_probe(struct platform_device *pdev)
 		goto err_clk;
 
 	sdhci_get_of_property(pdev);
-	//host->quirks |= SDHCI_QUIRK_BROKEN_ADMA;
-	//host->quirks |= SDHCI_QUIRK_CAP_CLOCK_BASE_BROKEN;
-	host->quirks | SDHCI_QUIRK_CLOCK_BEFORE_RESET;
+	host->quirks2 |= SDHCI_QUIRK2_PRESET_VALUE_BROKEN;
 	host->quirks2 |= SDHCI_QUIRK2_BROKEN_HS200;
+	sdhci_enable_v4_mode(host);
 	err = sdhci_add_host(host);
 	if (err)
 		goto err_clk;

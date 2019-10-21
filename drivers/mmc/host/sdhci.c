@@ -47,7 +47,7 @@
 
 #define MAX_TUNING_LOOP 40
 
-static unsigned int debug_quirks = 1;
+static unsigned int debug_quirks = 0;
 static unsigned int debug_quirks2;
 
 static void sdhci_finish_data(struct sdhci_host *);
@@ -213,7 +213,7 @@ void sdhci_reset(struct sdhci_host *host, u8 mask)
 	}
 
 	/* Wait max 100 ms */
-	timeout = ktime_add_ms(ktime_get(), 1000);
+	timeout = ktime_add_ms(ktime_get(), 100);
 
 	/* hw clears the bit when it's done */
 	while (1) {
@@ -701,7 +701,6 @@ static void sdhci_adma_table_pre(struct sdhci_host *host,
 
 	for_each_sg(data->sg, sg, host->sg_count, i) {
 		addr = sg_dma_address(sg);
-
 		len = sg_dma_len(sg);
 
 		/*
@@ -1673,7 +1672,6 @@ void sdhci_enable_clk(struct sdhci_host *host, u16 clk)
 }
 EXPORT_SYMBOL_GPL(sdhci_enable_clk);
 
-extern int hispeed_flag;
 void sdhci_set_clock(struct sdhci_host *host, unsigned int clock)
 {
 	u16 clk;
@@ -1686,11 +1684,6 @@ void sdhci_set_clock(struct sdhci_host *host, unsigned int clock)
 		return;
 
 	clk = sdhci_calc_clk(host, clock, &host->mmc->actual_clock);
-	if (hispeed_flag){
-		printk("please change haps clock......\n");
-		msleep(1000);
-		hispeed_flag = 0;
-	}
 	sdhci_enable_clk(host, clk);
 }
 EXPORT_SYMBOL_GPL(sdhci_set_clock);
@@ -2082,8 +2075,6 @@ static int sdhci_check_ro(struct sdhci_host *host)
 		is_readonly = 0;
 	else if (host->ops->get_ro)
 		is_readonly = host->ops->get_ro(host);
-	else if (mmc_can_gpio_ro(host->mmc))
-		is_readonly = mmc_gpio_get_ro(host->mmc);
 	else
 		is_readonly = !(sdhci_readl(host, SDHCI_PRESENT_STATE)
 				& SDHCI_WRITE_PROTECT);
@@ -3040,7 +3031,7 @@ static irqreturn_t sdhci_irq(int irq, void *dev_id)
 
 	spin_lock(&host->lock);
 
-	if (host->runtime_suspended && !sdhci_sdio_irq_enabled(host)) {
+	if (host->runtime_suspended) {
 		spin_unlock(&host->lock);
 		return IRQ_NONE;
 	}
@@ -3053,6 +3044,7 @@ static irqreturn_t sdhci_irq(int irq, void *dev_id)
 
 	do {
 		DBG("IRQ status 0x%08x\n", intmask);
+
 		if (host->ops->irq) {
 			intmask = host->ops->irq(host, intmask);
 			if (!intmask)
@@ -3129,6 +3121,8 @@ cont:
 
 		intmask = sdhci_readl(host, SDHCI_INT_STATUS);
 	} while (intmask && --max_loops);
+
+
 out:
 	spin_unlock(&host->lock);
 
@@ -4261,7 +4255,7 @@ int __sdhci_add_host(struct sdhci_host *host)
 	 * Init tasklets.
 	 */
 	tasklet_init(&host->finish_tasklet,
-		sdhci_tasklet_finish, (unsigned long)host);
+			sdhci_tasklet_finish, (unsigned long)host);
 
 	setup_timer(&host->timer, sdhci_timeout_timer, (unsigned long)host);
 	setup_timer(&host->data_timer, sdhci_timeout_data_timer,
@@ -4289,7 +4283,6 @@ int __sdhci_add_host(struct sdhci_host *host)
 	mmiowb();
 
 	ret = mmc_add_host(mmc);
-	//sdhci_dumpregs(host);
 	if (ret)
 		goto unled;
 
