@@ -224,8 +224,24 @@ PVRSRV_ERROR SysDevInit(void *pvOSDevice, PVRSRV_DEVICE_CONFIG **ppsDevConfig)
 	psDevConfig->pfnSysDevFeatureDepInit = SysDevFeatureDepInit;
 
 	/* Device setup information */
-	psDevConfig->sRegsCpuPBase.uiAddr   = 0x34c00000;
-	psDevConfig->ui32RegsSize           = 0x7D000;
+#if defined(LINUX)
+        psDevMemRes = platform_get_resource(psDev, IORESOURCE_MEM, 0);
+        if (psDevMemRes)
+        {
+            psDevConfig->sRegsCpuPBase.uiAddr = psDevMemRes->start;
+            psDevConfig->ui32RegsSize         = (unsigned int)(psDevMemRes->end - psDevMemRes->start);
+        }
+        else
+#endif
+        {
+#if defined(LINUX)
+            PVR_LOG(("%s: platform_get_resource() failed",
+                    __func__));
+#endif
+            psDevConfig->sRegsCpuPBase.uiAddr   = 0x34c00000;
+            psDevConfig->ui32RegsSize           = 0x10000;
+        }
+
 	psDevConfig->ui32IRQ                = 168;
 #if defined(LINUX)
         iIrq = platform_get_irq(psDev, 0);

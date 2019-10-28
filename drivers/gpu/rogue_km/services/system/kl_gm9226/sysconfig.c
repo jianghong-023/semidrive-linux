@@ -1,14 +1,14 @@
-/* 
+/*
 * sysconfig.c
-* 
-* Copyright (c) 2018 Semidrive Semiconductor. 
-* All rights reserved. 
-* 
-* Description: System Configuration functions. 
-* 
-* Revision History: 
-* ----------------- 
-* 011, 01/14/2019 Lili create this file 
+*
+* Copyright (c) 2018 Semidrive Semiconductor.
+* All rights reserved.
+*
+* Description: System Configuration functions.
+*
+* Revision History:
+* -----------------
+* 011, 01/14/2019 Lili create this file
 */
 
 #include "pvrsrv_device.h"
@@ -172,6 +172,7 @@ PVRSRV_ERROR SysDevInit(void *pvOSDevice, PVRSRV_DEVICE_CONFIG **ppsDevConfig)
 	PHYS_HEAP_CONFIG *pasPhysHeaps;
 	IMG_UINT32 uiPhysHeapCount;
 	PVRSRV_ERROR eError;
+	struct resource *psDevMemRes = NULL;
 
 #if defined(LINUX)
         int iIrq;
@@ -212,7 +213,7 @@ PVRSRV_ERROR SysDevInit(void *pvOSDevice, PVRSRV_DEVICE_CONFIG **ppsDevConfig)
 	psRGXData->uiTDFWCodePhysHeapID = PHYS_HEAP_IDX_TDFWCODE;
 
 	psRGXData->bHasTDSecureBufPhysHeap = IMG_TRUE;
-	psRGXData->uiTDSecureBufPhysHeapID = PHYS_HEAP_IDX_TDSECUREBUF; 
+	psRGXData->uiTDSecureBufPhysHeapID = PHYS_HEAP_IDX_TDSECUREBUF;
 #endif
 
 	/* Setup the device config */
@@ -221,9 +222,25 @@ PVRSRV_ERROR SysDevInit(void *pvOSDevice, PVRSRV_DEVICE_CONFIG **ppsDevConfig)
 	psDevConfig->pszVersion             = NULL;
 	psDevConfig->pfnSysDevFeatureDepInit = SysDevFeatureDepInit;
 
-	/* Device setup information */
-	psDevConfig->sRegsCpuPBase.uiAddr   = 0x34e00000;
-	psDevConfig->ui32RegsSize           = 0x7D000;
+        /* Device setup information */
+#if defined(LINUX)
+        psDevMemRes = platform_get_resource(psDev, IORESOURCE_MEM, 0);
+        if (psDevMemRes)
+        {
+            psDevConfig->sRegsCpuPBase.uiAddr = psDevMemRes->start;
+            psDevConfig->ui32RegsSize         = (unsigned int)(psDevMemRes->end - psDevMemRes->start);
+        }
+        else
+#endif
+        {
+#if defined(LINUX)
+            PVR_LOG(("%s: platform_get_resource() failed",
+                    __func__));
+#endif
+            psDevConfig->sRegsCpuPBase.uiAddr   = 0x34e00000;
+            psDevConfig->ui32RegsSize           = 0x10000;
+        }
+
 #if defined(LINUX)
         iIrq = platform_get_irq(psDev, 0);
         if (iIrq >= 0)
