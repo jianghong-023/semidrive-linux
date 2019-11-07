@@ -23,6 +23,7 @@
 #include "ion_support.h"
 #endif
 #if defined(LINUX)
+#include <linux/platform_device.h>
 #include <linux/dma-mapping.h>
 #endif
 #include "rgx_bvnc_defs_km.h"
@@ -173,6 +174,7 @@ PVRSRV_ERROR SysDevInit(void *pvOSDevice, PVRSRV_DEVICE_CONFIG **ppsDevConfig)
 	PHYS_HEAP_CONFIG *pasPhysHeaps;
 	IMG_UINT32 uiPhysHeapCount;
 	PVRSRV_ERROR eError;
+	struct resource *psDevMemRes = NULL;
 
 #if defined(LINUX)
         int iIrq;
@@ -214,7 +216,7 @@ PVRSRV_ERROR SysDevInit(void *pvOSDevice, PVRSRV_DEVICE_CONFIG **ppsDevConfig)
 	psRGXData->uiTDFWCodePhysHeapID = PHYS_HEAP_IDX_TDFWCODE;
 
 	psRGXData->bHasTDSecureBufPhysHeap = IMG_TRUE;
-	psRGXData->uiTDSecureBufPhysHeapID = PHYS_HEAP_IDX_TDSECUREBUF; 
+	psRGXData->uiTDSecureBufPhysHeapID = PHYS_HEAP_IDX_TDSECUREBUF;
 #endif
 
 	/* Setup the device config */
@@ -277,6 +279,10 @@ PVRSRV_ERROR SysDevInit(void *pvOSDevice, PVRSRV_DEVICE_CONFIG **ppsDevConfig)
 	IonInit(NULL);
 #endif
 
+#if defined(PVRSRV_VZ_NUM_OSID) && (PVRSRV_VZ_NUM_OSID + 0 > 2)
+        SysVzDevInit();
+#endif
+
 	*ppsDevConfig = psDevConfig;
 
 	return PVRSRV_OK;
@@ -288,6 +294,10 @@ ErrorFreeDevConfig:
 
 void SysDevDeInit(PVRSRV_DEVICE_CONFIG *psDevConfig)
 {
+#if defined(PVRSRV_VZ_NUM_OSID) && (PVRSRV_VZ_NUM_OSID + 0> 2)
+    SysVzDevDeInit();
+#endif
+
 #if defined(SUPPORT_ION)
 	IonDeinit();
 #endif
