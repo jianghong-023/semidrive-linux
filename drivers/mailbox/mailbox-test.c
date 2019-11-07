@@ -22,9 +22,10 @@
 #include <linux/slab.h>
 #include <linux/uaccess.h>
 #include <linux/sched/signal.h>
+#include <linux/soc/semidrive/mb_msg.h>
 
 #define MBOX_MAX_SIG_LEN	8
-#define MBOX_MAX_MSG_LEN	128
+#define MBOX_MAX_MSG_LEN	(128)
 #define MBOX_BYTES_PER_LINE	16
 #define MBOX_HEXDUMP_LINE_LEN	((MBOX_BYTES_PER_LINE * 4) + 2)
 #define MBOX_HEXDUMP_MAX_LEN	(MBOX_HEXDUMP_LINE_LEN *		\
@@ -101,16 +102,17 @@ static ssize_t mbox_test_message_write(struct file *filp,
 	struct mbox_test_device *tdev = filp->private_data;
 	void *data;
 	int ret;
+	sd_msghdr_t *msg;
 
 	if (!tdev->tx_channel) {
 		dev_err(tdev->dev, "Channel cannot do Tx\n");
 		return -EINVAL;
 	}
 
-	if (count > MBOX_MAX_MSG_LEN) {
+	if (count > MBOX_MAX_MSG_LEN - MB_MSG_HDR_SZ) {
 		dev_err(tdev->dev,
-			"Message length %zd greater than max allowed %d\n",
-			count, MBOX_MAX_MSG_LEN);
+			"Message length %zd greater than max allowed %ld\n",
+			count, (int)MBOX_MAX_MSG_LEN - MB_MSG_HDR_SZ);
 		return -EINVAL;
 	}
 
@@ -118,7 +120,14 @@ static ssize_t mbox_test_message_write(struct file *filp,
 	if (!tdev->message)
 		return -ENOMEM;
 
-	ret = copy_from_user(tdev->message, userbuf, count);
+	msg = (sd_msghdr_t *)tdev->message;
+	msg->dat_len = count + MB_MSG_HDR_SZ;
+	msg->priority = 0;
+	msg->protocol = 0;
+	msg->rproc = 3;
+	msg->reserved = 0xee;
+
+	ret = copy_from_user(msg->data, userbuf, count);
 	if (ret) {
 		ret = -EFAULT;
 		goto out;
@@ -137,7 +146,7 @@ static ssize_t mbox_test_message_write(struct file *filp,
 		data = tdev->message;
 
 	print_hex_dump_bytes("Client: Sending: Message: ", DUMP_PREFIX_ADDRESS,
-			     tdev->message, MBOX_MAX_MSG_LEN);
+			     tdev->message, msg->dat_len);
 
 	ret = mbox_send_message(tdev->tx_channel, data);
 	if (ret < 0)
@@ -288,9 +297,10 @@ static void mbox_test_receive_message(struct mbox_client *client, void *message)
 		print_hex_dump_bytes("Client: Received [MMIO]: ", DUMP_PREFIX_ADDRESS,
 				     tdev->rx_buffer, MBOX_MAX_MSG_LEN);
 	} else if (message) {
+		sd_msghdr_t *msg = message;
 		print_hex_dump_bytes("Client: Received [API]: ", DUMP_PREFIX_ADDRESS,
-				     message, MBOX_MAX_MSG_LEN);
-		memcpy(tdev->rx_buffer, message, MBOX_MAX_MSG_LEN);
+				     msg, msg->dat_len);
+		memcpy(tdev->rx_buffer, msg->data, msg->dat_len - MB_MSG_HDR_SZ);
 	}
 	mbox_data_ready = true;
 	spin_unlock_irqrestore(&tdev->lock, flags);
@@ -363,25 +373,35 @@ static int mbox_test_probe(struct platform_device *pdev)
 
 	/* It's okay for MMIO to be NULL */
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-	size = resource_size(res);
-	tdev->tx_mmio = devm_ioremap_resource(&pdev->dev, res);
-	if (PTR_ERR(tdev->tx_mmio) == -EBUSY)
-		/* if reserved area in SRAM, try just ioremap */
-		tdev->tx_mmio = devm_ioremap(&pdev->dev, res->start, size);
-	else if (IS_ERR(tdev->tx_mmio))
+	if (res) {
+		size = resource_size(res);
+		tdev->tx_mmio = devm_ioremap_resource(&pdev->dev, res);
+		if (PTR_ERR(tdev->tx_mmio) == -EBUSY)
+			/* if reserved area in SRAM, try just ioremap */
+			tdev->tx_mmio = devm_ioremap(&pdev->dev, res->start, size);
+		else if (IS_ERR(tdev->tx_mmio))
+			tdev->tx_mmio = NULL;
+	} else {
 		tdev->tx_mmio = NULL;
+	}
 
 	/* If specified, second reg entry is Rx MMIO */
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
-	size = resource_size(res);
-	tdev->rx_mmio = devm_ioremap_resource(&pdev->dev, res);
-	if (PTR_ERR(tdev->rx_mmio) == -EBUSY)
-		tdev->rx_mmio = devm_ioremap(&pdev->dev, res->start, size);
-	else if (IS_ERR(tdev->rx_mmio))
-		tdev->rx_mmio = tdev->tx_mmio;
+	if (res) {
+		size = resource_size(res);
+		tdev->rx_mmio = devm_ioremap_resource(&pdev->dev, res);
+		if (PTR_ERR(tdev->rx_mmio) == -EBUSY)
+			tdev->rx_mmio = devm_ioremap(&pdev->dev, res->start, size);
+		else if (IS_ERR(tdev->rx_mmio))
+			tdev->rx_mmio = tdev->tx_mmio;
+	} else {
+		tdev->rx_mmio = NULL;
+	}
 
 	tdev->tx_channel = mbox_test_request_channel(pdev, "tx");
 	tdev->rx_channel = mbox_test_request_channel(pdev, "rx");
+
+	dev_info(&pdev->dev, "tx %p rx %p channel\n", tdev->tx_channel, tdev->rx_channel);
 
 	if (!tdev->tx_channel && !tdev->rx_channel)
 		return -EPROBE_DEFER;
