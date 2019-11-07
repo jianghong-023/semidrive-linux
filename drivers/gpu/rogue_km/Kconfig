@@ -1,4 +1,23 @@
-config ROGUE_KM
+menuconfig ROGUE_KM
 	tristate "rogue gpu support"
 	help
 	  Choose this if you have a rogue gpu.
+
+if ROGUE_KM
+config PVR_SYSTEM
+	string "pvr system used"
+	help
+	  choose correct gpu type.
+
+config PVRSRV_VZ_NUM_OSID
+	int "pvr virtualisation os number"
+	range 0 8
+	default 0
+	help
+	  choose correct pvr virtualisation os number.
+
+config VMM_TYPE
+	string "gpu virtualisation manager type"
+	help
+	  choose correct gpu vmm type
+endif
