@@ -2,6 +2,7 @@
 dtb-$(CONFIG_ARCH_SEMIDRIVE_X9) += x9-z1.dtb
 dtb-$(CONFIG_ARCH_SEMIDRIVE_X9) += x9-z1-cpu1.dtb
 dtb-$(CONFIG_ARCH_SEMIDRIVE_X9) += x9-fpga.dtb
+dtb-$(CONFIG_ARCH_SEMIDRIVE_X9) += x9-evb.dtb
 
 always		:= $(dtb-y)
 subdir-y	:= $(dts-dirs)
