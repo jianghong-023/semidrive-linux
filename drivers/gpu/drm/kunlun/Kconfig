@@ -20,6 +20,13 @@ config DRM_KUNLUN_RGB
 		for the RGB parallel driver. If you want to  enable RGB
 		parallel, you should select this option.
 
+config DRM_KUNLUN_LVDS
+	bool "Semidrive specific extensions for LVDS"
+	help
+		This selects support for Semidrive SoC specific extensions
+		for the LVDS driver. If you want to  enable LVDS, you
+		should select this option.
+
 config DRM_KUNLUN_CRTC
 	bool "Semidrive DRM CRTC"
 	help
