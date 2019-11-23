@@ -256,7 +256,7 @@ static bool _is_best_div(unsigned long rate, unsigned long now,
 			 unsigned long best, unsigned long flags)
 {
 	if (flags & CLK_DIVIDER_ROUND_CLOSEST)
-		return abs(rate - now) < abs(rate - best);
+		return abs_diff(rate, now) < abs_diff(rate, best);
 
 	return now <= rate && now > best;
 }
@@ -316,7 +316,8 @@ static int clk_divider_bestdiv(struct clk_hw *hw, struct clk_hw *parent,
 		}
 		parent_rate = clk_hw_round_rate(parent, rate * i);
 		now = DIV_ROUND_UP_ULL((u64)parent_rate, i);
-		if (_is_best_div(rate, now, best, flags)) {
+		if (parent_rate != 0 && (best == 0
+			|| _is_best_div(rate, now, best, flags))) {
 			bestdiv = i;
 			best = now;
 			*best_parent_rate = parent_rate;

@@ -13,6 +13,7 @@
 
 #include <linux/io.h>
 #include <linux/of.h>
+#define abs_diff(a, b) (((a) > (b)) ? ((a) - (b)):((b) - (a)))
 
 #ifdef CONFIG_COMMON_CLK
 

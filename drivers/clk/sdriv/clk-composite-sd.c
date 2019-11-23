@@ -108,7 +108,7 @@ static int sd_clk_composite_determine_rate(struct clk_hw *hw,
 			if (tmp_rate < req->min_rate || tmp_rate > req->max_rate)
 				continue;
 
-			rate_diff = abs(req->rate - tmp_rate);
+			rate_diff = abs_diff(req->rate, tmp_rate);
 
 			if (!rate_diff || !req->best_parent_hw
 				|| best_rate_diff > rate_diff

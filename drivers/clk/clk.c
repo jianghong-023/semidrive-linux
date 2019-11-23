@@ -353,7 +353,7 @@ static bool mux_is_better_rate(unsigned long rate, unsigned long now,
 			   unsigned long best, unsigned long flags)
 {
 	if (flags & CLK_MUX_ROUND_CLOSEST)
-		return abs(now - rate) < abs(best - rate);
+		return abs_diff(now, rate) < abs_diff(best, rate);
 
 	return now <= rate && now > best;
 }
@@ -401,9 +401,9 @@ int clk_mux_determine_rate_flags(struct clk_hw *hw,
 		} else {
 			parent_req.rate = clk_core_get_rate_nolock(parent);
 		}
-
-		if (mux_is_better_rate(req->rate, parent_req.rate,
-				       best, flags)) {
+		if (parent_req.rate != 0 && (best == 0
+			|| mux_is_better_rate(req->rate, parent_req.rate,
+				       best, flags))) {
 			best_parent = parent;
 			best = parent_req.rate;
 		}
