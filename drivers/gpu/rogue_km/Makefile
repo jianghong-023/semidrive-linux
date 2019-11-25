@@ -66,6 +66,7 @@ ccflags-y += -DPVR_BUILD_DIR=\"$(PVR_BUILD_DIR)\"
 ccflags-y += -DPVRSRV_VZ_NUM_OSID=$(PVRSRV_VZ_NUM_OSID)
 ccflags-y += -DVMM_TYPE=$(VMM_TYPE)
 ccflags-y += -DPVR_SYSTEM=$(PVR_SYSTEM)
+ccflags-y += -DPVR_SYSTEM_CLEAN=$(PVR_SYSTEM_CLEAN)
 
 ccflags-y += -D__linux__ -include $(TOP)/config_kernel.h \
  -I$(TOP)/include \

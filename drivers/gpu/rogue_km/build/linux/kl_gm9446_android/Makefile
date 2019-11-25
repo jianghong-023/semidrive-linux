@@ -70,8 +70,7 @@ export EXCLUDED_APIS=dnn cldnn nnhal
 include ../config/preconfig.mk
 
 PVR_SYSTEM := kl_gm9446
-# real RGX_BVNC := 24.56.208.505
-RGX_BVNC := 24.50.208.504
+RGX_BVNC := 24.56.208.505
 
 include ../common/android/arch.mk
 include ../common/android/features.mk
@@ -81,7 +80,7 @@ include ../common/android/features.mk
  # to get the correct heap id.
  # For kernels <4.12, we use heap_id_mask defined in this Makefile.
  # Heap names defined here are for reference only.
-ION_DEFAULT_HEAP_NAME := \"system\"
+ION_DEFAULT_HEAP_NAME := \"linux,cma\"
 ION_DEFAULT_HEAP_ID_MASK := (1 << ION_HEAP_TYPE_SYSTEM)
 ION_FALLBACK_HEAP_NAME := \"carveout\"
 ION_FALLBACK_HEAP_ID_MASK := (1 << ION_HEAP_TYPE_CARVEOUT)
@@ -92,7 +91,7 @@ endif
 
 ifeq ($(PVR_ANDROID_COMPOSERHAL),drm)
 PVR_DRM_MODESET_MODULE_NAME := dumb
-PVR_DRM_MODESET_DRIVER_NAME := rockchip
+PVR_DRM_MODESET_DRIVER_NAME := semidrive
 override PVR_LDM_PLATFORM_PRE_REGISTERED := 1
 else
 DISPLAY_CONTROLLER ?= adf_fbdev
