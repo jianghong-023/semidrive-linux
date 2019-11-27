@@ -186,8 +186,8 @@ int serial8250_request_dma(struct uart_8250_port *p)
 	ret = dma_get_slave_caps(dma->rxchan, &caps);
 	if (ret)
 		goto release_rx;
-	if (!caps.cmd_pause || !caps.cmd_terminate ||
-	    caps.residue_granularity == DMA_RESIDUE_GRANULARITY_DESCRIPTOR) {
+	if (!caps.cmd_pause || !caps.cmd_terminate/* ||
+	    caps.residue_granularity == DMA_RESIDUE_GRANULARITY_DESCRIPTOR*/) {
 		ret = -EINVAL;
 		goto release_rx;
 	}
