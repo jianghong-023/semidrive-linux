@@ -7,6 +7,7 @@ kunlun-drm-objs := \
 kunlun-drm-$(CONFIG_DRM_FBDEV_EMULATION) += kunlun_drm_fbdev.o
 
 obj-$(CONFIG_DRM_KUNLUN_RGB) += kunlun_drm_parallel.o
+obj-$(CONFIG_DRM_KUNLUN_LVDS) += kunlun_drm_lvds.o
 
 obj-$(CONFIG_DRM_KUNLUN) += kunlun-drm.o
 
