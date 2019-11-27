@@ -216,7 +216,7 @@ static int kunlun_drm_parallel_register(struct drm_device *drm,
 				&kunlun_parallel_connector_helper_funcs);
 		drm_connector_init(drm, connector,
 				&kunlun_parallel_connector_funcs,
-				DRM_MODE_CONNECTOR_Unknown);
+				DRM_MODE_CONNECTOR_DPI);
 		drm_mode_connector_attach_encoder(connector, encoder);
 	}
 
@@ -275,7 +275,7 @@ static void kunlun_drm_parallel_unbind(struct device *dev,
 		struct device *master, void *data)
 {
 	struct kunlun_drm_parallel *kpar = dev_get_drvdata(dev);
-	
+
 	if(kpar->panel)
 		drm_panel_detach(kpar->panel);
 }
