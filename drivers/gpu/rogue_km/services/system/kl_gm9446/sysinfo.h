@@ -22,7 +22,7 @@
 
 #if defined(__linux__)
 #define SYS_RGX_DEV_NAME    "rgxkunlun"
-#define SYS_RGX_OF_COMPATIBLE "imagination,pvr-9226"
+#define SYS_RGX_OF_COMPATIBLE "imagination,pvr-9446"
 #endif
 
 #endif	/* !defined(__SYSINFO_H__) */

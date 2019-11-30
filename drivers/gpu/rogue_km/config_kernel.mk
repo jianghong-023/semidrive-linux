@@ -1,8 +1,10 @@
 #below configs come from .config
 ifeq ($(CONFIG_PVR_SYSTEM),"kl_gm9226")
 override PVR_SYSTEM := kl_gm9226
+override PVR_SYSTEM_CLEAN := 9226
 else
 override PVR_SYSTEM := kl_gm9446
+override PVR_SYSTEM_CLEAN := 9446
 endif
 ifeq ($(CONFIG_VMM_TYPE),"stub")
 override VMM_TYPE := stub
