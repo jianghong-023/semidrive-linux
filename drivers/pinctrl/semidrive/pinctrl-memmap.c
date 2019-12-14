@@ -39,7 +39,7 @@ int sd_pmx_set_one_pin_mem(struct sd_pinctrl *ipctl, struct sd_pin *pin)
 
 	if (pin_reg && pin_reg->mux_reg) {
     		writel(mux_val, ipctl->base + pin_reg->mux_reg);
-    		dev_err(ipctl->dev, "write: offset 0x%x val 0x%x\n", pin_reg->mux_reg, mux_val);
+    		//dev_err(ipctl->dev, "write: offset 0x%x val 0x%x\n", pin_reg->mux_reg, mux_val);
 	}
 
 	return 0;
@@ -79,13 +79,13 @@ int sd_pinconf_backend_set_mem(struct pinctrl_dev *pctldev,
 		return -EINVAL;
 	}
 
-	dev_err(ipctl->dev, "pinconf set pin %s\n", info->pins[pin_id].name);
+	//dev_err(ipctl->dev, "pinconf set pin %s\n", info->pins[pin_id].name);
 
 	for (i = 0; i < num_configs; i++) {
         	/* TODO: only for Z1 */
 		if (pin_reg && pin_reg->conf_reg) {
         		writel(configs[i], ipctl->base + pin_reg->conf_reg);
-        		dev_err(ipctl->dev, "[set_mem] write: offset 0x%x val 0x%lx\n", pin_reg->conf_reg, configs[i]);
+        		//dev_err(ipctl->dev, "[set_mem] write: offset 0x%x val 0x%lx\n", pin_reg->conf_reg, configs[i]);
 		}
 	} /* for each config */
 
@@ -106,7 +106,7 @@ int sd_pinctrl_parse_pin_mem(struct sd_pinctrl_soc_info *info,
 	unsigned int pin_id;
 	struct sd_pin_reg *pin_reg;
 
-    	dev_err(info->dev, "sd_pinctrl_parse_pin_mem Enter");
+    	//dev_err(info->dev, "sd_pinctrl_parse_pin_mem Enter");
     	conf_reg = be32_to_cpu(*((*list_p)++)); /* [1] config_reg */
     	if (!conf_reg) {
         	// no config_reg need to be setup
@@ -123,7 +123,7 @@ int sd_pinctrl_parse_pin_mem(struct sd_pinctrl_soc_info *info,
 		pin_id = 0;
 		pin_reg = 0;
 	}
-	dev_err(info->dev, "sd_pinctrl_parse_pin_mem: pin_id [%d], mux_reg [0x%08x]", pin_id, mux_reg);
+	//dev_err(info->dev, "sd_pinctrl_parse_pin_mem: pin_id [%d], mux_reg [0x%08x]", pin_id, mux_reg);
 
 	pin->pin = pin_id;
 	*grp_pin_id = pin_id;
@@ -135,9 +135,9 @@ int sd_pinctrl_parse_pin_mem(struct sd_pinctrl_soc_info *info,
 	pin_memmap->config = be32_to_cpu(*((*list_p)++)); /* [3] config */
 	pin_memmap->direct_val = be32_to_cpu((*(*list_p)++)); /* [4] output direction */
 
-	if (mux_reg)
-		dev_err(info->dev, "%s: 0x%x 0x%08lx, direction[%d]", info->pins[pin_id].name,
-			pin_memmap->mux_mode, pin_memmap->config, pin_memmap->direct_val);
+	//if (mux_reg)
+	//	dev_err(info->dev, "%s: 0x%x 0x%08lx, direction[%d]", info->pins[pin_id].name,
+	//		pin_memmap->mux_mode, pin_memmap->config, pin_memmap->direct_val);
 
 	return 0;
 }
