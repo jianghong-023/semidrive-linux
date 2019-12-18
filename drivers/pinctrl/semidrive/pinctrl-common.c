@@ -109,8 +109,8 @@ static int sd_dt_node_to_map(struct pinctrl_dev *pctldev,
 		}
 	}
 
-	dev_err(pctldev->dev, "maps: function %s group %s num %d\n",
-		(*map)->data.mux.function, (*map)->data.mux.group, map_num);
+	//dev_err(pctldev->dev, "maps: function %s group %s num %d\n",
+	//	(*map)->data.mux.function, (*map)->data.mux.group, map_num);
 
 	return 0;
 }
@@ -155,8 +155,8 @@ static int sd_pmx_set(struct pinctrl_dev *pctldev, unsigned selector,
 
 	npins = grp->num_pins;
 
-	dev_dbg(ipctl->dev, "enable function %s group %s\n",
-		func->name, grp->name);
+	//dev_dbg(ipctl->dev, "enable function %s group %s\n",
+	//	func->name, grp->name);
 
 	for (i = 0; i < npins; i++) {
 		struct sd_pin *pin = &((struct sd_pin *)(grp->data))[i];
@@ -318,7 +318,7 @@ static int sd_pinctrl_parse_groups(struct device_node *np,
 	u32 config;
 	int i;
 
-	dev_err(info->dev, "group(%d): %s\n", index, np->name);
+	//dev_err(info->dev, "group(%d): %s\n", index, np->name);
 
     pin_size = SD_PIN_SIZE;
 
@@ -350,7 +350,7 @@ static int sd_pinctrl_parse_groups(struct device_node *np,
 
 	list_p = &list;
 
-    dev_err(info->dev, "parse_groups: size [%d], pin_size [%d]\n", size, pin_size);
+    //dev_err(info->dev, "parse_groups: size [%d], pin_size [%d]\n", size, pin_size);
 
 	/* we do not check return since it's safe node passed down */
 	if (!size || size % pin_size) {
@@ -390,7 +390,7 @@ static int sd_pinctrl_parse_functions(struct device_node *np,
 	struct group_desc *grp;
 	u32 i = 0;
 
-	dev_err(info->dev, "parse function(%d): %s\n", index, np->name);
+	//dev_err(info->dev, "parse function(%d): %s\n", index, np->name);
 
 	func = pinmux_generic_get_function(pctl, index);
 	if (!func)

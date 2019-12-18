@@ -258,8 +258,8 @@ static int pinctrl_register_one_pin(struct pinctrl_dev *pctldev,
 	pindesc->drv_data = pin->drv_data;
 
 	radix_tree_insert(&pctldev->pin_desc_tree, pin->number, pindesc);
-	pr_debug("registered pin %d (%s) on %s\n",
-		 pin->number, pindesc->name, pctldev->desc->name);
+	//pr_debug("registered pin %d (%s) on %s\n",
+	//	 pin->number, pindesc->name, pctldev->desc->name);
 	return 0;
 }
 
@@ -716,10 +716,10 @@ int pinctrl_get_group_selector(struct pinctrl_dev *pctldev,
 		const char *gname = pctlops->get_group_name(pctldev,
 							    group_selector);
 		if (!strcmp(gname, pin_group)) {
-			dev_dbg(pctldev->dev,
-				"found group selector %u for %s\n",
-				group_selector,
-				pin_group);
+			//dev_dbg(pctldev->dev,
+			//	"found group selector %u for %s\n",
+			//	group_selector,
+			//	pin_group);
 			return group_selector;
 		}
 
