@@ -159,6 +159,10 @@
 #define DWC3_OEVTEN		0xcc0C
 #define DWC3_OSTS		0xcc10
 
+/* NCR Registers */
+#define DWC3_NCR_INTEN		0xd000
+#define DWC3_NCR_INTR		0xd080
+
 /* Bit fields */
 
 /* Global Debug Queue/FIFO Space Available Register */
@@ -906,6 +910,7 @@ struct dwc3 {
 	struct ulpi		*ulpi;
 
 	void __iomem		*regs;
+	void __iomem		*usb_bridge_sync;
 	size_t			regs_size;
 
 	enum usb_dr_mode	dr_mode;

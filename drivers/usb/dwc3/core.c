@@ -1165,6 +1165,7 @@ static int dwc3_probe(struct platform_device *pdev)
 	int			ret;
 
 	void __iomem		*regs;
+	unsigned int		data;
 
 	dwc = devm_kzalloc(dev, sizeof(*dwc), GFP_KERNEL);
 	if (!dwc)
@@ -1198,6 +1199,19 @@ static int dwc3_probe(struct platform_device *pdev)
 
 	dwc->regs	= regs;
 	dwc->regs_size	= resource_size(res);
+
+	/* workaround, it will be removed to usb phy driver */
+	dwc->usb_bridge_sync = ioremap(0x31250000, 0x1000);
+
+	data = readl(dwc->usb_bridge_sync);
+	data &= ~(1<<18);
+	writel(data, dwc->usb_bridge_sync);
+
+	data = readl(dwc->usb_bridge_sync + 0xc);
+	data |= (1<<8);
+	writel(data, dwc->usb_bridge_sync + 0xc);
+
+	dwc3_writel(dwc->regs, DWC3_NCR_INTEN, 0x3f);
 
 	dwc3_get_properties(dwc);
 

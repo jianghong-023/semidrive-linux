@@ -1749,6 +1749,9 @@ static int dwc3_gadget_run_stop(struct dwc3 *dwc, int is_on, int suspend)
 
 	dwc3_writel(dwc->regs, DWC3_DCTL, reg);
 
+	/*just for notify usb bridge that Z1 is ready*/
+	writel(is_on, dwc->usb_bridge_sync + 0x1c);
+
 	do {
 		reg = dwc3_readl(dwc->regs, DWC3_DSTS);
 		reg &= DWC3_DSTS_DEVCTRLHLT;
@@ -3158,10 +3161,21 @@ static irqreturn_t dwc3_check_event_buf(struct dwc3_event_buffer *evt)
 	return IRQ_WAKE_THREAD;
 }
 
+static void dwc3_ncr_interrupt(struct dwc3_event_buffer *evt)
+{
+	struct dwc3 *dwc = evt->dwc;
+	u32 data;
+
+	data = dwc3_readl(dwc->regs, DWC3_NCR_INTR);
+	if (data & 0x7f)
+		dwc3_writel(dwc->regs, DWC3_NCR_INTR, data & 0x7f);
+}
+
 static irqreturn_t dwc3_interrupt(int irq, void *_evt)
 {
 	struct dwc3_event_buffer	*evt = _evt;
 
+	dwc3_ncr_interrupt(evt);
 	return dwc3_check_event_buf(evt);
 }
 
