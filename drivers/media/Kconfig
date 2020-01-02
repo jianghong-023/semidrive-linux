@@ -131,7 +131,7 @@ config VIDEO_V4L2_SUBDEV_API
 	  This API is mostly used by camera interfaces in embedded platforms.
 
 source "drivers/media/v4l2-core/Kconfig"
-
+source "drivers/media/platform/semidrive/Kconfig"
 #
 # DVB Core
 #	Only enables if one of DTV is selected
