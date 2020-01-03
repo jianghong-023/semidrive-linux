@@ -404,7 +404,6 @@ CPU_LE( bic     x0, x0, #(3 << 24)      )       // Clear the EE and E0E bits for
 	/* set EL1 to 64bit */
 	mrs x0, scr_el3
 	orr x0, x0, #(1<<10)
-	orr x0, x0, #(1<<0)	/* none sec */
 	msr scr_el3, x0
 
 
