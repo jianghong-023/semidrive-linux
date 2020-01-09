@@ -25,6 +25,18 @@
 		vsync-len = <5>;
 	};
 
+	hd1280x800: vesa_1280x800@60 {
+		clock-frequency = <71000000>;
+		hactive = <1280>;
+		vactive = <800>;
+		hback-porch = <80>;
+		hfront-porch = <48>;
+		vback-porch = <14>;
+		vfront-porch = <3>;
+		hsync-len = <32>;
+		vsync-len = <6>;
+	};
+
 	fhd1920x1080: z1_1920x1080@60 {
 		clock-frequency = <132220000>;
 		hactive = <1920>;

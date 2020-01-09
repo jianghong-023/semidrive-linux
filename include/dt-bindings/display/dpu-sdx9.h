@@ -7,6 +7,8 @@
 #ifndef __DTS_SDX9_DPU_H
 #define __DTS_SDX9_DPU_H
 
+#define LVDS_BASE   0x0 0x30c40000
+
 #define DP0_BASE    0x0 0x30d80000
 #define DP1_BASE    0x0 0x30d90000
 #define DP2_BASE    0x0 0x30da0000
@@ -18,4 +20,5 @@
 #define DC4_BASE    0x0 0x30df0000
 
 #define DPU_RANGE   0x0 0x10000
+#define LVDS_RANGE  0x0 0x50000
 #endif /*__DTS_SDX9_DPU_H*/
