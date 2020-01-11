@@ -175,67 +175,76 @@ static const struct drm_connector_funcs kunlun_lvds_connector_funcs = {
 
 static void lvds_channel_config(struct lvds_context *ctx, uint8_t chidx)
 {
-    int val, mux, clk_sel, clk_en;
+	int val, mux, clk_sel, clk_en, i;
 
-    val = reg_readl(ctx->base, LVDS_CHN_CTRL_(chidx));
-    val = reg_value(ctx->dual_mode, val, CHN_DUALMODE_SHIFT, CHN_DUALMODE_MASK);
-    val = reg_value(ctx->pixel_format, val, CHN_BPP_SHIFT, CHN_BPP_MASK);
-    val = reg_value(ctx->map_format, val, CHN_FORMAT_SHIFT, CHN_FORMAT_MASK);
-    val = reg_value(ctx->vsync_pol, val,
-        CHN_VSYNC_POL_SHIFT, CHN_VSYNC_POL_MASK);
+	val = reg_readl(ctx->base, LVDS_CHN_CTRL_(chidx));
+	val = reg_value(ctx->dual_mode, val, CHN_DUALMODE_SHIFT, CHN_DUALMODE_MASK);
+	val = reg_value(ctx->pixel_format, val, CHN_BPP_SHIFT, CHN_BPP_MASK);
+	val = reg_value(ctx->map_format, val, CHN_FORMAT_SHIFT, CHN_FORMAT_MASK);
+	val = reg_value(ctx->vsync_pol, val,
+		CHN_VSYNC_POL_SHIFT, CHN_VSYNC_POL_MASK);
 
-    if ((ctx->pixel_format == PIXEL_FORMAT_30_BIT) &&
-        ctx->dual_mode) {
-        if ((chidx == LVDS_CH1) || (chidx == LVDS_CH2))
-            val = reg_value(DUALLODD_ODD, val,
-                CHN_DUALODD_SHIFT, CHN_DUALODD_MASK);
-        else
-            val = reg_value(DUALLODD_EVEN, val,
-                CHN_DUALODD_SHIFT, CHN_DUALODD_MASK);
-    }
+	if ((ctx->pixel_format == PIXEL_FORMAT_30_BIT) &&
+		ctx->dual_mode) {
+		if ((chidx == LVDS_CH1) || (chidx == LVDS_CH2))
+			val = reg_value(DUALLODD_ODD, val,
+				CHN_DUALODD_SHIFT, CHN_DUALODD_MASK);
+		else
+			val = reg_value(DUALLODD_EVEN, val,
+				CHN_DUALODD_SHIFT, CHN_DUALODD_MASK);
+	}
 
-    if (ctx->pixel_format == PIXEL_FORMAT_30_BIT) {
-        if ((chidx == LVDS_CH1) || (chidx == LVDS_CH3))
-            mux = 0;
-        else
-            mux = 1;
-    } else {
-        if (ctx->dual_mode) {
-            if ((chidx == LVDS_CH1) || (chidx == LVDS_CH3))
-                mux = 0;
-            else
-                mux = 1;
-        } else {
-            if ((chidx == LVDS_CH1) || (chidx == LVDS_CH3))
-                mux = 0;
-            else
-                mux = 2;
-        }
-    }
+	if (ctx->pixel_format == PIXEL_FORMAT_30_BIT) {
+		if ((chidx == LVDS_CH1) || (chidx == LVDS_CH3))
+			mux = 0;
+		else
+			mux = 1;
+	} else {
+		if (ctx->dual_mode) {
+			if ((chidx == LVDS_CH1) || (chidx == LVDS_CH3))
+				mux = 0;
+			else
+				mux = 1;
+		} else {
+			if ((chidx == LVDS_CH1) || (chidx == LVDS_CH3))
+				mux = 0;
+			else
+				mux = 2;
+		}
+	}
 
-    val = reg_value(mux, val, CHN_MUX_SHIFT, CHN_MUX_MASK);
+	val = reg_value(mux, val, CHN_MUX_SHIFT, CHN_MUX_MASK);
 
-    val = reg_value(1, val, CHN_EN_SHIFT, CHN_EN_MASK);
-    reg_writel(ctx->base, LVDS_CHN_CTRL_(chidx), val);
+	val = reg_value(1, val, CHN_EN_SHIFT, CHN_EN_MASK);
+	reg_writel(ctx->base, LVDS_CHN_CTRL_(chidx), val);
 
-    val = reg_readl(ctx->base, LVDS_CHN_CLOCK_(chidx));
-    if (ctx->dual_mode) {
-        clk_sel = SRC_SEL_3P5_CLOCK;
-        clk_en = LVDS_CLK_EN | LVDS_CLK_X3P5_EN | LVDS_DSP_CLK_EN;
-    } else {
-        clk_sel = SRC_SEL_7_CLOCK;
-        clk_en = LVDS_CLK_EN | LVDS_CLK_X7_EN | LVDS_DSP_CLK_EN;
-    }
+	val = reg_readl(ctx->base, LVDS_CHN_CLOCK_(chidx));
+	if (ctx->dual_mode) {
+		clk_sel = SRC_SEL_3P5_CLOCK;
+		clk_en = LVDS_CLK_EN | LVDS_CLK_X3P5_EN | LVDS_DSP_CLK_EN;
+	} else {
+		clk_sel = SRC_SEL_7_CLOCK;
+		clk_en = LVDS_CLK_EN | LVDS_CLK_X7_EN | LVDS_DSP_CLK_EN;
+	}
+	val = reg_value(0, val, CHN_DIV_NUM_LVDS_SHIFT, CHN_DIV_NUM_LVDS_MASK);
+	val = reg_value(clk_sel, val, CHN_SRC_SEL_SHIFT, CHN_SRC_SEL_MASK);
+	val = reg_value(clk_en, val, CHN_GATING_EN_SHIFT, CHN_GATING_EN_MASK);
+	reg_writel(ctx->base, LVDS_CHN_CLOCK_(chidx), val);
 
-    val = reg_value(clk_sel, val, CHN_SRC_SEL_SHIFT, CHN_SRC_SEL_MASK);
-    val = reg_value(clk_en, val, CHN_GATING_EN_SHIFT, CHN_GATING_EN_MASK);
-    reg_writel(ctx->base, LVDS_CHN_CLOCK_(chidx), val);
-
+	/*config 5 lanes base vdd*/
+	for (i = 0; i < 5; i++) {
+		reg_writel(ctx->base, LVDS_CHN_PAD_SET_(chidx) + 0x4 * i, 0x98F);
+	}
 }
 
 static int kunlun_lvds_init(struct kunlun_drm_lvds *klvds)
 {
+	int val;
 	struct lvds_context *ctx = &klvds->ctx;
+
+	val = reg_readl(ctx->base, LVDS_BIAS_SET);
+	val = reg_value(1, val, BIAS_EN_SHIFT, BIAS_EN_MASK);
+	reg_writel(ctx->base, LVDS_BIAS_SET, val);
 
 	if (ctx->pixel_format == PIXEL_FORMAT_30_BIT) {
 		if (!ctx->dual_mode) {
