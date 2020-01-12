@@ -436,7 +436,7 @@ static int kunlun_lvds_get_resource(struct kunlun_drm_lvds *klvds,
 	else
 		ctx->dual_mode = 0;
 
-	if (!of_property_read_u32(np, "map-foramt", &tmp))
+	if (!of_property_read_u32(np, "map-format", &tmp))
 		ctx->map_format = tmp;
 	else
 		ctx->map_format = 0;
