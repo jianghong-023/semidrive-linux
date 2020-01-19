@@ -31,7 +31,7 @@
 #define GPIO_CTRL_PIN_0		0x00
 #define GPIO_CTRL_PIN_1		0x10
 #define GPIO_CTRL_SIZE		(GPIO_CTRL_PIN_1 - GPIO_CTRL_PIN_0)
-#define GPIO_CTRL_PIN_X(n)		((n) * GPIO_CTRL_SIZE)
+#define GPIO_CTRL_PIN_X(n)    (((n)<=47) ? ((n)>=24 ? ((n)-24)*GPIO_CTRL_SIZE : ((n)+24)*GPIO_CTRL_SIZE) : ((n)*GPIO_CTRL_SIZE))
 #define GPIO_SET_PIN_X(n)	(GPIO_CTRL_PIN_X(n) +  0x4)
 #define GPIO_CLEAR_PIN_X(n)	(GPIO_CTRL_PIN_X(n) +  0x8)
 #define GPIO_TOGGLE_PIN_X(n)	(GPIO_CTRL_PIN_X(n) +  0xc)
@@ -243,146 +243,6 @@ static inline void kunlun_write(struct kunlun_gpio *gpio, unsigned int offset,
 		offset, val);
 
 	gc->write_reg(reg_base + gpio_reg_convert(gpio, offset), val);
-
-}
-
-
-static void kunlun_gpio_set_scr(struct kunlun_gpio *gpio)
-{
-	/* setup sec_scr, saf_scr for gpio mux */
-	unsigned int rdata = 0;
-	void __iomem *saf_iobase;
-	void __iomem *sec_iobase;
-
-	dev_err(gpio->dev, "%s: set SAF_SCR ...\n", __func__);
-	saf_iobase = ioremap(APB_SCR_SAF_BASE, APB_SCR_SAF_LEN);
-
-	rdata = readl(saf_iobase + (0x230 << 10));
-	writel((rdata & (MIDMASK(0, 15))) | ((MID(0xFFFF, 0, 15)) << 0),
-		saf_iobase + (0x230 << 10));
-
-	rdata = readl(saf_iobase + (0x234 << 10));
-	writel((rdata & (MIDMASK(0, 15))) | ((MID(0xFFFF, 0, 15)) << 0),
-		saf_iobase + (0x234 << 10));
-
-	rdata = readl(saf_iobase + (0x238 << 10));
-	writel((rdata & (MIDMASK(0, 15))) | ((MID(0xFFFF, 0, 15)) << 0),
-		saf_iobase + (0x238 << 10));
-
-	rdata = readl(saf_iobase + (0x23c << 10));
-	writel((rdata & (MIDMASK(0, 15))) | ((MID(0xFFFF, 0, 15)) << 0),
-		saf_iobase + (0x23c << 10));
-
-	rdata = readl(saf_iobase + (0x240 << 10));
-	writel((rdata & (MIDMASK(0, 15))) | ((MID(0xFFFF, 0, 15)) << 0),
-		saf_iobase + (0x240 << 10));
-
-	rdata = readl(saf_iobase + (0x244 << 10));
-	writel((rdata & (MIDMASK(0, 15))) | ((MID(0xFFFF, 0, 15)) << 0),
-		saf_iobase + (0x244 << 10));
-
-	rdata = readl(saf_iobase + (0x248 << 10));
-	writel((rdata & (MIDMASK(0, 15))) | ((MID(0xFFFF, 0, 15)) << 0),
-		saf_iobase + (0x248 << 10));
-
-	rdata = readl(saf_iobase + (0x24c << 10));
-	writel((rdata & (MIDMASK(0, 15))) | ((MID(0xFFFF, 0, 15)) << 0),
-		saf_iobase + (0x24c << 10));
-
-	rdata = readl(saf_iobase + (0x250 << 10));
-	writel((rdata & (MIDMASK(0, 15))) | ((MID(0xFFFF, 0, 15)) << 0),
-		saf_iobase + (0x250 << 10));
-
-	iounmap(saf_iobase);
-
-	dev_err(gpio->dev, "%s: set SEC_SCR ...\n", __func__);
-	sec_iobase = ioremap(APB_SCR_SEC_BASE, APB_SCR_SEC_LEN);
-
-	rdata = readl(sec_iobase + (0x258 << 10));
-	writel((rdata & (MIDMASK(0, 15))) | ((MID(0xFFFF, 0, 15)) << 0),
-		sec_iobase + (0x258 << 10));
-
-	rdata = readl(sec_iobase + (0x25c << 10));
-	writel((rdata & (MIDMASK(0, 15))) | ((MID(0xFFFF, 0, 15)) << 0),
-		sec_iobase + (0x25c << 10));
-
-	rdata = readl(sec_iobase + (0x260 << 10));
-	writel((rdata & (MIDMASK(0, 15))) | ((MID(0xFFFF, 0, 15)) << 0),
-		sec_iobase + (0x260 << 10));
-
-	rdata = readl(sec_iobase + (0x264 << 10));
-	writel((rdata & (MIDMASK(0, 15))) | ((MID(0xFFFF, 0, 15)) << 0),
-		sec_iobase + (0x264 << 10));
-
-	rdata = readl(sec_iobase + (0x268 << 10));
-	writel((rdata & (MIDMASK(0, 15))) | ((MID(0xFFFF, 0, 15)) << 0),
-		sec_iobase + (0x268 << 10));
-
-	rdata = readl(sec_iobase + (0x26c << 10));
-	writel((rdata & (MIDMASK(0, 15))) | ((MID(0xFFFF, 0, 15)) << 0),
-		sec_iobase + (0x26c << 10));
-
-	rdata = readl(sec_iobase + (0x270 << 10));
-	writel((rdata & (MIDMASK(0, 11))) | ((MID(0xFFFF, 0, 11)) << 0),
-		sec_iobase + (0x270 << 10));
-
-	rdata = readl(sec_iobase + (0x220 << 10));
-	writel((rdata & (MIDMASK(0, 15))) | ((MID(0xFFFF, 0, 15)) << 0),
-		sec_iobase + (0x220 << 10));
-
-	rdata = readl(sec_iobase + (0x224 << 10));
-	writel((rdata & (MIDMASK(0, 15))) | ((MID(0xFFFF, 0, 15)) << 0),
-		sec_iobase + (0x224 << 10));
-
-	rdata = readl(sec_iobase + (0x228 << 10));
-	writel((rdata & (MIDMASK(0, 15))) | ((MID(0xFFFF, 0, 15)) << 0),
-		sec_iobase + (0x228 << 10));
-
-	rdata = readl(sec_iobase + (0x22c << 10));
-	writel((rdata & (MIDMASK(0, 15))) | ((MID(0xFFFF, 0, 15)) << 0),
-		sec_iobase + (0x22c << 10));
-
-	rdata = readl(sec_iobase + (0x230 << 10));
-	writel((rdata & (MIDMASK(0, 15))) | ((MID(0xFFFF, 0, 15)) << 0),
-		sec_iobase + (0x230 << 10));
-
-	rdata = readl(sec_iobase + (0x234 << 10));
-	writel((rdata & (MIDMASK(0, 15))) | ((MID(0xFFFF, 0, 15)) << 0),
-		sec_iobase + (0x234 << 10));
-
-	rdata = readl(sec_iobase + (0x238 << 10));
-	writel((rdata & (MIDMASK(0, 15))) | ((MID(0xFFFF, 0, 15)) << 0),
-		sec_iobase + (0x238 << 10));
-
-	rdata = readl(sec_iobase + (0x23c << 10));
-	writel((rdata & (MIDMASK(0, 15))) | ((MID(0xFFFF, 0, 15)) << 0),
-		sec_iobase + (0x23c << 10));
-
-	rdata = readl(sec_iobase + (0x240 << 10));
-	writel((rdata & (MIDMASK(0, 15))) | ((MID(0xFFFF, 0, 15)) << 0),
-		sec_iobase + (0x240 << 10));
-
-	rdata = readl(sec_iobase + (0x244 << 10));
-	writel((rdata & (MIDMASK(0, 15))) | ((MID(0xFFFF, 0, 15)) << 0),
-		sec_iobase + (0x244 << 10));
-
-	rdata = readl(sec_iobase + (0x248 << 10));
-	writel((rdata & (MIDMASK(0, 15))) | ((MID(0xFFFF, 0, 15)) << 0),
-		sec_iobase + (0x248 << 10));
-
-	rdata = readl(sec_iobase + (0x24c << 10));
-	writel((rdata & (MIDMASK(0, 15))) | ((MID(0xFFFF, 0, 15)) << 0),
-		sec_iobase + (0x24c << 10));
-
-	rdata = readl(sec_iobase + (0x250 << 10));
-	writel((rdata & (MIDMASK(0, 15))) | ((MID(0xFFFF, 0, 15)) << 0),
-		sec_iobase + (0x250 << 10));
-
-	rdata = readl(sec_iobase + (0x254 << 10));
-	writel((rdata & (MIDMASK(0, 7))) | ((MID(0xFFFF, 0, 7)) << 0),
-		sec_iobase + (0x254 << 10));
-
-	iounmap(sec_iobase);
 
 }
 
@@ -1052,9 +912,6 @@ static int kunlun_gpio_probe(struct platform_device *pdev)
 				gpio->flags = (uintptr_t)of_devid->data;
 		}
 	}
-
-	/* setup sec_scr & saf_sce for GPIO Mux */
-	kunlun_gpio_set_scr(gpio);
 
 	for (i = 0; i < gpio->nr_ports; i++) {
 		err = kunlun_gpio_add_port(gpio, &pdata->properties[i], i);
