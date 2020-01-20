@@ -1175,7 +1175,6 @@ dma_chan_prep_slave_sg(struct dma_chan *dchan, struct scatterlist *sgl,
 		reg_addr = sconfig->src_addr;
 		for_each_sg(sgl, sg, sg_len, i)
 		{
-			struct axi_dma_desc *desc;
 			u32 len;
 			size_t dlen; /* desc len */
 
@@ -1193,10 +1192,10 @@ dma_chan_prep_slave_sg(struct dma_chan *dchan, struct scatterlist *sgl,
 			if (unlikely(!desc))
 				goto err_desc_get;
 
-			/* Memory address. */
-			write_desc_sar(desc, mem_addr);
 			/* Device address */
-			write_desc_dar(desc, reg_addr);
+			write_desc_sar(desc, reg_addr);
+			/* Memory address. */
+			write_desc_dar(desc, mem_addr);
 			/* calculate block size */
 			desc->lli.block_ts_lo = cpu_to_le32(bytes2block(max_block_ts, len, reg_width, &dlen) - 1);
 			/* 0: Shadow Register content/LLI is invalid.1: Last Shadow Register/LLI is valid. */
