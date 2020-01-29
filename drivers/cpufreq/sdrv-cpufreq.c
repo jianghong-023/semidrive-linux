@@ -55,7 +55,7 @@ static int sdrv_cpufreq_driver_init(struct cpufreq_policy *policy)
 
 	if (policy->cpu != 0)
 		return -EINVAL;
-	cpumask_setall(&policy->cpus);
+	cpumask_setall(policy->cpus);
 	cpuclk = clk_get(get_cpu_device(policy->cpu), "cpu0");
 	if (IS_ERR(cpuclk)) {
 		pr_err("cpufreq: could not get CPU clk\n");
