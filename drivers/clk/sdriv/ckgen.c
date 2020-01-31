@@ -12,7 +12,7 @@
  */
 #include "ckgen_reg.h"
 #include "ckgen.h"
-
+#include <linux/delay.h>
 /*
  * IP clk slice
  * clkin0-7 -> CG -> pre_div(3 bits) -> post_div(6bits)
@@ -25,10 +25,14 @@ void ckgen_ip_slice_cfg(void __iomem *base, u32 slice_id,
 	void __iomem *ctl_addr = base +
 		SOC_CKGEN_REG_MAP(CKGEN_IP_SLICE_CTL_OFF(slice_id));
 	u32 ctl = clk_readl(ctl_addr);
+	int count = 100;
 
 	/* 1> Set pre_en to 1'b0 to turn off the clock */
 	ctl &= ~BM_CKGEN_IP_SLICE_CTL_CG_EN;
 	clk_writel(ctl, ctl_addr);
+
+	while ((clk_readl(ctl_addr) & (BM_CKGEN_IP_SLICE_CTL_CG_EN_STATUS)) && count--)
+		udelay(1);
 
 	/* 2> Change pre_mux_sel to select clock source */
 	ctl &= ~FM_CKGEN_IP_SLICE_CTL_CLK_SRC_SEL;
@@ -38,17 +42,31 @@ void ckgen_ip_slice_cfg(void __iomem *base, u32 slice_id,
 	/* 3> Set pre_en to 1'b1 to turn on the clock */
 	ctl |= BM_CKGEN_IP_SLICE_CTL_CG_EN;
 	clk_writel(ctl, ctl_addr);
+	count = 100;
+	while (!(clk_readl(ctl_addr) & (BM_CKGEN_IP_SLICE_CTL_CG_EN_STATUS)) && count--)
+		udelay(1);
 
-	/* 4>	a. Set pre_div_num/post_div_num */
-	ctl &= ~(FM_CKGEN_IP_SLICE_CTL_POST_DIV_NUM
-			| FM_CKGEN_IP_SLICE_CTL_PRE_DIV_NUM);
-	ctl |= (FV_CKGEN_IP_SLICE_CTL_POST_DIV_NUM(post_div)
-			| FV_CKGEN_IP_SLICE_CTL_PRE_DIV_NUM(pre_div));
+	/* 4>	a. Set pre_div_num */
+	ctl &= ~FM_CKGEN_IP_SLICE_CTL_PRE_DIV_NUM;
+	ctl |= FV_CKGEN_IP_SLICE_CTL_PRE_DIV_NUM(pre_div);
 	clk_writel(ctl, ctl_addr);
 
 	/*		b. Check the corresponding busy bit. */
-	while (clk_readl(ctl_addr) & (BM_CKGEN_IP_SLICE_CTL_POST_BUSY
-				| BM_CKGEN_IP_SLICE_CTL_PRE_BUSY)) {};
+	while ((clk_readl(ctl_addr) & (BM_CKGEN_IP_SLICE_CTL_PRE_BUSY)) && count--)
+		udelay(1);
+	if (count == 0)
+		pr_err("polling fail: ip pre div busy bit\n");
+	count = 100;
+	/* 4>	a. Set post_div_num */
+	ctl &= ~FM_CKGEN_IP_SLICE_CTL_POST_DIV_NUM;
+	ctl |= FV_CKGEN_IP_SLICE_CTL_POST_DIV_NUM(post_div);
+	clk_writel(ctl, ctl_addr);
+
+	/*		b. Check the corresponding busy bit. */
+	while ((clk_readl(ctl_addr) & (BM_CKGEN_IP_SLICE_CTL_POST_BUSY)) && count--)
+		udelay(1);
+	if (count == 0)
+		pr_err("polling fail: ip post div busy bit\n");
 }
 
 /*
@@ -69,13 +87,16 @@ void ckgen_bus_slice_cfg(void __iomem *base, u32 slice_id,
 	void __iomem *ctl_addr = base +
 		SOC_CKGEN_REG_MAP(CKGEN_BUS_SLICE_CTL_OFF(slice_id));
 	u32 ctl = clk_readl(ctl_addr);
+	int count = 100;
 
-	if (PATH_A == path) {
+	if (path == PATH_A) {
 		/* B is being selected now */
 		WARN_ON(!(ctl & BM_CKGEN_BUS_SLICE_CTL_A_B_SEL));
 		/* 1> Set pre_en to 1'b0 to turn off path. */
 		ctl &= ~BM_CKGEN_BUS_SLICE_CTL_CG_EN_A;
 		clk_writel(ctl, ctl_addr);
+		while ((clk_readl(ctl_addr) & (BM_CKGEN_BUS_SLICE_CTL_CG_EN_A_STATUS)) && count--)
+			udelay(1);
 		/* 2> Change pre_mux_sel to select clock source.*/
 		ctl &= ~FM_CKGEN_BUS_SLICE_CTL_CLK_SRC_SEL_A;
 		ctl |= FV_CKGEN_BUS_SLICE_CTL_CLK_SRC_SEL_A(src_sel);
@@ -83,18 +104,28 @@ void ckgen_bus_slice_cfg(void __iomem *base, u32 slice_id,
 		/* 3> Set pre_en to 1'b1 to turn on path. */
 		ctl |= BM_CKGEN_BUS_SLICE_CTL_CG_EN_A;
 		clk_writel(ctl, ctl_addr);
+		count = 100;
+		while (!(clk_readl(ctl_addr) & (BM_CKGEN_BUS_SLICE_CTL_CG_EN_A_STATUS)) && count--)
+			udelay(1);
 		/* 4>	a. Set pre_div_num */
 		ctl &= ~FM_CKGEN_BUS_SLICE_CTL_PRE_DIV_NUM_A;
 		ctl |= FV_CKGEN_BUS_SLICE_CTL_PRE_DIV_NUM_A(pre_div);
 		clk_writel(ctl, ctl_addr);
 		/*		b. Check the corresponding busy bit. */
-		while (clk_readl(ctl_addr) & BM_CKGEN_BUS_SLICE_CTL_PRE_BUSY_A);
+		count = 100;
+		while ((clk_readl(ctl_addr) & BM_CKGEN_BUS_SLICE_CTL_PRE_BUSY_A) && count--)
+			udelay(1);
+		if (count == 0)
+			pr_err("polling fail: bus pre div busy bit\n");
 	} else {
 		/* A is being selected now */
 		WARN_ON((ctl & BM_CKGEN_BUS_SLICE_CTL_A_B_SEL));
 		/* 1> Set pre_en to 1'b0 to turn off path. */
 		ctl &= ~BM_CKGEN_BUS_SLICE_CTL_CG_EN_B;
 		clk_writel(ctl, ctl_addr);
+		count = 100;
+		while ((clk_readl(ctl_addr) & (BM_CKGEN_BUS_SLICE_CTL_CG_EN_B_STATUS)) && count--)
+			udelay(1);
 		/* 2> Change pre_mux_sel to select clock source.*/
 		ctl &= ~FM_CKGEN_BUS_SLICE_CTL_CLK_SRC_SEL_B;
 		ctl |= FV_CKGEN_BUS_SLICE_CTL_CLK_SRC_SEL_B(src_sel);
@@ -102,12 +133,19 @@ void ckgen_bus_slice_cfg(void __iomem *base, u32 slice_id,
 		/* 3> Set pre_en to 1'b1 to turn on path. */
 		ctl |= BM_CKGEN_BUS_SLICE_CTL_CG_EN_B;
 		clk_writel(ctl, ctl_addr);
+		count = 100;
+		while (!(clk_readl(ctl_addr) & (BM_CKGEN_BUS_SLICE_CTL_CG_EN_B_STATUS)) && count--)
+			udelay(1);
 		/* 4>	a. Set pre_div_num */
 		ctl &= ~FM_CKGEN_BUS_SLICE_CTL_PRE_DIV_NUM_B;
 		ctl |= FV_CKGEN_BUS_SLICE_CTL_PRE_DIV_NUM_B(pre_div);
 		clk_writel(ctl, ctl_addr);
 		/*		b. Check the corresponding busy bit. */
-		while (clk_readl(ctl_addr) & BM_CKGEN_BUS_SLICE_CTL_PRE_BUSY_B);
+		count = 100;
+		while ((clk_readl(ctl_addr) & BM_CKGEN_BUS_SLICE_CTL_PRE_BUSY_B) && count--)
+			udelay(1);
+		if (count == 0)
+			pr_err("polling fail: bus pre div b busy bit\n");
 	}
 }
 
@@ -117,13 +155,17 @@ void ckgen_bus_slice_postdiv_update(void __iomem *base, u32 slice_id,
 	void __iomem *ctl_addr = base +
 		SOC_CKGEN_REG_MAP(CKGEN_BUS_SLICE_CTL_OFF(slice_id));
 	u32 ctl = clk_readl(ctl_addr);
+	int count = 100;
 
 	/* 6>	a. Change post_div_num */
 	ctl &= ~FM_CKGEN_BUS_SLICE_CTL_POST_DIV_NUM;
 	ctl |= FV_CKGEN_BUS_SLICE_CTL_POST_DIV_NUM(post_div);
 	clk_writel(ctl, ctl_addr);
 	/* b. Check the corresponding busy bit. */
-	while (clk_readl(ctl_addr) & BM_CKGEN_BUS_SLICE_CTL_POST_BUSY);
+	while ((clk_readl(ctl_addr) & BM_CKGEN_BUS_SLICE_CTL_POST_BUSY) && count--)
+		udelay(1);
+	if (count == 0)
+			pr_err("polling fail: bus post div b busy bit\n");
 }
 
 void ckgen_bus_slice_switch(void __iomem *base, u32 slice_id)
@@ -156,13 +198,17 @@ void ckgen_core_slice_cfg(void __iomem *base, u32 slice_id, u32 path,
 	void __iomem *ctl_addr = base +
 		SOC_CKGEN_REG_MAP(CKGEN_CORE_SLICE_CTL_OFF(slice_id));
 	u32 ctl = clk_readl(ctl_addr);
+	int count = 100;
 
-	if (PATH_A == path) {
+	if (path == PATH_A) {
 		/* B is being selected now */
 		WARN_ON(!(ctl & BM_CKGEN_CORE_SLICE_CTL_A_B_SEL));
 		/* 1> Set pre_en to 1'b0 to turn off path. */
 		ctl &= ~BM_CKGEN_CORE_SLICE_CTL_CG_EN_A;
 		clk_writel(ctl, ctl_addr);
+		count = 100;
+		while ((clk_readl(ctl_addr) & (BM_CKGEN_CORE_SLICE_CTL_CG_EN_A_STATUS)) && count--)
+			udelay(1);
 		/* 2> Change pre_mux_sel to select clock source.*/
 		ctl &= ~FM_CKGEN_CORE_SLICE_CTL_CLK_SRC_SEL_A;
 		ctl |= FV_CKGEN_CORE_SLICE_CTL_CLK_SRC_SEL_A(src_sel);
@@ -170,12 +216,18 @@ void ckgen_core_slice_cfg(void __iomem *base, u32 slice_id, u32 path,
 		/* 3> Set pre_en to 1'b1 to turn on path. */
 		ctl |= BM_CKGEN_CORE_SLICE_CTL_CG_EN_A;
 		clk_writel(ctl, ctl_addr);
+		count = 100;
+		while (!(clk_readl(ctl_addr) & (BM_CKGEN_CORE_SLICE_CTL_CG_EN_A_STATUS)) && count--)
+			udelay(1);
 	} else {
 		/* A is being selected now */
 		WARN_ON((ctl & BM_CKGEN_CORE_SLICE_CTL_A_B_SEL));
 		/* 1> Set pre_en to 1'b0 to turn off path. */
 		ctl &= ~BM_CKGEN_CORE_SLICE_CTL_CG_EN_B;
 		clk_writel(ctl, ctl_addr);
+		count = 100;
+		while ((clk_readl(ctl_addr) & (BM_CKGEN_CORE_SLICE_CTL_CG_EN_B_STATUS)) && count--)
+			udelay(1);
 		/* 2> Change pre_mux_sel to select clock source.*/
 		ctl &= ~FM_CKGEN_CORE_SLICE_CTL_CLK_SRC_SEL_B;
 		ctl |= FV_CKGEN_CORE_SLICE_CTL_CLK_SRC_SEL_B(src_sel);
@@ -183,6 +235,9 @@ void ckgen_core_slice_cfg(void __iomem *base, u32 slice_id, u32 path,
 		/* 3> Set pre_en to 1'b1 to turn on path. */
 		ctl |= BM_CKGEN_CORE_SLICE_CTL_CG_EN_B;
 		clk_writel(ctl, ctl_addr);
+		count = 100;
+		while (!(clk_readl(ctl_addr) & (BM_CKGEN_CORE_SLICE_CTL_CG_EN_A_STATUS)) && count--)
+			udelay(1);
 	}
 }
 
@@ -192,13 +247,17 @@ void ckgen_core_slice_postdiv_update(void __iomem *base, u32 slice_id,
 	void __iomem *ctl_addr = base +
 			SOC_CKGEN_REG_MAP(CKGEN_CORE_SLICE_CTL_OFF(slice_id));
 	u32 ctl = clk_readl(ctl_addr);
+	int count = 100;
 
 	/* 6>	a. Change post_div_num */
 	ctl &= ~FM_CKGEN_CORE_SLICE_CTL_POST_DIV_NUM;
 	ctl |= FV_CKGEN_CORE_SLICE_CTL_POST_DIV_NUM(post_div);
 	clk_writel(ctl, ctl_addr);
 	/*		b. Check the corresponding busy bit. */
-	while (clk_readl(ctl_addr) & BM_CKGEN_CORE_SLICE_CTL_POST_BUSY);
+	while ((clk_readl(ctl_addr) & BM_CKGEN_CORE_SLICE_CTL_POST_BUSY) && count--)
+		udelay(1);
+	if (count == 0)
+		pr_err("polling fail: core post div busy bit\n");
 }
 
 void ckgen_core_slice_switch(void __iomem *base, u32 slice_id)
@@ -243,7 +302,7 @@ void ckgen_uuu_slice_cfg(void __iomem *base, u32 slice_id, u32 src_sel,
 	void __iomem *a = base + SOC_CKGEN_REG_MAP(CKGEN_UUU_SLICE_OFF(slice_id));
 	u32 v = clk_readl(a);
 
-	WARN_ON(!((UUU_SEL_CKGEN_SOC == src_sel) || (UUU_SEL_PLL == src_sel)));
+	WARN_ON(!((src_sel == UUU_SEL_CKGEN_SOC) || (src_sel == UUU_SEL_PLL)));
 
 	v &= FM_CKGEN_UUU_SLICE_UUU_SEL;
 	v |= FV_CKGEN_UUU_SLICE_UUU_SEL(src_sel);

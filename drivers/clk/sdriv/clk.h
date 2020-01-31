@@ -16,17 +16,34 @@
 
 #define MAX_PARENT_NUM 10
 #include "ckgate.h"
-#define IP_DIV_SHIFT 10
-#define IP_DIV_WIDTH 6
+#define IP_PREDIV_SHIFT 4
+#define IP_PREDIV_WIDTH 3
+#define IP_PREDIV_BUSYSHIFT 30
+#define IP_PREDIV_BUSYWIDTH 1
+#define IP_PREDIV_EXPECT 0
+#define IP_POSTDIV_SHIFT 10
+#define IP_POSTDIV_WIDTH 6
+#define IP_POSTDIV_BUSYSHIFT 31
+#define IP_POSTDIV_BUSYWIDTH 1
+#define IP_POSTDIV_EXPECT 0
+
 #define CORE_DIV_SHIFT 10
 #define CORE_DIV_WIDTH 6
-#define BUS_DIV_SHIFT 10
-#define BUS_DIV_WIDTH 6
+#define CORE_DIV_BUSYSHIFT 31
+#define CORE_DIV_BUSYWIDTH 1
+#define CORE_DIV_EXPECT 0
+
+#define BUS_POSTDIV_SHIFT 10
+#define BUS_POSTDIV_WIDTH 6
+#define BUS_POSTDIV_BUSYSHIFT 31
+#define BUS_POSTDIV_BUSYWIDTH 1
+#define BUS_POSTDIV_EXPECT 0
 
 enum CLK_TYPE {
 	CLK_TYPE_CORE,
 	CLK_TYPE_BUS,
 	CLK_TYPE_IP,
+	CLK_TYPE_IP_POST,
 	CLK_TYPE_UUU_MUX,
 	CLK_TYPE_UUU_MUX2,
 	CLK_TYPE_UUU_DIVIDER,
@@ -55,6 +72,9 @@ struct sdrv_cgu_out_clk {
 	unsigned long min_rate;
 	unsigned long max_rate;
 	struct notifier_block clk_nb;
+	int busywidth;	//0 means no busy bit
+	int busyshift;
+	int expect;
 };
 #define mux_to_sdrv_cgu_out_clk(_hw) container_of(_hw, struct sdrv_cgu_out_clk, mux_hw)
 #define gate_to_sdrv_cgu_out_clk(_hw) container_of(_hw, struct sdrv_cgu_out_clk, gate_hw)

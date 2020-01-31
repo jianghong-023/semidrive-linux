@@ -264,7 +264,7 @@ static u8 sdclk_mux_get_parent(struct clk_hw *hw)
 		val = get_soc_uuu_sel0_parent(clk->base, clk->slice_id);
 	} else if (clk->type == CLK_TYPE_UUU_MUX2) {//UUU MUX
 		val = get_soc_uuu_sel1_parent(clk->base, clk->slice_id);
-	} else {//UUU n/p/q and gate only have one parent
+	} else {//UUU n/p/q , ip post div and gate only have one parent
 		return 0;
 	}
 
@@ -305,8 +305,8 @@ static int sdclk_mux_set_parent(struct clk_hw *hw, u8 index)
 		val = set_soc_uuu_sel0_parent(clk->base, clk->slice_id, index);
 	} else if (clk->type == CLK_TYPE_UUU_MUX2) {//UUU MUX2
 		val = set_soc_uuu_sel1_parent(clk->base, clk->slice_id, index);
-	} else {//UUU and gate only have one parent
-		return 0;
+	} else {//UUU , ip post div and gate only have one parent
+		//return 0;
 	}
 
 	if (clk->lock)
@@ -372,7 +372,7 @@ static int sdclk_gate_enable(struct clk_hw *hw)
 		ctl.cg_en = 1;
 		clk_writel(ctl.val, reg);
 	} else if (clk->type == CLK_TYPE_UUU_DIVIDER || clk->type == CLK_TYPE_UUU_MUX2
-			|| clk->type == CLK_TYPE_GATE) {
+			|| clk->type == CLK_TYPE_GATE || clk->type == CLK_TYPE_IP_POST) {
 		if (clk->gate_id != -1) {
 			soc_lp_gate_en gate;
 
@@ -513,6 +513,8 @@ const struct clk_ops sdclk_gate_ops = {
 	.is_enabled = sdclk_gate_is_enabled,
 };
 
+#define div_mask(width)	((1 << (width)) - 1)
+
 static unsigned long sdclk_divider_recalc_rate(struct clk_hw *hw,
 		unsigned long parent_rate)
 {
@@ -528,11 +530,51 @@ static long sdclk_divider_round_rate(struct clk_hw *hw, unsigned long rate,
 static int sdclk_divider_set_rate(struct clk_hw *hw, unsigned long rate,
 				unsigned long parent_rate)
 {
-	//struct sdrv_cgu_out_clk *clk = div_to_sdrv_cgu_out_clk(hw);
-	pr_debug("name %s set rate %ld prate %ld\n", clk_hw_get_name(hw), rate, parent_rate);
-	return clk_divider_ops.set_rate(hw, rate, parent_rate);
-}
+	struct clk_divider *divider = to_clk_divider(hw);
+	struct sdrv_cgu_out_clk *clk = div_to_sdrv_cgu_out_clk(hw);
+	int value;
+	unsigned long flags = 0;
+	u32 val;
 
+	value = divider_get_val(rate, parent_rate, divider->table,
+				divider->width, divider->flags);
+	if (value < 0)
+		return value;
+
+	if (divider->lock)
+		spin_lock_irqsave(divider->lock, flags);
+	else
+		__acquire(divider->lock);
+
+	if (divider->flags & CLK_DIVIDER_HIWORD_MASK) {
+		val = div_mask(divider->width) << (divider->shift + 16);
+	} else {
+		val = clk_readl(divider->reg);
+		val &= ~(div_mask(divider->width) << divider->shift);
+	}
+	val |= (u32)value << divider->shift;
+	clk_writel(val, divider->reg);
+	/* polling busy bit */
+	if (clk->busywidth) {
+		int count = 100;
+
+		do {
+				udelay(1);
+				val = clk_readl(divider->reg);
+				val &= (div_mask(clk->busywidth) << clk->busyshift);
+				val = val >> clk->busyshift;
+
+		} while (val != clk->expect && count--);
+		if (count == 0)
+			pr_err("polling fail: %s busy bit\n", clk->name);
+	}
+
+	if (divider->lock)
+		spin_unlock_irqrestore(divider->lock, flags);
+	else
+		__release(divider->lock);
+	return 0;
+}
 
 const struct clk_ops sdclk_divider_ops = {
 	.recalc_rate = sdclk_divider_recalc_rate,
@@ -607,6 +649,7 @@ struct clk *sdrv_register_out_composite(struct device_node *np, void __iomem *ba
 		ctl_offset = SOC_CKGEN_REG_MAP(CKGEN_BUS_SLICE_CTL_OFF(clk->slice_id));
 		break;
 	case CLK_TYPE_IP:
+	case CLK_TYPE_IP_POST:
 		ctl_offset = SOC_CKGEN_REG_MAP(CKGEN_IP_SLICE_CTL_OFF(clk->slice_id));
 		break;
 	case CLK_TYPE_UUU_MUX2:
@@ -619,52 +662,32 @@ struct clk *sdrv_register_out_composite(struct device_node *np, void __iomem *ba
 		break;
 	}
 
-	if (clk->type != CLK_TYPE_UUU_MUX && clk->type != CLK_TYPE_UUU_MUX2
-				&& clk->type != CLK_TYPE_GATE) {
+	if (clk->type == CLK_TYPE_UUU_MUX || clk->type == CLK_TYPE_UUU_MUX2
+				|| clk->type == CLK_TYPE_GATE) {
+		clk->div.reg = NULL;
+	} else {
+
 		clk->div.reg = base + ctl_offset;
 		clk->div.lock = clk->lock;
 		clk->div.flags = CLK_DIVIDER_ROUND_CLOSEST;
 	}
-
-	pr_debug("register clk:%s\n", clk->name);
-	if (clk->type == CLK_TYPE_UUU_MUX) {
-		sdrv_fill_parent_names(parents, clk->mux_table, clk->n_parents, global_clk_names);
-		ret = sd_clk_register_composite(NULL, clk->name, parents, clk->n_parents,
-					&clk->mux_hw, &sdclk_mux_ops,
-					NULL, NULL,
-					NULL, NULL, CLK_IGNORE_UNUSED|CLK_SET_RATE_PARENT);
-	} else if (clk->type == CLK_TYPE_UUU_MUX2) {
-		sdrv_fill_parent_names(parents, clk->mux_table, clk->n_parents, global_clk_names);
-		ret = sd_clk_register_composite(NULL, clk->name, parents, clk->n_parents,
-					&clk->mux_hw, &sdclk_mux_ops,
-					NULL, NULL,
-					&clk->gate_hw, &sdclk_gate_ops, CLK_IGNORE_UNUSED|CLK_SET_RATE_PARENT);
-	} else if (clk->type == CLK_TYPE_UUU_DIVIDER) {
-		parents[0] = global_clk_names[clk->parent_id];
-		ret = sd_clk_register_composite(NULL, clk->name, parents, 1,
-					&clk->mux_hw, &sdclk_mux_ops,
-					&clk->div.hw, &sdclk_divider_ops,
-					&clk->gate_hw, &sdclk_gate_ops, CLK_IGNORE_UNUSED|CLK_SET_RATE_PARENT);
-	} else if (clk->type == CLK_TYPE_GATE) {
-		if (clk->parent_id != -1) {
-			parents[0] = global_clk_names[clk->parent_id];
-			ret = sd_clk_register_composite(NULL, clk->name, parents, 1,
-						&clk->mux_hw, &sdclk_mux_ops,
-						NULL, NULL,
-						&clk->gate_hw, &sdclk_gate_ops, CLK_IGNORE_UNUSED|CLK_SET_RATE_PARENT);
-		} else {
-			ret = sd_clk_register_composite(NULL, clk->name, NULL, 0,
-						NULL, NULL,
-						NULL, NULL,
-						&clk->gate_hw, &sdclk_gate_ops, CLK_IGNORE_UNUSED);
-		}
-	} else {
-		sdrv_fill_parent_names(parents, clk->mux_table, clk->n_parents, global_clk_names);
-		ret = sd_clk_register_composite(NULL, clk->name, parents, clk->n_parents,
-					&clk->mux_hw, &sdclk_mux_ops,
-					&clk->div.hw, &sdclk_divider_ops,
-					&clk->gate_hw, &sdclk_gate_ops, CLK_IGNORE_UNUSED | CLK_SET_RATE_PARENT);
+	if (clk->type == CLK_TYPE_IP || clk->type == CLK_TYPE_BUS
+			|| clk->type == CLK_TYPE_CORE) {
+		clk->gate_id = 0;	//force to internal gate
 	}
+	pr_debug("register clk:%s\n", clk->name);
+	if (clk->parent_id != -1) {
+			parents[0] = global_clk_names[clk->parent_id];
+	} else
+		sdrv_fill_parent_names(parents, clk->mux_table, clk->n_parents, global_clk_names);
+
+
+	ret = sd_clk_register_composite(NULL, clk->name, parents, clk->n_parents,
+					(clk->n_parents != 0)?(&clk->mux_hw):NULL, (clk->n_parents != 0)?(&sdclk_mux_ops):NULL,
+					(clk->div.reg != NULL) ? (&clk->div.hw):NULL, (clk->div.reg != NULL) ? (&sdclk_divider_ops):NULL,
+					(clk->gate_id != -1) ? (&clk->gate_hw):NULL, (clk->gate_id != -1) ? (&sdclk_gate_ops):NULL,
+					(clk->n_parents != 0)?(CLK_IGNORE_UNUSED | CLK_SET_RATE_PARENT):CLK_IGNORE_UNUSED);
+
 	if (sdrv_get_clk_min_rate(clk->name, &min_freq) == 0) {
 		clk_set_min_rate(ret, min_freq);
 		clk->min_rate = min_freq;

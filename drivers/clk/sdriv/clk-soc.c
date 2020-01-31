@@ -181,17 +181,23 @@ enum SOC_CLKIN SOC_CLK_table_HIS_BUS_m[] = {
 };
 
 
-#define SOC_OUT_CLK(id, _tablename, _type, _slice_id, div_shift, div_width) \
+#define SOC_OUT_CLK(id, _tablename, _type, _slice_id, div_shift, div_width,	\
+				_busywidth, _busyshift, _expect) \
 {	\
 	.clk_id = SOC_CLK_ ##id,	\
 	.type = _type,	\
 	.slice_id = _slice_id,	\
+	.gate_id = -1,	\
 	.n_parents = ARRAY_SIZE(SOC_CLK_table_ ##_tablename),	\
 	.div = {	\
 		.shift = div_shift,	\
 		.width = div_width,	\
 	},	\
 	.mux_table = SOC_CLK_table_ ##_tablename,	\
+	.parent_id = -1,	\
+	.busywidth = _busywidth,	\
+	.busyshift = _busyshift,	\
+	.expect = _expect,	\
 }
 
 #define SOC_OUT_MUX(id, _tablename, _type, _slice_id, _gate_id)	\
@@ -202,19 +208,26 @@ enum SOC_CLKIN SOC_CLK_table_HIS_BUS_m[] = {
 	.gate_id = _gate_id,	\
 	.n_parents = ARRAY_SIZE(SOC_CLK_table_ ##_tablename),	\
 	.mux_table = SOC_CLK_table_ ##_tablename,	\
+	.parent_id = -1,	\
+	.busywidth = 0,	\
 }
 
-#define SOC_OUT_DIVIDER(id, p_id, _slice_id, _gate_id, div_shift, div_width)	\
+#define SOC_OUT_DIVIDER(id, p_id, clk_type, _slice_id, _gate_id, div_shift, div_width,	\
+								_busywidth, _busyshift, _expect)	\
 {	\
 	.clk_id = SOC_CLK_ ##id,	\
-	.type = CLK_TYPE_UUU_DIVIDER,	\
+	.type = clk_type,	\
 	.slice_id = _slice_id,	\
 	.gate_id = _gate_id,	\
 	.parent_id = SOC_CLK_ ##p_id,	\
+	.n_parents = 1,	\
 	.div = {	\
 		.shift = div_shift,\
 		.width = div_width,\
 	},	\
+	.busywidth = _busywidth,	\
+	.busyshift = _busyshift,	\
+	.expect = _expect,	\
 }
 
 #define SOC_OUT_GATE(id, p_id, _gate_id)	\
@@ -223,18 +236,21 @@ enum SOC_CLKIN SOC_CLK_table_HIS_BUS_m[] = {
 	.type = CLK_TYPE_GATE,	\
 	.gate_id = _gate_id,	\
 	.parent_id = SOC_CLK_ ##p_id,	\
+	.n_parents = 1,	\
+	.busywidth = 0,	\
 }
 
 
 #define SOC_INTERN_CLK_IP(id, slice_id)	\
-	SOC_OUT_CLK(id, id, CLK_TYPE_IP, slice_id, IP_DIV_SHIFT, IP_DIV_WIDTH)
+	SOC_OUT_CLK(id##_PRE, id, CLK_TYPE_IP, slice_id, IP_PREDIV_SHIFT, IP_PREDIV_WIDTH, IP_PREDIV_BUSYWIDTH, IP_PREDIV_BUSYSHIFT, IP_PREDIV_EXPECT),	\
+	SOC_OUT_DIVIDER(id, id##_PRE, CLK_TYPE_IP_POST, slice_id, -1, IP_POSTDIV_SHIFT, IP_POSTDIV_WIDTH, IP_POSTDIV_BUSYWIDTH, IP_POSTDIV_BUSYSHIFT, IP_POSTDIV_EXPECT)
 
 
 #define SOC_INTERN_CLK_CORE(id, slice_id)	\
-	SOC_OUT_CLK(id, id, CLK_TYPE_CORE, slice_id, CORE_DIV_SHIFT, CORE_DIV_WIDTH)
+	SOC_OUT_CLK(id, id, CLK_TYPE_CORE, slice_id, CORE_DIV_SHIFT, CORE_DIV_WIDTH, CORE_DIV_BUSYWIDTH, CORE_DIV_BUSYSHIFT, CORE_DIV_EXPECT)
 
 #define SOC_INTERN_CLK_BUS(id, slice_id)	\
-	SOC_OUT_CLK(id, id, CLK_TYPE_BUS, slice_id, BUS_DIV_SHIFT, BUS_DIV_WIDTH)
+	SOC_OUT_CLK(id, id, CLK_TYPE_BUS, slice_id, BUS_POSTDIV_SHIFT, BUS_POSTDIV_WIDTH, BUS_POSTDIV_BUSYWIDTH, BUS_POSTDIV_BUSYSHIFT, BUS_POSTDIV_EXPECT)
 
 #define SOC_OUT_CLK_UUU_MUX(id, table_name, slice_id)	\
 	SOC_OUT_MUX(id, table_name, CLK_TYPE_UUU_MUX, slice_id, -1)
@@ -243,7 +259,7 @@ enum SOC_CLKIN SOC_CLK_table_HIS_BUS_m[] = {
 	SOC_OUT_MUX(id, table_name, CLK_TYPE_UUU_MUX2, slice_id, gate_id)
 
 #define SOC_OUT_CLK_UUU_DIVIDER(id, p_id, slice_id, gate_id, div_shift, div_width)	\
-	SOC_OUT_DIVIDER(id, p_id, slice_id, gate_id, div_shift, div_width)
+	SOC_OUT_DIVIDER(id, p_id, CLK_TYPE_UUU_DIVIDER, slice_id, gate_id, div_shift, div_width, 0, 0, 0)
 
 #define SOC_OUT_CLK_GATE(id, p_id, slice_id)	\
 	SOC_OUT_GATE(id, p_id, slice_id)
