@@ -353,6 +353,7 @@ struct dma_features {
 	unsigned int rx_fifo_size;
 	/* Automotive Safety Package */
 	unsigned int asp;
+	unsigned int addr64;
 };
 
 /* GMAC TX FIFO is 8K, Rx FIFO is 16K */
