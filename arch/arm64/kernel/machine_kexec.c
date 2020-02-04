@@ -256,9 +256,12 @@ void machine_crash_shutdown(struct pt_regs *regs)
 
 	/* for crashing cpu */
 	crash_save_cpu(regs, smp_processor_id());
-	machine_kexec_mask_interrupts();
 
-	pr_info("Starting crashdump kernel...\n");
+	if (kexec_crash_image) {
+		machine_kexec_mask_interrupts();
+
+		pr_info("Starting crashdump kernel...\n");
+	}
 }
 
 void arch_kexec_protect_crashkres(void)

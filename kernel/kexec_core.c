@@ -942,6 +942,12 @@ void __noclone __crash_kexec(struct pt_regs *regs)
 			crash_save_vmcoreinfo();
 			machine_crash_shutdown(&fixed_regs);
 			machine_kexec(kexec_crash_image);
+		} else {
+			/* save crash_notes for coredump */
+			struct pt_regs fixed_regs;
+			crash_setup_regs(&fixed_regs, regs);
+			crash_save_vmcoreinfo();
+			machine_crash_shutdown(&fixed_regs);
 		}
 		mutex_unlock(&kexec_mutex);
 	}
