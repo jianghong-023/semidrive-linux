@@ -1,7 +1,7 @@
 #include <linux/module.h>
 #include <linux/moduleparam.h>
 #include <linux/init.h>
-#include <linux/of.h>
+#include <linux/of_address.h>
 #include <linux/kernel.h>
 #include <linux/fs.h>
 #include <linux/errno.h>
@@ -24,62 +24,31 @@ module_param(hardsect_size, int, 0);
  */
 #define KERNEL_SECTOR_SIZE 512
 #define MEMDISK_MINORS	16
-#define MEMDISKS_COUNT 4
+
 /*
  * The internal representation of our device.
  */
 struct memdisk_dev {
-	unsigned long size;             /* Device size in sectors */
+	u64 size;                      	/* Device size in sectors */
 	spinlock_t lock;                /* For mutual exclusion */
 	u8 *data;                       /* The data array */
 	struct request_queue *queue;    /* The device request queue */
 	struct gendisk *gd;             /* The gendisk structure */
 };
 
-/* default addr & size if not found in dts */
-#define MEMDISK_SYSTEM_PHYS    0x80000000
-#define MEMDISK_SYSTEM_SIZE    0x48000000  // 1.1G
-
-#define MEMDISK_USERDATA_PHYS  0xc9000000  // haps backdoor only 32bit
-#define MEMDISK_USERDATA_SIZE  0x20000000  // 512M
-
-#define MEMDISK_VENDOR_PHYS    0xea000000  //
-#define MEMDISK_VENDOR_SIZE    0x10000000  // 256M
-
-#define MEMDISK_CACHE_PHYS     0xfb000000  // use this partition as xfer space
-#define MEMDISK_CACHE_SIZE     0x04000000  // 64M
-
-static struct memdisk_dev memdisks[] = {
-	[0] = {
-		.data    = MEMDISK_SYSTEM_PHYS,
-		.size    = MEMDISK_SYSTEM_SIZE,
-	},
-	[1] = {
-		.data    = MEMDISK_USERDATA_PHYS,
-		.size    = MEMDISK_USERDATA_SIZE,
-	},
-	[2] = {
-		.data    = MEMDISK_VENDOR_PHYS,
-		.size    = MEMDISK_VENDOR_SIZE,
-	},
-	[3] = {
-		.data    = MEMDISK_CACHE_PHYS,
-		.size    = MEMDISK_CACHE_SIZE,
-        },
-};
-
+struct memdisk_dev *memdisk_pdev = NULL;
 /*
  * Handle an I/O request.
  */
 static void memdisk_transfer(struct memdisk_dev *dev, sector_t sector,
 		unsigned long nsect, char *buffer, int write)
 {
-	unsigned long offset = sector * hardsect_size;
-	unsigned long nbytes = nsect * hardsect_size;
+	u64 offset = sector * hardsect_size;
+	u64 nbytes = nsect * hardsect_size;
 
 	//printk("%s: %s offset:%x, %d bytes. \n", __FUNCTION__, write ? "write" : "read", offset, nbytes);
 	if ((offset + nbytes) > (dev->size * hardsect_size)) {
-		pr_err("%s: Beyond-end write (%ld %ld)\n", __FUNCTION__, offset, nbytes);
+		pr_err("%s: Beyond-end write (%llu %llu)\n", __FUNCTION__, offset, nbytes);
 		return;
 	}
 
@@ -126,101 +95,89 @@ static struct block_device_operations memdisk_ops = {
 	.getgeo = memdisk_getgeo
 };
 
+#if IS_ENABLED(CONFIG_OF)
 static int memdisk_parse_dt(void)
 {
-	struct device_node *matched_node, *memdisk_node;
-	struct property *prop;
-	const char *str;
-	int ret, i, err;
-	u64 addr;
-	u32 size;
+	struct device_node *np, *res_np;
+	struct resource res;
+	int ret = 0;
 
-	matched_node = of_find_compatible_node(NULL, NULL, "sd,memdisks");
-	if (!matched_node) {
+	np = of_find_compatible_node(NULL, NULL, "semidrive,memdisk");
+	if (!np) {
+		pr_err("memdisk: no memdisk node in dts\n");
 		return -ENODEV;
 	}
 
-	for (i = 0; ; i++) {
-		memdisk_node = of_parse_phandle(matched_node, "sd-memdisk", i);
-		if (!memdisk_node)
-			break;
-
-		if (!of_device_is_available(memdisk_node)) {
-			of_node_put(memdisk_node);
-			continue;
-		}
-		// found, parse system/userdata/vendor
-		err = of_property_read_string(memdisk_node, "memdisk-name", &str);
-		if (err) {
-			pr_err("Parsing memdisk addr %pOF failed with err %d\n", memdisk_node, err);
-			err = -EINVAL;
-			break;
-		}
-
-		err = of_property_read_u64(memdisk_node, "memdisk-addr", &addr);
-		if (err) {
-			pr_err("Parsing memdisk addr %pOF failed with err %d\n", memdisk_node, err);
-			err = -EINVAL;
-			break;
-		}
-
-		err = of_property_read_u32(memdisk_node, "memdisk-size", &size);
-		if (err) {
-			pr_err("Parsing memdisk size %pOF failed with err %d\n", memdisk_node, err);
-			err = -EINVAL;
-			break;
-		}
-
-		if (!str) {
-			pr_err("%s: no partition name defined\n", __FUNCTION__);
-		}
-		else if (!strncmp(str, "system", 6)) {
-			memdisks[0].data = addr;
-			memdisks[0].size = size;
-		}
-		else if (!strncmp(str, "userdata", 8)){
-			memdisks[1].data = addr;
-			memdisks[1].size = size;
-		}
-		else if (!strncmp(str, "vendor", 6)){
-			memdisks[2].data = addr;
-			memdisks[2].size = size;
-		}
-		else {
-			pr_err("%s: invalid partition name:%s\n", __FUNCTION__, str);
-		}
-
-		of_node_put(memdisk_node);
+	if (!of_device_is_available(np)) {
+		pr_err("memdisk: memdisk node is disabled in dts\n");
+		of_node_put(np);
+		return -ENODEV;;
 	}
 
-	of_node_put(matched_node);
+	res_np = of_parse_phandle(np, "memory-region", 0);
+	if (!res_np) {
+		pr_err("memdisk: no memory reserved for memdisk\n");
+		of_node_put(np);
+		return -ENODEV;
+	}
 
-	return 0;
+	if (!of_device_is_available(res_np)) {
+		pr_err("memdisk: reserved memory region is disabled in dts\n");
+                ret = -ENODEV;
+		goto err;
+        }
+
+	ret = of_address_to_resource(res_np, 0, &res);
+	if (ret < 0) {
+		pr_err("memdisk: no reg in reserved memory\n");
+		goto err;
+	}
+
+	if (!of_find_property(res_np, "no-map", NULL)) {
+		pr_err("memdisk: Can't apply mapped reserved-memory\n");
+		goto err;
+	}
+
+	pr_info("%s: reserved memdisk memory : 0x%llx - 0x%llx\n", __FUNCTION__, res.start, res.end);
+	memdisk_pdev =(struct memdisk_dev *)kmalloc(sizeof(struct memdisk_dev), GFP_KERNEL);
+	if (!memdisk_pdev) {
+		ret = -ENOMEM;
+		goto err;
+	}
+	memdisk_pdev->data = (u8 *)res.start;
+	memdisk_pdev->size = resource_size(&res);
+err:
+	of_node_put(res_np);
+	of_node_put(np);
+
+	return ret;
 }
+#endif
 
 /*
  * Set up our internal device.
  */
-static void memdisk_setup_device(struct memdisk_dev *dev, int i)
+static int memdisk_setup_device(struct memdisk_dev *dev)
 {
 	unsigned char __iomem  *base;
-	pr_info("%s:[%d]\n", __FUNCTION__, i);
 
 	spin_lock_init(&dev->lock);
 	base = ioremap((phys_addr_t)dev->data, dev->size);
 	if(!base) {
-		printk("%s:ioremap error, dev[%d] data: %llx, size: %x\n", __FUNCTION__, i, dev->data, dev->size);
-		return;
+		pr_err("memdisk: ioremap error, data: %llx, size: %llx\n",
+			(u64)dev->data, dev->size);
+		return -EINVAL;
 	}
 
-	printk("%s base: %llx, start: %llx, size: %x\n", __FUNCTION__, base, dev->data, dev->size);
+	pr_info("%s base: %llx, start: %llx, size: %llx\n", __FUNCTION__,
+		(u64)base, (u64)dev->data, dev->size);
 	dev->data = base;
 	dev->size = (dev->size / hardsect_size);
 
 	dev->queue = blk_init_queue(memdisk_request, &dev->lock);
 	if (dev->queue == NULL) {
-		pr_err("%s blk_init_queue failure\n", __FUNCTION__);
-		return;
+		pr_err("memdisk: blk_init_queue failure\n");
+		return -EINVAL;
 	}
 
 	blk_queue_logical_block_size(dev->queue, hardsect_size);
@@ -228,58 +185,55 @@ static void memdisk_setup_device(struct memdisk_dev *dev, int i)
 
 	dev->gd = alloc_disk(MEMDISK_MINORS);
 	if (! dev->gd) {
-		pr_err("%s alloc_disk failure\n", __FUNCTION__);
-		return;
+		pr_err("memdisk: alloc_disk failure\n");
+		return -ENODEV;
 	}
 	dev->gd->major = memdisk_major;
-	dev->gd->first_minor = i*MEMDISK_MINORS;
+	dev->gd->first_minor = 0;
 	dev->gd->fops = &memdisk_ops;
 	dev->gd->queue = dev->queue;
 	dev->gd->private_data = dev;
 
-	snprintf (dev->gd->disk_name, 32, "memdisk.%d", i);
+	snprintf(dev->gd->disk_name, 32, "memdisk%d", dev->gd->first_minor);
 	set_capacity(dev->gd, dev->size*(hardsect_size/KERNEL_SECTOR_SIZE));
 	add_disk(dev->gd);
 
-	pr_info("%s:[%d] success\n", __FUNCTION__, i);
-	return;
+	pr_info("%s: memdisk%d success\n", __FUNCTION__, dev->gd->first_minor);
+	return 0;
 }
 
 static int __init memdisk_init(void)
 {
-	int i;
+	int rc = 0;
 
-	pr_info("%s \n", __FUNCTION__);
+	pr_info("%s enter\n", __FUNCTION__);
 	memdisk_major = register_blkdev(memdisk_major, "memdisk");
 	if (memdisk_major <= 0) {
 		pr_err("memdisk: unable to get major number\n");
 		return -EBUSY;
 	}
+#if IS_ENABLED(CONFIG_OF)
+	if (memdisk_parse_dt()) {
+		pr_err("memdisk: cannot find any valid memdisk, skip\n");
+		return -ENODEV;
+	}
 
-	memdisk_parse_dt();
-
-	for (i = 0; i < MEMDISKS_COUNT; i++)
-		memdisk_setup_device(&memdisks[i], i);
-
+	rc = memdisk_setup_device(memdisk_pdev);
+#endif
 	pr_info("%s finished\n", __FUNCTION__);
 	return 0;
 }
 
 static void __exit memdisk_exit(void)
 {
-	int i;
+	struct memdisk_dev *dev = memdisk_pdev;
 
-	pr_info("%s\n", __FUNCTION__);
-	for (i = 0; i < MEMDISKS_COUNT; i++) {
-		struct memdisk_dev *dev = &memdisks[i];
-
-		if (dev->gd) {
-			del_gendisk(dev->gd);
-			put_disk(dev->gd);
-		}
-		if (dev->queue) {
-			blk_cleanup_queue(dev->queue);
-		}
+	if (dev->gd) {
+		del_gendisk(dev->gd);
+		put_disk(dev->gd);
+	}
+	if (dev->queue) {
+		blk_cleanup_queue(dev->queue);
 	}
 	unregister_blkdev(memdisk_major, "memdisk");
 }

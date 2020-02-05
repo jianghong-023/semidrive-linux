@@ -4917,7 +4917,7 @@ CONFIG_TEE=y
 # TEE drivers
 #
 CONFIG_OPTEE=y
-# CONFIG_MEMDISK is not set
+CONFIG_MEMDISK=y
 
 #
 # Firmware Drivers
