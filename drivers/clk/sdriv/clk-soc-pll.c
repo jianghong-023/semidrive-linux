@@ -152,7 +152,7 @@ void sdrv_register_soc_plls(struct clk *clkbase[])
 	}
 
 	/* PLL_VPU ROOT/DIVA/B */
-	sdrv_get_pll_regbase(soc_clk_src_names[SOC_CLKIN_19]);
+	reg_base = sdrv_get_pll_regbase(soc_clk_src_names[SOC_CLKIN_19]);
 	if (reg_base) {
 		for (i = SOC_CLKIN_19; i <= SOC_CLKIN_21; i++)
 			soc_pll_clk[i].reg_base = reg_base;
