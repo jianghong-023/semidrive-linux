@@ -160,6 +160,7 @@ struct plat_stmmacenet_data {
 	int bugged_jumbo;
 	int pmt;
 	int force_sf_dma_mode;
+	int force_disable_asp;
 	int force_thresh_dma_mode;
 	int riwt_off;
 	int max_speed;

@@ -428,6 +428,9 @@ stmmac_probe_config_dt(struct platform_device *pdev, const char **mac)
 	plat->force_sf_dma_mode =
 		of_property_read_bool(np, "snps,force_sf_dma_mode");
 
+	plat->force_disable_asp =
+		of_property_read_bool(np, "snps,force_disable_asp");
+
 	plat->en_tx_lpi_clockgating =
 		of_property_read_bool(np, "snps,en-tx-lpi-clockgating");
 
