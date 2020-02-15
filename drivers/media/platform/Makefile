@@ -93,3 +93,5 @@ obj-$(CONFIG_VIDEO_QCOM_VENUS)		+= qcom/venus/
 obj-$(CONFIG_VIDEO_SEMIDRIVE)		+= kunlun/
 
 obj-y					+= meson/
+
+obj-y                                   += semidrive/
