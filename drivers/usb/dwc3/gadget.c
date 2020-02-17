@@ -1749,9 +1749,6 @@ static int dwc3_gadget_run_stop(struct dwc3 *dwc, int is_on, int suspend)
 
 	dwc3_writel(dwc->regs, DWC3_DCTL, reg);
 
-	/*just for notify usb bridge that Z1 is ready*/
-	writel(is_on, dwc->usb_bridge_sync + 0x1c);
-
 	do {
 		reg = dwc3_readl(dwc->regs, DWC3_DSTS);
 		reg &= DWC3_DSTS_DEVCTRLHLT;

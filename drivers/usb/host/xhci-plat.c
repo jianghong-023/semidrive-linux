@@ -227,6 +227,16 @@ static int xhci_plat_probe(struct platform_device *pdev)
 	hcd->rsrc_start = res->start;
 	hcd->rsrc_len = resource_size(res);
 
+	if ((hcd->rsrc_start == 0x31260000 && hcd->rsrc_len == 0x8000)
+		|| (hcd->rsrc_start == 0x31220000 && hcd->rsrc_len == 0x8000)) {
+		hcd->ncr_regs = devm_ioremap(&pdev->dev,
+				hcd->rsrc_start + 0xd000, 0x1000);
+		if (IS_ERR(hcd->ncr_regs)) {
+			ret = PTR_ERR(hcd->ncr_regs);
+			goto put_hcd;
+		}
+	}
+
 	/*
 	 * Not all platforms have a clk so it is not an error if the
 	 * clock does not exists.
