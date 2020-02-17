@@ -52,7 +52,7 @@ static int ma211x_set_master(struct phy_device *phydev, int is_master)
 static int ma211x_check_link(struct phy_device *phydev)
 {
 	u16 data1, data2;
-	u32 count = 10000;
+	u32 count = 10;
 
 	while (count--) {
 		data1 = ma211x_read(phydev, 3, 0x8109);
