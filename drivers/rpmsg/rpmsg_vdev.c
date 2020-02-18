@@ -135,6 +135,7 @@ static bool sd_rpmsg_notify(struct virtqueue *vq)
 	struct sd_rpmsg_vq_info *rpvq = vq->priv;
 	struct sd_notify_msg msg;
 	struct sd_rpmsg_vproc *rpdev = rpvq->rpdev;
+	int ret;
 
 	MB_MSG_INIT_RPMSG_HEAD(&msg.msghead, rpdev->rproc_id, sizeof(struct sd_notify_msg));
 	msg.vq_id = rpvq->vq_id;
@@ -142,9 +143,14 @@ static bool sd_rpmsg_notify(struct virtqueue *vq)
 
 	mutex_lock(&rpdev->lock);
 	/* send the index of the triggered virtqueue as the mbox payload */
-	mbox_send_message(rpdev->mbox, &msg);
+	ret = mbox_send_message(rpdev->mbox, &msg);
 	mutex_unlock(&rpdev->lock);
 
+	/* in case of TIMEOUT because remote proc may be off */
+	if (ret < 0) {
+		pr_info("%s rproc %s may be off\n", __func__, rpdev->rproc_name);
+		return false;
+	}
 	return true;
 }
 
@@ -238,7 +244,7 @@ static struct virtqueue *rp_find_vq(struct virtio_device *vdev,
 
 	memset_io(rpvq->addr, 0, RPMSG_RING_SIZE);
 
-	pr_info("vring%d: phys 0x%x, virt 0x%p\n", index, virdev->vring[index],
+	pr_debug("vring%d: phys 0x%x, virt 0x%p\n", index, virdev->vring[index],
 					rpvq->addr);
 
 	vq = vring_new_virtqueue(index, RPMSG_NUM_BUFS / 2, RPMSG_VRING_ALIGN,
@@ -468,6 +474,7 @@ static int sd_rpmsg_probe(struct platform_device *pdev)
 		client->tx_done = NULL;
 		client->rx_callback = sd_rpmsg_mbox_callback;
 		client->tx_block = true;
+		client->tx_tout = 1000;
 		client->knows_txdone = false;
 
 		rpdev->mbox = mbox_request_channel_byname(client, rpdev->rproc_name);
