@@ -511,6 +511,8 @@ static int rpmsg_chrdev_probe(struct rpmsg_device *rpdev)
 
 	dev_set_drvdata(&rpdev->dev, ctrldev);
 
+	dev_info(&rpdev->dev, "create rpmsg ctrl device done\n");
+
 	return ret;
 
 free_ctrl_ida:

@@ -4469,7 +4469,11 @@ CONFIG_ARM_SMMU_V3=y
 #
 # Rpmsg drivers
 #
+CONFIG_RPMSG=y
+CONFIG_RPMSG_CHAR=y
 # CONFIG_RPMSG_QCOM_GLINK_RPM is not set
+CONFIG_RPMSG_VIRTIO=y
+CONFIG_RPMSG_SEMIDRIVE=y
 
 #
 # SOC (System On Chip) specific Drivers
