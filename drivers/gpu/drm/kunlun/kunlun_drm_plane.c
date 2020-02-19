@@ -871,7 +871,7 @@ static int kunlun_plane_frm_comp_set(void __iomem *regs,
 			break;
 		case DRM_FORMAT_XBGR8888:
 			bpa = bpy = bpu = bpv = 8;
-			swap = SWAP_A_RBG;
+			swap = SWAP_A_BGR;
 			format_string = "DRM_FORMAT_XBGR8888";
 			break;
 		case DRM_FORMAT_BGRX8888:
