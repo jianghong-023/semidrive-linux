@@ -36,6 +36,7 @@
 #define MB_MSG_REGs_PER_CPU     (MB_MSG_REGs_PER_MSG * 4)
 #define MB_MSGID_INVALID        (0xff)
 #define MB_ADDR_ANY             (0xdeadceefU)
+#define MB_TMH_RESET_VAL        0x02U
 
 #define MU_MASTERID_OFF         0x500U
 #define MU_TX_BUF_BASE          0x1000U
@@ -66,14 +67,15 @@ struct sd_mbox_chan {
 	bool priority;
 	bool is_run;
 	void __iomem *rmh;
-    u32 cl_data;
+	u32 cl_data;
+	u32 dest_addr;
 };
 
 typedef struct sd_mbox_device {
 	void __iomem *reg_base;
 	void __iomem *txb_base;
 	void __iomem *rxb_base;
-    int curr_cpu;
+	int curr_cpu;
 	int irq;
 	spinlock_t msg_lock;
 	struct sd_mbox_tx_msg tmsg[MB_MAX_MSGS];
@@ -119,6 +121,11 @@ static inline u32 mu_get_msg_rmh1(struct sd_mbox_device *mu,
 	addr_t rmh = mu->reg_base + CPU0_MSG0_RMH1_OFF +
 		4 * (remote_proc * MB_MSG_REGs_PER_CPU + msg_id * MB_MSG_REGs_PER_MSG);
 
+#if CONFIG_MBOX_DUMP_HEX
+	print_hex_dump_bytes("mu: rmh1: ", DUMP_PREFIX_ADDRESS,
+				 rmh, 4);
+#endif
+
 	return readl(rmh);
 }
 
@@ -127,6 +134,11 @@ static inline u32 mu_get_msg_rmh2(struct sd_mbox_device *mu,
 {
 	addr_t rmh = mu->reg_base + CPU0_MSG0_RMH2_OFF +
 		4 * (remote_proc * MB_MSG_REGs_PER_CPU + msg_id * MB_MSG_REGs_PER_MSG);
+
+#if CONFIG_MBOX_DUMP_HEX
+		print_hex_dump_bytes("mu: rmh2: ", DUMP_PREFIX_ADDRESS,
+					 rmh, 4);
+#endif
 
 	return readl(rmh);
 }
@@ -155,22 +167,30 @@ static int sd_mu_fill_tmh(struct sd_mbox_chan *mlink)
 	if (msg) {
 		u32 tmh0 = FV_TMH0_TXMES_LEN((ALIGN(mlink->actual_size, 2))/2)
 							| FV_TMH0_MID(msg->msg_id);
+		u32 reset_check;
 
 		tmh0 |= FV_TMH0_MDP(1 << mlink->target);
 		tmh0 |= BM_TMH0_TXUSE_MB | FV_TMH0_MBM(1 << msg->msg_id);
 
 		writel(tmh0, msg->tmh);
-        writel(mlink->cl_data, msg->tmh + TMH1_OFF);
-        /* use tmh2 to identify destination client */
-        writel(MB_ADDR_ANY, msg->tmh + TMH2_OFF);
+		/* use tmh1 as source addr */
+		writel(mlink->cl_data, msg->tmh + TMH1_OFF);
+		/* use tmh2 as destination addr */
+		writel(mlink->dest_addr, msg->tmh + TMH2_OFF);
+
+		reset_check = readl(msg->tmh);
+		if (reset_check != tmh0) {
+			return -ENODEV;
+		}
+
 #if CONFIG_MBOX_DUMP_HEX
 		print_hex_dump_bytes("mu: tmh: ", DUMP_PREFIX_ADDRESS,
 					 msg->tmh, 12);
 #endif
-		return tmh0;
+		return 0;
 	}
 
-	return 0;
+	return -EINVAL;
 }
 
 /* write message to tx buffer */
@@ -291,7 +311,8 @@ static int sd_mbox_send_data(struct mbox_chan *chan, void *data)
 	struct mbox_controller *mbox = chan->mbox;
 	struct sd_mbox_device *mbdev =
 		container_of(mbox, struct sd_mbox_device, controller);
-    int prefer_msg;
+	int prefer_msg;
+	int ret = 0;
 
 	mlink->actual_size = mb_msg_parse_packet_len(data);
 	mlink->priority = mb_msg_parse_packet_prio(data);
@@ -306,22 +327,29 @@ static int sd_mbox_send_data(struct mbox_chan *chan, void *data)
 	if (!mlink->msg) {
         mlink->msg = sd_mu_alloc_msg(mbdev, prefer_msg, mlink->priority);
 		if (!mlink->msg) {
-			dev_err(mbox->dev, "No MU msg available, something wrong\n");
+			dev_err(mbox->dev, "No msg available\n");
 			return -EBUSY;
 		}
 		mlink->msg->remote = mlink->target;
 	}
 
-    dev_dbg(mbox->dev, "mu: send_data to rproc: %d proto: %d length: %d msg: %d\n",
-            mlink->target, mlink->protocol,
-            mlink->actual_size, mlink->msg->msg_id);
-	sd_mu_fill_tmh(mlink);
+	dev_dbg(mbox->dev, "mu: send_data to rproc: %d proto: %d length: %d msg: %d\n",
+			mlink->target, mlink->protocol,
+			mlink->actual_size, mlink->msg->msg_id);
+	ret = sd_mu_fill_tmh(mlink);
 
 	sd_mu_write_msg(mlink, data);
 
-	sd_mu_send_msg(mlink->msg);
+	if (!ret)
+		sd_mu_send_msg(mlink->msg);
+	else {
+		/* if fail the send anyway, free this msg */
+		dev_err(mbox->dev, "mu: sendto rproc%d unexpected ret: %d\n",
+				mlink->target, ret);
+		sd_mu_free_msg(mbdev, mlink->msg);
+	}
 
-	return 0;
+	return ret;
 }
 
 static int sd_mbox_startup(struct mbox_chan *chan)
@@ -367,12 +395,27 @@ static bool sd_mbox_last_tx_done(struct mbox_chan *chan)
 	return false;
 }
 
-inline static struct mbox_chan *find_used_chan_atomic(struct sd_mbox_device *mbdev, u32 rproc)
+inline static struct mbox_chan *find_used_chan_atomic(
+		struct sd_mbox_device *mbdev, u32 rproc, u32 dest)
 {
 	u32 idx;
 	struct mbox_chan *chan;
 	struct sd_mbox_chan *mlink;
+	struct mbox_controller *mbox = &mbdev->controller;
 
+	if (dest) {
+		/* match exact reciever address */
+		for (idx = 0;idx < MB_MAX_CHANS; idx++) {
+			chan = &mbdev->chan[idx];
+			mlink = &mbdev->mlink[idx];
+			if (chan->cl && (dest == mlink->cl_data))
+				return chan;
+		}
+		dev_info(mbox->dev, "mu: channel addr %d not found\n", dest);
+	} else
+		dev_info(mbox->dev, "mu: invalid addr from rproc%d\n", rproc);
+
+	/* if addr not matched, try to match processor */
 	for (idx = 0;idx < MB_MAX_CHANS; idx++) {
 		chan = &mbdev->chan[idx];
 		mlink = &mbdev->mlink[idx];
@@ -380,18 +423,21 @@ inline static struct mbox_chan *find_used_chan_atomic(struct sd_mbox_device *mbd
 			return chan;
 	}
 
+	dev_warn(mbox->dev, "mu: channel addr %d not found for rproc %d\n",
+			dest, rproc);
+
     return NULL;
 }
 
 static irqreturn_t sd_mbox_rx_interrupt(int irq, void *p)
 {
 	struct sd_mbox_device *mbdev = p;
-	struct sd_mbox_chan *mlink;
 	struct mbox_controller *mbox = &mbdev->controller;
 	struct mbox_chan *chan = NULL;
 	unsigned int state, msg_id;
 	u32 remote_proc, mmask;
 	sd_msghdr_t *msg;
+	u32 dest;
 
 	if (!mbdev) {
 		return IRQ_HANDLED;
@@ -414,14 +460,21 @@ static irqreturn_t sd_mbox_rx_interrupt(int irq, void *p)
 
 			msg = (sd_msghdr_t *) sd_mu_get_read_ptr(mbdev,
                                         remote_proc, msg_id);
+			dest = mu_get_msg_rmh2(mbdev, remote_proc, msg_id);
+
 			/* protocol default is callback user
 			 * otherwise is rom code test
 			 */
 			if (MB_MSG_PROTO_ROM == msg->protocol) {
 				dev_info(mbox->dev, "mu: suppose not ROM msg\n");
 			} else {
-				chan = find_used_chan_atomic(mbdev, remote_proc);
+				chan = find_used_chan_atomic(mbdev, remote_proc, dest);
 			}
+
+#if CONFIG_MBOX_DUMP_HEX
+			print_hex_dump_bytes("recv: msg: ", DUMP_PREFIX_ADDRESS,
+						 msg, msg->dat_len);
+#endif
 
 			if (chan)
 				mbox_chan_received_data(chan, (void *)msg);
@@ -443,7 +496,7 @@ static const struct mbox_chan_ops sd_mbox_ops = {
 static struct mbox_chan *sd_mbox_of_xlate(struct mbox_controller *mbox,
 					    const struct of_phandle_args *p)
 {
-	int cpu_id, remote_proc;
+	int local_addr, remote_link;
 	int i;
 
 	/* #mbox-cells is 2 */
@@ -453,21 +506,23 @@ static struct mbox_chan *sd_mbox_of_xlate(struct mbox_controller *mbox,
 		return ERR_PTR(-EINVAL);
 	}
 
-	cpu_id = p->args[0];
-	remote_proc = p->args[1];
+	local_addr = p->args[0];
+	remote_link = p->args[1];
 
 	for (i = 0;i < mbox->num_chans;i++) {
 		struct mbox_chan *mchan = &mbox->chans[i];
 		struct sd_mbox_chan *mlink = mchan->con_priv;
 		if (0xff == mlink->target) {
-			mlink->target = remote_proc;
+			mlink->target = MB_RPROC_ID(remote_link);
+			mlink->cl_data = local_addr;
+			mlink->dest_addr = MB_DST_ADDR(remote_link);
 			strncpy(mlink->chan_name, p->np->name, MB_MAX_NAMES);
 			return mchan;
 		}
 	}
 
-	dev_info(mbox->dev, "CPU ID %d, RProc ID %d is wrong on %s\n",
-		cpu_id, remote_proc, p->np->name);
+	dev_info(mbox->dev, "myaddr %d, remote %d is wrong on %s\n",
+		local_addr, remote_link, p->np->name);
 	return ERR_PTR(-ENOENT);
 }
 

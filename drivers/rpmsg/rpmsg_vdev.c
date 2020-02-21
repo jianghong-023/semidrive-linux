@@ -137,7 +137,8 @@ static bool sd_rpmsg_notify(struct virtqueue *vq)
 	struct sd_rpmsg_vproc *rpdev = rpvq->rpdev;
 	int ret;
 
-	MB_MSG_INIT_RPMSG_HEAD(&msg.msghead, rpdev->rproc_id, sizeof(struct sd_notify_msg));
+	MB_MSG_INIT_RPMSG_HEAD(&msg.msghead, rpdev->rproc_id,
+			sizeof(struct sd_notify_msg), IPCC_ADDR_RPMSG);
 	msg.vq_id = rpvq->vq_id;
 	msg.device_type = 0x99;
 
@@ -176,7 +177,7 @@ static int sd_rpmsg_callback(struct notifier_block *this,
 
 	vq_id -= virdev->base_vq_id;
 
-	pr_debug("%s vqid: %d rproc: %d nvqs: %d\n", __func__, msg->vq_id,
+	pr_info("%s vqid: %d rproc: %d nvqs: %d\n", __func__, msg->vq_id,
 				msg->msghead.rproc, virdev->num_of_vqs);
 
 	/*

@@ -121,12 +121,7 @@ static ssize_t mbox_test_message_write(struct file *filp,
 		return -ENOMEM;
 
 	msg = (sd_msghdr_t *)tdev->message;
-	msg->dat_len = count + MB_MSG_HDR_SZ;
-	msg->priority = 0;
-	msg->protocol = 0;
-	msg->rproc = 3;
-	msg->reserved = 0xee;
-
+	mb_msg_init_head(msg, 3, 0, 0, count + MB_MSG_HDR_SZ, IPCC_ADDR_MB_TEST);
 	ret = copy_from_user(msg->data, userbuf, count);
 	if (ret) {
 		ret = -EFAULT;
