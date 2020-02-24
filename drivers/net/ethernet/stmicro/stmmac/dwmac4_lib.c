@@ -19,7 +19,6 @@ int dwmac4_dma_reset(void __iomem *ioaddr)
 	u32 value = readl(ioaddr + DMA_BUS_MODE);
 	int limit;
 
-	return 0;
 	/* DMA SW reset */
 	value |= DMA_BUS_MODE_SFT_RESET;
 	writel(value, ioaddr + DMA_BUS_MODE);
