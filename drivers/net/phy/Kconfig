@@ -330,6 +330,11 @@ config MARVELL_10G_PHY
 	---help---
 	  Support for the Marvell Alaska MV88X3310 and compatible PHYs.
 
+config MARVELL_AUTO_PHY
+	tristate "Marvell Automotive PHYs"
+	---help---
+	  Support for the Marvell Automotive 88Q211X and compatible PHYs.
+
 config MESON_GXL_PHY
 	tristate "Amlogic Meson GXL Internal PHY"
 	depends on ARCH_MESON || COMPILE_TEST
