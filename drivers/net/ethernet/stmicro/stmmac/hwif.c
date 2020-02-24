@@ -68,6 +68,13 @@ static int stmmac_dwmac4_quirks(struct stmmac_priv *priv)
 	return 0;
 }
 
+static int stmmac_dwmac5_quirks(struct stmmac_priv *priv)
+{
+	if (priv->plat->force_disable_asp)
+		priv->dma_cap.asp = 0;
+	return 0;
+}
+
 static const struct stmmac_hwif_entry {
 	bool gmac;
 	bool gmac4;
@@ -146,7 +153,7 @@ static const struct stmmac_hwif_entry {
 		.hwtimestamp = &stmmac_ptp,
 		.mode = &dwmac4_ring_mode_ops,
 		.setup = dwmac4_setup,
-		.quirks = NULL,
+		.quirks = stmmac_dwmac5_quirks,
 	}
 };
 

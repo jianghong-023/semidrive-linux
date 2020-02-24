@@ -452,11 +452,13 @@ static int dwc_eth_dwmac_probe(struct platform_device *pdev)
 	if (IS_ERR(plat_dat))
 		return PTR_ERR(plat_dat);
 
-	priv = data->probe(pdev, plat_dat, &stmmac_res);
-	if (IS_ERR(priv)) {
-		ret = PTR_ERR(priv);
-		dev_err(&pdev->dev, "failed to probe subdriver: %d\n", ret);
-		goto remove_config;
+	if (data) {
+		priv = data->probe(pdev, plat_dat, &stmmac_res);
+		if (IS_ERR(priv)) {
+			ret = PTR_ERR(priv);
+			dev_err(&pdev->dev, "failed to probe subdriver: %d\n", ret);
+			goto remove_config;
+		}
 	}
 
 	ret = dwc_eth_dwmac_config_dt(pdev, plat_dat);
@@ -470,7 +472,8 @@ static int dwc_eth_dwmac_probe(struct platform_device *pdev)
 	return ret;
 
 remove:
-	data->remove(pdev);
+	if (data)
+		data->remove(pdev);
 remove_config:
 	stmmac_remove_config_dt(pdev, plat_dat);
 
@@ -490,9 +493,11 @@ static int dwc_eth_dwmac_remove(struct platform_device *pdev)
 	if (err < 0)
 		dev_err(&pdev->dev, "failed to remove platform: %d\n", err);
 
-	err = data->remove(pdev);
-	if (err < 0)
-		dev_err(&pdev->dev, "failed to remove subdriver: %d\n", err);
+	if (data) {
+		err = data->remove(pdev);
+		if (err < 0)
+			dev_err(&pdev->dev, "failed to remove subdriver: %d\n", err);
+	}
 
 	stmmac_remove_config_dt(pdev, priv->plat);
 
@@ -502,6 +507,7 @@ static int dwc_eth_dwmac_remove(struct platform_device *pdev)
 static const struct of_device_id dwc_eth_dwmac_match[] = {
 	{ .compatible = "snps,dwc-qos-ethernet-4.10", .data = &dwc_qos_data },
 	{ .compatible = "nvidia,tegra186-eqos", .data = &tegra_eqos_data },
+	{ .compatible = "semidrive,dwc-qos-ethernet", .data = NULL },
 	{ }
 };
 MODULE_DEVICE_TABLE(of, dwc_eth_dwmac_match);

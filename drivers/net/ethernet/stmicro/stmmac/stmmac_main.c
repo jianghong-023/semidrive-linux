@@ -4275,7 +4275,7 @@ int stmmac_dvr_probe(struct device *device,
 		stmmac_clk_csr_set(priv);
 	else
 		priv->clk_csr = priv->plat->clk_csr;
-
+	priv->clk_csr = 1;
 	stmmac_check_pcs_mode(priv);
 
 	if (priv->hw->pcs != STMMAC_PCS_RGMII  &&
