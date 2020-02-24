@@ -73,7 +73,7 @@ static void dwmac4_dma_axi(void __iomem *ioaddr, struct stmmac_axi *axi)
 
 static void dwmac4_dma_init_rx_chan(void __iomem *ioaddr,
 				    struct stmmac_dma_cfg *dma_cfg,
-				    u32 dma_rx_phy, u32 chan)
+				    dma_addr_t dma_rx_phy, u32 chan)
 {
 	u32 value;
 	u32 rxpbl = dma_cfg->rxpbl ?: dma_cfg->pbl;
@@ -82,12 +82,16 @@ static void dwmac4_dma_init_rx_chan(void __iomem *ioaddr,
 	value = value | (rxpbl << DMA_BUS_MODE_RPBL_SHIFT);
 	writel(value, ioaddr + DMA_CHAN_RX_CONTROL(chan));
 
-	writel(dma_rx_phy, ioaddr + DMA_CHAN_RX_BASE_ADDR(chan));
+	if (IS_ENABLED(CONFIG_ARCH_DMA_ADDR_T_64BIT) && likely(dma_cfg->eame))
+		writel(upper_32_bits(dma_rx_phy),
+			ioaddr + DMA_CHAN_RX_BASE_ADDR_HI(chan));
+
+	writel(lower_32_bits(dma_rx_phy), ioaddr + DMA_CHAN_RX_BASE_ADDR(chan));
 }
 
 static void dwmac4_dma_init_tx_chan(void __iomem *ioaddr,
 				    struct stmmac_dma_cfg *dma_cfg,
-				    u32 dma_tx_phy, u32 chan)
+				    dma_addr_t dma_tx_phy, u32 chan)
 {
 	u32 value;
 	u32 txpbl = dma_cfg->txpbl ?: dma_cfg->pbl;
@@ -100,7 +104,11 @@ static void dwmac4_dma_init_tx_chan(void __iomem *ioaddr,
 
 	writel(value, ioaddr + DMA_CHAN_TX_CONTROL(chan));
 
-	writel(dma_tx_phy, ioaddr + DMA_CHAN_TX_BASE_ADDR(chan));
+	if (IS_ENABLED(CONFIG_ARCH_DMA_ADDR_T_64BIT) && likely(dma_cfg->eame))
+		writel(upper_32_bits(dma_tx_phy),
+			ioaddr + DMA_CHAN_TX_BASE_ADDR_HI(chan));
+
+	writel(lower_32_bits(dma_tx_phy), ioaddr + DMA_CHAN_TX_BASE_ADDR(chan));
 }
 
 static void dwmac4_dma_init_channel(void __iomem *ioaddr,
@@ -135,6 +143,9 @@ static void dwmac4_dma_init(void __iomem *ioaddr,
 
 	if (dma_cfg->aal)
 		value |= DMA_SYS_BUS_AAL;
+
+        if (dma_cfg->eame)
+                value |= DMA_SYS_BUS_EAME;
 
 	writel(value, ioaddr + DMA_SYS_BUS_MODE);
 }
@@ -357,6 +368,23 @@ static void dwmac4_get_hw_feature(void __iomem *ioaddr,
 	hw_cap = readl(ioaddr + GMAC_HW_FEATURE1);
 	dma_cap->av = (hw_cap & GMAC_HW_FEAT_AVSEL) >> 20;
 	dma_cap->tsoen = (hw_cap & GMAC_HW_TSOEN) >> 18;
+
+        dma_cap->addr64 = (hw_cap & GMAC_HW_ADDR64) >> 14;
+        switch (dma_cap->addr64) {
+        case 0:
+                dma_cap->addr64 = 32;
+                break;
+        case 1:
+                dma_cap->addr64 = 40;
+                break;
+        case 2:
+                dma_cap->addr64 = 48;
+                break;
+        default:
+                dma_cap->addr64 = 32;
+                break;
+        }
+
 	/* RX and TX FIFO sizes are encoded as log2(n / 128). Undo that by
 	 * shifting and store the sizes in bytes.
 	 */
