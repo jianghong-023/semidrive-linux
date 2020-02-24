@@ -1213,6 +1213,17 @@ static int dwc3_probe(struct platform_device *pdev)
 
 	dwc3_writel(dwc->regs, DWC3_NCR_INTEN, 0x3f);
 
+	/* reset usb phy, reset high effective */
+	data = readl(dwc->usb_bridge_sync);
+	data |= (1<<0);
+	writel(data, dwc->usb_bridge_sync);
+
+	udelay(1);
+
+	data = readl(dwc->usb_bridge_sync);
+	data &= ~(1<<0);
+	writel(data, dwc->usb_bridge_sync);
+
 	dwc3_get_properties(dwc);
 
 	platform_set_drvdata(pdev, dwc);
