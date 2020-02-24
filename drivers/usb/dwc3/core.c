@@ -1201,15 +1201,11 @@ static int dwc3_probe(struct platform_device *pdev)
 	dwc->regs_size	= resource_size(res);
 
 	/* workaround, it will be removed to usb phy driver */
-	dwc->usb_bridge_sync = ioremap(0x31250000, 0x1000);
+	dwc->usb_bridge_sync = regs + 0x30000 - DWC3_GLOBALS_REGS_START;
 
 	data = readl(dwc->usb_bridge_sync);
 	data &= ~(1<<18);
 	writel(data, dwc->usb_bridge_sync);
-
-	data = readl(dwc->usb_bridge_sync + 0xc);
-	data |= (1<<8);
-	writel(data, dwc->usb_bridge_sync + 0xc);
 
 	dwc3_writel(dwc->regs, DWC3_NCR_INTEN, 0x3f);
 
@@ -1218,7 +1214,7 @@ static int dwc3_probe(struct platform_device *pdev)
 	data |= (1<<0);
 	writel(data, dwc->usb_bridge_sync);
 
-	udelay(1);
+	udelay(30);
 
 	data = readl(dwc->usb_bridge_sync);
 	data &= ~(1<<0);
