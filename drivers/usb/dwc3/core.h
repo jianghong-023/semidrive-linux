@@ -910,7 +910,6 @@ struct dwc3 {
 	struct ulpi		*ulpi;
 
 	void __iomem		*regs;
-	void __iomem		*usb_bridge_sync;
 	size_t			regs_size;
 
 	enum usb_dr_mode	dr_mode;

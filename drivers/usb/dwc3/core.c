@@ -1165,7 +1165,6 @@ static int dwc3_probe(struct platform_device *pdev)
 	int			ret;
 
 	void __iomem		*regs;
-	unsigned int		data;
 
 	dwc = devm_kzalloc(dev, sizeof(*dwc), GFP_KERNEL);
 	if (!dwc)
@@ -1200,25 +1199,7 @@ static int dwc3_probe(struct platform_device *pdev)
 	dwc->regs	= regs;
 	dwc->regs_size	= resource_size(res);
 
-	/* workaround, it will be removed to usb phy driver */
-	dwc->usb_bridge_sync = regs + 0x30000 - DWC3_GLOBALS_REGS_START;
-
-	data = readl(dwc->usb_bridge_sync);
-	data &= ~(1<<18);
-	writel(data, dwc->usb_bridge_sync);
-
 	dwc3_writel(dwc->regs, DWC3_NCR_INTEN, 0x3f);
-
-	/* reset usb phy, reset high effective */
-	data = readl(dwc->usb_bridge_sync);
-	data |= (1<<0);
-	writel(data, dwc->usb_bridge_sync);
-
-	udelay(30);
-
-	data = readl(dwc->usb_bridge_sync);
-	data &= ~(1<<0);
-	writel(data, dwc->usb_bridge_sync);
 
 	dwc3_get_properties(dwc);
 
