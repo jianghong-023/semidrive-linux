@@ -21,5 +21,6 @@ obj-y					+= broadcom/	\
 					   qualcomm/	\
 					   ralink/	\
 					   samsung/	\
+					   semidrive/	\
 					   st/		\
 					   ti/
