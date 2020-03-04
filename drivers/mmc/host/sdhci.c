@@ -45,7 +45,10 @@
 #define SDHCI_DUMP(f, x...) \
 	pr_err("%s: " DRIVER_NAME ": " f, mmc_hostname(host->mmc), ## x)
 
-#define MAX_TUNING_LOOP 40
+#define MAX_TUNING_LOOP 140
+
+#define DWC_ADMA_BOUNDARY_WORKAROUND 1
+#define DWC_ADMA_BOUNDARY_SIZE (0x8000000)
 
 static unsigned int debug_quirks = 0;
 static unsigned int debug_quirks2;
@@ -677,6 +680,13 @@ static void sdhci_adma_mark_end(void *desc)
 	dma_desc->cmd |= cpu_to_le16(ADMA2_END);
 }
 
+#ifdef DWC_ADMA_BOUNDARY_WORKAROUND
+static dma_addr_t calc_adma_boundary(dma_addr_t addr, dma_addr_t boundary)
+{
+    return ((addr + boundary) & ~(boundary - 1));
+}
+#endif
+
 static void sdhci_adma_table_pre(struct sdhci_host *host,
 	struct mmc_data *data, int sg_count)
 {
@@ -686,7 +696,9 @@ static void sdhci_adma_table_pre(struct sdhci_host *host,
 	void *desc, *align;
 	char *buffer;
 	int len, offset, i;
-
+#ifdef DWC_ADMA_BOUNDARY_WORKAROUND
+	dma_addr_t boundary_addr;
+#endif
 	/*
 	 * The spec does not specify endianness of descriptor table.
 	 * We currently guess that it is LE.
@@ -730,6 +742,23 @@ static void sdhci_adma_table_pre(struct sdhci_host *host,
 			addr += offset;
 			len -= offset;
 		}
+
+#ifdef DWC_ADMA_BOUNDARY_WORKAROUND
+		offset = 0;
+		boundary_addr = calc_adma_boundary(addr, DWC_ADMA_BOUNDARY_SIZE);
+		if ((addr + len) > boundary_addr)
+			offset = boundary_addr - addr;
+		if (offset) {
+			/* tran, valid */
+			__sdhci_adma_write_desc(host, &desc, addr,
+						offset, ADMA2_TRAN_VALID);
+
+			BUG_ON(offset > 65536);
+
+			addr += offset;
+			len -= offset;
+		}
+#endif
 
 		BUG_ON(len > 65536);
 
