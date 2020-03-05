@@ -642,6 +642,7 @@ static long vpu_ioctl(struct file *filp, u_int cmd, u_long arg)
 
 #ifdef VPU_SUPPORT_CLOCK_CONTROL
             u32 clkgate;
+            DPRINTK("[VPUDRV][+]VDI_IOCTL_SET_CLOCK_GATE\n");
 
             if (get_user(clkgate, (u32 __user *) arg))
                 return -EFAULT;
@@ -651,6 +652,7 @@ static long vpu_ioctl(struct file *filp, u_int cmd, u_long arg)
             else
                 vpu_clk_disable(s_vpu_clk);
 
+            DPRINTK("[VPUDRV][-]VDI_IOCTL_SET_CLOCK_GATE\n");
 #endif
         }
         break;
@@ -1304,7 +1306,7 @@ static int vpu_probe(struct platform_device *pdev)
         DPRINTK("[VPUDRV] : get clock controller s_vpu_clk=%p\n", s_vpu_clk);
 
 
-    vpu_clk_enable(s_vpu_clk);
+//    vpu_clk_enable(s_vpu_clk);
 
 
 #ifdef VPU_SUPPORT_ISR
@@ -1907,7 +1909,7 @@ static int vpu_clk_enable(struct clk *clk)
             return err_code;
         }
         clk_enable(clk);
-        DPRINTK("[DRV] colk enable success clk_reference %d  \n", clk_reference++);
+        DPRINTK("[DRV] colk enable success clk_reference %d  \n", ++clk_reference);
     }
 
     return 0;
@@ -1933,7 +1935,7 @@ static void vpu_clk_disable(struct clk *clk)
             clk_disable(clk);
             clk_unprepare(clk);
 
-            DPRINTK("[DRV] colk and pclk disable is success clk_reference %d \n", clk_reference--);
+            DPRINTK("[DRV] colk and pclk disable is success clk_reference %d \n", --clk_reference);
         }
 
 #else
