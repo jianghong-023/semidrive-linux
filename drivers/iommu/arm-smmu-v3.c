@@ -730,7 +730,14 @@ static void queue_inc_cons(struct arm_smmu_queue *q)
 	u32 cons = (Q_WRP(q, q->cons) | Q_IDX(q, q->cons)) + 1;
 
 	q->cons = Q_OVF(q, q->cons) | Q_WRP(q, cons) | Q_IDX(q, cons);
-	writel(q->cons, q->cons_reg);
+
+	/*
+	 * Ensure that all CPU accesses (reads and writes) to the queue
+	 * are complete before we update the cons pointer.
+	 */
+	mb();
+
+	writel_relaxed(q->cons, q->cons_reg);
 }
 
 static int queue_sync_prod(struct arm_smmu_queue *q)
@@ -956,8 +963,10 @@ static void arm_smmu_cmdq_issue_cmd(struct arm_smmu_device *smmu,
 			dev_err_ratelimited(smmu->dev, "CMDQ timeout\n");
 	}
 
-	if (ent->opcode == CMDQ_OP_CMD_SYNC && queue_poll_cons(q, true, wfe))
+	if (ent->opcode == CMDQ_OP_CMD_SYNC && queue_poll_cons(q, true, wfe)) {
 		dev_err_ratelimited(smmu->dev, "CMD_SYNC timeout\n");
+		arm_smmu_cmdq_skip_err(smmu);
+	}
 	spin_unlock_irqrestore(&smmu->cmdq.lock, flags);
 }
 
@@ -1725,6 +1734,7 @@ static int arm_smmu_attach_dev(struct iommu_domain *domain, struct device *dev)
 	}
 
 	arm_smmu_install_ste_for_dev(dev->iommu_fwspec);
+
 out_unlock:
 	mutex_unlock(&smmu_domain->init_mutex);
 	return ret;

@@ -1023,7 +1023,7 @@ struct iommu_group *iommu_group_get_for_dev(struct device *dev)
 	 * IOMMU driver.
 	 */
 	if (!group->default_domain) {
-		struct iommu_domain *dom;
+		struct iommu_domain *dom = NULL;
 
 		prop = of_find_property(dev->of_node, "smmu", NULL);
 		if (prop) {

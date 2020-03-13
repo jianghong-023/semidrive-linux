@@ -135,7 +135,7 @@ int of_dma_configure(struct device *dev, struct device_node *np)
 	 * setup the correct supported mask.
 	 */
 	if (!dev->coherent_dma_mask)
-		dev->coherent_dma_mask = DMA_BIT_MASK(38);
+		dev->coherent_dma_mask = DMA_BIT_MASK(32);
 	/*
 	 * Set it to coherent_dma_mask by default if the architecture
 	 * code has not set it.
