@@ -59,6 +59,7 @@
 #define DWC_MSHC_DLL_CNFG2 (DWC_MSHC_PTR_PHY_REGS + 0x26)
 #define DWC_MSHC_DLLDL_CNFG (DWC_MSHC_PTR_PHY_REGS + 0x28)
 #define DWC_MSHC_DLL_OFFSET (DWC_MSHC_PTR_PHY_REGS + 0x29)
+#define DWC_MSHC_DLLLBT_CNFG (DWC_MSHC_PTR_PHY_REGS + 0x2C)
 #define DWC_MSHC_DLL_STATUS (DWC_MSHC_PTR_PHY_REGS + 0x2E)
 #define ERROR_STS BIT(1)
 #define LOCK_STS BIT(0)
@@ -137,6 +138,8 @@ static int dwcmshc_phy_dll_config(struct sdhci_host *host)
 	u32 reg;
 	ktime_t timeout;
 
+	sdhci_writeb(host, 0, DWC_MSHC_DLL_CTRL);
+
 	/* Disable the card clock */
 	clk_ctrl = sdhci_readw(host, SDHCI_CLOCK_CONTROL);
 	clk_ctrl &= ~SDHCI_CLOCK_CARD_EN;
@@ -146,14 +149,14 @@ static int dwcmshc_phy_dll_config(struct sdhci_host *host)
 
 	sdhci_writeb(host, 0x20, DWC_MSHC_DLL_CNFG1);
 	// TODO: set the dll value by real chip
-	sdhci_writeb(host, 0x4, DWC_MSHC_DLL_CNFG2);
+	sdhci_writeb(host, 0x0, DWC_MSHC_DLL_CNFG2);
 	sdhci_writeb(host, 0x60, DWC_MSHC_DLLDL_CNFG);
-	sdhci_writeb(host, 0x10, DWC_MSHC_DLL_OFFSET);
-	// sdhci_writew(host, , DWC_MSHC_DLLLBT_CNFG);
+	sdhci_writeb(host, 0x0, DWC_MSHC_DLL_OFFSET);
+	sdhci_writew(host, 0x0, DWC_MSHC_DLLLBT_CNFG);
 
 	/* Enable the clock */
 	clk_ctrl |= SDHCI_CLOCK_CARD_EN;
-	sdhci_enable_clk(host, clk_ctrl);
+	sdhci_writew(host, clk_ctrl, SDHCI_CLOCK_CONTROL);
 
 	sdhci_writeb(host, 1, DWC_MSHC_DLL_CTRL);
 
@@ -276,6 +279,8 @@ static void dwcmshc_set_clock(struct sdhci_host *host, unsigned int clock)
 	} else {
 		host->mmc->actual_clock = clock;
 	}
+	pr_debug("%s: Set clock = %d, actual clock = %d\n",
+		mmc_hostname(host->mmc), clock, host->mmc->actual_clock);
 
 	sdhci_enable_clk(host, 0);
 }
@@ -294,7 +299,8 @@ static void set_ddr_mode(struct sdhci_host *host, unsigned int ddr_mode)
 	if (iobase) {
 		value = readl(iobase);
 		writel((value & (~(1<<0))) | ((ddr_mode & 0x1) << 0), iobase);
-		pr_debug(" sdhci : Set scr mshc ddr mode reg = 0x%08x\n", readl(iobase));
+		pr_debug("%s: Set scr mshc ddr mode reg = 0x%08x\n",
+			mmc_hostname(host->mmc), readl(iobase));
 	}
 }
 
@@ -307,8 +313,11 @@ static void dwcmshc_set_uhs_signaling(struct sdhci_host *host, unsigned timing)
 	if ((timing > MMC_TIMING_UHS_DDR50) && (timing != MMC_TIMING_MMC_HS200))
 		ddr_mode = 1;
 	set_ddr_mode(host, ddr_mode);
-	if (timing > MMC_TIMING_MMC_HS200) {
-		dwcmshc_phy_dll_config(host);
+
+	if ((timing > MMC_TIMING_MMC_HS200) &&
+			(host->mmc->actual_clock > 100000000)) {
+		if (dwcmshc_phy_dll_config(host))
+			pr_err("%s: phy dll config failed!\n", mmc_hostname(host->mmc));
 	}
 }
 
@@ -321,12 +330,9 @@ static void dwcmshc_sdhci_reset(struct sdhci_host *host, u8 mask)
 	}
 }
 
-void dwcmshc_get_property(struct platform_device *pdev, struct dwcmshc_priv *priv)
+static void dwcmshc_get_property(struct platform_device *pdev, struct dwcmshc_priv *priv)
 {
 	struct device *dev = &pdev->dev;
-	struct sdhci_host *host = platform_get_drvdata(pdev);
-	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
-	u32 bus_width;
 
 	if (device_property_present(dev, "no-3-3-v"))
 		priv->no_3_3_v = 1;
@@ -340,21 +346,43 @@ void dwcmshc_get_property(struct platform_device *pdev, struct dwcmshc_priv *pri
 
 }
 
+static void dwcmshc_set_power(struct sdhci_host *host, unsigned char mode,
+		     unsigned short vdd)
+{
+	u16 ctrl;
+	struct sdhci_pltfm_host *pltfm_host;
+        struct dwcmshc_priv *priv;
+
+	pltfm_host = sdhci_priv(host);
+	priv = sdhci_pltfm_priv(pltfm_host);
+
+	sdhci_set_power(host, mode, vdd);
+
+	if (priv->no_3_3_v) {
+		/* Set 1.8v signal in host ctrl2 register */
+		ctrl = sdhci_readw(host, SDHCI_HOST_CONTROL2);
+		ctrl |= SDHCI_CTRL_VDD_180;
+		sdhci_writew(host, ctrl, SDHCI_HOST_CONTROL2);
+	}
+}
+
+static unsigned int dwcmshc_get_max_clock(struct sdhci_host *host)
+{
+	return host->mmc->f_max;
+}
 
 static const struct sdhci_ops sdhci_dwcmshc_ops = {
 	.set_clock		= dwcmshc_set_clock,
+	.set_power		= dwcmshc_set_power,
 	.set_bus_width		= sdhci_set_bus_width,
 	.set_uhs_signaling	= dwcmshc_set_uhs_signaling,
-	.get_max_clock		= sdhci_pltfm_clk_get_max_clock,
+	.get_max_clock		= dwcmshc_get_max_clock,
 	.reset			= dwcmshc_sdhci_reset,
 };
 
 static const struct sdhci_pltfm_data sdhci_dwcmshc_pdata = {
 	.ops = &sdhci_dwcmshc_ops,
-	//.quirks = SDHCI_QUIRK_BROKEN_ADMA,
-	.quirks2 = SDHCI_QUIRK2_BROKEN_HS200 |
-	   //SDHCI_QUIRK2_USE_32BIT_BLK_CNT |
-	   SDHCI_QUIRK2_PRESET_VALUE_BROKEN,
+	.quirks2 = SDHCI_QUIRK2_PRESET_VALUE_BROKEN,
 };
 
 static int dwcmshc_probe(struct platform_device *pdev)
