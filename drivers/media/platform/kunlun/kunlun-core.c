@@ -120,19 +120,40 @@ static int kstream_interface_subdev_bound(struct v4l2_subdev *subdev,
 	struct kstream_device *kstream =
 		container_of(asd, struct kstream_device, interface.asd);
 	int ret;
+	struct csi_core *csi;
 
-	kstream->interface.subdev = subdev;
-	kstream->interface.mbus_type = kstream->core->mbus_type;
-	ret = kunlun_find_pad(subdev, MEDIA_PAD_FL_SOURCE);
-	if(ret < 0)
-		return ret;
-	kstream->interface.source_pad = ret;
+	csi = kstream->core;
+	if(csi->mbus_type == V4L2_MBUS_CSI2){
 
-	ret = kunlun_find_pad(subdev, MEDIA_PAD_FL_SINK);
-	kstream->interface.sink_pad = ret < 0 ? 0 : ret;
+		list_for_each_entry(kstream, &csi->kstreams, csi_entry){
+			kstream->interface.subdev = subdev;
+			kstream->interface.mbus_type = kstream->core->mbus_type;
+			ret = kunlun_find_pad(subdev, MEDIA_PAD_FL_SOURCE);
+			if(ret < 0)
+				return ret;
+			kstream->interface.source_pad = ret+kstream->id;
 
-	dev_dbg(kstream->dev, "Bound subdev %s source pad: %u sink pad: %u\n",
-			subdev->name, kstream->interface.source_pad, kstream->interface.sink_pad);
+			ret = kunlun_find_pad(subdev, MEDIA_PAD_FL_SINK);
+			kstream->interface.sink_pad = (ret < 0 ? 0 : ret) + kstream->id;
+
+			dev_info(kstream->dev, "Bound subdev %s source pad: %u sink pad: %u\n",
+					subdev->name, kstream->interface.source_pad, kstream->interface.sink_pad);
+		}
+	}
+	else{
+		kstream->interface.subdev = subdev;
+		kstream->interface.mbus_type = kstream->core->mbus_type;
+		ret = kunlun_find_pad(subdev, MEDIA_PAD_FL_SOURCE);
+		if(ret < 0)
+			return ret;
+		kstream->interface.source_pad = ret;
+
+		ret = kunlun_find_pad(subdev, MEDIA_PAD_FL_SINK);
+		kstream->interface.sink_pad = ret < 0 ? 0 : ret;
+
+		dev_dbg(kstream->dev, "Bound subdev %s source pad: %u sink pad: %u\n",
+				subdev->name, kstream->interface.source_pad, kstream->interface.sink_pad);
+	}
 	return 0;
 }
 
@@ -142,15 +163,31 @@ static int kstream_sensor_subdev_bound(struct v4l2_subdev *subdev,
 	struct kstream_device *kstream =
 		container_of(asd, struct kstream_device, sensor.asd);
 	int ret;
+	struct csi_core *csi;
 
-	kstream->sensor.subdev = subdev;
-	ret = kunlun_find_pad(subdev, MEDIA_PAD_FL_SOURCE);
-	if(ret < 0)
-		return ret;
-	kstream->sensor.source_pad = ret;
+	csi = kstream->core;
+	if(csi->mbus_type == V4L2_MBUS_CSI2){
+		list_for_each_entry(kstream, &csi->kstreams, csi_entry){
 
-	dev_dbg(kstream->dev, "Bound subdev %s source pad: %u\n",
-			subdev->name, kstream->sensor.source_pad);
+			kstream->sensor.subdev = subdev;
+			ret = kunlun_find_pad(subdev, MEDIA_PAD_FL_SOURCE);
+			if(ret < 0)
+				return ret;
+			kstream->sensor.source_pad = ret;
+
+			dev_info(kstream->dev, "Bound subdev %s source pad: %u\n",
+					subdev->name, kstream->sensor.source_pad);
+		}
+	} else {
+		kstream->sensor.subdev = subdev;
+		ret = kunlun_find_pad(subdev, MEDIA_PAD_FL_SOURCE);
+		if(ret < 0)
+			return ret;
+		kstream->sensor.source_pad = ret;
+
+		dev_dbg(kstream->dev, "Bound subdev %s source pad: %u\n",
+				subdev->name, kstream->sensor.source_pad);
+	}
 	return 0;
 }
 
@@ -241,9 +278,28 @@ static int kunlun_of_parse_ports(struct csi_core *csi)
 		kstream->interface.asd.match_type = V4L2_ASYNC_MATCH_FWNODE;
 		kstream->interface.asd.match.fwnode.fwnode =
 			of_fwnode_handle(interface);
-		notifier->num_subdevs++;
+		if(csi->mbus_type == V4L2_MBUS_CSI2){
+			if(csi->mipi_stream_num<1){
+				notifier->num_subdevs++;
+			}
+		}else{
+			notifier->num_subdevs++;
+		}
 
 		for_each_endpoint_of_node(interface, intf_ep) {
+
+			ret = of_graph_parse_endpoint(intf_ep, &ep);
+			if((ret < 0) || (ep.port >= KUNLUN_IMG_NUM)) {
+				dev_err(dev, "Can't get port id\n");
+				return ret;
+			}
+
+			if(kstream->id != ep.port){
+				dev_info(dev, "port not match\n");
+				of_node_put(intf_ep);
+				continue;
+			}
+
 			sensor = of_graph_get_remote_port_parent(intf_ep);
 			if(!sensor || sensor == dev->of_node) {
 				of_node_put(sensor);
@@ -254,7 +310,15 @@ static int kunlun_of_parse_ports(struct csi_core *csi)
 			kstream->sensor.asd.match.fwnode.fwnode =
 				of_fwnode_handle(sensor);
 			of_node_put(sensor);
-			notifier->num_subdevs++;
+			if(csi->mbus_type == V4L2_MBUS_CSI2){
+				if(csi->mipi_stream_num<1){
+					notifier->num_subdevs++;
+				}
+				csi->mipi_stream_num++;
+			}
+			else {
+				notifier->num_subdevs++;
+			}
 			kstream->enabled = true;
 			list_add_tail(&kstream->csi_entry, &csi->kstreams);
 		}
@@ -273,6 +337,8 @@ static int kunlun_of_parse_ports(struct csi_core *csi)
 	list_for_each_entry(kstream, &csi->kstreams, csi_entry) {
 		notifier->subdevs[i++] = &kstream->interface.asd;
 		notifier->subdevs[i++] = &kstream->sensor.asd;
+		if((csi->mbus_type == V4L2_MBUS_CSI2) && (csi->mipi_stream_num>1))
+			break;
 	}
 
 	return notifier->num_subdevs;
@@ -286,6 +352,7 @@ static int kunlun_of_parse_core(struct platform_device *pdev,
 	struct fwnode_handle *fwnode;
 	int ret;
 	const char *mbus;
+	u32 host_id;
 
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	csi->base = devm_ioremap_resource(dev, res);
@@ -320,6 +387,14 @@ static int kunlun_of_parse_core(struct platform_device *pdev,
 		csi->mbus_type = KUNLUN_MBUS_DC2CSI2;
 	else
 		dev_err(dev, "Unknow mbus-type\n");
+
+
+	ret = of_property_read_u32(dev->of_node, "host_id", &host_id);
+	if(ret < 0) {
+		dev_err(dev, "Missing host id\n");
+		return -EINVAL;
+	}
+	csi->host_id = host_id;
 
 	fwnode = dev_fwnode(dev);
 	ret = v4l2_fwnode_endpoint_parse(fwnode, &csi->vep);

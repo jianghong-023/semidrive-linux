@@ -101,12 +101,12 @@ enum ov5640_mode_id {
 	OV5640_MODE_QCIF_176_144 = 0,
 	OV5640_MODE_QVGA_320_240,
 	OV5640_MODE_VGA_640_480,
-	OV5640_MODE_NTSC_720_480,
+	/*OV5640_MODE_NTSC_720_480,
 	OV5640_MODE_PAL_720_576,
 	OV5640_MODE_XGA_1024_768,
 	OV5640_MODE_720P_1280_720,
 	OV5640_MODE_1080P_1920_1080,
-	OV5640_MODE_QSXGA_2592_1944,
+	OV5640_MODE_QSXGA_2592_1944,*/
 	OV5640_NUM_MODES,
 };
 
@@ -719,7 +719,7 @@ ov5640_mode_data[OV5640_NUM_FRAMERATES][OV5640_NUM_MODES] = {
 		 640, 1896, 480, 1080,
 		 ov5640_setting_15fps_VGA_640_480,
 		 ARRAY_SIZE(ov5640_setting_15fps_VGA_640_480)},
-		{OV5640_MODE_NTSC_720_480, SUBSAMPLING,
+		/*{OV5640_MODE_NTSC_720_480, SUBSAMPLING,
 		 720, 1896, 480, 984,
 		 ov5640_setting_15fps_NTSC_720_480,
 		 ARRAY_SIZE(ov5640_setting_15fps_NTSC_720_480)},
@@ -742,7 +742,7 @@ ov5640_mode_data[OV5640_NUM_FRAMERATES][OV5640_NUM_MODES] = {
 		{OV5640_MODE_QSXGA_2592_1944, SCALING,
 		 2592, 2844, 1944, 1968,
 		 ov5640_setting_15fps_QSXGA_2592_1944,
-		 ARRAY_SIZE(ov5640_setting_15fps_QSXGA_2592_1944)},
+		 ARRAY_SIZE(ov5640_setting_15fps_QSXGA_2592_1944)},*/
 	}, {
 		{OV5640_MODE_QCIF_176_144, SUBSAMPLING,
 		 176, 1896, 144, 984,
@@ -756,7 +756,7 @@ ov5640_mode_data[OV5640_NUM_FRAMERATES][OV5640_NUM_MODES] = {
 		 640, 1896, 480, 1080,
 		 ov5640_setting_30fps_VGA_640_480,
 		 ARRAY_SIZE(ov5640_setting_30fps_VGA_640_480)},
-		{OV5640_MODE_NTSC_720_480, SUBSAMPLING,
+		/*{OV5640_MODE_NTSC_720_480, SUBSAMPLING,
 		 720, 1896, 480, 984,
 		 ov5640_setting_30fps_NTSC_720_480,
 		 ARRAY_SIZE(ov5640_setting_30fps_NTSC_720_480)},
@@ -776,7 +776,7 @@ ov5640_mode_data[OV5640_NUM_FRAMERATES][OV5640_NUM_MODES] = {
 		 1920, 2500, 1080, 1120,
 		 ov5640_setting_30fps_1080P_1920_1080,
 		 ARRAY_SIZE(ov5640_setting_30fps_1080P_1920_1080)},
-		{OV5640_MODE_QSXGA_2592_1944, -1, 0, 0, 0, 0, NULL, 0},
+		{OV5640_MODE_QSXGA_2592_1944, -1, 0, 0, 0, 0, NULL, 0},*/
 	},
 };
 
@@ -862,6 +862,7 @@ static int ov5640_read_reg(struct ov5640_dev *sensor, u16 reg, u8 *val)
 	}
 
 	*val = buf[0];
+	//dev_err(&client->dev,"%s: reg=0x%x, *val=0x%x\n", __func__, reg, *val);
 	return 0;
 }
 
@@ -1490,8 +1491,8 @@ static int ov5640_set_mode_exposure_calc(struct ov5640_dev *sensor,
 	ret = ov5640_get_binning(sensor);
 	if (ret < 0)
 		return ret;
-	if (ret && mode->id != OV5640_MODE_720P_1280_720 &&
-	    mode->id != OV5640_MODE_1080P_1920_1080)
+	/*if (ret && mode->id != OV5640_MODE_720P_1280_720 &&
+	    mode->id != OV5640_MODE_1080P_1920_1080)*/
 		prev_shutter *= 2;
 
 	/* read preview gain */
@@ -1756,7 +1757,7 @@ static void ov5640_reset(struct ov5640_dev *sensor)
 	if (!sensor->reset_gpio)
 		return;
 
-	gpiod_set_value_cansleep(sensor->reset_gpio, 0);
+	gpiod_set_value_cansleep(sensor->reset_gpio, 1);
 
 	/* camera power cycle */
 	ov5640_power(sensor, false);
@@ -1764,10 +1765,10 @@ static void ov5640_reset(struct ov5640_dev *sensor)
 	ov5640_power(sensor, true);
 	usleep_range(5000, 10000);
 
-	gpiod_set_value_cansleep(sensor->reset_gpio, 1);
+	gpiod_set_value_cansleep(sensor->reset_gpio, 0);
 	usleep_range(1000, 2000);
 
-	gpiod_set_value_cansleep(sensor->reset_gpio, 0);
+	gpiod_set_value_cansleep(sensor->reset_gpio, 1);
 	usleep_range(5000, 10000);
 }
 
@@ -1793,7 +1794,7 @@ static int ov5640_set_power_on(struct ov5640_dev *sensor)
 #endif
 	ov5640_reset(sensor);
 	ov5640_power(sensor, true);
-
+	msleep(1);
 	ret = ov5640_init_slave_id(sensor);
 	if (ret)
 		goto power_off;
@@ -2744,10 +2745,18 @@ static int ov5640_probe(struct i2c_client *client,
 	fmt->height = 480;
 	fmt->field = V4L2_FIELD_NONE;
 	sensor->frame_interval.numerator = 1;
+	#if 0
 	sensor->frame_interval.denominator = ov5640_framerates[OV5640_30_FPS];
 	sensor->current_fr = OV5640_30_FPS;
 	sensor->current_mode =
 		&ov5640_mode_data[OV5640_30_FPS][OV5640_MODE_VGA_640_480];
+	#else
+		 sensor->frame_interval.denominator = ov5640_framerates[OV5640_15_FPS];
+		 sensor->current_fr = OV5640_15_FPS;
+		 sensor->current_mode =
+				 &ov5640_mode_data[OV5640_15_FPS][OV5640_MODE_VGA_640_480];
+	#endif
+
 	sensor->last_mode = sensor->current_mode;
 
 	sensor->ae_target = 52;
@@ -2796,14 +2805,14 @@ static int ov5640_probe(struct i2c_client *client,
 			sensor->xclk_freq);
 		return -EINVAL;
 	}
-
+#endif
 	/* request optional power down pin */
 	sensor->pwdn_gpio = devm_gpiod_get_optional(dev, "powerdown",
 						    GPIOD_OUT_HIGH);
 	/* request optional reset pin */
 	sensor->reset_gpio = devm_gpiod_get_optional(dev, "reset",
 						     GPIOD_OUT_HIGH);
-#endif
+//#endif
 	sensor->xclk_freq = 24000000;
 	v4l2_i2c_subdev_init(&sensor->sd, client, &ov5640_subdev_ops);
 

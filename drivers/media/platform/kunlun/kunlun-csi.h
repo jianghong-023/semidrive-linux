@@ -99,7 +99,7 @@ struct kstream_video {
 	struct v4l2_format active_fmt;
 	struct list_head buf_list;
 	unsigned int sequence;
-
+	u8 id;	/* stream id */
 	struct mutex lock;
 	struct mutex q_lock;
 	spinlock_t buf_lock;
@@ -152,7 +152,7 @@ struct csi_core {
 	struct device *dev;
 	void __iomem *base;
 	u32 irq;
-
+	u32 host_id;	/* host ip id */
 	struct mutex lock;
 
 	struct v4l2_device v4l2_dev;
@@ -161,6 +161,7 @@ struct csi_core {
 	struct v4l2_fwnode_endpoint vep;
 
 	unsigned int  mbus_type;
+	unsigned int mipi_stream_num;
 
 	struct list_head kstreams;
 	unsigned int kstream_nums;

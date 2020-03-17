@@ -32,11 +32,12 @@
 
 #define IMG_STRIDE_(n)				(0x18 + (n) * 4)
 
-#define IMG_IMG_SIZE				0x24
+#define IMG_IMG_SIZE				(0x24)
+
 #define IMG_SIZE_WIDTH_SHIFT		16
 #define IMG_SIZE_HEIGHT_SHIFT		0
 
-#define IMG_CTRL					0x28
+#define IMG_CTRL					(0x28)
 #define IMG_FC_DUAL					BIT(13)
 #define IMG_MIMG_YUV422				BIT(6)
 #define IMG_MIMG_YUV420_LEGACY		BIT(4)
@@ -49,15 +50,16 @@
 #define IMG_PIXEL_VLD_ODD_SHIFT		9
 #define IMG_VSYNC_MASK_SHIFT		7
 
-#define IMG_MASK_0					0x2C
-#define IMG_MASK_1					0x30
+#define IMG_MASK_0				(0x2C)
+#define IMG_MASK_1				(0x30)
 
 #define IMG_CROP_(n)				(0x44 + (n) * 4)
 #define IMG_CROP_MASK				0xFFFFFFFF
 #define IMG_CROP_LEN_SHIFT			16
 #define IMG_CROP_POS_SHIFT			0
 
-#define IMG_CHN_CTRL				0x34
+#define IMG_CHN_CTRL				(0x34)
+
 #define IMG_PIXEL_ENDIAN_SHIFT		7
 #define IMG_PIXEL_ROUNDING			BIT(6)
 #define IMG_PIXEL_CROP_MASK			0x38
@@ -87,8 +89,8 @@
 #define IMG_SHADOW_UPDATE_SHIFT		4
 #define IMG_SHADOW_SET_SHIFT		0
 
-#define IMG_BADDR_H_(n)				(0x00 + (n) * 8)
-#define IMG_BADDR_L_(n)				(0x04 + (n) * 8)
+#define IMG_BADDR_H_(n)			(0x00 + (n) * 8)
+#define IMG_BADDR_L_(n)			(0x04 + (n) * 8)
 #define IMG_BADDR_H_MASK			0xFF00000000
 #define IMG_BADDR_H_SHIFT			32
 #define IMG_BADDR_L_MASK			0xFFFFFFFF
@@ -312,7 +314,10 @@ static int kstream_set_stride(struct kstream_device *kstream)
 	if(pos_i >= ARRAY_SIZE(mbus_fmts))
 		return -EINVAL;
 
-	width = in_fmt->width - (1 + mbus_fmts[pos_i].pix_odd);
+	if((kstream->core->host_id==0) || (kstream->core->host_id==1))
+		width = in_fmt->width - 1;
+	else
+		width = in_fmt->width - (1 + mbus_fmts[pos_i].pix_odd);
 	height = in_fmt->height - 1;
 
 	WARN_ON(width <= 0 || height <= 0);
@@ -336,7 +341,8 @@ static int kstream_set_wdma(struct kstream_device *kstream)
 	int pos, i;
 	u32 dfifo = 0x400008;
 	u32 cfifo = 0x04;
-	u32 axi0 = 0x3C8;
+	//u32 axi0 = 0x3C8;
+	u32 axi0 = 0xa18;
 	u32 axi1 = 0x00;
 	u32 axi2 = 0x0B;
 
@@ -353,7 +359,7 @@ static int kstream_set_wdma(struct kstream_device *kstream)
 	}
 
 	kcsi_set(kstream->core->base, IMG_REG_LOAD,
-			REG_LOAD_WDMA_CFG | REG_LOAD_WDMA_ARB);
+			REG_LOAD_WDMA_CFG/* | REG_LOAD_WDMA_ARB*/);
 	return 0;
 }
 
@@ -403,16 +409,25 @@ static int kstream_set_para_bt(struct kstream_device *kstream)
 			break;
 	}
 
-	if(kstream->id && (kstream->interface.mbus_type == V4L2_MBUS_CSI2))
-		return 0;
+	value2 = 1<<BT_VSYNC_EDGE_SHIFT;
 
-	kcsi_writel(kstream->core->base, IMG_PARA_BT0_(kstream->id), value0);
-	kcsi_writel(kstream->core->base, IMG_PARA_BT1_(kstream->id), value1);
-	kcsi_writel(kstream->core->base, IMG_PARA_BT2_(kstream->id), value2);
-	for(i = 0; i < PIXEL_MAP_COUNT; i++)
-		kcsi_writel(kstream->core->base,
-				IMG_PARA_MAP_(kstream->id,i), map[i]);
-
+	if(kstream->interface.mbus_type == V4L2_MBUS_CSI2){
+		kcsi_writel(kstream->core->base, IMG_PARA_BT0_(0), value0);
+		value1 = 0x2800005;
+		kcsi_writel(kstream->core->base, IMG_PARA_BT1_(0), value1);
+		kcsi_writel(kstream->core->base, IMG_PARA_BT2_(0), value2);
+		for(i = 0; i < PIXEL_MAP_COUNT; i++)
+			kcsi_writel(kstream->core->base,
+					IMG_PARA_MAP_(0,i), map[i]);
+	} else {
+		kcsi_writel(kstream->core->base, IMG_PARA_BT0_(kstream->id), value0);
+		value1 = 0x2800005;
+		kcsi_writel(kstream->core->base, IMG_PARA_BT1_(kstream->id), value1);
+		kcsi_writel(kstream->core->base, IMG_PARA_BT2_(kstream->id), value2);
+		for(i = 0; i < PIXEL_MAP_COUNT; i++)
+			kcsi_writel(kstream->core->base,
+					IMG_PARA_MAP_(kstream->id,i), map[i]);
+	}
 	return 0;
 }
 
@@ -427,8 +442,13 @@ static int kstream_set_channel(struct kstream_device *kstream)
 		return pos;
 
 	for(n = 0; n < IMG_HW_NUM_PLANES; n++) {
-		kcsi_writel(kstream->base, IMG_CHN_SPLIT_(n), pix_fmts[pos].split[n]);
-		kcsi_writel(kstream->base, IMG_CHN_PACK_(n), pix_fmts[pos].pack[n]);
+		if((kstream->core->host_id==0) || (kstream->core->host_id==1)){
+			kcsi_writel(kstream->base, IMG_CHN_SPLIT_(n), 0x13);
+			kcsi_writel(kstream->base, IMG_CHN_PACK_(n), 0x108);
+		} else {
+			kcsi_writel(kstream->base, IMG_CHN_SPLIT_(n), pix_fmts[pos].split[n]);
+			kcsi_writel(kstream->base, IMG_CHN_PACK_(n), pix_fmts[pos].pack[n]);
+		}
 		if(n < pix_fmt->num_planes)
 			ctrl |= ((1 << n) << IMG_PIXEL_STREAM_EN_SHIFT);
 	}
@@ -517,12 +537,15 @@ static int kstream_set_pixel_ctrl(struct kstream_device *kstream)
 
 	val |= (0x01 << IMG_VSYNC_MASK_SHIFT);
 
-	val |= (mbus_fmts[i].pix_even << IMG_PIXEL_VLD_EVEN_SHIFT);
-	val |= (mbus_fmts[i].pix_odd << IMG_PIXEL_VLD_ODD_SHIFT);
-
+	if(kstream->core->host_id==2) {
+		val |= (mbus_fmts[i].pix_even << IMG_PIXEL_VLD_EVEN_SHIFT);
+		val |= (mbus_fmts[i].pix_odd << IMG_PIXEL_VLD_ODD_SHIFT);
+	}
+	//val = 0x4a82;
 	kcsi_clr_and_set(kstream->base, IMG_CTRL, IMG_PIXEL_CTRL_MASK, val);
 
-	val = 0x55 << REG_UPDATE_SHIFT;
+	//val = 0x55 << REG_UPDATE_SHIFT;
+	val = 0xff << REG_UPDATE_SHIFT;
 	kcsi_set(kstream->core->base, IMG_REG_LOAD, val);
 	return 0;
 }
@@ -597,7 +620,6 @@ static int kstream_set_baddr(struct kstream_device *kstream)
 	for(i = 0; i < format->num_planes; i++) {
 		addr_h = (kbuf->paddr[i] & IMG_BADDR_H_MASK) >> IMG_BADDR_H_SHIFT;
 		addr_l = (kbuf->paddr[i] & IMG_BADDR_L_MASK) >> IMG_BADDR_L_SHIFT;
-
 		kcsi_writel(kstream->base, IMG_BADDR_H_(i), addr_h);
 		kcsi_writel(kstream->base, IMG_BADDR_L_(i), addr_l);
 	}
@@ -1368,7 +1390,8 @@ static void kunlun_stream_init_interface(struct kstream_device *kstream)
 	switch(kstream->interface.mbus_type) {
 	case V4L2_MBUS_PARALLEL:
 	case KUNLUN_MBUS_DC2CSI1:
-		val |= IMG_PARALLEL_SEL;
+		//val |= IMG_PARALLEL_SEL;
+		val |= 2;
 		break;
 	case V4L2_MBUS_CSI2:
 	case KUNLUN_MBUS_DC2CSI2:
@@ -1442,6 +1465,7 @@ int kunlun_stream_register_entities(struct kstream_device *kstream,
 
 	video->core = kstream->core;
 	video->dev = kstream->dev;
+	video->id = kstream->id;
 	ret = kunlun_stream_video_register(video, v4l2_dev);
 	if(ret < 0) {
 		dev_err(dev, "Failed to register video device: %d\n", ret);
