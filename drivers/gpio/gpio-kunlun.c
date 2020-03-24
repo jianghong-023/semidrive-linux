@@ -294,13 +294,6 @@ static u32 kunlun_do_irq(struct kunlun_gpio_port *port)
 		GPIO_INT_EDGE_CLR_PORT_X(reg_idx),
 		(reg_read | BIT(bit_idx)));
 
-	/* inverse level for both edge trigger */
-	kunlun_write(gpio,
-		GPIO_TOGGLE_PIN_X(reg_idx * 32 + bit_idx),
-		BIT(GPIO_CTRL_INT_POL_BIT));
-	dev_err(gpio->dev, "do_irq: interrupt polarity toggled ! bit[%lu]\n",
-		BIT(GPIO_CTRL_INT_POL_BIT));
-
 	while (irq_status) {
 		int irq_bit = fls(irq_status) - 1;
 		int gpio_irq = irq_find_mapping(port->domain, irq_bit);
@@ -335,15 +328,17 @@ static void kunlun_irq_enable(struct irq_data *d)
 	struct irq_chip_generic *igc = irq_data_get_irq_chip_data(d);
 	struct kunlun_gpio_port *port = igc->private;
 	struct kunlun_gpio *gpio = port->gpio;
-	struct gpio_chip *gc = &gpio->ports[0].gc;
+	struct gpio_chip *gc;
 	unsigned long flags;
 	u32 val;
-	unsigned int reg_idx;
+	unsigned int reg_idx = 0;
 	unsigned int bit_idx;
 	unsigned long reg_read;
 
 	reg_idx = port->idx;
 	bit_idx = d->hwirq + gpio->k_port_idx[reg_idx - 1].hwirq_start;
+
+	gc = &gpio->ports[reg_idx - 1].gc;
 
 	dev_err(gpio->dev, "%s: hwirq[%lu], bit_idx[%d], reg_idx[%d]\n",
 		__func__, d->hwirq, bit_idx, reg_idx);
@@ -359,32 +354,6 @@ static void kunlun_irq_enable(struct irq_data *d)
 		GPIO_CLEAR_PIN_X((reg_idx * 32 + bit_idx)),
 		BIT(GPIO_CTRL_INT_MASK_BIT));
 
-	/* enable debounce */
-	kunlun_write(gpio,
-		GPIO_SET_PIN_X((reg_idx * 32 + bit_idx)),
-		BIT(GPIO_CTRL_INT_DEB_EN_BIT));
-
-	/* clock source select 32k(1) */
-	kunlun_write(gpio,
-		GPIO_SET_PIN_X((reg_idx * 32 + bit_idx)),
-		BIT(GPIO_CTRL_INT_CLK_SEL_BIT));
-
-	kunlun_write(gpio,
-		GPIO_SET_PIN_X((reg_idx * 32 + bit_idx)),
-		BIT(GPIO_CTRL_INT_LEV_SYNC_BIT));
-
-	kunlun_write(gpio,
-		GPIO_CLEAR_PIN_X((reg_idx * 32 + bit_idx)),
-		BIT(GPIO_CTRL_INT_BOTH_EDGE_BIT));
-
-	kunlun_write(gpio,
-		GPIO_CLEAR_PIN_X((reg_idx * 32 + bit_idx)),
-		BIT(GPIO_CTRL_INT_TYPE_BIT));
-
-	kunlun_write(gpio,
-		GPIO_CLEAR_PIN_X((reg_idx * 32 + bit_idx)),
-		BIT(GPIO_CTRL_DIR_BIT));
-
 	/* INT EN */
 	kunlun_write(gpio,  GPIO_INT_EN_PORT_X(reg_idx), val);
 
@@ -399,14 +368,16 @@ static void kunlun_irq_disable(struct irq_data *d)
 	struct irq_chip_generic *igc = irq_data_get_irq_chip_data(d);
 	struct kunlun_gpio_port *port = igc->private;
 	struct kunlun_gpio *gpio = port->gpio;
-	struct gpio_chip *gc = &gpio->ports[0].gc;
+	struct gpio_chip *gc;
 	unsigned long flags;
 	u32 val;
-	unsigned int reg_idx;
+	unsigned int reg_idx = 0;
 	unsigned int bit_idx;
 
 	reg_idx = port->idx;
 	bit_idx = d->hwirq + gpio->k_port_idx[reg_idx-1].hwirq_start;
+
+	gc = &gpio->ports[reg_idx - 1].gc;
 
 	dev_err(gpio->dev, "%s: hwirq[%lu], bit_idx:[%d], reg_idx:[%d]\n",
 		__func__, d->hwirq, bit_idx, reg_idx);
@@ -424,7 +395,12 @@ static int kunlun_irq_reqres(struct irq_data *d)
 	struct irq_chip_generic *igc = irq_data_get_irq_chip_data(d);
 	struct kunlun_gpio_port *port = igc->private;
 	struct kunlun_gpio *gpio = port->gpio;
-	struct gpio_chip *gc = &gpio->ports[0].gc;
+	struct gpio_chip *gc;
+	unsigned int reg_idx = 0;
+
+	reg_idx = port->idx;
+	dev_err(gpio->dev, "%s: reg_idx %d\n", __func__, reg_idx);
+	gc = &gpio->ports[reg_idx - 1].gc;
 
 	dev_err(gpio->dev, "%s: hwirq %lu\n", __func__, irqd_to_hwirq(d));
 
@@ -441,7 +417,12 @@ static void kunlun_irq_relres(struct irq_data *d)
 	struct irq_chip_generic *igc = irq_data_get_irq_chip_data(d);
 	struct kunlun_gpio_port *port = igc->private;
 	struct kunlun_gpio *gpio = port->gpio;
-	struct gpio_chip *gc = &gpio->ports[0].gc;
+	struct gpio_chip *gc;
+	unsigned int reg_idx = 0;
+
+	reg_idx = port->idx;
+	dev_err(gpio->dev, "%s: reg_idx %d\n", __func__, reg_idx);
+	gc = &gpio->ports[reg_idx - 1].gc;
 
 	gpiochip_unlock_as_irq(gc, irqd_to_hwirq(d));
 }
@@ -451,20 +432,23 @@ static int kunlun_irq_set_type(struct irq_data *d, u32 type)
 	struct irq_chip_generic *igc = irq_data_get_irq_chip_data(d);
 	struct kunlun_gpio_port *port = igc->private;
 	struct kunlun_gpio *gpio = port->gpio;
-	struct gpio_chip *gc = &gpio->ports[0].gc;
+	struct gpio_chip *gc;
 	unsigned long flags;
 	unsigned int reg_idx = 0;
 	unsigned int bit_idx;
 
+	reg_idx = port->idx;
+	dev_err(gpio->dev, "%s: reg_idx %d\n", __func__, reg_idx);
+	gc = &gpio->ports[reg_idx - 1].gc;
+
 	dev_err(gpio->dev, "%s: %d\n", __func__, type);
 
 	if (type & ~(IRQ_TYPE_EDGE_RISING | IRQ_TYPE_EDGE_FALLING |
-		     IRQ_TYPE_LEVEL_HIGH | IRQ_TYPE_LEVEL_LOW))
+		     IRQ_TYPE_LEVEL_HIGH | IRQ_TYPE_LEVEL_LOW | IRQ_TYPE_EDGE_BOTH))
 		return -EINVAL;
 
 	spin_lock_irqsave(&gc->bgpio_lock, flags);
 
-	reg_idx = port->idx;
 	bit_idx = d->hwirq + gpio->k_port_idx[reg_idx-1].hwirq_start;
 
 	dev_err(gpio->dev, "%s: reg_idx[%d], hwirq[%lu], bit_idx[%u]\n",
