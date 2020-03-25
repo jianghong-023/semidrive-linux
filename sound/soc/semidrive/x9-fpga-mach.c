@@ -260,12 +260,14 @@ static struct platform_driver x9_fpga_mach_driver = {
 	    .of_match_table = x9_cs42888_dt_match,
 #ifdef CONFIG_PM
 	    .pm = &snd_soc_pm_ops,
-	    .suspend = snd_x9_suspend,
-	    .resume = snd_x9_resume,
 #endif
 	},
-    .probe = x9_fpga_probe,
-    .remove = x9_fpga_remove,
+	.probe = x9_fpga_probe,
+	.remove = x9_fpga_remove,
+#ifdef CONFIG_PM
+	.suspend = snd_x9_suspend,
+	.resume = snd_x9_resume,
+#endif
 };
 
 module_platform_driver(x9_fpga_mach_driver);
