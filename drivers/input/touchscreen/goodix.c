@@ -273,7 +273,7 @@ static void goodix_ts_report_touch(struct goodix_ts_data *ts, u8 *coor_data)
 	input_report_abs(ts->input_dev, ABS_MT_POSITION_Y, input_y);
 	input_report_abs(ts->input_dev, ABS_MT_TOUCH_MAJOR, input_w);
 	input_report_abs(ts->input_dev, ABS_MT_WIDTH_MAJOR, input_w);
-	printk("point: (%d, %d)\n", input_x, input_y);
+	//printk("point: (%d, %d)\n", input_x, input_y);
 }
 
 /**
