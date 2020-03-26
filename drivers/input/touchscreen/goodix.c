@@ -82,7 +82,7 @@ struct goodix_ts_data {
 #define MAX_CONTACTS_LOC	5
 #define TRIGGER_LOC		6
 
-#define TP_USE_THREAD 1
+#define TP_USE_THREAD 0
 
 static const unsigned long goodix_irq_flags[] = {
 	IRQ_TYPE_EDGE_RISING,
@@ -274,6 +274,7 @@ static void goodix_ts_report_touch(struct goodix_ts_data *ts, u8 *coor_data)
 	input_report_abs(ts->input_dev, ABS_MT_TOUCH_MAJOR, input_w);
 	input_report_abs(ts->input_dev, ABS_MT_WIDTH_MAJOR, input_w);
 	//printk("point: (%d, %d)\n", input_x, input_y);
+	dev_info(&ts->client->dev, "point: (%d, %d)\n", input_x, input_y);
 }
 
 /**
@@ -317,7 +318,7 @@ static void goodix_process_events(struct goodix_ts_data *ts)
 static irqreturn_t goodix_ts_irq_handler(int irq, void *dev_id)
 {
 	struct goodix_ts_data *ts = dev_id;
-
+    dev_info(&ts->client->dev, "%s\n", __func__);
 	goodix_process_events(ts);
 
 	if (goodix_i2c_write_u8(ts->client, GOODIX_READ_COOR_ADDR, 0) < 0)
@@ -487,7 +488,7 @@ static int goodix_get_gpio_config(struct goodix_ts_data *ts)
 				GOODIX_GPIO_INT_NAME, error);
 		return error;
 	}
-	printk("%s\n", __func__);
+
 	ts->gpiod_int = gpiod;
 
 	/* Get the reset line GPIO pin number */
@@ -531,7 +532,7 @@ static void goodix_read_config(struct goodix_ts_data *ts)
 		ts->max_touch_num = GOODIX_MAX_CONTACTS;
 		return;
 	}
-	printk("%s(): len=%d, 0x%x, 0x%x, 0x%x, 0x%x, 0x%x, 0x%x, 0x%x\n", __func__, ts->cfg_len, config[0], config[1], config[2], config[3], config[4], config[5], config[6]);
+	dev_info(&ts->client->dev, "%s(): len=%d, 0x%x, 0x%x, 0x%x, 0x%x, 0x%x, 0x%x, 0x%x\n", __func__, ts->cfg_len, config[0], config[1], config[2], config[3], config[4], config[5], config[6]);
 	ts->abs_x_max = get_unaligned_le16(&config[RESOLUTION_LOC]);
 	ts->abs_y_max = get_unaligned_le16(&config[RESOLUTION_LOC + 2]);
 	if (ts->swapped_x_y)
@@ -601,7 +602,7 @@ static int goodix_i2c_test(struct i2c_client *client)
 	while (retry++ < 2) {
 		error = goodix_i2c_read(client, GOODIX_REG_CONFIG_DATA,
 					&test, 1);
-		printk("%s(): read test=0x%x\n", __func__, test);
+		dev_info(&client->dev, "%s(): read test=0x%x\n", __func__, test);
 		if (!error)
 			return 0;
 
@@ -708,6 +709,7 @@ printk("%s\n", __func__);
 	#if TP_USE_THREAD
 	kthread_run(goodix_tp_thread, ts, "tp thread");
 	#else
+	ts->client->irq = gpiod_to_irq(ts->gpiod_int);
 	error = goodix_request_irq(ts);
 	if (error) {
 		dev_err(&ts->client->dev, "request IRQ failed: %d\n", error);
@@ -766,13 +768,13 @@ static int goodix_ts_probe(struct i2c_client *client,
 	init_completion(&ts->firmware_loading_complete);
 
 	error = goodix_get_gpio_config(ts);
-	printk("%s(): get_gpio error=%d \n", __func__, error);
+	dev_err(&client->dev, "%s(): get_gpio error=%d \n", __func__, error);
 	if (error)
 		return error;
 
 	if (ts->gpiod_int && ts->gpiod_rst) {
 		/* reset the controller */
-		printk("%s(): call reset\n", __func__);
+		dev_err(&client->dev, "%s(): call reset\n", __func__);
 		error = goodix_reset(ts);
 		if (error) {
 			dev_err(&client->dev, "Controller reset failed.\n");
@@ -786,7 +788,7 @@ static int goodix_ts_probe(struct i2c_client *client,
 		#if 0
 		return error;
 		#else
-		printk("%s: switch address\n", __func__);
+		dev_err(&client->dev, "%s: switch address\n", __func__);
 		client->addr = 0x14;
 		error = goodix_i2c_test(client);
 		if (error){
@@ -822,7 +824,7 @@ static int goodix_ts_probe(struct i2c_client *client,
 
 		return 0;
 	} else {
-		printk("%s(): do else \n", __func__);
+		dev_err(&client->dev, "%s(): do else \n", __func__);
 		error = goodix_configure_dev(ts);
 		if (error)
 			return error;
