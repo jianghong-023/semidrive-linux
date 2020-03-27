@@ -175,6 +175,11 @@ static int xen_starting_cpu(unsigned int cpu)
 
 	err = HYPERVISOR_vcpu_op(VCPUOP_register_vcpu_info, xen_vcpu_nr(cpu),
 				 &info);
+	pr_info("Xen: info mfn=0x%llx, offset=%d\n", info.mfn, info.offset);
+	pr_info("Xen: err=%d, cpu=%d, vcpu_nr=%d, vcpup=%p, xen_vcpu_info=%p\n", err, cpu, xen_vcpu_nr(cpu),
+		vcpup,
+		xen_vcpu_info);
+
 	BUG_ON(err);
 	per_cpu(xen_vcpu, cpu) = vcpup;
 
@@ -370,15 +375,16 @@ static int __init xen_guest_init(void)
 
 	/* xen_vcpu is a pointer to the vcpu_info struct in the shared_info
 	 * page, we use it in the event channel upcall and in some pvclock
-	 * related functions. 
+	 * related functions.
 	 * The shared info contains exactly 1 CPU (the boot CPU). The guest
 	 * is required to use VCPUOP_register_vcpu_info to place vcpu info
 	 * for secondary CPUs as they are brought up.
 	 * For uniformity we use VCPUOP_register_vcpu_info even on cpu0.
 	 */
-	xen_vcpu_info = alloc_percpu(struct vcpu_info);
+	xen_vcpu_info = alloc_reserved_percpu(struct vcpu_info);
 	if (xen_vcpu_info == NULL)
 		return -ENOMEM;
+	pr_info("Xen: 1 xen_vcpu_info=%p\n", xen_vcpu_info);
 
 	/* Direct vCPU id mapping for ARM guests. */
 	for_each_possible_cpu(cpu)
@@ -391,6 +397,7 @@ static int __init xen_guest_init(void)
 		free_percpu(xen_vcpu_info);
 		return -ENOMEM;
 	}
+	pr_info("Xen: 2 xen_vcpu_info=%p\n", xen_vcpu_info);
 	gnttab_init();
 	if (!xen_initial_domain())
 		xenbus_probe(NULL);

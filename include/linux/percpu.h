@@ -149,4 +149,8 @@ extern phys_addr_t per_cpu_ptr_to_phys(void *addr);
 	(typeof(type) __percpu *)__alloc_percpu(sizeof(type),		\
 						__alignof__(type))
 
+#define alloc_reserved_percpu(type)						\
+	(typeof(type) __percpu *)__alloc_reserved_percpu(sizeof(type),		\
+						__alignof__(type))
+
 #endif /* __LINUX_PERCPU_H */
