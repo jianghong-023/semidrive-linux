@@ -178,7 +178,7 @@ static int set_post_param(struct dcparam *param)
 
 static int frame_config(void)
 {
-	struct dc_ops *ops = disp_res->dc.ops;
+	struct dc_ops *ops = (struct dc_ops *)disp_res->dc.ops;
 
 	ops->config(&disp_res->dc, dpu_info);
 
