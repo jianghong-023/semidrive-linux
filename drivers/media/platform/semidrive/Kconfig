@@ -14,7 +14,7 @@ config SEMIDRIVE_VPU_CODA988
 
 
 config SEMIDRIVE_VPU_WAVE412
-	tristate "codec vpu wave412"
+	tristate "semidrive vpu wave412"
 	---help---
 	    This driver provides downloading VPU firmware and
 	    communicating with VPU. This driver for hw video
