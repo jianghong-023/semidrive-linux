@@ -156,7 +156,7 @@ void arm_smccc_native(unsigned long function_id,
 			unsigned long arg0, unsigned long arg1,
 			unsigned long arg2, struct arm_smccc_res *res)
 {
-	int cpunum = arg0;
+	int cpunum = ((arg0>>8) & 0xff);
 	uint32_t value;
 	void __iomem *iobase;
 	unsigned long pbootbase = arg1;
