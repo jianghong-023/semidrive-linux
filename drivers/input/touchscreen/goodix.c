@@ -785,7 +785,7 @@ static int goodix_ts_probe(struct i2c_client *client,
 	error = goodix_i2c_test(client);
 	if (error) {
 		dev_err(&client->dev, "I2C communication failure: %d\n", error);
-		#if 0
+		#if 1
 		return error;
 		#else
 		dev_err(&client->dev, "%s: switch address\n", __func__);
