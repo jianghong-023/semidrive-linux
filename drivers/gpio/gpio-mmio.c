@@ -148,8 +148,6 @@ static int bgpio_get_set(struct gpio_chip *gc, unsigned int gpio)
 		val = !!(gc->read_reg(gc->reg_dat) & pinmask);
 	}
 
-	printk(KERN_ERR "bgpio_get_set: gpio[%d], pinmask[%lu], val [0x%8x]\n",
-					gpio, pinmask, val);
 	return val;
 }
 
@@ -158,8 +156,7 @@ static int bgpio_get(struct gpio_chip *gc, unsigned int gpio)
 	int val = 0;
 
 	val = !!(gc->read_reg(gc->reg_dat) & gc->pin2mask(gc, gpio));
-	printk(KERN_ERR "bgpio_get: gpio[%d], pinmask[%lu], val[0x%8x]\n",
-			gpio, gc->pin2mask(gc, gpio), val);
+
 	return val;
 }
 
