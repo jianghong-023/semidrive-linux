@@ -292,7 +292,7 @@ static void goodix_process_events(struct goodix_ts_data *ts)
 	int i;
 
 	touch_num = goodix_ts_read_input_report(ts, point_data);
-	if (touch_num < 0)
+	if ((touch_num < 0) || (point_data[0]==0))
 		return;
 
 	/*
