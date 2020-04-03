@@ -20,4 +20,17 @@ config VMM_TYPE
 	string "gpu virtualisation manager type"
 	help
 	  choose correct gpu vmm type
+
+config BUFFER_SYNC
+	bool "gpu buffer sync"
+	default n
+	help
+	  use buffer sync function,GNU/Linux requires it.
+	  But Android doesn't need this, set default=n
+
+config PVR_KMD_DEBUG
+	bool "debug version"
+	default y
+	help
+	 choose debug or release version
 endif

@@ -9,15 +9,19 @@
 #define PVRSRV_APPHINT_OSIDREGION1MAX  "0x3FFFFFFF 0x3FFFFFFF 0x3FFFFFFF 0x3FFFFFFF 0x3FFFFFFF 0x3FFFFFFF 0x3FFFFFFF 0x3FFFFFFF"
 #define RGX_FW_FILENAME "rgx.fw"
 #define LINUX 
+#ifdef PVR_KMD_DEBUG
 #define PVR_BUILD_TYPE "debug"
+#define DEBUG
+#define DEBUG_LINUX_MEMORY_ALLOCATIONS
+#define DEBUG_LINUX_MEM_AREAS
+#define DEBUG_LINUX_MMAP_AREAS
+#define DEBUG_HANDLEALLOC_KM
+#else
+#define PVR_BUILD_TYPE "release"
+#endif
 #define PVRSRV_MODNAME "pvrsrvkm"
 #define PVRSYNC_MODNAME "pvr_sync"
 #define SUPPORT_RGX 1
-#define DEBUG 
-#define DEBUG_LINUX_MEMORY_ALLOCATIONS 
-#define DEBUG_LINUX_MEM_AREAS 
-#define DEBUG_LINUX_MMAP_AREAS 
-#define DEBUG_HANDLEALLOC_KM 
 #define RGXFW_ALIGNCHECKS 
 #if (PVR_SYSTEM_CLEAN==9226)
 #define RGX_BVNC_CORE_KM_HEADER "cores/rgxcore_km_24.67.104.504.h"
@@ -153,6 +157,4 @@
 #define PVR_ANDROID_ION_PRIV_HEADER "../drivers/staging/android/ion/ion_priv.h"
 #define PVR_ANDROID_ION_USE_SG_LENGTH 
 #define PVR_ANDROID_SYNC_HEADER "linux/sync.h"
-#else
-#define SUPPORT_BUFFER_SYNC 1
 #endif

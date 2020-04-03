@@ -44,7 +44,18 @@ override SUPPORT_BUFFER_SYNC := 1
 override undefine ANDROID
 endif
 
+ifeq ($(CONFIG_BUFFER_SYNC),y)
+override SUPPORT_BUFFER_SYNC := 1
+endif
+
+ifeq ($(CONFIG_PVR_KMD_DEBUG),y)
 override PVR_BUILD_TYPE := debug
+override BUILD := debug
+else
+override PVR_BUILD_TYPE := release
+override BUILD := release
+endif
+
 override KERNEL_COMPONENTS := pvrsrvkm
 override SUPPORT_GPUTRACE_EVENTS := 1
 override SUPPORT_ION := 1
@@ -62,7 +73,6 @@ override PVRSRV_MODNAME := pvrsrvkm
 override PVRSYNC_MODNAME := pvr_sync
 override SUPPORT_RGX := 1
 override PVR_LOADER := 
-override BUILD := debug
 override PVR_SERVICES_DEBUG := 1
 override undefine PDUMP
 override RGX_TIMECORR_CLOCK := sched
