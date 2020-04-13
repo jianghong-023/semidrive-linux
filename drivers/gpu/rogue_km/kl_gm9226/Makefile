@@ -51,29 +51,41 @@
 # variables are set according to the build's $(KERNEL_COMPONENTS) and
 # $(EXTRA_PVRSRVKM_COMPONENTS). To add a new kernel module to the build, edit
 # these variables in the per-build Makefile.
+PWD := $(patsubst %/,%,$(dir $(abspath $(lastword $(MAKEFILE_LIST)))))
+TOP := $(PWD)/..
+src := $(TOP)
+obj := $(PWD)
+OUT_DIR := $(shell mkdir -p $(PWD)/services/server/env/linux/ $(PWD)/services/server/common/ \
+        $(PWD)/services/shared/common $(PWD)/services/server/devices/rgx \
+        $(PWD)/kernel/drivers/staging/imgtec $(PWD)/services/shared/devices/rgx/ \
+        $(PWD)/generated/cmm_bridge $(PWD)/generated/mm_bridge $(PWD)/generated/sync_bridge \
+        $(PWD)/generated/srvcore_bridge $(PWD)/generated/pvrtl_bridge $(PWD)/generated/dmabuf_bridge \
+        $(PWD)/generated/cache_bridge $(PWD)/generated/rgxta3d_bridge $(PWD)/generated/rgxtq2_bridge \
+        $(PWD)/generated/rgxtq_bridge/ $(PWD)/generated/htbuffer_bridge/ $(PWD)/generated/rgxhwperf_bridge\
+        $(PWD)/generated/rgxkicksync_bridge/  $(PWD)/generated/rgxcmp_bridge/ $(PWD)/generated/rgxray_bridge/\
+        $(PWD)/generated/regconfig_bridge/ $(PWD)/generated/debugmisc_bridge $(PWD)/generated/timerquery_bridge/ \
+        $(PWD)/generated/devicememhistory_bridge $(PWD)/generated/ri_bridge $(PWD)/generated/synctracking_bridge\
+        $(PWD)/generated/breakpoint_bridge $(PWD)/generated/rgxsignals_bridge/ $(PWD)/services/system/common\
+        $(PWD)/services/server/devices/rgx/env/linux/km $(PWD)/services/system/kl_gm9226 \
+        $(PWD)/services/system/common/env/linux/ $(PWD)/services/system/common/env/xen/)
 
-include $(OUT)/config_kernel.mk
+include $(PWD)/config_kernel.mk
 
-.SECONDARY:
+PVRSRVKM_NAME := $(PVRSRV_MODNAME)
 
-define symlink-source-file
-@if [ ! -e $(dir $@) ]; then mkdir -p $(dir $@); fi
-@if [ ! -h $@ ]; then ln -sf $< $@; fi
-endef
+bridge_base := $(TOP)/generated
 
-bridge_base := $(BRIDGE_SOURCE_ROOT)
+ifeq ($(CONFIG_ANDROID), y)
+ccflags-y += -DANDROID
+endif
 
-$(OUT)/$(TARGET_PRIMARY_ARCH)/kbuild/%.c: $(TOP)/%.c
-	$(symlink-source-file)
+ccflags-y += -DPVR_BUILD_DIR=\"$(PVR_BUILD_DIR)\"
+ccflags-y += -DPVRSRV_VZ_NUM_OSID=$(PVRSRV_VZ_NUM_OSID)
+ccflags-y += -DVMM_TYPE=$(VMM_TYPE)
+ccflags-y += -DPVR_SYSTEM=$(PVR_SYSTEM)
+ccflags-y += -DPVR_SYSTEM_CLEAN=$(PVR_SYSTEM_CLEAN)
 
-$(OUT)/$(TARGET_PRIMARY_ARCH)/kbuild/generated/%.c: $(bridge_base)/%.c
-	$(symlink-source-file)
-
-$(OUT)/$(TARGET_PRIMARY_ARCH)/kbuild/external/%.c: $(abspath $(srctree))/%.c
-	$(symlink-source-file)
-
-ccflags-y += -D__linux__ -include $(OUT)/config_kernel.h \
- -I$(OUT)/include \
+ccflags-y += -D__linux__ -include $(PWD)/config_kernel.h \
  -I$(TOP)/include \
  -I$(TOP)/include/public \
  -I$(TOP)/hwdefs/km \
@@ -91,7 +103,7 @@ ifeq ($(KERNEL_DRIVER_DIR),)
  ccflags-y += -I$(TOP)/services/system/$(PVR_SYSTEM)
 endif
 
-include $(INTERNAL_KBUILD_MAKEFILES)
+include $(TOP)/services/server/env/linux/Kbuild.mk
 
 ifneq ($(KERNEL_DRIVER_DIR),)
  ccflags-y += \
@@ -101,5 +113,6 @@ endif
 
 $(if $($(PVRSRVKM_NAME)-y),,$(warning $(PVRSRVKM_NAME)-y was empty, which could mean that srvkm is missing from $$(KERNEL_COMPONENTS)))
 $(PVRSRVKM_NAME)-y += $(foreach _m,$(INTERNAL_EXTRA_KBUILD_OBJECTS:.o=),$($(_m)-y))
+#ENABLE_VMM := $(shell ( [ $(PVRSRV_VZ_NUM_OSID) -ge 2 ]) && echo 1 || echo 0)
 
-obj-m += $(INTERNAL_KBUILD_OBJECTS)
+obj-m += $(PVRSRVKM_NAME).o
