@@ -42,6 +42,7 @@ config SND_SOC_ALL_CODECS
 	select SND_SOC_AK4642 if I2C
 	select SND_SOC_AK4671 if I2C
 	select SND_SOC_AK5386
+	select SND_SOC_AK7738
 	select SND_SOC_ALC5623 if I2C
 	select SND_SOC_ALC5632 if I2C
 	select SND_SOC_BT_SCO
@@ -400,6 +401,9 @@ config SND_SOC_ALC5623
 
 config SND_SOC_ALC5632
 	tristate
+
+config SND_SOC_AK7738
+	tristate "AKM AK7738 CODEC"
 
 config SND_SOC_BT_SCO
 	tristate "Dummy BT SCO codec driver"
