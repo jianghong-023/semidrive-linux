@@ -15,6 +15,7 @@
 typedef enum {
     IPCC_ADDR_INVALID           = 0x0,
     IPCC_ADDR_MB_TEST           = 0x05,
+    IPCC_ADDR_VDSP_ANN          = 0x07,
     IPCC_ADDR_ECHO_TEST         = 0x08,
     IPCC_ADDR_RPMSG             = 0x10,
     IPCC_ADDR_RPMSG_TEST        = 0x20,

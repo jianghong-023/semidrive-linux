@@ -61,6 +61,7 @@ obj-$(CONFIG_UID_SYS_STATS)	+= uid_sys_stats.o
 obj-$(CONFIG_MEMORY_STATE_TIME)	+= memory_state_time.o
 #obj-y += sd_display/
 obj-$(CONFIG_KAPROBE) += kaprobe.o
+obj-$(CONFIG_VDSP)    += xtensa-xvp/
 
 lkdtm-$(CONFIG_LKDTM)		+= lkdtm_core.o
 lkdtm-$(CONFIG_LKDTM)		+= lkdtm_bugs.o

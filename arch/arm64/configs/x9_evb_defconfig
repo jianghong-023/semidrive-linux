@@ -4920,6 +4920,14 @@ CONFIG_OPTEE=y
 CONFIG_MEMDISK=y
 
 #
+# xtensa vdsp drivers
+#
+CONFIG_VDSP=y
+CONFIG_XRP=y
+# CONFIG_XRP_DEBUG is not set
+CONFIG_XRP_HW_SEMIDRIVE=m
+
+#
 # Firmware Drivers
 #
 CONFIG_ARM_PSCI_FW=y
