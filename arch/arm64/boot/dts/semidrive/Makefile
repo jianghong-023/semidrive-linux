@@ -13,6 +13,13 @@ dtb-$(CONFIG_ARCH_SEMIDRIVE_X9) += x9_high_evb_ivi_dual-disp-1280x800.dtb
 dtb-$(CONFIG_ARCH_SEMIDRIVE_X9) += x9_high_evb_cluster_single-disp-1920x720.dtb
 dtb-$(CONFIG_ARCH_SEMIDRIVE_X9) += x9_high_evb_controlpanel.dtb
 
+dtb-$(CONFIG_ARCH_SEMIDRIVE_X9) += x9_high_evb_native_ivi.dtb
+dtb-$(CONFIG_ARCH_SEMIDRIVE_X9) += x9_high_evb_native_cluster.dtb
+dtb-$(CONFIG_ARCH_SEMIDRIVE_X9) += x9_high_evb_native_controlpanel.dtb
+dtb-$(CONFIG_ARCH_SEMIDRIVE_X9) += x9_high_ref_native_ivi.dtb
+dtb-$(CONFIG_ARCH_SEMIDRIVE_X9) += x9_high_ref_native_cluster.dtb
+dtb-$(CONFIG_ARCH_SEMIDRIVE_X9) += x9_high_ref_native_controlpanel.dtb
+
 always		:= $(dtb-y)
 subdir-y	:= $(dts-dirs)
 clean-files	:= *.dtb
