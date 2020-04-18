@@ -435,6 +435,18 @@ config HW_RANDOM_MTK
 
 	  If unsure, say Y.
 
+config HW_RANDOM_SEMIDRIVE
+	tristate "semidrive True Random Number Generator support"
+	default HW_RANDOM
+	---help---
+	  This driver provides kernel-side support for the True
+	  Random Number Generator on semidrive hardware platforms.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called semidrive-trng.
+
+	  If unsure, say Y.
+
 config HW_RANDOM_S390
 	tristate "S390 True Random Number Generator support"
 	depends on S390
