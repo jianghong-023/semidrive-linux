@@ -51,8 +51,8 @@ static int kstream_video_querycap(struct file *file, void *fh,
 
 	strlcpy(cap->driver, KUNLUN_IMG_NAME, sizeof(cap->driver));
 	strlcpy(cap->card, KUNLUN_IMG_NAME, sizeof(cap->card));
-	snprintf(cap->bus_info, sizeof(cap->bus_info), "platform:%s",
-			dev_name(video->dev));
+	snprintf(cap->bus_info, sizeof(cap->bus_info), "platform:%s-%d",
+			dev_name(video->dev), video->id);
 
 	return 0;
 }
@@ -250,9 +250,10 @@ static int kstream_video_s_fmt(struct file *file, void *fh,
 	struct kstream_video *video = video_drvdata(file);
 	int ret;
 
-	if(vb2_is_busy(&video->queue))
+	if(vb2_is_busy(&video->queue)){
+		dev_err(video->dev, "%s busy return.\n", __func__);
 		return -EBUSY;
-
+	}
 	ret = __kstream_video_try_format(video, V4L2_SUBDEV_FORMAT_ACTIVE, f);
 	if(ret < 0)
 		return ret;
@@ -489,11 +490,19 @@ static int kstream_enum_framesizes(struct file *file, void *fh,
 	 if(ret)
 		 goto done;
 
+#if 0
 	fsize->type = V4L2_FRMSIZE_TYPE_STEPWISE;
 	fsize->stepwise.min_width = fse.min_width;
 	fsize->stepwise.max_width = fse.max_width;
 	fsize->stepwise.min_height = fse.min_height;
 	fsize->stepwise.max_height = fse.max_height;
+	fsize->stepwise.step_width = 1;
+	fsize->stepwise.step_height = 1;
+#else
+	fsize->type = V4L2_FRMSIZE_TYPE_DISCRETE;
+	fsize->discrete.width = fse.min_width;
+	fsize->discrete.height = fse.min_height;
+#endif
 
 done:
 	v4l2_subdev_free_pad_config(pad_cfg);
