@@ -1775,8 +1775,12 @@ static int xvp_open(struct inode *inode, struct file *filp)
 
 	pr_debug("%s\n", __func__);
 	rc = pm_runtime_get_sync(xvp->dev);
-	if (rc < 0)
+	if (rc < 0) {
+		/* status should be cleared if resume failed */
+		pr_err("%s dev resume failed\n", __func__);
+		pm_runtime_set_suspended(xvp->dev);
 		return rc;
+	}
 
 	xvp_file = devm_kzalloc(xvp->dev, sizeof(*xvp_file), GFP_KERNEL);
 	if (!xvp_file) {
