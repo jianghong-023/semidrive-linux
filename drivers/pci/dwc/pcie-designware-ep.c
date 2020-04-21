@@ -287,6 +287,11 @@ int dw_pcie_ep_init(struct dw_pcie_ep *ep)
 		return -EINVAL;
 	}
 
+	if (pci->iatu_unroll_enabled && !pci->atu_base) {
+		dev_err(dev, "atu_base is not populated\n");
+		return -EINVAL;
+	}
+
 	ret = of_property_read_u32(np, "num-ib-windows", &ep->num_ib_windows);
 	if (ret < 0) {
 		dev_err(dev, "unable to read *num-ib-windows* property\n");
