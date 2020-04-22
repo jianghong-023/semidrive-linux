@@ -130,6 +130,6 @@ kernel/configs/android-*.cfg
 chipcfg
 
 #some directory in aosp kernel git
-build
-configs
-tests
+/build
+/configs
+/tests
