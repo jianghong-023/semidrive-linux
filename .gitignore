@@ -128,3 +128,8 @@ kernel/configs/android-*.cfg
 
 #chipcfg directory
 chipcfg
+
+#some directory in aosp kernel git
+build
+configs
+tests
