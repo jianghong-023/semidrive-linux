@@ -52,7 +52,7 @@ static int rstgen_is_core(unsigned long id)
 static int sdriv_rstgen_assert(struct reset_controller_dev *rcdev,
 		unsigned long id)
 {
-	void __iomem *rstgen_en, *rstgen_status;
+	void __iomem *rstgen_en = NULL, *rstgen_status = NULL;
 	unsigned int value;
 	struct sdriv_rstgen *rstgen = container_of(rcdev, struct sdriv_rstgen, rcdev);
 	struct sdriv_reset_entry *reset_entry;
@@ -365,7 +365,7 @@ static unsigned long reset_mem_to_index(phys_addr_t addr, phys_addr_t core, phys
 static int sdriv_reset_probe(struct platform_device *pdev)
 {
 	struct sdriv_rstgen *rstgen;
-	int i, ret;
+	int i, ret, size;
 	u32 *res_array, res_nr, reg_nr, id;
 	struct sdriv_reset_entry *entry;
 	struct resource res;
@@ -384,18 +384,14 @@ static int sdriv_reset_probe(struct platform_device *pdev)
 	}
 
 	/* Get rstgen resource from dts */
-	ret = device_property_read_u32(dev, "rstgen_resource_num", &res_nr);
-	if (ret) {
-		dev_err(dev, "failed to parse reset num %d\n", ret);
-		return ret;
-	}
-
-	if (res_nr == 0) {
-		dev_err(dev, "no rstgen resource\n");
+	if (!of_get_property(dev->of_node, "rstgen_resource", &size)) {
+		dev_err(dev, "no rstgen_resource property\n");
 		return -ENODATA;
 	}
 
-	res_array = devm_kzalloc(dev, sizeof(*res_array) * res_nr, GFP_KERNEL);
+	res_nr = size/sizeof(u32);
+
+	res_array = devm_kzalloc(dev, size, GFP_KERNEL);
 	if (!res_array)
 		return -ENOMEM;
 
