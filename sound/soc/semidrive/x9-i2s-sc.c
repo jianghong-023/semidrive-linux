@@ -597,11 +597,13 @@ static irqreturn_t x9_i2s_sc_irq_handler(int irq, void *dev_id)
 	/*  TODO: Add rx period elapsed */
 
 	if (i2s_sc_status & BIT_STAT_RDATA_OVERR) {
-		dev_err(afe->dev, "i2s sc overrun! \n");
+		/* remove temporarily
+		 * dev_err(afe->dev, "i2s sc overrun! \n");  */
 	}
 
 	if (i2s_sc_status & BIT_STAT_TDATA_UNDERR) {
-		dev_err(afe->dev, "i2s sc underrun!\n");
+		/* removfe temporarily
+		dev_err(afe->dev, "i2s sc underrun!\n");*/
 	}
 	// x9_pcm_refill_fifo(afe);
 	return IRQ_HANDLED;
