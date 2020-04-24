@@ -244,7 +244,6 @@ static inline void kunlun_write(struct kunlun_gpio *gpio, unsigned int offset,
 static int kunlun_gpio_to_irq(struct gpio_chip *gc, unsigned offset)
 {
 	struct kunlun_gpio_port *port = gpiochip_get_data(gc);
-	struct kunlun_gpio *gpio = port->gpio;
 	int irq;
 
 	irq = irq_find_mapping(port->domain, offset);
@@ -299,7 +298,6 @@ static void kunlun_irq_handler(struct irq_desc *desc)
 {
 	struct kunlun_gpio_port *port = irq_desc_get_handler_data(desc);
 	struct irq_chip *chip = irq_desc_get_chip(desc);
-	struct kunlun_gpio *gpio = port->gpio;
 
 	kunlun_do_irq(port);
 

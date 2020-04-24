@@ -38,8 +38,11 @@ int sd_pmx_set_one_pin_mem(struct sd_pinctrl *ipctl, struct sd_pin *pin)
     mux_val = ((pin_memmap->mux_mode & 0xffffffef) | (pin_memmap->direct_val << 4));
 
 	if (pin_reg && pin_reg->mux_reg) {
-    		writel(mux_val, ipctl->base + pin_reg->mux_reg);
-    		//dev_err(ipctl->dev, "write: offset 0x%x val 0x%x\n", pin_reg->mux_reg, mux_val);
+		/*
+		* changed to dummy pinctrl driver for vm
+    		* writel(mux_val, ipctl->base + pin_reg->mux_reg);
+		* dev_err(ipctl->dev, "write: offset 0x%x val 0x%x\n", pin_reg->mux_reg, mux_val);
+		*/
 	}
 
 	return 0;
@@ -58,8 +61,12 @@ int sd_pinconf_backend_get_mem(struct pinctrl_dev *pctldev,
 		return -EINVAL;
 	}
 
-	if (pin_reg && pin_reg->conf_reg)
-		*config = readl(ipctl->base + pin_reg->conf_reg);
+	if (pin_reg && pin_reg->conf_reg) {
+		/*
+		 * changed to dummy pinctrl driver for vm
+		 * *config = readl(ipctl->base + pin_reg->conf_reg);
+		 */
+	}
 
 	return 0;
 }
@@ -82,10 +89,12 @@ int sd_pinconf_backend_set_mem(struct pinctrl_dev *pctldev,
 	//dev_err(ipctl->dev, "pinconf set pin %s\n", info->pins[pin_id].name);
 
 	for (i = 0; i < num_configs; i++) {
-        	/* TODO: only for Z1 */
 		if (pin_reg && pin_reg->conf_reg) {
-        		writel(configs[i], ipctl->base + pin_reg->conf_reg);
-        		//dev_err(ipctl->dev, "[set_mem] write: offset 0x%x val 0x%lx\n", pin_reg->conf_reg, configs[i]);
+			/*
+			* changed to dummy pinctrl driver for vm
+        		* writel(configs[i], ipctl->base + pin_reg->conf_reg);
+        		* dev_err(ipctl->dev, "[set_mem] write: offset 0x%x val 0x%lx\n", pin_reg->conf_reg, configs[i]);
+			*/
 		}
 	} /* for each config */
 
