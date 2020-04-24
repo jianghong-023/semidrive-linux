@@ -38,6 +38,7 @@
 #define VDI_IOCTL_DEVICE_MEMORY_MAP         _IO(VDI_IOCTL_MAGIC, 13)
 #define VDI_IOCTL_DEVICE_MEMORY_UNMAP       _IO(VDI_IOCTL_MAGIC, 14)
 #define VDI_IOCTL_DEVICE_SRAM_CFG           _IO(VDI_IOCTL_MAGIC, 15)
+#define VDI_IOCTL_DEVICE_GET_SRAM_INFO      _IO(VDI_IOCTL_MAGIC, 16)
 
 /**
  *@Brief Description of buffer memory allocated by driver

@@ -34,6 +34,9 @@
 
 #include <linux/dma-buf.h>
 #include <linux/scatterlist.h>
+#include <linux/reset.h>
+#include <linux/of.h>
+#include <linux/of_address.h>
 
 #include "vpuconfig.h"
 #include "vpu.h"
@@ -107,14 +110,37 @@ struct vpucoda_clk {
     struct clk *core_clk;
 };
 
+/*
+ *sram info: inter sram; soc sram
+ * id  1 inter; 2 soc sram
+ * phy address
+ * size mem size
+ */
+struct sram_info {
+    uint32_t id;
+    uint32_t phy;
+    uint32_t size;
+};
+
 struct wave_drive {
     struct class  *wave_class;
     struct device *wave_device;
     /**/
     struct dentry *debug_root;
+    /* sram[0] inter sram[1] soc sram */
+    struct sram_info  sram[2];
 };
 
 static struct wave_drive drive_data;
+
+/*for APB_SCR_SEC_BASE; will del when scr module is ready */
+struct apb_scr_info {
+    uint32_t  phy_addr;
+    uint32_t  size;
+    uint32_t  virt_addr;
+};
+static struct apb_scr_info scr_info = {0};
+/* will del when src module is ready */
 
 /* x9 plat ignored following */
 #ifdef VPU_SUPPORT_RESERVED_VIDEO_MEMORY
@@ -428,8 +454,6 @@ static irqreturn_t vpu_irq_handler(int irq, void *dev_id)
     int core;
     int product_code;
 
-    DPRINTK("[VPUDRV][+]%s\n", __func__);
-
     for (core = 0; core < MAX_NUM_VPU_CORE; core++) {
         if (s_bit_firmware_info[core].size ==
                 0) {/* it means that we didn't get an information the current core from API layer. No core activated.*/
@@ -458,9 +482,6 @@ static irqreturn_t vpu_irq_handler(int irq, void *dev_id)
             continue;
         }
 
-        DPRINTK("[VPUDRV] product: 0x%08x intr_reason: 0x%08lx\n",
-                product_code,
-                dev->interrupt_reason);
     }
 
     if (dev->async_queue)
@@ -468,9 +489,7 @@ static irqreturn_t vpu_irq_handler(int irq, void *dev_id)
                     POLL_IN); /* notify the interrupt to user space */
 
     s_interrupt_flag = 1;
-
     wake_up_interruptible(&s_interrupt_wait_q);
-    DPRINTK("[VPUDRV][-]%s\n", __func__);
 
     return IRQ_HANDLED;
 }
@@ -609,7 +628,6 @@ static long vpu_ioctl(struct file *filp, u_int cmd, u_long arg)
 
         case VDI_IOCTL_WAIT_INTERRUPT: {
             vpudrv_intr_info_t info;
-            DPRINTK("[VPUDRV][+]VDI_IOCTL_WAIT_INTERRUPT\n");
             ret = copy_from_user(&info, (vpudrv_intr_info_t *)arg,
                                  sizeof(vpudrv_intr_info_t));
 
@@ -632,16 +650,12 @@ static long vpu_ioctl(struct file *filp, u_int cmd, u_long arg)
                             break;
                         }
             */
-            DPRINTK("[VPUDRV] s_interrupt_flag(%d), reason(0x%08lx)\n",
-                    s_interrupt_flag,
-                    dev->interrupt_reason);
 
             info.intr_reason = dev->interrupt_reason;
             s_interrupt_flag = 0;
             dev->interrupt_reason = 0;
             ret = copy_to_user((void __user *)arg, &info,
                                sizeof(vpudrv_intr_info_t));
-            DPRINTK("[VPUDRV][-]VDI_IOCTL_WAIT_INTERRUPT\n");
 
             if (ret != 0)
                 return -EFAULT;
@@ -967,6 +981,7 @@ static long vpu_ioctl(struct file *filp, u_int cmd, u_long arg)
         break;
 
         case VDI_IOCTL_DEVICE_SRAM_CFG: {
+        #if 0
             #define APB_SCR_SEC_BASE (0x38200000u)
             uint32_t mode = 0;
             volatile unsigned int tmp_reg = 0;
@@ -979,9 +994,38 @@ static long vpu_ioctl(struct file *filp, u_int cmd, u_long arg)
 
             io_adress = ioremap((APB_SCR_SEC_BASE + (0x48 << 10)), 32);
             tmp_reg = readl(io_adress);
-			DPRINTK("[VPUDRV] sram default cfg:%d\n", tmp_reg);
+            DPRINTK("[VPUDRV] sram default cfg:%d\n", tmp_reg);
             writel(((tmp_reg & 0xFC) | mode), io_adress); //[1:0] available
             DPRINTK("[VPUDRV] sram cfg:%ud, apb addr:%p data:%ud, tmp_reg %ux\n",mode,io_adress,readl(io_adress), tmp_reg);
+        #else   /* will del  when scr module ready */
+            uint32_t mode = 0;
+            volatile unsigned int tmp_reg = 0;
+            volatile void __iomem *io_adress = NULL;
+
+            if (get_user(mode, (u32 __user *) arg)) {
+                DPRINTK("[VPUDRV]  sram cfg error get_user\n");
+                return -EFAULT;
+            }
+
+            if(!scr_info.phy_addr)
+                return -1;
+
+            io_adress = ioremap(scr_info.phy_addr, 32);
+            tmp_reg = readl(io_adress);
+
+            DPRINTK("[VPUDRV] sram default cfg:%d\n", tmp_reg);
+            writel(((tmp_reg & 0xFC) | mode), io_adress); //[1:0] available
+            DPRINTK("[VPUDRV] sram cfg:%ud, apb addr:%p data:%ud, tmp_reg %ux\n",mode,io_adress,readl(io_adress), tmp_reg);
+        #endif
+
+        }
+        break;
+
+        case VDI_IOCTL_DEVICE_GET_SRAM_INFO: {
+
+            /* copy sram_info to user space;  note: two srams */
+            if (copy_to_user((void __user *)arg, &(drive_data.sram[0]), sizeof(struct sram_info) * 2))
+                return -1;
 
         }
         break;
@@ -1089,13 +1133,13 @@ static int vpu_release(struct inode *inode, struct file *filp)
             }
 
 #ifndef COMMON_MEMORY_USING_ION
-
+#if 0  // common buffer can not free until system power off
             if (s_common_memory.base) {
                 DPRINTK("[VPUDRV] free common memory\n");
                 vpu_free_dma_buffer(&s_common_memory);
                 s_common_memory.base = 0;
             }
-
+#endif
 #endif
         }
     }
@@ -1240,6 +1284,43 @@ static int vpu_mmap(struct file *fp, struct vm_area_struct *vm)
 #endif
 }
 
+/*brief get sram info from dts
+ *pdev:
+ *info:
+ *notes: info[0] inter sram in vpu
+ *       info[1] sram in soc, select sram3
+ */
+static void vpu_get_sram_info(struct platform_device *pdev, struct sram_info  *info)
+{
+    struct resource *res = NULL;
+    struct device_node *ram_node = NULL;
+    struct resource res_temp = {0};
+
+    if(pdev) {
+        res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "inter_sram");
+        if(res) {
+            info[0].phy = res->start;
+            info[0].size = res->end - res->start + 1;
+            info[0].id = 1;  /*for inter sram */
+        }
+
+        if(NULL != (ram_node = of_parse_phandle(pdev->dev.of_node, "vpu1,sram2", 0))) {
+            if(!of_address_to_resource(ram_node, 0, &res_temp)) {
+                info[1].phy = res_temp.start;
+                info[1].size = res_temp.end - res_temp.start + 1;
+                info[1].id = 2;   /* for soc sram */
+            }
+        }
+
+    }
+
+    DPRINTK("[VPUDRV] Wave412 get sram info : sram[0].id %d;  sram[0].phy %#x; sram[0].size %#x ,sram[1].id %d;  sram[1].phy %#x; sram[1].size %#x \n",
+                                      info[0].id , info[0].phy, info[0].size,
+                                      info[1].id , info[1].phy, info[1].size);
+
+}
+
+
 static struct file_operations vpu_fops = {
     .owner = THIS_MODULE,
     .open = vpu_open,
@@ -1258,25 +1339,23 @@ static int vpu_probe(struct platform_device *pdev)
 {
     int err = 0;
     struct resource *res = NULL;
-
-    drive_data.wave_class = NULL;
-    drive_data.wave_device = NULL;
+    memset(&drive_data, 0 , sizeof(struct wave_drive));
 
     DPRINTK("[VPUDRV] vpu_probe\n");
 
     if (pdev) {
         vpuwave_device = &(pdev->dev);
-        res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+        res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "register");
     }
 
     if (res) {/* if platform driver is implemented */
         s_vpu_register.phys_addr = res->start;
         s_vpu_register.virt_addr = (unsigned long)ioremap_nocache(res->start,
-                                   res->end - res->start);
-        s_vpu_register.size = res->end - res->start;
-        DPRINTK("[VPUDRV] : vpu base address get from platform driver physical base addr %p , kernel virtual base %p , vpuwave_device %p \n",
+                                   res->end - res->start + 1);
+        s_vpu_register.size = res->end - res->start + 1;
+        DPRINTK("[VPUDRV] : vpu base address get from platform driver physical base addr %p , kernel virtual base %p , vpuwave_device %p  register size %#x\n",
                 (void *)s_vpu_register.phys_addr, (void *)s_vpu_register.virt_addr,
-                vpuwave_device);
+                vpuwave_device, s_vpu_register.size);
     }
     else {
         s_vpu_register.phys_addr = VPU_REG_BASE_ADDR;
@@ -1286,8 +1365,22 @@ static int vpu_probe(struct platform_device *pdev)
         s_vpu_register.size = VPU_REG_SIZE;
         DPRINTK("[VPUDRV] : vpu base address get from defined value physical base addr %p, virtual base %p\n",
                 (void *)s_vpu_register.phys_addr, (void *)s_vpu_register.virt_addr);
-
     }
+
+    vpu_get_sram_info(pdev, &(drive_data.sram[0]));
+
+#if 1   // will dec when scr module ready
+    {
+        if(pdev) {
+            res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "scr_addr");
+            if(res) {
+                scr_info.phy_addr = res->start;
+                scr_info.size = res->end - res->start + 1;
+            }
+        }
+        DPRINTK("[VPUDRV]:Get scr_addr %#x %u\n", scr_info.phy_addr, scr_info.size);
+    }
+#endif
 
     /* get the major number of the character device */
     if ((alloc_chrdev_region(&s_vpu_major, 0, 1, VPU_DEV_NAME)) < 0) {
@@ -1295,8 +1388,6 @@ static int vpu_probe(struct platform_device *pdev)
         DPRINTK( "could not allocate major number\n");
         goto ERROR_PROVE_DEVICE;
     }
-
-    DPRINTK("SUCCESS alloc_chrdev_region\n");
 
     /* initialize the device structure and register the device with the kernel */
     cdev_init(&s_vpu_cdev, &vpu_fops);
@@ -1818,51 +1909,40 @@ MODULE_LICENSE("GPL");
 module_init(vpu_init);
 module_exit(vpu_exit);
 
-#define VPU_WAVE_IDX  39                    /* vpu module Id */
-#define APB_RSTGEN_AP_BASE 0x38400000       /* vpu module rset base address */
-
 static int vpu_hw_reset(void)
 {
-    uint32_t rstgen_value = 0;
-    uint32_t times = 100;
-    volatile void __iomem *io_adress = NULL;
+    struct reset_control *vpu_rst = NULL;
+    uint32_t core = 0;
+    unsigned long timeout = jiffies + HZ;   /* vpu wait timeout to 1sec */
 
-    io_adress = ioremap(APB_RSTGEN_AP_BASE + ((0x100 + (0x4 * VPU_WAVE_IDX)) << 10), 32);
-    rstgen_value = ioread32(io_adress);
-    DPRINTK("[VPUDRV] vpu module reset value %x \n", rstgen_value);
-    /*
-     *if bit31 is 0x0
-     *means this module reset is active not
-     *been locked
-     */
-    if (!(rstgen_value >> 31)) {
-
-        /*clear reset bit */
-        iowrite32(rstgen_value & 0xfffe, io_adress);
-        while(!(ioread32(io_adress) >> 30) || (times-- == 0));
-        DPRINTK("[VPUDRV] vpu module bit30 == 0 means clear's action success %x \n", ioread32(io_adress));
-
-        /* set bit0 to 1 */
-        rstgen_value = ioread32(io_adress);
-        rstgen_value = rstgen_value | 0x1;
-        iowrite32(rstgen_value, io_adress);
-
-        /*check bit30 */
-        times = 100;
-        /*wait module reset done*/
-        while (times--) {
-            rstgen_value = ioread32(io_adress);
-
-            if ((rstgen_value >> 30) & 0x1) {
-                DPRINTK("[VPUDRV] vpu module reset done rstgen_value %x\n", rstgen_value);
-                return 0;
-            }
+    while (ReadVpuRegister(BIT_BUSY_FLAG)) {
+        if (time_after(jiffies, timeout)) {
+            pr_err("[VPUDRV], Wave412 can not reset now ...\n");
+            return -1;
         }
-
     }
 
-    DPRINTK("[VPUDRV] vpu module reset locked please check bit31 \n");
-    return -1;
+    if (vpuwave_device)
+    {
+        vpu_rst = devm_reset_control_get(vpuwave_device, "vpu-reset");
+        if (IS_ERR(vpu_rst)) {
+            dev_err(vpuwave_device, "Error: Missing controller reset\n");
+            return -1;
+        }
+
+        if (reset_control_reset(vpu_rst)) {
+            reset_control_put(vpu_rst);
+            dev_err(vpuwave_device, "reset vpu failed\n");
+            return -1;
+        }
+
+        reset_control_put(vpu_rst);
+    } else {
+        pr_err("[VPUDRV] No vpucoda_device\n");
+        return -1;
+    }
+
+    return 0;
 }
 
 
