@@ -53,7 +53,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 
 /**
- * Debug utility macro for printing FW IRQ count and Last sampled IRQ count in 
+ * Debug utility macro for printing FW IRQ count and Last sampled IRQ count in
  * LISR for each RGX FW thread.
  * Macro takes pointer to PVRSRV_RGXDEV_INFO as input.
  */
@@ -231,17 +231,18 @@ PVRSRV_ERROR RGXWriteWithSP(PVRSRV_RGXDEV_INFO *psDevInfo, IMG_UINT32 ui32FWAddr
 /*!
 *******************************************************************************
 
- @Function     ValidateFWImageWithSP
+ @Function     ValidateFWOnLoad
 
  @Description  Compare the Firmware image as seen from the CPU point of view
                against the same memory area as seen from the META point of view
+               after first power up.
 
  @Input        psDevInfo - Device Info
 
  @Return       PVRSRV_ERROR
 ******************************************************************************/
-PVRSRV_ERROR ValidateFWImageWithSP(PVRSRV_RGXDEV_INFO *psDevInfo);
-#endif /* defined(SUPPORT_EXTRA_METASP_DEBUG) */
+PVRSRV_ERROR ValidateFWOnLoad(PVRSRV_RGXDEV_INFO *psDevInfo);
+#endif
 
 /*!
 *******************************************************************************

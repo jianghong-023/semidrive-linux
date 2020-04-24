@@ -55,6 +55,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include <net/genetlink.h>
 #include <linux/bug.h>
 
+#include "drm_netlink_gem.h"
 #include "drm_nulldisp_drv.h"
 #include "drm_nulldisp_netlink.h"
 #include "kernel_compatibility.h"
@@ -74,8 +75,10 @@ struct nlpvrdpy {
 	void *copied_cb_data;
 	struct mutex mutex;
 	struct list_head nl_list;
+	bool gem_names_required;
 };
-#define NLPVRDPY_MINOR(nlpvrdpy) ((unsigned)((nlpvrdpy)->dev->primary->index))
+#define NLPVRDPY_MINOR(nlpvrdpy) \
+	((unsigned int)((nlpvrdpy)->dev->primary->index))
 
 /* Command internal flags */
 #define	NLPVRDPY_CIF_NLPVRDPY_NOT_CONNECTED	0x00000001
@@ -292,11 +295,34 @@ err_msg_free:
 	nlmsg_free(msg);
 }
 
+static int nlpvrdpy_get_offsets_and_sizes(struct drm_framebuffer *fb,
+					  struct drm_gem_object **objs,
+					  u64 *addr, u64 *size)
+{
+	int i;
+
+	for (i = 0; i < nulldisp_drm_fb_num_planes(fb); i++) {
+		int err;
+		struct drm_gem_object *obj = objs[i];
+
+		err = drm_gem_create_mmap_offset(obj);
+		if (err) {
+			DRM_ERROR("Failed to get mmap offset for buffer[%d] = %p\n",
+				  i, obj);
+			return err;
+		}
+
+		addr[i] = drm_vma_node_offset_addr(&obj->vma_node);
+		size[i] = obj->size;
+	}
+
+	return 0;
+}
+
 static int nlpvrdpy_put_fb_attributes(struct sk_buff *msg,
-                                      struct drm_framebuffer *fb,
-                                      struct nlpvrdpy *nlpvrdpy,
-                                      u64 *plane_addr,
-                                      u64 *plane_size)
+				      struct drm_framebuffer *fb,
+				      struct nlpvrdpy *nlpvrdpy,
+				      struct drm_gem_object **objs)
 {
 #define RETURN_ON_ERROR(f) \
 	{ \
@@ -307,7 +333,13 @@ static int nlpvrdpy_put_fb_attributes(struct sk_buff *msg,
 		} \
 	}
 
+	int i;
 	const int num_planes = nulldisp_drm_fb_num_planes(fb);
+	u64 plane_addr[NLPVRDPY_MAX_NUM_PLANES],
+	    plane_size[NLPVRDPY_MAX_NUM_PLANES];
+
+	RETURN_ON_ERROR(nlpvrdpy_get_offsets_and_sizes(fb, objs, &plane_addr[0],
+						       &plane_size[0]));
 
 	RETURN_ON_ERROR(nla_put_u32(msg, NLPVRDPY_ATTR_MINOR, NLPVRDPY_MINOR(nlpvrdpy)));
 
@@ -328,35 +360,76 @@ static int nlpvrdpy_put_fb_attributes(struct sk_buff *msg,
 	RETURN_ON_ERROR(nla_put_u8(msg, NLPVRDPY_ATTR_YUV_CSC, 1));  /* IMG_COLORSPACE_BT601_CONFORMANT_RANGE */
 	RETURN_ON_ERROR(nla_put_u8(msg, NLPVRDPY_ATTR_YUV_BPP, 8));  /* 8-bit per sample */
 
-	RETURN_ON_ERROR(nla_put_u64_64bit(msg, NLPVRDPY_ATTR_PLANE0_ADDR,    plane_addr[0], NLPVRDPY_ATTR_PAD));
-	RETURN_ON_ERROR(nla_put_u64_64bit(msg, NLPVRDPY_ATTR_PLANE0_SIZE,    plane_size[0], NLPVRDPY_ATTR_PAD));
-	RETURN_ON_ERROR(nla_put_u64_64bit(msg, NLPVRDPY_ATTR_PLANE0_OFFSET, fb->offsets[0], NLPVRDPY_ATTR_PAD));
-	RETURN_ON_ERROR(nla_put_u64_64bit(msg, NLPVRDPY_ATTR_PLANE0_PITCH,  fb->pitches[0], NLPVRDPY_ATTR_PAD));
-
-	if (num_planes > 1) {
-		RETURN_ON_ERROR(nla_put_u64_64bit(msg, NLPVRDPY_ATTR_PLANE1_ADDR,    plane_addr[1], NLPVRDPY_ATTR_PAD));
-		RETURN_ON_ERROR(nla_put_u64_64bit(msg, NLPVRDPY_ATTR_PLANE1_SIZE,    plane_size[1], NLPVRDPY_ATTR_PAD));
-		RETURN_ON_ERROR(nla_put_u64_64bit(msg, NLPVRDPY_ATTR_PLANE1_OFFSET, fb->offsets[1], NLPVRDPY_ATTR_PAD));
-		RETURN_ON_ERROR(nla_put_u64_64bit(msg, NLPVRDPY_ATTR_PLANE1_PITCH,  fb->pitches[1], NLPVRDPY_ATTR_PAD));
+	for (i = 0; i < num_planes; i++) {
+		RETURN_ON_ERROR(nla_put_u64_64bit(msg,
+						  NLPVRDPY_ATTR_PLANE(i, ADDR),
+						  plane_addr[i],
+						  NLPVRDPY_ATTR_PAD));
+		RETURN_ON_ERROR(nla_put_u64_64bit(msg,
+						  NLPVRDPY_ATTR_PLANE(i, SIZE),
+						  plane_size[i],
+						  NLPVRDPY_ATTR_PAD));
+		RETURN_ON_ERROR(nla_put_u64_64bit(msg,
+						  NLPVRDPY_ATTR_PLANE(i, OFFSET),
+						  fb->offsets[i],
+						  NLPVRDPY_ATTR_PAD));
+		RETURN_ON_ERROR(nla_put_u64_64bit(msg,
+						  NLPVRDPY_ATTR_PLANE(i, PITCH),
+						  fb->pitches[i],
+						  NLPVRDPY_ATTR_PAD));
+		RETURN_ON_ERROR(nla_put_u32(msg,
+					    NLPVRDPY_ATTR_PLANE(i, GEM_OBJ_NAME),
+					    (u32)objs[0]->name));
 	}
 
-	if (num_planes > 2) {
-		RETURN_ON_ERROR(nla_put_u64_64bit(msg, NLPVRDPY_ATTR_PLANE2_ADDR,    plane_addr[2], NLPVRDPY_ATTR_PAD));
-		RETURN_ON_ERROR(nla_put_u64_64bit(msg, NLPVRDPY_ATTR_PLANE2_SIZE,    plane_size[2], NLPVRDPY_ATTR_PAD));
-		RETURN_ON_ERROR(nla_put_u64_64bit(msg, NLPVRDPY_ATTR_PLANE2_OFFSET, fb->offsets[2], NLPVRDPY_ATTR_PAD));
-		RETURN_ON_ERROR(nla_put_u64_64bit(msg, NLPVRDPY_ATTR_PLANE2_PITCH,  fb->pitches[2], NLPVRDPY_ATTR_PAD));
-	}
-
-	WARN_ON_ONCE(num_planes > NLPVRDPY_MAX_NUM_PLANES);
+	WARN_ONCE(num_planes > NLPVRDPY_MAX_NUM_PLANES,
+		  "NLPVRDPY_MAX_NUM_PLANES = [%d], num_planes = [%d]\n",
+		  NLPVRDPY_MAX_NUM_PLANES, num_planes);
 
 	return 0;
 #undef RETURN_ON_ERROR
 }
 
+static int nlpvrdpy_name_gem_obj(struct drm_device *dev,
+				 struct drm_gem_object *obj)
+{
+	int ret;
+
+	mutex_lock(&dev->object_name_lock);
+	if (!obj->name) {
+		ret = idr_alloc(&dev->object_name_idr, obj, 1, 0, GFP_KERNEL);
+		if (ret < 0)
+			goto exit_unlock;
+
+		obj->name = ret;
+	}
+
+	ret = 0;
+
+exit_unlock:
+	mutex_unlock(&dev->object_name_lock);
+	return ret;
+}
+
+static int nlpvrdpy_name_gem_objs(struct drm_framebuffer *fb,
+				  struct drm_gem_object **objs)
+{
+	int i;
+	struct drm_device *dev = fb->dev;
+
+	for (i = 0; i < nulldisp_drm_fb_num_planes(fb); i++) {
+		int err = nlpvrdpy_name_gem_obj(dev, objs[i]);
+
+		if (err < 0)
+			return err;
+	}
+
+	return 0;
+}
+
 int nlpvrdpy_send_flip(struct nlpvrdpy *nlpvrdpy,
 		       struct drm_framebuffer *fb,
-		       u64 *plane_addr,
-		       u64 *plane_size)
+		       struct drm_gem_object **objs)
 {
 	struct sk_buff *msg;
 	void *hdr;
@@ -364,6 +437,12 @@ int nlpvrdpy_send_flip(struct nlpvrdpy *nlpvrdpy,
 
 	if (!atomic_read(&nlpvrdpy->connected))
 		return -ENOTCONN;
+
+	if (nlpvrdpy->gem_names_required) {
+		err = nlpvrdpy_name_gem_objs(fb, objs);
+		if (err)
+			return err;
+	}
 
 	msg = genlmsg_new(NLMSG_GOODSIZE, GFP_KERNEL);
 	if (!msg)
@@ -376,8 +455,7 @@ int nlpvrdpy_send_flip(struct nlpvrdpy *nlpvrdpy,
 		goto err_msg_free;
 	}
 
-	err = nlpvrdpy_put_fb_attributes(msg, fb, nlpvrdpy, plane_addr,
-					 plane_size);
+	err = nlpvrdpy_put_fb_attributes(msg, fb, nlpvrdpy, objs);
 	if (err)
 		goto err_msg_free;
 
@@ -392,8 +470,7 @@ err_msg_free:
 
 int nlpvrdpy_send_copy(struct nlpvrdpy *nlpvrdpy,
 		       struct drm_framebuffer *fb,
-		       u64 *plane_addr,
-		       u64 *plane_size)
+		       struct drm_gem_object **objs)
 {
 	struct sk_buff *msg;
 	void *hdr;
@@ -401,6 +478,12 @@ int nlpvrdpy_send_copy(struct nlpvrdpy *nlpvrdpy,
 
 	if (!atomic_read(&nlpvrdpy->connected))
 		return -ENOTCONN;
+
+	if (nlpvrdpy->gem_names_required) {
+		err = nlpvrdpy_name_gem_objs(fb, objs);
+		if (err)
+			return err;
+	}
 
 	msg = genlmsg_new(NLMSG_GOODSIZE, GFP_KERNEL);
 	if (!msg)
@@ -413,8 +496,7 @@ int nlpvrdpy_send_copy(struct nlpvrdpy *nlpvrdpy,
 		goto err_msg_free;
 	}
 
-	err = nlpvrdpy_put_fb_attributes(msg, fb, nlpvrdpy, plane_addr,
-					 plane_size);
+	err = nlpvrdpy_put_fb_attributes(msg, fb, nlpvrdpy, objs);
 	if (err)
 		goto err_msg_free;
 
@@ -433,6 +515,9 @@ static int nlpvrdpy_cmd_connect(struct sk_buff *skb, struct genl_info *info)
 	struct sk_buff *msg;
 	void *hdr;
 	int err;
+
+	if (info->attrs[NLPVRDPY_ATTR_NAMING_REQUIRED])
+		nlpvrdpy->gem_names_required = true;
 
 	msg = genlmsg_new(NLMSG_GOODSIZE, GFP_KERNEL);
 	if (!msg)

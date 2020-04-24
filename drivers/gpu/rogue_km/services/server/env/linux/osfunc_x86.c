@@ -62,9 +62,8 @@ PVRSRV_ERROR OSCPUOperation(PVRSRV_CACHE_OP uiCacheOp)
 {
 	PVRSRV_ERROR eError = PVRSRV_OK;
 
-	switch(uiCacheOp)
+	switch (uiCacheOp)
 	{
-		/* Fall-through */
 		case PVRSRV_CACHE_OP_CLEAN:
 		case PVRSRV_CACHE_OP_FLUSH:
 		case PVRSRV_CACHE_OP_INVALIDATE:
@@ -77,7 +76,7 @@ PVRSRV_ERROR OSCPUOperation(PVRSRV_CACHE_OP uiCacheOp)
 		default:
 			PVR_DPF((PVR_DBG_ERROR,
 					"%s: Global cache operation type %d is invalid",
-					__FUNCTION__, uiCacheOp));
+					__func__, uiCacheOp));
 			eError = PVRSRV_ERROR_INVALID_PARAMS;
 			PVR_ASSERT(0);
 			break;
@@ -96,7 +95,7 @@ static void x86_flush_cache_range(const void *pvStart, const void *pvEnd)
 	                              (uintptr_t)boot_cpu_data.x86_clflush_size);
 
 	mb();
-	for(pbBase = pbStart; pbBase < pbEnd; pbBase += boot_cpu_data.x86_clflush_size)
+	for (pbBase = pbStart; pbBase < pbEnd; pbBase += boot_cpu_data.x86_clflush_size)
 	{
 #if !defined(CONFIG_L4)
 		clflush(pbBase);
@@ -117,7 +116,6 @@ void OSCPUCacheFlushRangeKM(PVRSRV_DEVICE_NODE *psDevNode,
 
 	x86_flush_cache_range(pvVirtStart, pvVirtEnd);
 }
-
 
 void OSCPUCacheCleanRangeKM(PVRSRV_DEVICE_NODE *psDevNode,
                             void *pvVirtStart,
@@ -155,4 +153,9 @@ PVRSRV_CACHE_OP_ADDR_TYPE OSCPUCacheOpAddressType(void)
 void OSUserModeAccessToPerfCountersEn(void)
 {
 	/* Not applicable to x86 architecture. */
+}
+
+IMG_BOOL OSIsWriteCombineUnalignedSafe(void)
+{
+	return IMG_TRUE;
 }

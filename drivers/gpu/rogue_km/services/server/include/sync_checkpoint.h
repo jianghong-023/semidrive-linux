@@ -54,8 +54,8 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "device_connection.h"
 #include "opaque_types.h"
 
-#ifndef _CHECKPOINT_TYPES_
-#define _CHECKPOINT_TYPES_
+#ifndef CHECKPOINT_TYPES
+#define CHECKPOINT_TYPES
 typedef struct _SYNC_CHECKPOINT_CONTEXT *PSYNC_CHECKPOINT_CONTEXT;
 
 typedef struct _SYNC_CHECKPOINT *PSYNC_CHECKPOINT;
@@ -85,15 +85,34 @@ typedef PVRSRV_ERROR (*PFN_SYNC_CHECKPOINT_FENCE_FINALISE_FN)(PVRSRV_FENCE fence
 typedef void (*PFN_SYNC_CHECKPOINT_NOHW_UPDATE_TIMELINES_FN)(void *private_data);
 typedef void (*PFN_SYNC_CHECKPOINT_FREE_CHECKPOINT_LIST_MEM_FN)(void *mem_ptr);
 typedef IMG_UINT32 (*PFN_SYNC_CHECKPOINT_DUMP_INFO_ON_STALLED_UFOS_FN)(IMG_UINT32 num_ufos, IMG_UINT32 *vaddrs);
+#if defined(PVRSRV_SYNC_CHECKPOINT_CCB)
+typedef IMG_BOOL (*PFN_SYNC_CHECKPOINT_UFO_HAS_SIGNALLED_FN)(IMG_UINT32 ui32FwAddr, IMG_UINT32 ui32Value);
+typedef PVRSRV_ERROR (*PFN_SYNC_CHECKPOINT_SIGNAL_WAITERS_FN)(void);
+typedef void (*PFN_SYNC_CHECKPOINT_CHECK_STATE_FN)(void);
 #endif
 
-PVRSRV_ERROR SyncCheckpointRegisterFunctions(PFN_SYNC_CHECKPOINT_FENCE_RESOLVE_FN pfnFenceResolve,
-	                                         PFN_SYNC_CHECKPOINT_FENCE_CREATE_FN pfnFenceCreate,
-                                             PFN_SYNC_CHECKPOINT_FENCE_ROLLBACK_DATA_FN pfnFenceDataRollback,
-                                             PFN_SYNC_CHECKPOINT_FENCE_FINALISE_FN pfnFenceFinalise,
-                                             PFN_SYNC_CHECKPOINT_NOHW_UPDATE_TIMELINES_FN pfnNoHWUpdateTimelines,
-                                             PFN_SYNC_CHECKPOINT_FREE_CHECKPOINT_LIST_MEM_FN pfnFreeCheckpointListMem,
-                                             PFN_SYNC_CHECKPOINT_DUMP_INFO_ON_STALLED_UFOS_FN pfnDumpInfoOnStalledUFOs);
+#define SYNC_CHECKPOINT_IMPL_MAX_STRLEN 20
+
+typedef struct
+{
+	PFN_SYNC_CHECKPOINT_FENCE_RESOLVE_FN pfnFenceResolve;
+	PFN_SYNC_CHECKPOINT_FENCE_CREATE_FN pfnFenceCreate;
+	PFN_SYNC_CHECKPOINT_FENCE_ROLLBACK_DATA_FN pfnFenceDataRollback;
+	PFN_SYNC_CHECKPOINT_FENCE_FINALISE_FN pfnFenceFinalise;
+	PFN_SYNC_CHECKPOINT_NOHW_UPDATE_TIMELINES_FN pfnNoHWUpdateTimelines;
+	PFN_SYNC_CHECKPOINT_FREE_CHECKPOINT_LIST_MEM_FN pfnFreeCheckpointListMem;
+	PFN_SYNC_CHECKPOINT_DUMP_INFO_ON_STALLED_UFOS_FN pfnDumpInfoOnStalledUFOs;
+#if defined(PVRSRV_SYNC_CHECKPOINT_CCB)
+	PFN_SYNC_CHECKPOINT_UFO_HAS_SIGNALLED_FN pfnCheckpointHasSignalled;
+	PFN_SYNC_CHECKPOINT_CHECK_STATE_FN pfnCheckState;
+	PFN_SYNC_CHECKPOINT_SIGNAL_WAITERS_FN pfnSignalWaiters;
+#endif
+	IMG_CHAR pszImplName[SYNC_CHECKPOINT_IMPL_MAX_STRLEN];
+} PFN_SYNC_CHECKPOINT_STRUCT;
+
+PVRSRV_ERROR SyncCheckpointRegisterFunctions(PFN_SYNC_CHECKPOINT_STRUCT *psSyncCheckpointPfns);
+
+#endif /* ifndef _CHECKPOINT_PFNS_ */
 
 /*************************************************************************/ /*!
 @Function       SyncCheckpointContextCreate
@@ -131,6 +150,33 @@ PVRSRV_ERROR
 SyncCheckpointContextDestroy(PSYNC_CHECKPOINT_CONTEXT psSyncCheckpointContext);
 
 /*************************************************************************/ /*!
+@Function       SyncCheckpointContextRef
+
+@Description    Takes a reference on a synchronisation checkpoint context
+
+@Input          psContext  Handle to the synchronisation checkpoint context
+                           on which a ref is to be taken
+
+@Return         None
+*/
+/*****************************************************************************/
+void SyncCheckpointContextRef(PSYNC_CHECKPOINT_CONTEXT psContext);
+
+/*************************************************************************/ /*!
+@Function       SyncCheckpointContextUnref
+
+@Description    Drops a reference taken on a synchronisation checkpoint
+                context
+
+@Input          psContext  Handle to the synchronisation checkpoint context
+                           on which the ref is to be dropped
+
+@Return         None
+*/
+/*****************************************************************************/
+void SyncCheckpointContextUnref(PSYNC_CHECKPOINT_CONTEXT psContext);
+
+/*************************************************************************/ /*!
 @Function       SyncCheckpointAlloc
 
 @Description    Allocate a new synchronisation checkpoint on the specified
@@ -141,6 +187,12 @@ SyncCheckpointContextDestroy(PSYNC_CHECKPOINT_CONTEXT psSyncCheckpointContext);
 
 @Input          hTimeline               Timeline on which this sync
                                         checkpoint is being created
+
+@Input          hFence                  Fence as passed into pfnFenceResolve
+                                        API, when the API encounters a non-PVR
+                                        fence as part of its input fence. From
+                                        all other places this argument must be
+                                        PVRSRV_NO_FENCE.
 
 @Input          pszClassName            Sync checkpoint source annotation
                                         (will be truncated to at most
@@ -155,6 +207,7 @@ SyncCheckpointContextDestroy(PSYNC_CHECKPOINT_CONTEXT psSyncCheckpointContext);
 PVRSRV_ERROR
 SyncCheckpointAlloc(PSYNC_CHECKPOINT_CONTEXT psSyncContext,
                     PVRSRV_TIMELINE hTimeline,
+                    PVRSRV_FENCE hFence,
                     const IMG_CHAR *pszCheckpointName,
                     PSYNC_CHECKPOINT *ppsSyncCheckpoint);
 
@@ -271,6 +324,54 @@ SyncCheckpointErrorFromUFO(PPVRSRV_DEVICE_NODE psDevNode, IMG_UINT32 ui32FwAddr)
 void
 SyncCheckpointRollbackFromUFO(PPVRSRV_DEVICE_NODE psDevNode, IMG_UINT32 ui32FwAddr);
 
+#if defined(PVRSRV_SYNC_CHECKPOINT_CCB)
+/*************************************************************************/ /*!
+@Function       SyncCheckpointUFOHasSignalled
+
+@Description    Inform the sync backend that a specific checkpoint UFO has been
+                signalled by the firmware so that the host view of the object
+                can be updated.
+
+@Input          psDevNode               The device owning the sync
+                                        checkpoint that has been signalled.
+
+@Input          ui32FwAddr              The firmware address of the sync
+                                        checkpoint that has been signalled.
+
+@Input          ui32Value               The new value of the sync checkpoint.
+
+@Return         IMG_TRUE if a backing sync point has been found and updated,
+                IMG_FALSE otherwise.
+*/
+/*****************************************************************************/
+IMG_BOOL
+SyncCheckpointUFOHasSignalled(PPVRSRV_DEVICE_NODE psDevNode, IMG_UINT32 ui32FwAddr, IMG_UINT32 ui32Value);
+
+/*************************************************************************/ /*!
+@Function       SyncCheckpointCheckState
+
+@Description    Perform a full state check to check the state of all sync
+                points currently alive.
+
+@Return         IMG_TRUE if a backing sync point has been found and updated,
+                IMG_FALSE otherwise.
+*/
+/*****************************************************************************/
+void
+SyncCheckpointCheckState(void);
+
+/*************************************************************************/ /*!
+@Function       SyncCheckpointSignalWaiters
+
+@Description    Signal any clients waiting on syncs which have been updated.
+
+@Return         None
+*/
+/*****************************************************************************/
+void
+SyncCheckpointSignalWaiters(void);
+#endif /* defined(PVRSRV_SYNC_CHECKPOINT_CCB) */
+
 /*************************************************************************/ /*!
 @Function       SyncCheckpointIsSignalled
 
@@ -385,7 +486,7 @@ SyncCheckpointResolveFence(PSYNC_CHECKPOINT_CONTEXT psSyncCheckpointContext, PVR
 
 @Output         phNewFence              The newly created fence
 
-@Output         pui32FenceUID           Unique ID of the created fence
+@Output         pui64FenceUID           Unique ID of the created fence
 
 @Output         ppvFenceFinaliseData    Any data needed to finalise the fence
                                         in a later call to the function
@@ -445,9 +546,16 @@ SyncCheckpointRollbackFenceData(PVRSRV_FENCE hFence, void *pvFinaliseData);
                 implementation does not need to perform any actions at
                 this time, this function does not need to be registered.
 
+@Input          psDevNode               Device node
+
 @Input          hFence                  Fence to be 'finalised'
 
 @Input          pvFinaliseData          Data needed to finalise the fence
+
+@Input          psSyncCheckpoint        Base sync checkpoint that this fence
+                                        is formed of
+
+@Input          pszName                 Fence annotation
 
 @Return         PVRSRV_OK if a valid fence and finalise data were provided.
                 PVRSRV_ERROR_INVALID_PARAMS if an invalid fence or finalise
@@ -457,7 +565,11 @@ SyncCheckpointRollbackFenceData(PVRSRV_FENCE hFence, void *pvFinaliseData);
 */
 /*****************************************************************************/
 PVRSRV_ERROR
-SyncCheckpointFinaliseFence(PVRSRV_FENCE hFence, void *pvFinaliseData);
+SyncCheckpointFinaliseFence(PPVRSRV_DEVICE_NODE psDevNode,
+                            PVRSRV_FENCE hFence,
+                            void *pvFinaliseData,
+                            PSYNC_CHECKPOINT psSyncCheckpoint,
+                            const IMG_CHAR *pszName);
 
 /*************************************************************************/ /*!
 @Function       SyncCheckpointFreeCheckpointListMem
@@ -568,7 +680,6 @@ SyncCheckpointGetStateString(PSYNC_CHECKPOINT psSyncCheckpoint);
 PVRSRV_ERROR
 SyncCheckpointPDumpPol(PSYNC_CHECKPOINT psSyncCheckpoint, PDUMP_FLAGS_T ui32PDumpFlags);
 
-#if defined(PVRSRV_ENABLE_FULL_SYNC_TRACKING)
 /*************************************************************************/ /*!
 @Function       SyncCheckpointRecordLookup
 
@@ -590,7 +701,6 @@ SyncCheckpointPDumpPol(PSYNC_CHECKPOINT psSyncCheckpoint, PDUMP_FLAGS_T ui32PDum
 /*****************************************************************************/
 void SyncCheckpointRecordLookup(PPVRSRV_DEVICE_NODE psDevNode, IMG_UINT32 ui32FwAddr,
 								IMG_CHAR * pszSyncInfo, size_t len);
-#endif /* defined(PVRSRV_ENABLE_FULL_SYNC_TRACKING) */
 
 #endif	/* _SYNC_CHECKPOINT_ */
 

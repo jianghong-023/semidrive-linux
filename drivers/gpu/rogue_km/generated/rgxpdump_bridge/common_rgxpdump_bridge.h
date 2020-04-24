@@ -58,7 +58,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #define PVRSRV_BRIDGE_RGXPDUMP_CMD_LAST			(PVRSRV_BRIDGE_RGXPDUMP_CMD_FIRST+1)
 
 /*******************************************
-            PDumpTraceBuffer          
+            PDumpTraceBuffer
  *******************************************/
 
 /* Bridge in structure for PDumpTraceBuffer */
@@ -74,7 +74,7 @@ typedef struct PVRSRV_BRIDGE_OUT_PDUMPTRACEBUFFER_TAG
 } __attribute__ ((packed)) PVRSRV_BRIDGE_OUT_PDUMPTRACEBUFFER;
 
 /*******************************************
-            PDumpSignatureBuffer          
+            PDumpSignatureBuffer
  *******************************************/
 
 /* Bridge in structure for PDumpSignatureBuffer */

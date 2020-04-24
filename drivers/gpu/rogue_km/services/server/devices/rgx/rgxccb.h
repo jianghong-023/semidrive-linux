@@ -49,13 +49,64 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "rgxdevice.h"
 #include "sync_server.h"
 #include "connection_server.h"
-#include "rgx_fwif_shared.h"
 #include "rgxdebug.h"
 #include "rgxdefs_km.h"
 #include "pvr_notifier.h"
 
 #define MAX_CLIENT_CCB_NAME	30
 #define SYNC_FLAG_MASK_ALL  IMG_UINT32_MAX
+
+/*
+ * This size is to be used when a client CCB is found to consume very
+ * negligible space (e.g. a few hundred bytes to few KBs - less than a page).
+ * In such a case, instead of allocating CCB of size of only a few KBs, we
+ * allocate at-least this much to be future risk-free.
+ */
+#define MIN_SAFE_CCB_SIZE_LOG2         13  /* 8K (2 Pages) */
+#define MAX_SAFE_CCB_SIZE_LOG2         18  /* 256K (64 Pages) */
+
+#define RGX_TQ3D_CCB_SIZE_LOG2         PVRSRV_RGX_LOG2_CLIENT_CCB_SIZE_TQ3D
+static_assert(RGX_TQ3D_CCB_SIZE_LOG2 >= MIN_SAFE_CCB_SIZE_LOG2 &&
+	RGX_TQ3D_CCB_SIZE_LOG2 <= MAX_SAFE_CCB_SIZE_LOG2, "TQ3D CCB size is invalid");
+#define RGX_TQ3D_CCB_MAX_SIZE_LOG2		PVRSRV_RGX_LOG2_CLIENT_CCB_MAX_SIZE_TQ3D
+static_assert(RGX_TQ3D_CCB_MAX_SIZE_LOG2 >= PVRSRV_RGX_LOG2_CLIENT_CCB_SIZE_TQ3D
+	&& RGX_TQ3D_CCB_MAX_SIZE_LOG2 <= MAX_SAFE_CCB_SIZE_LOG2, "TQ3D max CCB size is invalid");
+
+#define RGX_TQ2D_CCB_SIZE_LOG2         PVRSRV_RGX_LOG2_CLIENT_CCB_SIZE_TQ2D
+static_assert(RGX_TQ2D_CCB_SIZE_LOG2 >= MIN_SAFE_CCB_SIZE_LOG2 &&
+	RGX_TQ2D_CCB_SIZE_LOG2 <= MAX_SAFE_CCB_SIZE_LOG2, "TQ2D CCB size is invalid");
+#define RGX_TQ2D_CCB_MAX_SIZE_LOG2		PVRSRV_RGX_LOG2_CLIENT_CCB_MAX_SIZE_TQ2D
+static_assert(RGX_TQ2D_CCB_MAX_SIZE_LOG2 >= PVRSRV_RGX_LOG2_CLIENT_CCB_SIZE_TQ2D &&
+	RGX_TQ2D_CCB_MAX_SIZE_LOG2 <= MAX_SAFE_CCB_SIZE_LOG2, "TQ2D max CCB size is invalid");
+
+#define RGX_CDM_CCB_SIZE_LOG2          PVRSRV_RGX_LOG2_CLIENT_CCB_SIZE_CDM
+static_assert(RGX_CDM_CCB_SIZE_LOG2 >= MIN_SAFE_CCB_SIZE_LOG2 &&
+	RGX_CDM_CCB_SIZE_LOG2 <= MAX_SAFE_CCB_SIZE_LOG2, "CDM CCB size is invalid");
+#define RGX_CDM_CCB_MAX_SIZE_LOG2		PVRSRV_RGX_LOG2_CLIENT_CCB_MAX_SIZE_CDM
+static_assert(RGX_CDM_CCB_MAX_SIZE_LOG2 >= PVRSRV_RGX_LOG2_CLIENT_CCB_SIZE_CDM &&
+	RGX_CDM_CCB_MAX_SIZE_LOG2 <= MAX_SAFE_CCB_SIZE_LOG2, "CDM max CCB size is invalid");
+
+#define RGX_TA_CCB_SIZE_LOG2           PVRSRV_RGX_LOG2_CLIENT_CCB_SIZE_TA
+static_assert(RGX_TA_CCB_SIZE_LOG2 >= MIN_SAFE_CCB_SIZE_LOG2 &&
+	RGX_TA_CCB_SIZE_LOG2 <= MAX_SAFE_CCB_SIZE_LOG2, "TA CCB size is invalid");
+#define RGX_TA_CCB_MAX_SIZE_LOG2		PVRSRV_RGX_LOG2_CLIENT_CCB_MAX_SIZE_TA
+static_assert(RGX_TA_CCB_MAX_SIZE_LOG2 >= PVRSRV_RGX_LOG2_CLIENT_CCB_SIZE_TA &&
+	RGX_TA_CCB_MAX_SIZE_LOG2 <= MAX_SAFE_CCB_SIZE_LOG2, "TA max CCB size is invalid");
+
+#define RGX_3D_CCB_SIZE_LOG2           PVRSRV_RGX_LOG2_CLIENT_CCB_SIZE_3D
+static_assert(RGX_3D_CCB_SIZE_LOG2 >= MIN_SAFE_CCB_SIZE_LOG2 &&
+	RGX_3D_CCB_SIZE_LOG2 <= MAX_SAFE_CCB_SIZE_LOG2, "3D CCB size is invalid");
+#define RGX_3D_CCB_MAX_SIZE_LOG2		PVRSRV_RGX_LOG2_CLIENT_CCB_MAX_SIZE_3D
+static_assert(RGX_3D_CCB_MAX_SIZE_LOG2 >= PVRSRV_RGX_LOG2_CLIENT_CCB_SIZE_3D &&
+	RGX_3D_CCB_MAX_SIZE_LOG2 <= MAX_SAFE_CCB_SIZE_LOG2, "3D max CCB size is invalid");
+
+#define RGX_KICKSYNC_CCB_SIZE_LOG2     PVRSRV_RGX_LOG2_CLIENT_CCB_SIZE_KICKSYNC
+static_assert(RGX_KICKSYNC_CCB_SIZE_LOG2 >= MIN_SAFE_CCB_SIZE_LOG2 &&
+	RGX_KICKSYNC_CCB_SIZE_LOG2 <= MAX_SAFE_CCB_SIZE_LOG2, "KickSync CCB size is invalid");
+#define RGX_KICKSYNC_CCB_MAX_SIZE_LOG2	PVRSRV_RGX_LOG2_CLIENT_CCB_MAX_SIZE_KICKSYNC
+static_assert(RGX_KICKSYNC_CCB_MAX_SIZE_LOG2 >= PVRSRV_RGX_LOG2_CLIENT_CCB_SIZE_KICKSYNC &&
+	RGX_KICKSYNC_CCB_MAX_SIZE_LOG2 <= MAX_SAFE_CCB_SIZE_LOG2, "KickSync max CCB size is invalid");
+
 
 typedef struct _RGX_CLIENT_CCB_ RGX_CLIENT_CCB;
 
@@ -69,19 +120,19 @@ typedef struct _RGX_CCB_CMD_HELPER_DATA_ {
 	RGX_CLIENT_CCB  			*psClientCCB;
 	IMG_CHAR 					*pszCommandName;
 	IMG_UINT32 					ui32PDumpFlags;
-	
+
 	IMG_UINT32					ui32ClientFenceCount;
 	PRGXFWIF_UFO_ADDR			*pauiFenceUFOAddress;
 	IMG_UINT32					*paui32FenceValue;
 	IMG_UINT32					ui32ClientUpdateCount;
 	PRGXFWIF_UFO_ADDR			*pauiUpdateUFOAddress;
 	IMG_UINT32					*paui32UpdateValue;
-
+#if defined(SUPPORT_SERVER_SYNC_IMPL)
 	IMG_UINT32					ui32ServerSyncCount;
 	IMG_UINT32					*paui32ServerSyncFlags;
 	IMG_UINT32					ui32ServerSyncFlagMask;
 	SERVER_SYNC_PRIMITIVE		**papsServerSyncs;
-	
+#endif
 	RGXFWIF_CCB_CMD_TYPE		eType;
 	IMG_UINT32					ui32CmdSize;
 	IMG_UINT8					*pui8DMCmd;
@@ -89,14 +140,6 @@ typedef struct _RGX_CCB_CMD_HELPER_DATA_ {
 	IMG_UINT32					ui32DMCmdSize;
 	IMG_UINT32					ui32UpdateCmdSize;
 	IMG_UINT32					ui32UnfencedUpdateCmdSize;
-
-	/* timestamp commands */
-	PRGXFWIF_TIMESTAMP_ADDR     pPreTimestampAddr;
-	IMG_UINT32                  ui32PreTimeStampCmdSize;
-	PRGXFWIF_TIMESTAMP_ADDR     pPostTimestampAddr;
-	IMG_UINT32                  ui32PostTimeStampCmdSize;
-	PRGXFWIF_UFO_ADDR           pRMWUFOAddr;
-	IMG_UINT32                  ui32RMWUFOCmdSize;
 
 	/* Data setup at command acquire time */
 	IMG_UINT8					*pui8StartPtr;
@@ -114,8 +157,6 @@ typedef struct _RGX_CCB_CMD_HELPER_DATA_ {
 	/* Workload kick information */
 	RGXFWIF_WORKEST_KICK_DATA	*psWorkEstKickData;
 
-	/* Robustness reset reason address */
-	IMG_DEV_VIRTADDR			sRobustnessResetReason;
 } RGX_CCB_CMD_HELPER_DATA;
 
 #define PADDING_COMMAND_SIZE	(sizeof(RGXFWIF_CCB_CMD_HEADER))
@@ -132,11 +173,6 @@ typedef struct _RGX_CCB_CMD_HELPER_DATA_ {
 	TYPE(TQ_2D)	\
 	TYPE(TQ_TDM)    \
 	TYPE(KICKSYNC)	\
-	/* Only used for validating the number of entries in this list */ TYPE(FIXED_COUNT)	\
-	TYPE(FC0)	\
-	TYPE(FC1)	\
-	TYPE(FC2)	\
-	TYPE(FC3)	\
 
 /* Forms an enum constant for each type present in RGX_CCB_REQUESTORS list. The enum is mainly used as
    an index to the aszCCBRequestors table defined in rgxccb.c. The total number of enums must adhere
@@ -147,17 +183,10 @@ typedef enum _RGX_CCB_REQUESTOR_TYPE_
 #define CONSTRUCT_ENUM(req) REQ_TYPE_##req,
 	RGX_CCB_REQUESTORS (CONSTRUCT_ENUM)
 #undef CONSTRUCT_ENUM
-	
+
 	/* should always be at the end */
 	REQ_TYPE_TOTAL_COUNT,
 } RGX_CCB_REQUESTOR_TYPE;
-
-/*	The number of enum constants in the above table is always equal to those provided in the RGX_CCB_REQUESTORS X macro list.
-	In an event of change in value of DPX_MAX_RAY_CONTEXTS to say 'n', appropriate entry/entries up to FC[n-1] must be added to
-	the RGX_CCB_REQUESTORS list.
-*/
-static_assert(REQ_TYPE_TOTAL_COUNT == REQ_TYPE_FIXED_COUNT + DPX_MAX_RAY_CONTEXTS + 1,
-			  "Mismatch between DPX_MAX_RAY_CONTEXTS and RGX_CCB_REQUESTOR_TYPE enum");
 
 /* Tuple describing the columns of the following table */
 typedef enum _RGX_CCB_REQUESTOR_TUPLE_
@@ -170,6 +199,27 @@ typedef enum _RGX_CCB_REQUESTOR_TUPLE_
 	REQ_TUPLE_CARDINALITY,
 } RGX_CCB_REQUESTOR_TUPLE;
 
+/* Unpack U8 values from U32. */
+#define U32toU8_Unpack1(U32Packed) (U32Packed & 0xFF)
+#define U32toU8_Unpack2(U32Packed) ((U32Packed>>8) & 0xFF)
+#define U32toU8_Unpack3(U32Packed) ((U32Packed>>16) & 0xFF)
+#define U32toU8_Unpack4(U32Packed) ((U32Packed>>24) & 0xFF)
+
+/* Defines for bit meanings within the ui32CCBFlags member of struct _RGX_CLIENT_CCB_
+ *
+ *   ( X = taken/in use, - = available/unused )
+ *
+ *   31                             10
+ *    |                             ||
+ *    ------------------------------XX
+ *  Bit   Meaning
+ *    0 = If set, CCB is still open and commands will be appended to it
+ *    1 = If set, do not perform Sync Lockup Recovery (SLR) for this CCB
+ */
+#define CCB_FLAGS_CCB_STATE_OPEN (0)  /*!< This bit is set to indicate CCB is in the 'Open' state. */
+#define CCB_FLAGS_SLR_DISABLED   (1)  /*!< This bit is set to disable Sync Lockup Recovery (SLR) for this CCB. */
+
+
 /*	Table containing an array of strings for each requestor type in the list of RGX_CCB_REQUESTORS. In addition to its use in
 	this module (rgxccb.c), this table is also used to access string to be dumped in PDUMP comments, hence, marking it extern for
 	use in other modules.
@@ -181,6 +231,7 @@ PVRSRV_ERROR RGXCCBPDumpDrainCCB(RGX_CLIENT_CCB *psClientCCB,
 
 PVRSRV_ERROR RGXCreateCCB(PVRSRV_RGXDEV_INFO	*psDevInfo,
 						  IMG_UINT32			ui32CCBSizeLog2,
+						  IMG_UINT32			ui32CCBMaxSizeLog2,
 						  CONNECTION_DATA		*psConnectionData,
 						  RGX_CCB_REQUESTOR_TYPE	eCCBRequestor,
 						  RGX_SERVER_COMMON_CONTEXT *psServerCommonContext,
@@ -208,15 +259,14 @@ PVRSRV_ERROR RGXCmdHelperInitCmdCCB(RGX_CLIENT_CCB            *psClientCCB,
                                     IMG_UINT32                ui32ClientUpdateCount,
                                     PRGXFWIF_UFO_ADDR         *pauiUpdateUFOAddress,
                                     IMG_UINT32                *paui32UpdateValue,
+#if defined(SUPPORT_SERVER_SYNC_IMPL)
                                     IMG_UINT32                ui32ServerSyncCount,
                                     IMG_UINT32                *paui32ServerSyncFlags,
                                     IMG_UINT32                ui32ServerSyncFlagMask,
                                     SERVER_SYNC_PRIMITIVE     **papsServerSyncs,
+#endif
                                     IMG_UINT32                ui32CmdSize,
                                     IMG_PBYTE                 pui8DMCmd,
-                                    PRGXFWIF_TIMESTAMP_ADDR   *ppPreAddr,
-                                    PRGXFWIF_TIMESTAMP_ADDR   *ppPostAddr,
-                                    PRGXFWIF_UFO_ADDR         *ppRMWUFOAddr,
                                     RGXFWIF_CCB_CMD_TYPE      eType,
                                     IMG_UINT32                ui32ExtJobRef,
                                     IMG_UINT32                ui32IntJobRef,
@@ -224,8 +274,7 @@ PVRSRV_ERROR RGXCmdHelperInitCmdCCB(RGX_CLIENT_CCB            *psClientCCB,
                                     RGXFWIF_WORKEST_KICK_DATA *psWorkEstKickData,
                                     IMG_CHAR                  *pszCommandName,
                                     IMG_BOOL                  bCCBStateOpen,
-                                    RGX_CCB_CMD_HELPER_DATA   *psCmdHelperData,
-									IMG_DEV_VIRTADDR		  sRobustnessResetReason);
+                                    RGX_CCB_CMD_HELPER_DATA   *psCmdHelperData);
 
 PVRSRV_ERROR RGXCmdHelperAcquireCmdCCB(IMG_UINT32 ui32CmdCount,
 									   RGX_CCB_CMD_HELPER_DATA *asCmdHelperData);
@@ -247,13 +296,12 @@ void DumpStalledCCBCommand(PRGXFWIF_FWCOMMONCONTEXT sFWCommonContext,
 				RGX_CLIENT_CCB  *psCurrentClientCCB,
 				DUMPDEBUG_PRINTF_FUNC *pfnDumpDebugPrintf,
 				void *pvDumpDebugFile);
-#if defined(PVRSRV_ENABLE_FULL_SYNC_TRACKING) || defined(PVRSRV_ENABLE_FULL_CCB_DUMP)
+
 void DumpCCB(PVRSRV_RGXDEV_INFO *psDevInfo,
 			PRGXFWIF_FWCOMMONCONTEXT sFWCommonContext,
 			RGX_CLIENT_CCB *psCurrentClientCCB,
 			DUMPDEBUG_PRINTF_FUNC *pfnDumpDebugPrintf,
 			void *pvDumpDebugFile);
-#endif
 
 PVRSRV_ERROR CheckForStalledCCB(PVRSRV_DEVICE_NODE *psDevNode, RGX_CLIENT_CCB  *psCurrentClientCCB, RGX_KICK_TYPE_DM eKickTypeDM);
 

@@ -53,6 +53,17 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  * possible version :)
  */
 
+/* Linux 3.6 introduced seq_vprintf(). Earlier versions don't have this
+ * so we work around the limitation by vsnprintf() + seq_puts().
+ */
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(3, 6, 0))
+#define seq_vprintf(seq_file, fmt, args) \
+do { \
+	char aszBuffer[512]; /* maximum message buffer size */ \
+	vsnprintf(aszBuffer, sizeof(aszBuffer), fmt, args); \
+	seq_puts(seq_file, aszBuffer); \
+} while(0)
+#endif /* (LINUX_VERSION_CODE < KERNEL_VERSION(3, 6, 0)) */
 
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(3, 7, 0))
 
@@ -121,7 +132,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #if defined(CONFIG_ARM)
 /* Linux 3.13 renamed ioremap_cached to ioremap_cache */
-#define ioremap_cache(cookie,size) ioremap_cached(cookie,size)
+#define ioremap_cache(cookie, size) ioremap_cached(cookie, size)
 #endif /* defined(CONFIG_ARM) */
 
 #endif /* (LINUX_VERSION_CODE < KERNEL_VERSION(3, 13, 0)) */
@@ -153,7 +164,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 #define drm_crtc_send_vblank_event(crtc, e) drm_send_vblank_event((crtc)->dev, drm_crtc_index(crtc), e)
 
-/* seq_has_overflowed() was introduced in 3.19 but the structure elements
+/* seq_has_overflowed() was introduced in 3.19-rc1 but the structure elements
  * have been available since 2.x
  */
 #include <linux/seq_file.h>
@@ -200,18 +211,18 @@ static inline bool seq_has_overflowed(struct seq_file *m)
 /* Linux 4.5 added a new printf-style parameter for debug messages */
 
 #define drm_encoder_init(dev, encoder, funcs, encoder_type, name, ...) \
-        drm_encoder_init(dev, encoder, funcs, encoder_type)
+	drm_encoder_init(dev, encoder, funcs, encoder_type)
 
 #define drm_universal_plane_init(dev, plane, possible_crtcs, funcs, formats, format_count, format_modifiers, type, name, ...) \
-        ({ (void) format_modifiers; drm_universal_plane_init(dev, plane, possible_crtcs, funcs, formats, format_count, type); })
+	({ (void) format_modifiers; drm_universal_plane_init(dev, plane, possible_crtcs, funcs, formats, format_count, type); })
 
 #define drm_crtc_init_with_planes(dev, crtc, primary, cursor, funcs, name, ...) \
-        drm_crtc_init_with_planes(dev, crtc, primary, cursor, funcs)
+	drm_crtc_init_with_planes(dev, crtc, primary, cursor, funcs)
 
 #elif (LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0))
 
 #define drm_universal_plane_init(dev, plane, possible_crtcs, funcs, formats, format_count, format_modifiers, type, name, ...) \
-        ({ (void) format_modifiers; drm_universal_plane_init(dev, plane, possible_crtcs, funcs, formats, format_count, type, name, ##__VA_ARGS__); })
+	({ (void) format_modifiers; drm_universal_plane_init(dev, plane, possible_crtcs, funcs, formats, format_count, type, name, ##__VA_ARGS__); })
 
 #endif /* (LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0)) */
 
@@ -305,6 +316,8 @@ static inline bool seq_has_overflowed(struct seq_file *m)
 
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(4, 15, 0))
 
+#define drm_dev_put(dev) drm_dev_unref(dev)
+
 #define drm_mode_object_find(dev, file_priv, id, type) drm_mode_object_find(dev, id, type)
 #define drm_encoder_find(dev, file_priv, id) drm_encoder_find(dev, id)
 
@@ -348,6 +361,82 @@ static inline bool seq_has_overflowed(struct seq_file *m)
 	})
 
 #endif /* (LINUX_VERSION_CODE < KERNEL_VERSION(4, 17, 0)) */
+
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(4, 19, 0))
+
+#define drm_connector_attach_encoder(connector, encoder) \
+	drm_mode_connector_attach_encoder(connector, encoder)
+
+#define drm_connector_update_edid_property(connector, edid) \
+	drm_mode_connector_update_edid_property(connector, edid)
+
+#endif /* (LINUX_VERSION_CODE < KERNEL_VERSION(4, 19, 0)) */
+
+
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 0, 0))
+
+/*
+ * Work around architectures, e.g. MIPS, that define copy_from_user and
+ * copy_to_user as macros that call access_ok, as this gets redefined below.
+ * As of kernel 4.12, these functions are no longer defined per-architecture
+ * so this work around isn't needed.
+ */
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0))
+#if defined(copy_from_user)
+ /*
+  * NOTE: This function should not be called directly as it exists simply to
+  * work around copy_from_user being defined as a macro that calls access_ok.
+  */
+static inline int
+__pvr_copy_from_user(void *to, const void __user *from, unsigned long n)
+{
+	return copy_from_user(to, from, n);
+}
+
+#undef copy_from_user
+#define copy_from_user(to, from, n) __copy_from_user(to, from, n)
+#endif
+
+#if defined(copy_to_user)
+ /*
+  * NOTE: This function should not be called directly as it exists simply to
+  * work around copy_to_user being defined as a macro that calls access_ok.
+  */
+static inline int
+__pvr_copy_to_user(void __user *to, const void *from, unsigned long n)
+{
+	return copy_to_user(to, from, n);
+}
+
+#undef copy_to_user
+#define copy_to_user(to, from, n) __copy_to_user(to, from, n)
+#endif
+#endif
+
+/*
+ * Linux 5.0 dropped the type argument.
+ *
+ * This is unused in at least Linux 3.4 and above for all architectures other
+ * than 'um' (User Mode Linux), which stopped using it in 4.2.
+ */
+#if defined(access_ok)
+ /*
+  * NOTE: This function should not be called directly as it exists simply to
+  * work around access_ok being defined as a macro.
+  */
+static inline int
+__pvr_access_ok_compat(int type, const void __user * addr, unsigned long size)
+{
+	return access_ok(type, addr, size);
+}
+
+#undef access_ok
+#define access_ok(addr, size) __pvr_access_ok_compat(0, addr, size)
+#else
+#define access_ok(addr, size) access_ok(0, addr, size)
+#endif
+
+#endif
 
 #if defined(CONFIG_L4)
 

@@ -24,6 +24,8 @@
 #if defined(LINUX)
 #include <linux/platform_device.h>
 #include <linux/dma-mapping.h>
+#include <linux/property.h>
+#include <linux/clk.h>
 #endif
 #include "rgx_bvnc_defs_km.h"
 #include "interrupt_support.h"
@@ -175,8 +177,11 @@ PVRSRV_ERROR SysDevInit(void *pvOSDevice, PVRSRV_DEVICE_CONFIG **ppsDevConfig)
 	struct resource *psDevMemRes = NULL;
 
 #if defined(LINUX)
+        int err;
         int iIrq;
+        IMG_UINT32 uiClk;
         struct platform_device *psDev;
+        struct clk * coreClock;
 
         psDev = to_platform_device((struct device *)pvOSDevice);
 	dma_set_mask(pvOSDevice, DMA_BIT_MASK(40));
@@ -249,6 +254,34 @@ PVRSRV_ERROR SysDevInit(void *pvOSDevice, PVRSRV_DEVICE_CONFIG **ppsDevConfig)
         }
 #endif
 
+#if defined(LINUX)
+        /* Always ask for fixed clock rate from a property. */
+        device_property_read_u32(&psDev->dev, "clock-frequency", &uiClk);
+
+        /* If there is separate gpucoreclk, get the rate from it. */
+        coreClock = devm_clk_get(&psDev->dev, "gpucoreclk");
+        if (IS_ERR(coreClock) && PTR_ERR(coreClock) != -EPROBE_DEFER)
+                coreClock = devm_clk_get(&psDev->dev, NULL);
+        if (IS_ERR(coreClock) && PTR_ERR(coreClock) == -EPROBE_DEFER)
+                return -EPROBE_DEFER;
+        if (!IS_ERR_OR_NULL(coreClock)) {
+                err = clk_prepare_enable(coreClock);
+                if (err)
+                        dev_warn(&psDev->dev, "could not enable optional gpucoreclk: %d\n", err);
+                else
+                        uiClk  = clk_get_rate(coreClock);
+        }
+
+        /* If no clock rate is defined, fail. */
+        if (!uiClk) {
+                dev_err(&psDev->dev, "clock rate not defined\n");
+                err = -EINVAL;
+                goto ErrorFreeDevConfig;
+        }
+        psRGXTimingInfo->ui32CoreClockSpeed = uiClk;
+        pr_info("core clock is %d\n", psRGXTimingInfo->ui32CoreClockSpeed);
+#endif
+
 	psDevConfig->pasPhysHeaps			= pasPhysHeaps;
 	psDevConfig->ui32PhysHeapCount		= uiPhysHeapCount;
 
@@ -275,10 +308,6 @@ PVRSRV_ERROR SysDevInit(void *pvOSDevice, PVRSRV_DEVICE_CONFIG **ppsDevConfig)
 	IonInit(NULL);
 #endif
 
-#if defined(PVRSRV_VZ_NUM_OSID) && (PVRSRV_VZ_NUM_OSID + 0 > 2)
-        SysVzDevInit();
-#endif
-
 	*ppsDevConfig = psDevConfig;
 
 	return PVRSRV_OK;
@@ -290,10 +319,6 @@ ErrorFreeDevConfig:
 
 void SysDevDeInit(PVRSRV_DEVICE_CONFIG *psDevConfig)
 {
-#if defined(PVRSRV_VZ_NUM_OSID) && (PVRSRV_VZ_NUM_OSID + 0> 2)
-    SysVzDevDeInit();
-#endif
-
 #if defined(SUPPORT_ION)
 	IonDeinit();
 #endif

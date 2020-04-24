@@ -1,6 +1,9 @@
 /*******************************************************************************
+@File
 @Title          Direct client bridge for pdump
 @Copyright      Copyright (c) Imagination Technologies Ltd. All Rights Reserved
+@Description    Implements the client side of the bridge for pdump
+                which is used in calls from Server context.
 @License        Dual MIT/GPLv2
 
 The contents of this file are subject to the MIT license as set out below.
@@ -125,6 +128,8 @@ IMG_INTERNAL PVRSRV_ERROR IMG_CALLCONV BridgePDumpImageDescriptor(IMG_HANDLE
 								  const
 								  IMG_UINT32 *
 								  pui32FBCClearColour,
+								  PDUMP_FBC_SWIZZLE
+								  eeFBCSwizzle,
 								  IMG_DEV_VIRTADDR
 								  sHeaderDevAddr,
 								  IMG_UINT32
@@ -138,7 +143,7 @@ IMG_INTERNAL PVRSRV_ERROR IMG_CALLCONV BridgePDumpImageDescriptor(IMG_HANDLE
 	psDevmemCtxInt = (DEVMEMINT_CTX *) hDevmemCtx;
 
 	eError =
-	    DevmemIntPdumpImageDescriptor(NULL,
+	    DevmemIntPDumpImageDescriptor(NULL,
 					  (PVRSRV_DEVICE_NODE *) ((void *)
 								  hBridge),
 					  psDevmemCtxInt, ui32StringSize,
@@ -147,8 +152,9 @@ IMG_INTERNAL PVRSRV_ERROR IMG_CALLCONV BridgePDumpImageDescriptor(IMG_HANDLE
 					  ui32LogicalHeight, ui32PhysicalWidth,
 					  ui32PhysicalHeight, ePixelFormat,
 					  eMemLayout, eFBCompression,
-					  pui32FBCClearColour, sHeaderDevAddr,
-					  ui32HeaderSize, ui32PDumpFlags);
+					  pui32FBCClearColour, eeFBCSwizzle,
+					  sHeaderDevAddr, ui32HeaderSize,
+					  ui32PDumpFlags);
 
 	return eError;
 }
@@ -178,6 +184,42 @@ IMG_INTERNAL PVRSRV_ERROR IMG_CALLCONV BridgePVRSRVPDumpSetFrame(IMG_HANDLE
 	eError =
 	    PDumpSetFrameKM(NULL, (PVRSRV_DEVICE_NODE *) ((void *)hBridge),
 			    ui32Frame);
+
+	return eError;
+}
+
+IMG_INTERNAL PVRSRV_ERROR IMG_CALLCONV BridgePDumpDataDescriptor(IMG_HANDLE
+								 hBridge,
+								 IMG_HANDLE
+								 hDevmemCtx,
+								 IMG_UINT32
+								 ui32StringSize,
+								 const IMG_CHAR
+								 * puiFileName,
+								 IMG_DEV_VIRTADDR
+								 sDataDevAddr,
+								 IMG_UINT32
+								 ui32DataSize,
+								 IMG_UINT32
+								 ui32ElementType,
+								 IMG_UINT32
+								 ui32ElementCount,
+								 IMG_UINT32
+								 ui32PDumpFlags)
+{
+	PVRSRV_ERROR eError;
+	DEVMEMINT_CTX *psDevmemCtxInt;
+
+	psDevmemCtxInt = (DEVMEMINT_CTX *) hDevmemCtx;
+
+	eError =
+	    DevmemIntPDumpDataDescriptor(NULL,
+					 (PVRSRV_DEVICE_NODE *) ((void *)
+								 hBridge),
+					 psDevmemCtxInt, ui32StringSize,
+					 puiFileName, sDataDevAddr,
+					 ui32DataSize, ui32ElementType,
+					 ui32ElementCount, ui32PDumpFlags);
 
 	return eError;
 }

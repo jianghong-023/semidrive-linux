@@ -111,7 +111,7 @@ typedef enum Resize {
 	/* This should be set to indicate the change needs free */
 	SPARSE_RESIZE_FREE = 2,
 
-	SPARSE_RESIZE_BOTH = (SPARSE_RESIZE_ALLOC | SPARSE_RESIZE_FREE),
+	SPARSE_RESIZE_BOTH = ((IMG_UINT8)SPARSE_RESIZE_ALLOC | (IMG_UINT8)SPARSE_RESIZE_FREE),
 
 	/* This should be set to silently swap underlying physical memory
 	 * without disturbing its device or cpu virtual maps

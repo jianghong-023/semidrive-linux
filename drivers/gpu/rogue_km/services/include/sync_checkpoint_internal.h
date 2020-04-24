@@ -56,9 +56,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "devicemem.h"
 #include "rgx_fwif_shared.h"
 
-#if defined(PVRSRV_ENABLE_FULL_SYNC_TRACKING)
 struct SYNC_CHECKPOINT_RECORD;
-#endif
 
 /*
 	Private structures
@@ -68,7 +66,7 @@ typedef struct _SYNC_CHECKPOINT_CONTEXT_CTL_ *_PSYNC_CHECKPOINT_CONTEXT_CTL;
 
 typedef struct _SYNC_CHECKPOINT_CONTEXT_
 {
-	PPVRSRV_DEVICE_NODE     		psDevNode;
+	PPVRSRV_DEVICE_NODE				psDevNode;
 	IMG_CHAR						azName[PVRSRV_SYNC_NAME_LENGTH];       /*!< Name of the RA */
 	RA_ARENA						*psSubAllocRA;                         /*!< RA context */
 	IMG_CHAR						azSpanName[PVRSRV_SYNC_NAME_LENGTH];   /*!< Name of the span RA */
@@ -90,32 +88,29 @@ typedef struct _SYNC_CHECKPOINT_BLOCK_
 	DEVMEM_MEMDESC            *hMemDesc;                  /*!< DevMem allocation for block */
 	volatile IMG_UINT32       *pui32LinAddr;              /*!< Server-code CPU mapping */
 	IMG_UINT64                uiSpanBase;                 /*!< Base of this import (FW DevMem) in the span RA */
-	DLLIST_NODE               sListNode;                  /*!< List node for the sync chkpt block list */
 } SYNC_CHECKPOINT_BLOCK;
 
 typedef struct SYNC_CHECKPOINT_RECORD* PSYNC_CHECKPOINT_RECORD_HANDLE;
 
 typedef struct _SYNC_CHECKPOINT_
 {
-	//_SYNC_CHECKPOINT_CONTEXT		*psContext;				/*!< pointer to the parent context of this checkpoint */
+	//_SYNC_CHECKPOINT_CONTEXT      *psContext;             /*!< pointer to the parent context of this checkpoint */
 	/* A sync checkpoint is assigned a unique ID, to avoid any confusion should
 	 * the same memory be re-used later for a different checkpoint
 	 */
-	IMG_UINT32                      ui32UID;                 /*!< Unique ID assigned to sync checkpoint (to distinguish checkpoints if memory is re-used)*/
+	IMG_UINT32                      ui32UID;                /*!< Unique ID assigned to sync checkpoint (to distinguish checkpoints if memory is re-used)*/
 	POS_LOCK                        hLock;
-	ATOMIC_T                        hRefCount;               /*!< Ref count for this sync */
-	ATOMIC_T                        hEnqueuedCCBCount;       /*!< Num times sync has been put in CCBs */
-	SYNC_CHECKPOINT_BLOCK           *psSyncCheckpointBlock;  /*!< Synchronisation block this checkpoint is allocated on */
-	IMG_UINT64                      uiSpanAddr;              /*!< Span address of the sync */
-	volatile _SYNC_CHECKPOINT_FW_OBJ *psSyncCheckpointFwObj; /*!< CPU view of the data held in the sync block */
-	PRGXFWIF_UFO_ADDR               sCheckpointUFOAddr;      /*!< PRGXFWIF_UFO_ADDR struct used to pass update address to FW */
+	ATOMIC_T                        hRefCount;              /*!< Ref count for this sync */
+	ATOMIC_T                        hEnqueuedCCBCount;      /*!< Num times sync has been put in CCBs */
+	SYNC_CHECKPOINT_BLOCK           *psSyncCheckpointBlock; /*!< Synchronisation block this checkpoint is allocated on */
+	IMG_UINT64                      uiSpanAddr;             /*!< Span address of the sync */
+	volatile SYNC_CHECKPOINT_FW_OBJ *psSyncCheckpointFwObj; /*!< CPU view of the data held in the sync block */
+	PRGXFWIF_UFO_ADDR               sCheckpointUFOAddr;     /*!< PRGXFWIF_UFO_ADDR struct used to pass update address to FW */
 	IMG_CHAR                        azName[PVRSRV_SYNC_NAME_LENGTH]; /*!< Name of the checkpoint */
-	PVRSRV_TIMELINE                 hTimeline;               /*!< Timeline on which this sync checkpoint was created */
+	PVRSRV_TIMELINE                 hTimeline;              /*!< Timeline on which this sync checkpoint was created */
 	IMG_UINT32                      ui32ValidationCheck;
-	IMG_PID                         uiProcess;               /*!< The Process ID of the process which created this sync checkpoint */
-#if defined(PVRSRV_ENABLE_FULL_SYNC_TRACKING)
+	IMG_PID                         uiProcess;              /*!< The Process ID of the process which created this sync checkpoint */
 	PSYNC_CHECKPOINT_RECORD_HANDLE  hRecord;                /*!< Sync record handle */
-#endif
 	DLLIST_NODE                     sListNode;              /*!< List node for the global sync chkpt list */
 	DLLIST_NODE                     sDeferredFreeListNode;  /*!< List node for the deferred free sync chkpt list */
 	IMG_UINT32                      ui32FWAddr;             /*!< FWAddr stored at sync checkpoint alloc time */
@@ -252,4 +247,4 @@ SyncCheckpointGetTimeline(PSYNC_CHECKPOINT psSyncCheckpoint);
 PRGXFWIF_UFO_ADDR*
 SyncCheckpointGetRGXFWIFUFOAddr(PSYNC_CHECKPOINT psSyncCheckpoint);
 
-#endif	/* __SYNC_CHECKPOINT__ */
+#endif /* __SYNC_CHECKPOINT__ */

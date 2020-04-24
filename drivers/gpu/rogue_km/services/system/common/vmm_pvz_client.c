@@ -43,6 +43,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #include "pvrsrv.h"
 #include "img_types.h"
+#include "img_defs.h"
 #include "pvrsrv_error.h"
 
 #include "vmm_impl.h"
@@ -73,7 +74,7 @@ PvzClientLockRelease(void)
  * ===========================================================
  */
 
-PVRSRV_ERROR 
+PVRSRV_ERROR
 PvzClientCreateDevConfig(PVRSRV_DEVICE_CONFIG *psDevConfig,
 						 IMG_UINT32 ui32DevID)
 {
@@ -159,7 +160,7 @@ e0:
 	return eError;
 }
 
-PVRSRV_ERROR 
+PVRSRV_ERROR
 PvzClientCreateDevPhysHeaps(PVRSRV_DEVICE_CONFIG *psDevConfig,
 							IMG_UINT32 ui32DevID)
 {

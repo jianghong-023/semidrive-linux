@@ -42,8 +42,8 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */ /**************************************************************************/
 
-#ifndef _SYNC_CHECKPOINT_INTERNAL_FW_
-#define _SYNC_CHECKPOINT_INTERNAL_FW_
+#ifndef SYNC_CHECKPOINT_INTERNAL_FW_H
+#define SYNC_CHECKPOINT_INTERNAL_FW_H
 
 #include "img_types.h"
 
@@ -51,13 +51,13 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  * This is the FW-addressable structure use to hold the sync checkpoint's
  * state and other information which needs to be accessed by the firmware.
  */
-typedef struct _SYNC_CHECKPOINT_FW_OBJ_
+typedef struct
 {
 	IMG_UINT32	ui32State;          /*!< Holds the current state of the sync checkpoint */
 	IMG_UINT32	ui32FwRefCount;     /*!< Holds the FW reference count (num of fences/updates processed) */
-} _SYNC_CHECKPOINT_FW_OBJ;
+} SYNC_CHECKPOINT_FW_OBJ;
 
 /* Bit mask Firmware can use to test if a checkpoint has signalled or errored */
 #define SYNC_CHECKPOINT_SIGNALLED_MASK (0x1 << 0)
 
-#endif	/* _SYNC_CHECKPOINT_INTERNAL_FW_ */
+#endif	/* SYNC_CHECKPOINT_INTERNAL_FW_H */

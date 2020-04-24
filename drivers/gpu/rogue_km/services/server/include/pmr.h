@@ -9,7 +9,7 @@
                 (higher software levels provide an abstraction above that
                 to deal with dividing this down into smaller manageable units).
                 Importantly, this module knows nothing of virtual memory, or
-                of MMUs etc., with one excuseable exception.  We have the
+                of MMUs etc., with one excusable exception.  We have the
                 concept of a "page size", which really means nothing in
                 physical memory, but represents a "contiguity quantum" such
                 that the higher level modules which map this memory are able
@@ -58,6 +58,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 /* include/ */
 #include "img_types.h"
+#include "img_defs.h"
 #include "pdumpdefs.h"
 #include "pvrsrv_error.h"
 #include "pvrsrv_memallocflags.h"
@@ -72,6 +73,9 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "opaque_types.h"
 
 #define PMR_MAX_TRANSLATION_STACK_ALLOC				(32)
+
+/* Maximum number of pages a PMR can have is 1G of memory */
+ #define PMR_MAX_SUPPORTED_PAGE_COUNT				(262144)
 
 typedef IMG_UINT64 PMR_BASE_T;
 typedef IMG_UINT64 PMR_SIZE_T;
@@ -911,7 +915,7 @@ PMR_PDumpSymbolicAddr(const PMR *psPMR,
 }
 
 #ifdef INLINE_IS_PRAGMA
-#pragma inline(PMRPDumpLoadMemValue)
+#pragma inline(PMRPDumpLoadMemValue32)
 #endif
 static INLINE PVRSRV_ERROR
 PMRPDumpLoadMemValue32(PMR *psPMR,
@@ -927,7 +931,7 @@ PMRPDumpLoadMemValue32(PMR *psPMR,
 }
 
 #ifdef INLINE_IS_PRAGMA
-#pragma inline(PMRPDumpLoadMemValue)
+#pragma inline(PMRPDumpLoadMemValue64)
 #endif
 static INLINE PVRSRV_ERROR
 PMRPDumpLoadMemValue64(PMR *psPMR,
@@ -1095,11 +1099,10 @@ PMRInit(void);
 extern PVRSRV_ERROR
 PMRDeInit(void);
 
-#if defined(PVR_RI_DEBUG)
+#if defined(PVRSRV_ENABLE_GPU_MEMORY_INFO)
 extern PVRSRV_ERROR
 PMRStoreRIHandle(PMR *psPMR,
 				 void *hRIHandle);
 #endif
 
 #endif /* #ifdef _SRVSRV_PMR_H_ */
-

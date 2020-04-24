@@ -75,7 +75,6 @@ PVRSRV_ERROR PVRSRVRGXNotifySignalUpdateKM(CONNECTION_DATA *psConnection,
 		eError = RGXScheduleCommand((PVRSRV_RGXDEV_INFO *)psDeviceNode->pvDevice,
 		                            RGXFWIF_DM_GP,
 		                            &sKCCBCmd,
-		                            sizeof(sKCCBCmd),
 		                            0,
 		                            PDUMP_FLAGS_NONE);
 		if (eError != PVRSRV_ERROR_RETRY)

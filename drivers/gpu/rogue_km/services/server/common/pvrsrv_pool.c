@@ -93,7 +93,7 @@ PVRSRV_ERROR PVRSRVPoolCreate(PVRSRV_POOL_ALLOC_FUNC *pfnAlloc,
 		goto err_alloc;
 	}
 
-	eError = OSLockCreate(&psPool->hLock, LOCK_TYPE_NONE);
+	eError = OSLockCreate(&psPool->hLock);
 
 	if (eError != PVRSRV_OK)
 	{
@@ -225,6 +225,14 @@ PVRSRV_ERROR PVRSRVPoolGet(PVRSRV_POOL *psPool,
 			goto out_unlock;
 		}
 	}
+
+#if defined(DEBUG) || defined(SUPPORT_VALIDATION)
+	/* Don't poison the IN buffer as that is copied from client and would be
+	 * waste of cycles.
+	 */
+	OSCachedMemSet(((IMG_PBYTE)psEntry->pvData)+PVRSRV_MAX_BRIDGE_IN_SIZE,
+			PVRSRV_POISON_ON_ALLOC_VALUE, PVRSRV_MAX_BRIDGE_OUT_SIZE);
+#endif
 
 	psPool->uiNumBusy++;
 	*hToken = psEntry;

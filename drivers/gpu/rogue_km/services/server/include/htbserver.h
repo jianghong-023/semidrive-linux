@@ -85,10 +85,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
                                 number
 */ /**************************************************************************/
 PVRSRV_ERROR
-HTBDeviceCreate(
-		PVRSRV_DEVICE_NODE *psDeviceNode
-);
-
+HTBDeviceCreate(PVRSRV_DEVICE_NODE *psDeviceNode);
 
 /************************************************************************/ /*!
  @Function      HTBIDeviceDestroy
@@ -98,10 +95,7 @@ HTBDeviceCreate(
 
 */ /**************************************************************************/
 void
-HTBDeviceDestroy(
-		PVRSRV_DEVICE_NODE *psDeviceNode
-);
-
+HTBDeviceDestroy(PVRSRV_DEVICE_NODE *psDeviceNode);
 
 /************************************************************************/ /*!
  @Function      HTBInit
@@ -111,7 +105,7 @@ HTBDeviceDestroy(
                                 number
 */ /**************************************************************************/
 PVRSRV_ERROR
-HTBInit( void );
+HTBInit(void);
 
 /************************************************************************/ /*!
  @Function      HTBDeInit
@@ -121,8 +115,7 @@ HTBInit( void );
                                 number
 */ /**************************************************************************/
 PVRSRV_ERROR
-HTBDeInit( void );
-
+HTBDeInit(void);
 
 /*************************************************************************/ /*!
  @Function      HTBConfigureKM
@@ -138,11 +131,8 @@ HTBDeInit( void );
                                 number
 */ /**************************************************************************/
 PVRSRV_ERROR
-HTBConfigureKM(
-		IMG_UINT32 ui32NameSize,
-		const IMG_CHAR * pszName,
-		const IMG_UINT32 ui32BufferSize
-);
+HTBConfigureKM(IMG_UINT32 ui32NameSize, const IMG_CHAR * pszName,
+			   const IMG_UINT32 ui32BufferSize);
 
 
 /*************************************************************************/ /*!
@@ -165,28 +155,40 @@ HTBConfigureKM(
                                 number
 */ /**************************************************************************/
 PVRSRV_ERROR
-HTBControlKM(
-	const IMG_UINT32 ui32NumFlagGroups,
-	const IMG_UINT32 * aui32GroupEnable,
-	const IMG_UINT32 ui32LogLevel,
-	const IMG_UINT32 ui32EnablePID,
-	const HTB_LOGMODE_CTRL eLogMode,
-	const HTB_OPMODE_CTRL eOpMode
-);
+HTBControlKM(const IMG_UINT32 ui32NumFlagGroups,
+			 const IMG_UINT32 *aui32GroupEnable,
+			 const IMG_UINT32 ui32LogLevel,
+			 const IMG_UINT32 ui32EnablePID,
+			 const HTB_LOGMODE_CTRL eLogMode,
+			 const HTB_OPMODE_CTRL eOpMode);
 
 
 /*************************************************************************/ /*!
  @Function      HTBSyncPartitionMarker
  @Description   Write an HTB sync partition marker to the HTB log
 
- @Input         ui33Marker      Marker value
+ @Input         ui32Marker      Marker value
 
 */ /**************************************************************************/
 void
-HTBSyncPartitionMarker(
-	const IMG_UINT32 ui32Marker
-);
+HTBSyncPartitionMarker(const IMG_UINT32 ui32Marker);
 
+/*************************************************************************/ /*!
+ @Function      HTBSyncPartitionMarkerRpt
+ @Description   Write a HTB sync partition marker to the HTB log, given
+                the previous values to repeat.
+
+ @Input         ui32Marker      Marker value
+ @Input         ui64SyncOSTS    previous OSTS
+ @Input         ui64SyncCRTS    previous CRTS
+ @Input         ui32ClkSpeed    previous Clockspeed
+
+*/ /**************************************************************************/
+void
+HTBSyncPartitionMarkerRepeat(const IMG_UINT32 ui32Marker,
+							 const IMG_UINT64 ui64SyncOSTS,
+							 const IMG_UINT64 ui64SyncCRTS,
+							 const IMG_UINT32 ui32ClkSpeed);
 
 /*************************************************************************/ /*!
  @Function      HTBSyncScale
@@ -196,21 +198,16 @@ HTBSyncPartitionMarker(
  @Input         bLogValues      IMG_TRUE if value should be immediately written
                                 out to the log
 
- @Input         ui32OSTS        OS Timestamp
+ @Input         ui64OSTS        OS Timestamp
 
- @Input         ui32CRTS        Rogue timestamp
+ @Input         ui64CRTS        Rogue timestamp
 
  @Input         ui32CalcClkSpd  Calculated clock speed
 
 */ /**************************************************************************/
 void
-HTBSyncScale(
-	const IMG_BOOL bLogValues,
-	const IMG_UINT64 ui64OSTS,
-	const IMG_UINT64 ui64CRTS,
-	const IMG_UINT32 ui32CalcClkSpd
-);
-
+HTBSyncScale(const IMG_BOOL bLogValues, const IMG_UINT64 ui64OSTS,
+			 const IMG_UINT64 ui64CRTS, const IMG_UINT32 ui32CalcClkSpd);
 
 /*************************************************************************/ /*!
  @Function      HTBLogKM
@@ -222,7 +219,7 @@ HTBSyncScale(
                                 with a particular process, but performed by
                                 another can be logged correctly.
 
- @Input         ui32TimeStamp   The timestamp to be associated with this log event
+ @Input         ui64TimeStamp   The timestamp to be associated with this log event
 
  @Input         SF              The log event ID
 
@@ -232,16 +229,9 @@ HTBSyncScale(
 
 */ /**************************************************************************/
 PVRSRV_ERROR
-HTBLogKM(
-		IMG_UINT32 PID,
-		IMG_UINT32 ui32TimeStamp,
-		HTB_LOG_SFids SF,
-		IMG_UINT32 ui32NumArgs,
-		IMG_UINT32 * aui32Args
-);
-
+HTBLogKM(IMG_UINT32 PID, IMG_UINT64 ui64TimeStamp, HTB_LOG_SFids SF,
+		 IMG_UINT32 ui32NumArgs, IMG_UINT32 *aui32Args);
 
 #endif /* __HTBSERVER_H__ */
 
 /* EOF */
-

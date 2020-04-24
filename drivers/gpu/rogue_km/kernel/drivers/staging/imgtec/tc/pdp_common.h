@@ -44,7 +44,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #if !defined(__PDP_COMMON_H__)
 #define __PDP_COMMON_H__
 
-#include <asm/io.h>
+#include <linux/io.h>
 
 /*#define PDP_VERBOSE*/
 

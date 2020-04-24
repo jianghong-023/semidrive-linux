@@ -67,7 +67,7 @@ PVRSRV_ERROR PhysmemNewTDFWCodePMR(PVRSRV_DEVICE_NODE *psDevNode,
                                    IMG_DEVMEM_SIZE_T uiSize,
                                    PMR_LOG2ALIGN_T uiLog2Align,
                                    PVRSRV_MEMALLOCFLAGS_T uiFlags,
-                                   IMG_BOOL bFWCorememCode,
+                                   PVRSRV_TD_FW_MEM_REGION eRegion,
                                    PMR **ppsPMRPtr);
 
 #endif /* _PHYSMEM_TDFWCODE_H_ */

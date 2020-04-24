@@ -71,7 +71,7 @@ static IMG_INT32 devfreq_target(struct device *dev, long unsigned *requested_fre
 	RGX_DATA		*psRGXData = (RGX_DATA*) gpsDeviceNode->psDevConfig->hDevData;
 	IMG_DVFS_DEVICE		*psDVFSDevice = &gpsDeviceNode->psDevConfig->sDVFS.sDVFSDevice;
 	IMG_DVFS_DEVICE_CFG	*psDVFSDeviceCfg = &gpsDeviceNode->psDevConfig->sDVFS.sDVFSDeviceCfg;
-	RGX_TIMING_INFORMATION	*psRGXTimingInfo = psRGXData->psRGXTimingInfo;
+	RGX_TIMING_INFORMATION	*psRGXTimingInfo = NULL;
 	IMG_UINT32		ui32Freq, ui32CurFreq, ui32Volt;
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(3, 13, 0))
 	struct opp *opp;
@@ -79,6 +79,13 @@ static IMG_INT32 devfreq_target(struct device *dev, long unsigned *requested_fre
 	struct dev_pm_opp *opp;
 #endif
 
+	/* Check the RGX device is initialised */
+	if (!psRGXData)
+	{
+		return -ENODATA;
+	}
+
+	psRGXTimingInfo = psRGXData->psRGXTimingInfo;
 	if (!psDVFSDevice->bEnabled)
 	{
 		*requested_freq = psRGXTimingInfo->ui32CoreClockSpeed;
@@ -149,10 +156,17 @@ static int devfreq_get_dev_status(struct device *dev, struct devfreq_dev_status 
 	PVRSRV_RGXDEV_INFO      *psDevInfo = gpsDeviceNode->pvDevice;
 	IMG_DVFS_DEVICE         *psDVFSDevice = &gpsDeviceNode->psDevConfig->sDVFS.sDVFSDevice;
 	RGX_DATA                *psRGXData = (RGX_DATA*) gpsDeviceNode->psDevConfig->hDevData;
-	RGX_TIMING_INFORMATION  *psRGXTimingInfo = psRGXData->psRGXTimingInfo;
+	RGX_TIMING_INFORMATION  *psRGXTimingInfo = NULL;
 	RGXFWIF_GPU_UTIL_STATS   sGpuUtilStats;
 	PVRSRV_ERROR             eError;
 
+	/* Check the RGX device is initialised */
+	if (!psDevInfo || !psRGXData)
+	{
+		return -ENODATA;
+	}
+
+	psRGXTimingInfo = psRGXData->psRGXTimingInfo;
 	stat->current_frequency = psRGXTimingInfo->ui32CoreClockSpeed;
 
 	if (psDevInfo->pfnGetGpuUtilStats == NULL)
@@ -182,6 +196,12 @@ static int devfreq_get_dev_status(struct device *dev, struct devfreq_dev_status 
 static IMG_INT32 devfreq_cur_freq(struct device *dev, unsigned long *freq)
 {
 	RGX_DATA *psRGXData = (RGX_DATA*) gpsDeviceNode->psDevConfig->hDevData;
+
+	/* Check the RGX device is initialised */
+	if (!psRGXData)
+	{
+		return -ENODATA;
+	}
 
 	*freq = psRGXData->psRGXTimingInfo->ui32CoreClockSpeed;
 
@@ -478,7 +498,7 @@ PVRSRV_ERROR InitDVFS(PPVRSRV_DEVICE_NODE psDeviceNode)
 		goto err_exit;
 	}
 
-#if	defined(CHROMIUMOS_KERNEL) && (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 4, 0))
+#if	defined(CHROMIUMOS_KERNEL) && (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 4, 0)) && (LINUX_VERSION_CODE < KERNEL_VERSION(4, 5, 0))
 	psDVFSDevice->psDevFreq->policy.user.min_freq = min_freq;
 	psDVFSDevice->psDevFreq->policy.user.max_freq = max_freq;
 #else

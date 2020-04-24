@@ -39,7 +39,6 @@ PURPOSE AND NONINFRINGEMENT; AND (B) IN NO EVENT SHALL THE AUTHORS OR
 COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
 IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-
 */ /**************************************************************************/
 
 #ifndef SERVICES_KM_H
@@ -83,17 +82,21 @@ typedef struct _PVRSRV_DEV_CONNECTION_ PVRSRV_DEV_CONNECTION;
 	Flags for Services connection.
 	Allows to define per-client policy for Services
 */
+/*
+ *   Use of the 32-bit connection flags mask
+ *   ( X = taken/in use, - = available/unused )
+ *
+ *   31  27     20             6   2 0
+ *    |   |      |             |   | |
+ *    X---XXXXXXXX-------------XXXXX--
+ */
 
 #define SRV_WORKEST_ENABLED             (1U << 2)  /*!< If Workload Estimation is enabled */
 #define SRV_PDVFS_ENABLED               (1U << 3)  /*!< If PDVFS is enabled */
-
 #define SRV_NO_HWPERF_CLIENT_STREAM     (1U << 4)  /*!< Don't create HWPerf for this connection */
-
-#define SRV_FLAGS_CLIENT_64BIT_COMPAT	(1U << 5)	/* This flags gets set if the client is 64 Bit
- 	 	 	 	 	 	 	 	 	 	 	 	 	   compatible.
- 	 	 	 	 	 	 	 	 	 	 	 	 	 */
-/* Size of pointer on a 64 bit machine */
-#define	POINTER_SIZE_64BIT	(8)
+#define SRV_FLAGS_CLIENT_64BIT_COMPAT   (1U << 5)  /*!< This flags gets set if the client is 64 Bit compatible. */
+#define SRV_FLAGS_CLIENT_SLR_DISABLED   (1U << 6)  /*!< This flag is set if the client does not want Sync Lockup Recovery (SLR) enabled. */
+#define SRV_FLAGS_PDUMPCTRL             (1U << 31) /*!< PDump Ctrl client flag */
 
 /*
  * Bits 20 - 27 are used to pass information needed for validation
@@ -120,24 +123,28 @@ typedef struct _PVRSRV_DEV_CONNECTION_ PVRSRV_DEV_CONNECTION;
 #define VIRTVAL_FLAG_AXIPTD_SHIFT      (27)
 #define SRV_VIRTVAL_FLAG_AXIPTD_MASK   (1U << VIRTVAL_FLAG_AXIPTD_SHIFT)
 
-#define SRV_FLAGS_PDUMPCTRL             (1U << 31) /*!< PDump Ctrl client flag */
+
+/* Size of pointer on a 64 bit machine */
+#define	POINTER_SIZE_64BIT	(8)
+
 
 /*
     Pdump flags which are accessible to Services clients
 */
 #define PDUMP_NONE          0x00000000UL /*<! No flags */
 
-#define PDUMP_BLKDATA       0x10000000UL /*<! This flag indicates block-mode PDump data to be recorded in 
-                                                          Block script stream in addition to Main script stream. */
+#define PDUMP_BLKDATA       0x10000000UL /*<! This flag indicates block-mode PDump data to be recorded in
+                                                          Block script stream in addition to Main script stream,
+                                                          if capture mode is set to BLOCKED */
 
 #define PDUMP_CONT          0x40000000UL /*<! Output this entry always regardless of framed capture range,
                                                           used by client applications being dumped. */
 #define PDUMP_PERSIST       0x80000000UL /*<! Output this entry always regardless of app and range,
-                                                          used by persistent resources created after 
-                                                          driver initialisation that must appear in 
+                                                          used by persistent resources created after
+                                                          driver initialisation that must appear in
                                                           all PDump captures in that session. */
 
-/* Valid range of values for pdump block length used in 'block' mode of PDump */
+/* Valid range of values for pdump block length in Block mode of PDump */
 #define PDUMP_BLOCKLEN_MIN          10
 #define PDUMP_BLOCKLEN_MAX          1000
 

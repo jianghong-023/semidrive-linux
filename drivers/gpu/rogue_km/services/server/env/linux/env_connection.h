@@ -85,9 +85,6 @@ typedef struct _ENV_CONNECTION_DATA_
 #if defined(SUPPORT_ION) && (LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0))
 	ENV_ION_CONNECTION_DATA *psIonData;
 #endif
-#if defined(SUPPORT_DRM_EXT)
-	void *pPriv;
-#endif
 } ENV_CONNECTION_DATA;
 
 #endif /* !defined(_ENV_CONNECTION_H_) */

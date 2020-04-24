@@ -102,7 +102,7 @@ PVRSRVCmdCompleteDeinit(void)
 			PVRSRV_CMDCOMP_NOTIFY *psNotify;
 
 			dllist_remove_node(psNode);
-			
+
 			psNotify = IMG_CONTAINER_OF(psNode, PVRSRV_CMDCOMP_NOTIFY, sListNode);
 			OSFreeMem(psNotify);
 
@@ -136,7 +136,7 @@ PVRSRVRegisterCmdCompleteNotify(IMG_HANDLE *phNotify,
 		PVR_DPF((PVR_DBG_ERROR,
 				 "%s: Not enough memory to allocate CmdCompleteNotify function",
 				 __func__));
-		return PVRSRV_ERROR_OUT_OF_MEMORY;		
+		return PVRSRV_ERROR_OUT_OF_MEMORY;
 	}
 
 	/* Set-up the notify data */
@@ -232,8 +232,8 @@ typedef struct DEBUG_REQUEST_NOTIFY_TAG
 
 
 PVRSRV_ERROR
-PVRSRVRegisterDbgTable(PVRSRV_DEVICE_NODE *psDevNode, IMG_UINT32 *paui32Table,
-					   IMG_UINT32 ui32Length)
+PVRSRVRegisterDbgTable(PVRSRV_DEVICE_NODE *psDevNode,
+                       const IMG_UINT32 *paui32Table, IMG_UINT32 ui32Length)
 {
 	DEBUG_REQUEST_TABLE *psDebugTable;
 	IMG_UINT32 i;
@@ -272,7 +272,6 @@ PVRSRVRegisterDbgTable(PVRSRV_DEVICE_NODE *psDevNode, IMG_UINT32 *paui32Table,
 
 ErrorFreeDebugTable:
 	OSFreeMem(psDebugTable);
-	psDebugTable = NULL;
 
 	return eError;
 }
@@ -434,7 +433,6 @@ PVRSRVDebugRequest(PVRSRV_DEVICE_NODE *psDevNode,
 	static const IMG_CHAR *apszVerbosityTable[] = { "Low", "Medium", "High" };
 	const IMG_CHAR *szVerbosityLevel;
 	IMG_UINT32 i;
-	IMG_UINT32 j;
 
 	static_assert(ARRAY_SIZE(apszVerbosityTable) == DEBUG_REQUEST_VERBOSITY_MAX+1,
 	              "Incorrect number of verbosity levels");
@@ -460,7 +458,9 @@ PVRSRVDebugRequest(PVRSRV_DEVICE_NODE *psDevNode,
 
 	PVR_DUMPDEBUG_LOG("DDK info: %s (%s) %s",
 					   PVRVERSION_STRING, PVR_BUILD_TYPE, PVR_BUILD_DIR);
-	PVR_DUMPDEBUG_LOG("Time now: %015" IMG_UINT64_FMTSPECx, OSClockus64());
+
+	PVR_DUMPDEBUG_LOG("Time now: %" IMG_UINT64_FMTSPEC "us", \
+			OSClockus64());
 
 	switch (psPVRSRVData->eServicesState)
 	{
@@ -481,22 +481,19 @@ PVRSRVDebugRequest(PVRSRV_DEVICE_NODE *psDevNode,
 
 	PVRSRVConnectionDebugNotify(pfnDumpDebugPrintf, pvDumpDebugFile);
 
-	/* For each verbosity level */
-	for (j = 0; j <= ui32VerbLevel; j++)
+	/* For each requester */
+	for (i = 0; i < psDebugTable->ui32RequestCount; i++)
 	{
-		/* For each requester */
-		for (i = 0; i < psDebugTable->ui32RequestCount; i++)
-		{
-			DLLIST_NODE *psNode;
-			DLLIST_NODE *psNext;
+		DLLIST_NODE *psNode;
+		DLLIST_NODE *psNext;
 
-			dllist_foreach_node(&psDebugTable->asEntry[i].sListHead, psNode, psNext)
-			{
-				DEBUG_REQUEST_NOTIFY *psNotify =
-					IMG_CONTAINER_OF(psNode, DEBUG_REQUEST_NOTIFY, sListNode);
-				psNotify->pfnDbgRequestNotify(psNotify->hDbgRequestHandle, j,
-								pfnDumpDebugPrintf, pvDumpDebugFile);
-			}
+		/* For each notifier on this requestor */
+		dllist_foreach_node(&psDebugTable->asEntry[i].sListHead, psNode, psNext)
+		{
+			DEBUG_REQUEST_NOTIFY *psNotify =
+				IMG_CONTAINER_OF(psNode, DEBUG_REQUEST_NOTIFY, sListNode);
+			psNotify->pfnDbgRequestNotify(psNotify->hDbgRequestHandle, ui32VerbLevel,
+							pfnDumpDebugPrintf, pvDumpDebugFile);
 		}
 	}
 

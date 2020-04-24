@@ -44,6 +44,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #include "allocmem.h"
 #include "img_types.h"
+#include "img_defs.h"
 #include "pvrsrv_error.h"
 #include "ra.h"
 #include "devicemem_utils.h"
@@ -54,7 +55,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 #define DEVMEM_MAP_SVM_USER_MANAGED_RETRY				2
 
-static inline PVRSRV_ERROR 
+static inline PVRSRV_ERROR
 _DevmemCPUMapSVMKernelManaged(DEVMEM_HEAP *psHeap,
 		DEVMEM_IMPORT *psImport,
 		IMG_UINT64 *ui64MapAddress)
@@ -73,7 +74,7 @@ _DevmemCPUMapSVMKernelManaged(DEVMEM_HEAP *psHeap,
 	   means we lock-down the virtual address for the duration
 	   of the life-cycle of the allocation until a de-allocation
 	   request comes in. Thus the allocation is guaranteed not to
-	   change its virtual address on the CPU during its life-time. 
+	   change its virtual address on the CPU during its life-time.
 	   NOTE: Import might have already been CPU Mapped before now,
 	   normally this is not a problem, see fall back */
 	eError = _DevmemImportStructCPUMap(psImport);
@@ -94,7 +95,8 @@ _DevmemCPUMapSVMKernelManaged(DEVMEM_HEAP *psHeap,
 	PVR_ASSERT(ui64SvmMapAddr != (IMG_UINT64)0);
 
 	/* SVM limit test may fail if processor has more virtual address bits than device */
-	if (ui64SvmMapAddr >= ui64SvmHeapAddrEnd || ui64SvmMapAddrEnd > ui64SvmHeapAddrEnd)
+	if ((ui64SvmMapAddr >= ui64SvmHeapAddrEnd || ui64SvmMapAddrEnd > ui64SvmHeapAddrEnd) ||
+		(ui64SvmMapAddr & ~(ui64SvmHeapAddrEnd - 1)))
 	{
 		/* Unmap incompatible SVM virtual address, this
 		   may not release address if it was elsewhere
@@ -112,14 +114,14 @@ _DevmemCPUMapSVMKernelManaged(DEVMEM_HEAP *psHeap,
 	return eError;
 }
 
-static inline void 
+static inline void
 _DevmemCPUUnmapSVMKernelManaged(DEVMEM_HEAP *psHeap, DEVMEM_IMPORT *psImport)
 {
 	PVR_UNREFERENCED_PARAMETER(psHeap);
 	_DevmemImportStructCPUUnmap(psImport);
 }
 
-static inline PVRSRV_ERROR 
+static inline PVRSRV_ERROR
 _DevmemCPUMapSVMUserManaged(DEVMEM_HEAP *psHeap,
 		DEVMEM_IMPORT *psImport,
 		IMG_UINT uiAlign,
@@ -138,20 +140,20 @@ _DevmemCPUMapSVMUserManaged(DEVMEM_HEAP *psHeap,
 	   already in use by the user process */
 	PVR_ASSERT(psHeap->eHeapType == DEVMEM_HEAP_TYPE_USER_MANAGED);
 
-	/* Normally, for SVM heap allocations, CPUMap _must_  be done
+	/* Normally, for SVM heap allocations, CPUMap _must_ be done
 	   before DevMap; ideally the initial CPUMap should be done by
 	   SVM functions though this is not a hard requirement as long
 	   as the prior elsewhere obtained CPUMap virtual address meets
 	   SVM address requirements. This is a fall-back code-pathway
-	   so we have to test that this assumption holds before we 
+	   so we have to test that this assumption holds before we
 	   progress any further */
 	OSLockAcquire(psImport->sCPUImport.hLock);
 
 	if (psImport->sCPUImport.ui32RefCount)
 	{
 		/* Already CPU Mapped SVM heap allocation, this prior elsewhere
-		   obtained virtual address is  responsible for the above 
-		   XXX_KERNEL_MANAGED failure. As we are not responsible for 
+		   obtained virtual address is responsible for the above
+		   XXX_KERNEL_MANAGED failure. As we are not responsible for
 		   this, we cannot progress any further so need to fail */
 		PVR_DPF((PVR_DBG_ERROR,
 				"%s: Previously obtained CPU map address not SVM compatible"
@@ -207,7 +209,7 @@ _DevmemCPUMapSVMUserManaged(DEVMEM_HEAP *psHeap,
 		eError = _DevmemImportStructCPUMap(psImport);
 		if (eError != PVRSRV_OK)
 		{
-			/* For now we simply discard failed RA_Alloc() obtained virtual 
+			/* For now we simply discard failed RA_Alloc() obtained virtual
 			   address (i.e. plenty of virtual space), this prevents us from
 			   re-using these and furthermore essentially blacklists these
 			   addresses from future SVM consideration; We exit fall-back
@@ -233,7 +235,7 @@ _DevmemCPUMapSVMUserManaged(DEVMEM_HEAP *psHeap,
 	return eError;
 }
 
-static inline void 
+static inline void
 _DevmemCPUUnmapSVMUserManaged(DEVMEM_HEAP *psHeap, DEVMEM_IMPORT *psImport)
 {
 	RA_BASE_T uiAllocatedAddr;
@@ -246,7 +248,7 @@ _DevmemCPUUnmapSVMUserManaged(DEVMEM_HEAP *psHeap, DEVMEM_IMPORT *psImport)
 	_DevmemImportStructCPUUnmap(psImport);
 }
 
-static inline PVRSRV_ERROR 
+static inline PVRSRV_ERROR
 _DevmemImportStructDevMapSVM(DEVMEM_HEAP *psHeap,
 		DEVMEM_IMPORT *psImport,
 		IMG_UINT uiAlign,
@@ -254,7 +256,7 @@ _DevmemImportStructDevMapSVM(DEVMEM_HEAP *psHeap,
 {
 	PVRSRV_ERROR eError;
 
-	switch(psHeap->eHeapType)
+	switch (psHeap->eHeapType)
 	{
 	case DEVMEM_HEAP_TYPE_KERNEL_MANAGED:
 		eError = _DevmemCPUMapSVMKernelManaged(psHeap,
@@ -293,10 +295,10 @@ _DevmemImportStructDevMapSVM(DEVMEM_HEAP *psHeap,
 	return eError;
 }
 
-static inline void 
+static inline void
 _DevmemImportStructDevUnmapSVM(DEVMEM_HEAP *psHeap, DEVMEM_IMPORT *psImport)
 {
-	switch(psHeap->eHeapType)
+	switch (psHeap->eHeapType)
 	{
 	case DEVMEM_HEAP_TYPE_KERNEL_MANAGED:
 		_DevmemCPUUnmapSVMKernelManaged(psHeap, psImport);
@@ -331,7 +333,7 @@ void _DevmemImportStructAcquire(DEVMEM_IMPORT *psImport)
 	PVR_ASSERT(iRefCount != 1);
 
 	DEVMEM_REFCOUNT_PRINT("%s (%p) %d->%d",
-			__FUNCTION__,
+			__func__,
 			psImport,
 			iRefCount-1,
 			iRefCount);
@@ -344,14 +346,14 @@ IMG_BOOL _DevmemImportStructRelease(DEVMEM_IMPORT *psImport)
 	PVR_ASSERT(iRefCount >= 0);
 
 	DEVMEM_REFCOUNT_PRINT("%s (%p) %d->%d",
-			__FUNCTION__,
+			__func__,
 			psImport,
 			iRefCount+1,
 			iRefCount);
 
 	if (iRefCount == 0)
 	{
-		BridgePMRUnrefPMR(psImport->hDevConnection,
+		BridgePMRUnrefPMR(GetBridgeHandle(psImport->hDevConnection),
 				psImport->hPMR);
 		OSLockDestroy(psImport->sCPUImport.hLock);
 		OSLockDestroy(psImport->sDeviceImport.hLock);
@@ -388,24 +390,24 @@ PVRSRV_ERROR _DevmemMemDescAlloc(DEVMEM_MEMDESC **ppsMemDesc)
 		goto failAlloc;
 	}
 
-	eError = OSLockCreate(&psMemDesc->hLock, LOCK_TYPE_PASSIVE);
+	eError = OSLockCreate(&psMemDesc->hLock);
 	if (eError != PVRSRV_OK)
 	{
 		goto failMDLock;
 	}
 
-	eError = OSLockCreate(&psMemDesc->sDeviceMemDesc.hLock, LOCK_TYPE_PASSIVE);
+	eError = OSLockCreate(&psMemDesc->sDeviceMemDesc.hLock);
 	if (eError != PVRSRV_OK)
 	{
 		goto failDMDLock;
 	}
 
-	eError = OSLockCreate(&psMemDesc->sCPUMemDesc.hLock, LOCK_TYPE_PASSIVE);
+	eError = OSLockCreate(&psMemDesc->sCPUMemDesc.hLock);
 	if (eError != PVRSRV_OK)
 	{
 		goto failCMDLock;
 	}
-	
+
 	OSAtomicWrite(&psMemDesc->hRefCount, 0);
 
 	*ppsMemDesc = psMemDesc;
@@ -434,7 +436,7 @@ void _DevmemMemDescInit(DEVMEM_MEMDESC *psMemDesc,
 		IMG_DEVMEM_SIZE_T uiSize)
 {
 	DEVMEM_REFCOUNT_PRINT("%s (%p) %d->%d",
-			__FUNCTION__,
+			__func__,
 			psMemDesc,
 			0,
 			1);
@@ -446,10 +448,7 @@ void _DevmemMemDescInit(DEVMEM_MEMDESC *psMemDesc,
 	psMemDesc->sCPUMemDesc.ui32RefCount = 0;
 	psMemDesc->uiAllocSize = uiSize;
 	psMemDesc->hPrivData = NULL;
-
-#if defined(SUPPORT_PAGE_FAULT_DEBUG)
 	psMemDesc->ui32AllocationIndex = DEVICEMEM_HISTORY_ALLOC_INDEX_NONE;
-#endif
 
 	OSAtomicWrite(&psMemDesc->hRefCount, 1);
 }
@@ -461,10 +460,12 @@ void _DevmemMemDescAcquire(DEVMEM_MEMDESC *psMemDesc)
 
 	iRefCount = OSAtomicIncrement(&psMemDesc->hRefCount);
 	DEVMEM_REFCOUNT_PRINT("%s (%p) %d->%d",
-			__FUNCTION__,
+			__func__,
 			psMemDesc,
 			iRefCount-1,
 			iRefCount);
+
+	PVR_UNREFERENCED_PARAMETER(iRefCount);
 }
 
 IMG_INTERNAL
@@ -477,7 +478,7 @@ IMG_BOOL _DevmemMemDescRelease(DEVMEM_MEMDESC *psMemDesc)
 	PVR_ASSERT(iRefCount >= 0);
 
 	DEVMEM_REFCOUNT_PRINT("%s (%p) %d->%d",
-			__FUNCTION__,
+			__func__,
 			psMemDesc,
 			iRefCount+1,
 			iRefCount);
@@ -537,7 +538,7 @@ PVRSRV_ERROR _DevmemValidateParams(IMG_DEVMEM_SIZE_T uiSize,
 	{
 		PVR_DPF((PVR_DBG_ERROR,
 				"%s: Zero on Alloc and Poison on Alloc are mutually exclusive.",
-				__FUNCTION__));
+				__func__));
 		return PVRSRV_ERROR_INVALID_PARAMS;
 	}
 
@@ -545,7 +546,7 @@ PVRSRV_ERROR _DevmemValidateParams(IMG_DEVMEM_SIZE_T uiSize,
 	{
 		PVR_DPF((PVR_DBG_ERROR,
 				"%s: The requested alignment is not a power of two.",
-				__FUNCTION__));
+				__func__));
 		return PVRSRV_ERROR_INVALID_PARAMS;
 	}
 
@@ -553,7 +554,7 @@ PVRSRV_ERROR _DevmemValidateParams(IMG_DEVMEM_SIZE_T uiSize,
 	{
 		PVR_DPF((PVR_DBG_ERROR,
 				"%s: Please request a non-zero size value.",
-				__FUNCTION__));
+				__func__));
 		return PVRSRV_ERROR_INVALID_PARAMS;
 	}
 
@@ -589,7 +590,7 @@ PVRSRV_ERROR _DevmemImportStructAlloc(SHARED_DEV_CONNECTION hDevConnection,
 	psImport->sDeviceImport.psHeap = NULL;
 	psImport->sDeviceImport.bMapped = IMG_FALSE;
 
-	eError = OSLockCreate(&psImport->sDeviceImport.hLock, LOCK_TYPE_PASSIVE);
+	eError = OSLockCreate(&psImport->sDeviceImport.hLock);
 	if (eError != PVRSRV_OK)
 	{
 		goto failDIOSLockCreate;
@@ -598,7 +599,7 @@ PVRSRV_ERROR _DevmemImportStructAlloc(SHARED_DEV_CONNECTION hDevConnection,
 	psImport->sCPUImport.hOSMMapData = NULL;
 	psImport->sCPUImport.pvCPUVAddr = NULL;
 
-	eError = OSLockCreate(&psImport->sCPUImport.hLock, LOCK_TYPE_PASSIVE);
+	eError = OSLockCreate(&psImport->sCPUImport.hLock);
 	if (eError != PVRSRV_OK)
 	{
 		goto failCIOSLockCreate;
@@ -616,7 +617,7 @@ PVRSRV_ERROR _DevmemImportStructAlloc(SHARED_DEV_CONNECTION hDevConnection,
 	OSAtomicWrite(&psImport->hRefCount, 0);
 
 	/* Create the lock */
-	eError = OSLockCreate(&psImport->hLock, LOCK_TYPE_PASSIVE);
+	eError = OSLockCreate(&psImport->hLock);
 	if (eError != PVRSRV_OK)
 	{
 		goto failILockAlloc;
@@ -649,7 +650,7 @@ void _DevmemImportStructInit(DEVMEM_IMPORT *psImport,
 		DEVMEM_PROPERTIES_T uiProperties)
 {
 	DEVMEM_REFCOUNT_PRINT("%s (%p) %d->%d",
-			__FUNCTION__,
+			__func__,
 			psImport,
 			0,
 			1);
@@ -688,7 +689,7 @@ PVRSRV_ERROR _DevmemImportStructDevMap(DEVMEM_HEAP *psHeap,
 
 	OSLockAcquire(psDeviceImport->hLock);
 	DEVMEM_REFCOUNT_PRINT("%s (%p) %d->%d",
-			__FUNCTION__,
+			__func__,
 			psImport,
 			psDeviceImport->ui32RefCount,
 			psDeviceImport->ui32RefCount+1);
@@ -813,8 +814,8 @@ PVRSRV_ERROR _DevmemImportStructDevMap(DEVMEM_HEAP *psHeap,
 			if (ui64OptionalMapAddress & ((1 << psHeap->uiLog2Quantum) - 1))
 			{
 				PVR_DPF((PVR_DBG_ERROR,
-						"%s: Invalid address to map to. Please prove an address aligned to"
-						"a page multiple of the heap."
+						"%s: Invalid address to map to. Please provide an "
+						"address aligned to a page multiple of the heap."
 						, __func__));
 				eError = PVRSRV_ERROR_INVALID_PARAMS;
 				goto failVMRAAlloc;
@@ -836,7 +837,7 @@ PVRSRV_ERROR _DevmemImportStructDevMap(DEVMEM_HEAP *psHeap,
 		}
 
 		/* Setup page tables for the allocated VM space */
-		eError = BridgeDevmemIntReserveRange(psHeap->psCtx->hDevConnection,
+		eError = BridgeDevmemIntReserveRange(GetBridgeHandle(psHeap->psCtx->hDevConnection),
 				psHeap->hDevMemServerHeap,
 				sBase,
 				uiAllocatedSize,
@@ -853,7 +854,7 @@ PVRSRV_ERROR _DevmemImportStructDevMap(DEVMEM_HEAP *psHeap,
 			uiMapFlags = psImport->uiFlags & PVRSRV_MEMALLOCFLAGS_PERMAPPINGFLAGSMASK;
 
 			/* Actually map the PMR to allocated VM space */
-			eError = BridgeDevmemIntMapPMR(psHeap->psCtx->hDevConnection,
+			eError = BridgeDevmemIntMapPMR(GetBridgeHandle(psHeap->psCtx->hDevConnection),
 					psHeap->hDevMemServerHeap,
 					hReservation,
 					psImport->hPMR,
@@ -888,7 +889,7 @@ PVRSRV_ERROR _DevmemImportStructDevMap(DEVMEM_HEAP *psHeap,
 	return PVRSRV_OK;
 
 	failMap:
-	BridgeDevmemIntUnreserveRange(psHeap->psCtx->hDevConnection,
+	BridgeDevmemIntUnreserveRange(GetBridgeHandle(psHeap->psCtx->hDevConnection),
 			hReservation);
 	failReserve:
 	if (ui64OptionalMapAddress == 0)
@@ -922,7 +923,7 @@ void _DevmemImportStructDevUnmap(DEVMEM_IMPORT *psImport)
 
 	OSLockAcquire(psDeviceImport->hLock);
 	DEVMEM_REFCOUNT_PRINT("%s (%p) %d->%d",
-			__FUNCTION__,
+			__func__,
 			psImport,
 			psDeviceImport->ui32RefCount,
 			psDeviceImport->ui32RefCount-1);
@@ -933,12 +934,12 @@ void _DevmemImportStructDevUnmap(DEVMEM_IMPORT *psImport)
 
 		if (psDeviceImport->bMapped)
 		{
-			eError = BridgeDevmemIntUnmapPMR(psImport->hDevConnection,
+			eError = BridgeDevmemIntUnmapPMR(GetBridgeHandle(psImport->hDevConnection),
 					psDeviceImport->hMapping);
 			PVR_ASSERT(eError == PVRSRV_OK);
 		}
 
-		eError = BridgeDevmemIntUnreserveRange(psImport->hDevConnection,
+		eError = BridgeDevmemIntUnreserveRange(GetBridgeHandle(psImport->hDevConnection),
 				psDeviceImport->hReservation);
 		PVR_ASSERT(eError == PVRSRV_OK);
 
@@ -983,7 +984,7 @@ PVRSRV_ERROR _DevmemImportStructCPUMap(DEVMEM_IMPORT *psImport)
 
 	OSLockAcquire(psCPUImport->hLock);
 	DEVMEM_REFCOUNT_PRINT("%s (%p) %d->%d",
-			__FUNCTION__,
+			__func__,
 			psImport,
 			psCPUImport->ui32RefCount,
 			psCPUImport->ui32RefCount+1);
@@ -992,7 +993,7 @@ PVRSRV_ERROR _DevmemImportStructCPUMap(DEVMEM_IMPORT *psImport)
 	{
 		_DevmemImportStructAcquire(psImport);
 
-		eError = OSMMapPMR(psImport->hDevConnection,
+		eError = OSMMapPMR(GetBridgeHandle(psImport->hDevConnection),
 				psImport->hPMR,
 				psImport->uiSize,
 				psImport->uiFlags,
@@ -1033,7 +1034,7 @@ void _DevmemImportStructCPUUnmap(DEVMEM_IMPORT *psImport)
 
 	OSLockAcquire(psCPUImport->hLock);
 	DEVMEM_REFCOUNT_PRINT("%s (%p) %d->%d",
-			__FUNCTION__,
+			__func__,
 			psImport,
 			psCPUImport->ui32RefCount,
 			psCPUImport->ui32RefCount-1);
@@ -1045,10 +1046,10 @@ void _DevmemImportStructCPUUnmap(DEVMEM_IMPORT *psImport)
 		 * hence a compiler warning of implicit cast and loss of data.
 		 * Added explicit cast and assert to remove warning.
 		 */
-#if (defined(_WIN32) && !defined(_WIN64)) || (defined(LINUX) && defined(__i386__))
+#if defined(LINUX) && defined(__i386__)
 		PVR_ASSERT(psImport->uiSize<IMG_UINT32_MAX);
 #endif
-		OSMUnmapPMR(psImport->hDevConnection,
+		OSMUnmapPMR(GetBridgeHandle(psImport->hDevConnection),
 				psImport->hPMR,
 				psCPUImport->hOSMMapData,
 				psCPUImport->pvCPUVAddr,

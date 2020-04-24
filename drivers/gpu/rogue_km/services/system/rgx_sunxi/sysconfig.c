@@ -118,7 +118,7 @@ PVRSRV_ERROR SysDevInit(void *pvOSDevice, PVRSRV_DEVICE_CONFIG **ppsDevConfig)
 		return PVRSRV_ERROR_INVALID_DEVICE;
 	}
 
-	dma_set_mask(pvOSDevice, DMA_BIT_MASK(40));
+	dma_set_mask(pvOSDevice, DMA_BIT_MASK(32));
 
 	/* Sunxi Init */
 	RgxSunxiInit(&gsDevices[0]);
@@ -186,6 +186,8 @@ PVRSRV_ERROR SysDevInit(void *pvOSDevice, PVRSRV_DEVICE_CONFIG **ppsDevConfig)
 	gsDevices[0].hDevData               = &gsRGXData;
 
 	gsDevices[0].pfnSysDevFeatureDepInit = NULL;
+
+	gsDevices[0].bHasFBCDCVersion31 = IMG_FALSE;
 
 #if defined(PVR_DVFS)
 	gsDevices[0].sDVFS.sDVFSDeviceCfg.ui32PollMs = 100;

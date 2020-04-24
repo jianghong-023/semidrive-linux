@@ -48,6 +48,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 extern "C" {
 #endif
 
+#include "pvrsrv_apphint.h"
 #include "km_apphint_defs.h"
 #include "device.h"
 
@@ -61,12 +62,6 @@ int pvr_apphint_get_uint64(APPHINT_ID ue, IMG_UINT64 *pVal);
 int pvr_apphint_get_uint32(APPHINT_ID ue, IMG_UINT32 *pVal);
 int pvr_apphint_get_bool(APPHINT_ID ue, IMG_BOOL *pVal);
 int pvr_apphint_get_string(APPHINT_ID ue, IMG_CHAR *pBuffer, size_t size);
-
-/* Supplied to pvr_apphint_register_handlers_*() functions when the apphint
- * is a global driver apphint, i.e. apphints not present in
- * APPHINT_DEBUGFS_DEVICE_ID
- */
-#define APPHINT_OF_DRIVER_NO_DEVICE ((void*)-1U)
 
 void pvr_apphint_register_handlers_uint64(APPHINT_ID id,
 	PVRSRV_ERROR (*query)(const PVRSRV_DEVICE_NODE *device, const void *private_data, IMG_UINT64 *value),

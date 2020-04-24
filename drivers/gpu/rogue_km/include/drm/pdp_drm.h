@@ -3,6 +3,7 @@
 /*************************************************************************/ /*!
 @File
 @Title          PDP DRM definitions shared between kernel and user space.
+@Codingstyle    LinuxKernel
 @Copyright      Copyright (c) Imagination Technologies Ltd. All Rights Reserved
 @License        Dual MIT/GPLv2
 
@@ -87,9 +88,20 @@ struct drm_pdp_gem_cpu_fini {
 #define DRM_PDP_GEM_CPU_FINI		0x03
 
 /* These defines must be prefixed with "DRM_IOCTL_". */
-#define DRM_IOCTL_PDP_GEM_CREATE	DRM_IOWR(DRM_COMMAND_BASE + DRM_PDP_GEM_CREATE, struct drm_pdp_gem_create)
-#define DRM_IOCTL_PDP_GEM_MMAP		DRM_IOWR(DRM_COMMAND_BASE + DRM_PDP_GEM_MMAP, struct drm_pdp_gem_mmap)
-#define DRM_IOCTL_PDP_GEM_CPU_PREP	DRM_IOW(DRM_COMMAND_BASE + DRM_PDP_GEM_CPU_PREP, struct drm_pdp_gem_cpu_prep)
-#define DRM_IOCTL_PDP_GEM_CPU_FINI	DRM_IOW(DRM_COMMAND_BASE + DRM_PDP_GEM_CPU_FINI, struct drm_pdp_gem_cpu_fini)
+#define DRM_IOCTL_PDP_GEM_CREATE \
+	DRM_IOWR(DRM_COMMAND_BASE + DRM_PDP_GEM_CREATE, \
+		 struct drm_pdp_gem_create)
+
+#define DRM_IOCTL_PDP_GEM_MMAP\
+	DRM_IOWR(DRM_COMMAND_BASE + DRM_PDP_GEM_MMAP, \
+		 struct drm_pdp_gem_mmap)
+
+#define DRM_IOCTL_PDP_GEM_CPU_PREP \
+	DRM_IOW(DRM_COMMAND_BASE + DRM_PDP_GEM_CPU_PREP, \
+		struct drm_pdp_gem_cpu_prep)
+
+#define DRM_IOCTL_PDP_GEM_CPU_FINI \
+	DRM_IOW(DRM_COMMAND_BASE + DRM_PDP_GEM_CPU_FINI, \
+		struct drm_pdp_gem_cpu_fini)
 
 #endif /* defined(__PDP_DRM_H__) */

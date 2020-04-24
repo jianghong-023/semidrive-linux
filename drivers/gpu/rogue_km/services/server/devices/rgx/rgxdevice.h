@@ -45,10 +45,10 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #define __RGXDEVICE_H__
 
 #include "img_types.h"
+#include "img_defs.h"
 #include "pvrsrv_device_types.h"
 #include "mmu_common.h"
 #include "rgx_fwif_km.h"
-#include "rgx_fwif.h"
 #include "cache_ops.h"
 #include "device.h"
 #include "osfunc.h"
@@ -68,10 +68,10 @@ typedef struct {
  ******************************************************************************
  * Device state flags
  *****************************************************************************/
-#define RGXKM_DEVICE_STATE_ZERO_FREELIST			(0x1 << 0)		/*!< Zeroing the physical pages of reconstructed free lists */
-#define RGXKM_DEVICE_STATE_FTRACE_EN				(0x1 << 1)		/*!< Used to enable device FTrace thread to consume HWPerf data */
-#define RGXKM_DEVICE_STATE_DISABLE_DW_LOGGING_EN 	(0x1 << 2)		/*!< Used to disable the Devices Watchdog logging */
-#define RGXKM_DEVICE_STATE_DUST_REQUEST_INJECT_EN	(0x1 << 3)		/*!< Used for validation to inject dust requests every TA/3D kick */
+#define RGXKM_DEVICE_STATE_ZERO_FREELIST            (0x1) /*!< Zeroing the physical pages of reconstructed free lists */
+#define RGXKM_DEVICE_STATE_DISABLE_DW_LOGGING_EN    (0x2) /*!< Used to disable the Devices Watchdog logging */
+#define RGXKM_DEVICE_STATE_DUST_REQUEST_INJECT_EN   (0x4) /*!< Used for validation to inject dust requests every TA/3D kick */
+#define RGXKM_DEVICE_STATE_MASK                     (0x7)
 
 /*!
  ******************************************************************************
@@ -92,6 +92,22 @@ typedef struct _GPU_FREQ_TRACKING_DATA_
 	IMG_UINT32 ui32CalibrationCount;
 } GPU_FREQ_TRACKING_DATA;
 
+#if defined(PVRSRV_TIMER_CORRELATION_HISTORY)
+#define RGX_GPU_FREQ_TRACKING_SIZE 16
+
+typedef struct
+{
+	IMG_UINT64 ui64BeginCRTimestamp;
+	IMG_UINT64 ui64BeginOSTimestamp;
+
+	IMG_UINT64 ui64EndCRTimestamp;
+	IMG_UINT64 ui64EndOSTimestamp;
+
+	IMG_UINT32 ui32EstCoreClockSpeed;
+	IMG_UINT32 ui32CoreClockSpeed;
+} GPU_FREQ_TRACKING_HISTORY;
+#endif
+
 typedef struct _RGX_GPU_DVFS_TABLE_
 {
 	/* Beginning of current calibration period (in us) */
@@ -109,6 +125,11 @@ typedef struct _RGX_GPU_DVFS_TABLE_
 	IMG_UINT32 ui32FreqIndex;
 	IMG_UINT32 aui32GPUFrequency[RGX_GPU_DVFS_TABLE_SIZE];
 	GPU_FREQ_TRACKING_DATA asTrackingData[RGX_GPU_DVFS_TABLE_SIZE];
+
+#if defined(PVRSRV_TIMER_CORRELATION_HISTORY)
+	IMG_UINT32 ui32HistoryIndex;
+	GPU_FREQ_TRACKING_HISTORY asTrackingHistory[RGX_GPU_FREQ_TRACKING_SIZE];
+#endif
 } RGX_GPU_DVFS_TABLE;
 
 
@@ -158,10 +179,7 @@ typedef struct _PVRSRV_DEVICE_FEATURE_CONFIG_
 	IMG_UINT32 ui32N;
 	IMG_UINT32 ui32C;
 	IMG_UINT32 ui32FeaturesValues[RGX_FEATURE_WITH_VALUES_MAX_IDX];
-	IMG_UINT32 ui32MAXDMCount;
-	IMG_UINT32 ui32MAXDMMTSCount;
 	IMG_UINT32 ui32MAXDustCount;
-#define 	MAX_BVNC_STRING_LEN		(50)
 	IMG_PCHAR  pszBVNCString;
 }PVRSRV_DEVICE_FEATURE_CONFIG;
 
@@ -170,21 +188,21 @@ typedef struct _PVRSRV_DEVICE_FEATURE_CONFIG_
 #define RGX_GET_FEATURE_VALUE(psDevInfo, Feature) \
 			( psDevInfo->sDevFeatureCfg.ui32FeaturesValues[RGX_FEATURE_##Feature##_IDX] )
 
-/* This is used to check if the feature with value is available for the currently running bvnc or not */
+/* This is used to check if the feature value (e.g. with an integer value) is available for the currently running BVNC or not */
 #define RGX_IS_FEATURE_VALUE_SUPPORTED(psDevInfo, Feature) \
 			( psDevInfo->sDevFeatureCfg.ui32FeaturesValues[RGX_FEATURE_##Feature##_IDX] < RGX_FEATURE_VALUE_DISABLED )
 
-/* This is used to check if the feature WITHOUT value is available for the currently running bvnc or not */
+/* This is used to check if the Boolean feature (e.g. WITHOUT an integer value) is available for the currently running BVNC or not */
 #define RGX_IS_FEATURE_SUPPORTED(psDevInfo, Feature) \
-			( psDevInfo->sDevFeatureCfg.ui64Features & RGX_FEATURE_##Feature##_BIT_MASK)
+			BITMASK_HAS(psDevInfo->sDevFeatureCfg.ui64Features, RGX_FEATURE_##Feature##_BIT_MASK)
 
-/* This is used to check if the ERN is available for the currently running bvnc or not */
+/* This is used to check if the ERN is available for the currently running BVNC or not */
 #define RGX_IS_ERN_SUPPORTED(psDevInfo, ERN) \
-			( psDevInfo->sDevFeatureCfg.ui64ErnsBrns & HW_ERN_##ERN##_BIT_MASK)
+			BITMASK_HAS(psDevInfo->sDevFeatureCfg.ui64ErnsBrns, HW_ERN_##ERN##_BIT_MASK)
 
-/* This is used to check if the BRN is available for the currently running bvnc or not */
+/* This is used to check if the BRN is available for the currently running BVNC or not */
 #define RGX_IS_BRN_SUPPORTED(psDevInfo, BRN) \
-			( psDevInfo->sDevFeatureCfg.ui64ErnsBrns & FIX_HW_BRN_##BRN##_BIT_MASK)
+			BITMASK_HAS(psDevInfo->sDevFeatureCfg.ui64ErnsBrns, FIX_HW_BRN_##BRN##_BIT_MASK)
 
 /* there is a corresponding define in rgxapi.h */
 #define RGX_MAX_TIMER_QUERIES 16
@@ -299,6 +317,14 @@ typedef struct _PVRSRV_RGXDEV_INFO_
 	DEVMEM_MEMDESC			*psFirmwareCCBMemDesc;      /*!< memdesc for Firmware CCB */
 	IMG_UINT8				*psFirmwareCCB;             /*!< kernel mapping for Firmware CCB */
 
+#if defined(PVRSRV_SYNC_CHECKPOINT_CCB)
+	/* Checkpoint CCB */
+	DEVMEM_MEMDESC          *psCheckpointCCBCtlMemDesc;  /*!< memdesc for Checkpoint CCB control */
+	RGXFWIF_CCB_CTL         *psCheckpointCCBCtl;         /*!< kernel mapping for Checkpoint CCB control */
+	DEVMEM_MEMDESC          *psCheckpointCCBMemDesc;     /*!< memdesc for Checkpoint CCB */
+	IMG_UINT8               *psCheckpointCCB;            /*!< kernel mapping for Checkpoint CCB */
+#endif /* defined(PVRSRV_SYNC_CHECKPOINT_CCB) */
+
 	/* Workload Estimation Firmware CCB */
 	DEVMEM_MEMDESC			*psWorkEstFirmwareCCBCtlMemDesc;   /*!< memdesc for Workload Estimation Firmware CCB control */
 	RGXFWIF_CCB_CTL			*psWorkEstFirmwareCCBCtl;          /*!< kernel mapping for Workload Estimation Firmware CCB control */
@@ -314,6 +340,8 @@ typedef struct _PVRSRV_RGXDEV_INFO_
 	IMG_BOOL				bEnableFWPoisonOnFree;             /*!< Enable poisoning of FW allocations when freed */
 	IMG_BYTE				ubFWPoisonOnFreeValue;             /*!< Byte value used when poisoning FW allocations */
 
+	IMG_BOOL				bIgnoreHWReportedBVNC;			/*!< Ignore BVNC reported by HW */
+
 	/*
 		if we don't preallocate the pagetables we must
 		insert newly allocated page tables dynamically
@@ -325,13 +353,19 @@ typedef struct _PVRSRV_RGXDEV_INFO_
 
 	DEVMEM_MEMDESC			*psRGXFWCodeMemDesc;
 	IMG_DEV_VIRTADDR		sFWCodeDevVAddrBase;
+	IMG_UINT32			ui32FWCodeSizeInBytes;
 	DEVMEM_MEMDESC			*psRGXFWDataMemDesc;
 	IMG_DEV_VIRTADDR		sFWDataDevVAddrBase;
 	RGX_MIPS_ADDRESS_TRAMPOLINE	*psTrampoline;
 
-	DEVMEM_MEMDESC			*psRGXFWCorememMemDesc;
+	DEVMEM_MEMDESC			*psRGXFWCorememCodeMemDesc;
 	IMG_DEV_VIRTADDR		sFWCorememCodeDevVAddrBase;
-	RGXFWIF_DEV_VIRTADDR	sFWCorememCodeFWAddr;
+	RGXFWIF_DEV_VIRTADDR		sFWCorememCodeFWAddr;
+	IMG_UINT32			ui32FWCorememCodeSizeInBytes;
+
+	DEVMEM_MEMDESC			*psRGXFWIfCorememDataStoreMemDesc;
+	IMG_DEV_VIRTADDR		sFWCorememDataStoreDevVAddrBase;
+	RGXFWIF_DEV_VIRTADDR		sFWCorememDataStoreFWAddr;
 
 #if defined(RGXFW_ALIGNCHECKS)
 	DEVMEM_MEMDESC			*psRGXFWAlignChecksMemDesc;
@@ -343,15 +377,11 @@ typedef struct _PVRSRV_RGXDEV_INFO_
 	DEVMEM_MEMDESC			*psRGXFWSig3DChecksMemDesc;
 	IMG_UINT32				ui32Sig3DChecksSize;
 
-	DEVMEM_MEMDESC			*psRGXFWSigRTChecksMemDesc;
-	IMG_UINT32				ui32SigRTChecksSize;
-
-	DEVMEM_MEMDESC			*psRGXFWSigSHChecksMemDesc;
-	IMG_UINT32				ui32SigSHChecksSize;
+	DEVMEM_MEMDESC			*psRGXFWSigTDM2DChecksMemDesc;
+	IMG_UINT32				ui32SigTDM2DChecksSize;
 
 #if defined (PDUMP)
 	IMG_BOOL				bDumpedKCCBCtlAlready;
-	IMG_UINT32                              ui32LastBlockKCCBCtrlDumped; /* To be used in block-mode of pdump - Last pdump-block where we dumped KCCBCtrl */
 #endif
 
 #if !defined(PVRSRV_USE_BRIDGE_LOCK)
@@ -362,14 +392,9 @@ typedef struct _PVRSRV_RGXDEV_INFO_
 	DEVMEM_MEMDESC			*psRGXFWIfTraceBufferMemDesc[RGXFW_THREAD_NUM];	/*!< memdesc of actual FW trace (log) buffer(s) */
 	RGXFWIF_TRACEBUF		*psRGXFWIfTraceBuf;		/* structure containing trace control data and actual trace buffer */
 
-	DEVMEM_MEMDESC			*psRGXFWIfGuestTraceBufCtlMemDesc;	/*!< memdesc of trace buffer control structure */
-	RGXFWIF_TRACEBUF		*psRGXFWIfGuestTraceBuf;
-
 	DEVMEM_MEMDESC			*psRGXFWIfTBIBufferMemDesc;	/*!< memdesc of actual FW TBI buffer */
 	RGXFWIF_DEV_VIRTADDR		sRGXFWIfTBIBuffer;		/* TBI buffer data */
-
-	DEVMEM_MEMDESC			*psRGXFWIfGuestHWRInfoBufCtlMemDesc;
-	RGXFWIF_HWRINFOBUF		*psRGXFWIfGuestHWRInfoBuf;
+	IMG_UINT32			ui32FWIfTBIBufferSize;
 
 	DEVMEM_MEMDESC			*psRGXFWIfHWRInfoBufCtlMemDesc;
 	RGXFWIF_HWRINFOBUF		*psRGXFWIfHWRInfoBuf;
@@ -381,15 +406,12 @@ typedef struct _PVRSRV_RGXDEV_INFO_
 	IMG_BYTE				*psRGXFWIfHWPerfBuf;
 	IMG_UINT32				ui32RGXFWIfHWPerfBufSize; /* in bytes */
 
-	DEVMEM_MEMDESC			*psRGXFWIfCorememDataStoreMemDesc;
-
 	DEVMEM_MEMDESC			*psRGXFWIfRegCfgMemDesc;
 
 	DEVMEM_MEMDESC			*psRGXFWIfHWPerfCountersMemDesc;
 	DEVMEM_MEMDESC			*psRGXFWIfInitMemDesc;
 	DEVMEM_MEMDESC			*psRGXFWIfOSConfigDesc;
 	RGXFWIF_OS_CONFIG		*psFWIfOSConfig;
-	RGXFWIF_DEV_VIRTADDR	sFWInitFWAddr;
 
 	DEVMEM_MEMDESC			*psRGXFWIfRuntimeCfgMemDesc;
 	RGXFWIF_RUNTIME_CFG		*psRGXFWIfRuntimeCfg;
@@ -465,9 +487,7 @@ typedef struct _PVRSRV_RGXDEV_INFO_
 	IMG_BOOL    bWarnedPktOrdinalBroke;
 #endif
 
-#if defined(SUPPORT_GPUTRACE_EVENTS)
 	void        *pvGpuFtraceData;
-#endif
 
 	/* Poll data for detecting firmware fatal errors */
 	IMG_UINT32				aui32CrLastPollAddr[RGXFW_THREAD_NUM];
@@ -495,45 +515,23 @@ typedef struct _PVRSRV_RGXDEV_INFO_
 	/* If we do 10 deferred memory allocations per second, then the ID would wrap around after 13 years */
 	IMG_UINT32				ui32ZSBufferCurrID;	/*!< ID assigned to the next deferred devmem allocation */
 	IMG_UINT32				ui32FreelistCurrID;	/*!< ID assigned to the next freelist */
-	IMG_UINT32				ui32RPMFreelistCurrID;	/*!< ID assigned to the next RPM freelist */
 
 	POS_LOCK 				hLockZSBuffer;		/*!< Lock to protect simultaneous access to ZSBuffers */
 	DLLIST_NODE				sZSBufferHead;		/*!< List of on-demand ZSBuffers */
 	POS_LOCK 				hLockFreeList;		/*!< Lock to protect simultaneous access to Freelists */
 	DLLIST_NODE				sFreeListHead;		/*!< List of growable Freelists */
-	POS_LOCK 				hLockRPMFreeList;	/*!< Lock to protect simultaneous access to RPM Freelists */
-	DLLIST_NODE				sRPMFreeListHead;	/*!< List of growable RPM Freelists */
-	POS_LOCK				hLockRPMContext;	/*!< Lock to protect simultaneous access to RPM contexts */
 	PSYNC_PRIM_CONTEXT		hSyncPrimContext;
 	PVRSRV_CLIENT_SYNC_PRIM *psPowSyncPrim;
 
 	IMG_UINT32				ui32ActivePMReqOk;
 	IMG_UINT32				ui32ActivePMReqDenied;
 	IMG_UINT32				ui32ActivePMReqNonIdle;
+	IMG_UINT32				ui32ActivePMReqRetry;
 	IMG_UINT32				ui32ActivePMReqTotal;
 
 	IMG_HANDLE				hProcessQueuesMISR;
 
 	IMG_UINT32 				ui32DeviceFlags;		/*!< Flags to track general device state */
-
-	/* Timer Queries */
-	IMG_UINT32				ui32ActiveQueryId;		/*!< id of the active line */
-	IMG_BOOL				bSaveStart;				/*!< save the start time of the next kick on the device*/
-	IMG_BOOL				bSaveEnd;				/*!< save the end time of the next kick on the device*/
-
-	DEVMEM_MEMDESC			*psStartTimeMemDesc;    /*!< memdesc for Start Times */
-	IMG_UINT64				*pui64StartTimeById;    /*!< CPU mapping of the above */
-
-	DEVMEM_MEMDESC			*psEndTimeMemDesc;      /*!< memdesc for End Timer */
-	IMG_UINT64				*pui64EndTimeById;      /*!< CPU mapping of the above */
-
-	IMG_UINT32				aui32ScheduledOnId[RGX_MAX_TIMER_QUERIES];	/*!< kicks Scheduled on QueryId */
-	DEVMEM_MEMDESC			*psCompletedMemDesc;	/*!< kicks Completed on QueryId */
-	IMG_UINT32				*pui32CompletedById;	/*!< CPU mapping of the above */
-
-#if !defined(PVRSRV_USE_BRIDGE_LOCK)
-	POS_LOCK				hTimerQueryLock;		/*!< lock to protect simultaneous access to timer query members */
-#endif
 
 	/* GPU DVFS Table */
 	RGX_GPU_DVFS_TABLE  *psGpuDVFSTable;
@@ -564,30 +562,27 @@ typedef struct _PVRSRV_RGXDEV_INFO_
 	POSWR_LOCK				hComputeCtxListLock;
 	POSWR_LOCK				hTransferCtxListLock;
 	POSWR_LOCK				hTDMCtxListLock;
-	POSWR_LOCK				hRaytraceCtxListLock;
 	POSWR_LOCK				hMemoryCtxListLock;
 	POSWR_LOCK				hKickSyncCtxListLock;
 
 	/* Linked list of deferred KCCB commands due to a full KCCB */
 	POS_LOCK 				hLockKCCBDeferredCommandsList;
 	DLLIST_NODE				sKCCBDeferredCommandsListHead;
+	IMG_UINT32				ui32KCCBDeferredCommandsCount;	/*!< No of commands in the deferred list*/
 
 	/* Linked lists of contexts on this device */
 	DLLIST_NODE				sRenderCtxtListHead;
 	DLLIST_NODE				sComputeCtxtListHead;
 	DLLIST_NODE				sTransferCtxtListHead;
 	DLLIST_NODE				sTDMCtxtListHead;
-	DLLIST_NODE				sRaytraceCtxtListHead;
 	DLLIST_NODE				sKickSyncCtxtListHead;
 
 	DLLIST_NODE 			sCommonCtxtListHead;
 	POSWR_LOCK				hCommonCtxtListLock;
 	IMG_UINT32				ui32CommonCtxtCurrentID;	/*!< ID assigned to the next common context */
 
-#if defined(SUPPORT_PAGE_FAULT_DEBUG)
 	POS_LOCK 				hDebugFaultInfoLock;	/*!< Lock to protect the debug fault info list */
 	POS_LOCK 				hMMUCtxUnregLock;		/*!< Lock to protect list of unregistered MMU contexts */
-#endif
 
 	POS_LOCK				hNMILock; /*!< Lock to protect NMI operations */
 
@@ -605,10 +600,16 @@ typedef struct _PVRSRV_RGXDEV_INFO_
 	POS_LOCK				hCCBRecoveryLock;      /* Lock to protect pvEarliestStalledClientCCB and ui32OldestSubmissionOrdinal variables*/
 	void					*pvEarliestStalledClientCCB; /* Will point to cCCB command to unblock in the event of a stall */
 	IMG_UINT32				ui32OldestSubmissionOrdinal; /* Earliest submission ordinal of CCB entry found so far */
+	IMG_UINT32				ui32SLRHoldoffCounter;   /* Decremented each time health check is called until zero. SLR only happen when zero. */
 
 	POS_LOCK				hCCBStallCheckLock; /* Lock used to guard against multiple threads simultaneously checking for stalled CCBs */
 
-	IMG_UINT32				ui32ExpectedPartialFWCCBCmd; /* Partial FWCCB command expected from the FW */
+#if defined(SUPPORT_FIRMWARE_GCOV)
+	/* Firmware gcov buffer */
+	DEVMEM_MEMDESC 			*psFirmwareGcovBufferMemDesc;      /*!< mem desc for Firmware gcov dumping buffer */
+	IMG_UINT32				ui32FirmwareGcovSize;
+#endif
+
 } PVRSRV_RGXDEV_INFO;
 
 
@@ -646,5 +647,6 @@ typedef struct _RGX_DATA_
 	RGX PDUMP register bank name (prefix)
 */
 #define RGX_PDUMPREG_NAME		"RGXREG"
+#define RGX_TB_PDUMPREG_NAME	"EMUREG"
 
 #endif /* __RGXDEVICE_H__ */

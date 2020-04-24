@@ -57,7 +57,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #define PVRSRV_BRIDGE_RGXSIGNALS_CMD_LAST			(PVRSRV_BRIDGE_RGXSIGNALS_CMD_FIRST+0)
 
 /*******************************************
-            RGXNotifySignalUpdate          
+            RGXNotifySignalUpdate
  *******************************************/
 
 /* Bridge in structure for RGXNotifySignalUpdate */

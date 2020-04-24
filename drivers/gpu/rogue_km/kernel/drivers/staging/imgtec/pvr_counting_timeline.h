@@ -49,6 +49,11 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 struct pvr_counting_fence_timeline;
 
+void pvr_counting_fence_timeline_dump_timeline(
+	void *data,
+	DUMPDEBUG_PRINTF_FUNC *dump_debug_printf,
+	void *dump_debug_file);
+
 struct pvr_counting_fence_timeline *pvr_counting_fence_timeline_create(
 	void *dev_cookie,
 	const char *name);
@@ -57,9 +62,9 @@ void pvr_counting_fence_timeline_put(
 struct pvr_counting_fence_timeline *pvr_counting_fence_timeline_get(
 	struct pvr_counting_fence_timeline *fence_timeline);
 struct dma_fence *pvr_counting_fence_create(
-	struct pvr_counting_fence_timeline *fence_timeline, u64 value);
+	struct pvr_counting_fence_timeline *fence_timeline, u64 *sync_pt_idx);
 bool pvr_counting_fence_timeline_inc(
-	struct pvr_counting_fence_timeline *fence_timeline, u64 value);
+	struct pvr_counting_fence_timeline *fence_timeline, u64 *sync_pt_idx);
 void pvr_counting_fence_timeline_force_complete(
 	struct pvr_counting_fence_timeline *fence_timeline);
 

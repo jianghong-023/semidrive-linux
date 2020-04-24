@@ -59,7 +59,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #define PVRSRV_BRIDGE_CMM_CMD_LAST			(PVRSRV_BRIDGE_CMM_CMD_FIRST+2)
 
 /*******************************************
-            DevmemIntExportCtx          
+            DevmemIntExportCtx
  *******************************************/
 
 /* Bridge in structure for DevmemIntExportCtx */
@@ -77,7 +77,7 @@ typedef struct PVRSRV_BRIDGE_OUT_DEVMEMINTEXPORTCTX_TAG
 } __attribute__ ((packed)) PVRSRV_BRIDGE_OUT_DEVMEMINTEXPORTCTX;
 
 /*******************************************
-            DevmemIntUnexportCtx          
+            DevmemIntUnexportCtx
  *******************************************/
 
 /* Bridge in structure for DevmemIntUnexportCtx */
@@ -93,7 +93,7 @@ typedef struct PVRSRV_BRIDGE_OUT_DEVMEMINTUNEXPORTCTX_TAG
 } __attribute__ ((packed)) PVRSRV_BRIDGE_OUT_DEVMEMINTUNEXPORTCTX;
 
 /*******************************************
-            DevmemIntAcquireRemoteCtx          
+            DevmemIntAcquireRemoteCtx
  *******************************************/
 
 /* Bridge in structure for DevmemIntAcquireRemoteCtx */

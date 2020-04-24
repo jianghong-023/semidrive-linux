@@ -42,11 +42,13 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */ /**************************************************************************/
 
-#ifndef _SYNC_CHECKPOINT_EXTERNAL_
-#define _SYNC_CHECKPOINT_EXTERNAL_
+#ifndef SYNC_CHECKPOINT_EXTERNAL_H
+#define SYNC_CHECKPOINT_EXTERNAL_H
 
-#ifndef _CHECKPOINT_TYPES_
-#define _CHECKPOINT_TYPES_
+#include "img_types.h"
+
+#ifndef CHECKPOINT_TYPES
+#define CHECKPOINT_TYPES
 typedef struct _SYNC_CHECKPOINT_CONTEXT *PSYNC_CHECKPOINT_CONTEXT;
 
 typedef struct _SYNC_CHECKPOINT *PSYNC_CHECKPOINT;
@@ -58,23 +60,24 @@ typedef struct _SYNC_CHECKPOINT *PSYNC_CHECKPOINT;
  * state for a PVRSRV_SYNC_CHECKPOINT (which is currently in the NOT_SIGNALLED state)
  * where that PVRSRV_SYNC_CHECKPOINT is representing a foreign sync.
  */
-typedef enum
-{
-    PVRSRV_SYNC_CHECKPOINT_NOT_SIGNALLED = 0x000,  /*!< checkpoint has not signalled */
-    PVRSRV_SYNC_CHECKPOINT_SIGNALLED     = 0x519,  /*!< checkpoint has signalled */
-    PVRSRV_SYNC_CHECKPOINT_ERRORED       = 0xeff   /*!< checkpoint has been errored */
-} PVRSRV_SYNC_CHECKPOINT_STATE;
+typedef IMG_UINT32 PVRSRV_SYNC_CHECKPOINT_STATE;
 
-#define PVRSRV_UFO_IS_SYNC_CHECKPOINT_FWADDR(fwaddr)	((fwaddr) & 0x1)
+#define PVRSRV_SYNC_CHECKPOINT_UNDEF         0x000U
+#define PVRSRV_SYNC_CHECKPOINT_ACTIVE        0xac1U  /*!< checkpoint has not signalled */
+#define PVRSRV_SYNC_CHECKPOINT_SIGNALLED     0x519U  /*!< checkpoint has signalled */
+#define PVRSRV_SYNC_CHECKPOINT_ERRORED       0xeffU   /*!< checkpoint has been errored */
+
+
+#define PVRSRV_UFO_IS_SYNC_CHECKPOINT_FWADDR(fwaddr)	((fwaddr) & 0x1U)
 #define PVRSRV_UFO_IS_SYNC_CHECKPOINT(ufoptr)			(PVRSRV_UFO_IS_SYNC_CHECKPOINT_FWADDR((ufoptr)->puiAddrUFO.ui32Addr))
 
 /* Maximum number of sync checkpoints the firmware supports in one fence */
-#define MAX_SYNC_CHECKPOINTS_PER_FENCE 32
+#define MAX_SYNC_CHECKPOINTS_PER_FENCE 32U
 
 /*!
  * Define to be used with SyncCheckpointAlloc() to indicate a checkpoint which
  * represents a foreign sync point or collection of foreign sync points.
  */
-#define SYNC_CHECKPOINT_FOREIGN_CHECKPOINT ((PVRSRV_TIMELINE) -2)
+#define SYNC_CHECKPOINT_FOREIGN_CHECKPOINT ((PVRSRV_TIMELINE) - 2U)
 
-#endif /* _SYNC_CHECKPOINT_EXTERNAL_ */
+#endif /* SYNC_CHECKPOINT_EXTERNAL_H */

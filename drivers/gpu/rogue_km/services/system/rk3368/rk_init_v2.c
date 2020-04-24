@@ -84,7 +84,7 @@ typedef struct
 } IMG_OPP;
 #endif
 
-static const IMG_OPP rkOPPTable[] =
+/* static const IMG_OPP rkOPPTable[] =
 {
 #if defined(PVR_DVFS) || defined(SUPPORT_PDVFS)
 	{ 925,  100000000},
@@ -101,9 +101,9 @@ static const IMG_OPP rkOPPTable[] =
 	{ 1125,  400000000},
 	{ 1200,  500000000},
 #endif
-};
+}; */
 
-#define RGX_DVFS_STEP (sizeof(rkOPPTable) / sizeof(rkOPPTable[0]))
+//#define RGX_DVFS_STEP (sizeof(rkOPPTable) / sizeof(rkOPPTable[0]))
 
 
 #if defined(PVR_DVFS)
@@ -124,12 +124,12 @@ static int rk33_clk_set_normal_node(struct clk* node, unsigned long rate)
 	int ret = 0;
 
 	if (!node) {
-		printk("rk33_clk_set_normal_node error \r\n");
+		printk("rk33_clk_set_normal_node error\r\n");
 		ret = -1;
 	}
 	ret = clk_set_rate(node, rate);
 	if (ret)
-		printk("clk_set_rate error \r\n");
+		printk("clk_set_rate error\r\n");
 
 	return ret;
 }
@@ -139,12 +139,12 @@ static int rk33_clk_set_dvfs_node(struct dvfs_node *node, unsigned long rate)
 	int ret = 0;
 
 	if (!node) {
-		printk("rk33_clk_set_dvfs_node error \r\n");
+		printk("rk33_clk_set_dvfs_node error\r\n");
 		ret = -1;
 	}
 	ret = dvfs_clk_set_rate(node, rate);
 	if (ret)
-		printk("dvfs_clk_set_rate error \r\n");
+		printk("dvfs_clk_set_rate error\r\n");
 
 	return ret;
 }
@@ -199,7 +199,7 @@ void rkSetFrequency(IMG_UINT32 ui32Frequency)
 #if USE_PVR_SPEED_CHANGE
 	PVRSRVDevicePostClockSpeedChange(g_platform->dev_config->psDevNode, IMG_TRUE, NULL);
 #endif
-	
+
 }
 
 //undefine gpu_reg
@@ -208,7 +208,7 @@ void rkSetVoltage(IMG_UINT32 ui32Volt)
 	if (NULL == g_platform)
 		panic("oops");
 
-	if(regulator_set_voltage(g_platform->gpu_reg, ui32Volt, ui32Volt) != 0)
+	if (regulator_set_voltage(g_platform->gpu_reg, ui32Volt, ui32Volt) != 0)
 	{
 		PVR_DPF((PVR_DBG_ERROR, "Failed to set gpu power voltage=%d!",ui32Volt));
 	}
@@ -227,14 +227,14 @@ void rkSetFrequency(IMG_UINT32 ui32Frequency)
 
 	ret = clk_set_rate(g_platform->aclk_gpu_mem, ui32Frequency);
 	if (ret) {
-		PVR_DPF((PVR_DBG_ERROR, "failed to set aclk_gpu_mem rate: %d\n", ret));
+		PVR_DPF((PVR_DBG_ERROR, "failed to set aclk_gpu_mem rate: %d", ret));
 		if (old_volt > 0)
 			regulator_set_voltage(g_platform->gpu_reg, old_volt, INT_MAX);
 		return;
 	}
 	ret = clk_set_rate(g_platform->aclk_gpu_cfg, ui32Frequency);
 	if (ret) {
-		PVR_DPF((PVR_DBG_ERROR, "failed to set aclk_gpu_cfg rate: %d\n", ret));
+		PVR_DPF((PVR_DBG_ERROR, "failed to set aclk_gpu_cfg rate: %d", ret));
 		clk_set_rate(g_platform->aclk_gpu_mem, old_freq);
 		if (old_volt > 0)
 			regulator_set_voltage(g_platform->gpu_reg, old_volt, INT_MAX);
@@ -242,7 +242,7 @@ void rkSetFrequency(IMG_UINT32 ui32Frequency)
 	}
 	ret = clk_set_rate(g_platform->sclk_gpu_core, ui32Frequency);
 	if (ret) {
-		PVR_DPF((PVR_DBG_ERROR, "failed to set sclk_gpu_core rate: %d\n", ret));
+		PVR_DPF((PVR_DBG_ERROR, "failed to set sclk_gpu_core rate: %d", ret));
 		clk_set_rate(g_platform->aclk_gpu_mem, old_freq);
 		clk_set_rate(g_platform->aclk_gpu_cfg, old_freq);
 		if (old_volt > 0)
@@ -256,7 +256,7 @@ void rkSetVoltage(IMG_UINT32 ui32Volt)
 	if (NULL == g_platform)
 		panic("oops");
 
-	if(regulator_set_voltage(g_platform->gpu_reg, ui32Volt, INT_MAX) != 0)
+	if (regulator_set_voltage(g_platform->gpu_reg, ui32Volt, INT_MAX) != 0)
 	{
 		PVR_DPF((PVR_DBG_ERROR, "Failed to set gpu power voltage=%d!",ui32Volt));
 	}
@@ -409,7 +409,7 @@ PVRSRV_ERROR RkPrePowerState(IMG_HANDLE hSysData,
 	if (eNewPowerState == PVRSRV_DEV_POWER_STATE_ON)
 		RgxResume(platform);
 	return PVRSRV_OK;
-	
+
 }
 
 PVRSRV_ERROR RkPostPowerState(IMG_HANDLE hSysData,
@@ -639,7 +639,7 @@ struct rk_context *RgxRkInit(PVRSRV_DEVICE_CONFIG* psDevConfig)
 
 	platform->dev_config = psDevConfig;
 	platform->gpu_active = IMG_FALSE;
-	
+
 #if defined(PVR_DVFS) || defined(SUPPORT_PDVFS)
 	//psDevConfig->sDVFS.sDVFSDeviceCfg.pasOPPTable = rkOPPTable;
 	//psDevConfig->sDVFS.sDVFSDeviceCfg.ui32OPPTableSize = RGX_DVFS_STEP;
@@ -714,7 +714,7 @@ struct rk_context *RgxRkInit(PVRSRV_DEVICE_CONFIG* psDevConfig)
 
 	clk_set_rate(platform->sclk_gpu_core, RK33_DEFAULT_CLOCK * ONE_MHZ);
 
-	if(psRGXData && psRGXData->psRGXTimingInfo)
+	if (psRGXData && psRGXData->psRGXTimingInfo)
 	{
 		psRGXData->psRGXTimingInfo->ui32CoreClockSpeed = clk_get_rate(platform->sclk_gpu_core);
 	}

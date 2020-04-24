@@ -100,7 +100,7 @@ SysVzDestroyDmaPhysHeap(PHYS_HEAP_CONFIG *psPhysHeapConfig)
 
 		SysDmaFreeMem(psDmaAlloc);
 
-		psPhysHeapRegion->sCardBase.uiAddr = 0;	
+		psPhysHeapRegion->sCardBase.uiAddr = 0;
 		psPhysHeapRegion->sStartAddr.uiAddr = 0;
 		psPhysHeapConfig->eType = PHYS_HEAP_TYPE_UMA;
 	}
@@ -131,16 +131,11 @@ SysVzCreatePhysHeap(PVRSRV_DEVICE_CONFIG *psDevConfig,
 		psPhysHeapConfig->ui32NumOfRegions++;
 	}
 
-	PVR_DPF((PVR_DBG_ERROR,
-		"%s: psPhysHeapConfig->pasRegions[0].hPrivData == 0x%p.",
-		__FUNCTION__,
-		psPhysHeapConfig->pasRegions[0].hPrivData));
-
 	if (psPhysHeapConfig->pasRegions[0].hPrivData == NULL)
 	{
 		DMA_ALLOC *psDmaAlloc = OSAllocZMem(sizeof(DMA_ALLOC));
 		PVR_LOGG_IF_NOMEM(psDmaAlloc, "OSAllocZMem", eError, e0);
-		memset(psDmaAlloc, 0, sizeof(DMA_ALLOC));
+
 		psDmaAlloc->pvOSDevice = psDevConfig->pvOSDevice;
 		psPhysHeapConfig->pasRegions[0].hPrivData = psDmaAlloc;
 	}
@@ -238,7 +233,7 @@ SysVzCreatePhysHeap(PVRSRV_DEVICE_CONFIG *psDevConfig,
 					PVR_DPF((PVR_DBG_ERROR,
 							"%s: %s PVZ config: Invalid firmware physheap config\n"
 							"=>: HOST origin (i.e. static) VZ setups require non-UMA FW physheaps spec.",
-							__FUNCTION__,
+							__func__,
 							PVRSRV_VZ_MODE_IS(DRIVER_MODE_HOST) ? "Host" : "Guest"));
 					eError = PVRSRV_ERROR_INVALID_PVZ_CONFIG;
 				}
@@ -265,18 +260,12 @@ SysVzCreatePhysHeap(PVRSRV_DEVICE_CONFIG *psDevConfig,
 		}
 
 #if defined(CONFIG_L4)
-		{
-			IMG_UINT64 ui64Offset;
-			IMG_UINT64 ui64BaseAddr;
-			IMG_CPU_VIRTADDR pvCpuVAddr;
-
-			/* On Fiasco.OC/l4linux, ioremap physheap now */
-			gahPhysHeapIoRemap[ePhysHeap] = 
-							OSMapPhysToLin(psPhysHeapRegion->sStartAddr,
-										   psPhysHeapRegion->uiSize,
-										   PVRSRV_MEMALLOCFLAG_CPU_UNCACHED);
-			PVR_LOGG_IF_FALSE((NULL != gahPhysHeapIoRemap[ePhysHeap]), "OSMapPhysToLin", e0);
-		}
+		/* On Fiasco.OC/l4linux, ioremap physheap now */
+		gahPhysHeapIoRemap[ePhysHeap] =
+						OSMapPhysToLin(psPhysHeapRegion->sStartAddr,
+									   psPhysHeapRegion->uiSize,
+									   PVRSRV_MEMALLOCFLAG_CPU_UNCACHED);
+		PVR_LOGG_IF_FALSE((NULL != gahPhysHeapIoRemap[ePhysHeap]), "OSMapPhysToLin", e0);
 #endif
 
 		/* Services managed UMA carve-out physheap setup complete */
@@ -306,7 +295,7 @@ e0:
 		}
 	}
 
-	return  eError;
+	return eError;
 }
 
 static void
@@ -318,7 +307,7 @@ SysVzDestroyPhysHeap(PVRSRV_DEVICE_CONFIG *psDevConfig,
 	SysVzDeregisterPhysHeap(psDevConfig, ePhysHeap);
 
 	psPhysHeapConfig = SysVzGetPhysHeapConfig(psDevConfig, ePhysHeap);
-	if (psPhysHeapConfig == NULL || 
+	if (psPhysHeapConfig == NULL ||
 		psPhysHeapConfig->pasRegions == NULL)
 	{
 		return;

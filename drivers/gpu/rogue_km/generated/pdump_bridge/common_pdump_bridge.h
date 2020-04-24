@@ -59,10 +59,11 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #define PVRSRV_BRIDGE_PDUMP_PDUMPIMAGEDESCRIPTOR			PVRSRV_BRIDGE_PDUMP_CMD_FIRST+1
 #define PVRSRV_BRIDGE_PDUMP_PVRSRVPDUMPCOMMENT			PVRSRV_BRIDGE_PDUMP_CMD_FIRST+2
 #define PVRSRV_BRIDGE_PDUMP_PVRSRVPDUMPSETFRAME			PVRSRV_BRIDGE_PDUMP_CMD_FIRST+3
-#define PVRSRV_BRIDGE_PDUMP_CMD_LAST			(PVRSRV_BRIDGE_PDUMP_CMD_FIRST+3)
+#define PVRSRV_BRIDGE_PDUMP_PDUMPDATADESCRIPTOR			PVRSRV_BRIDGE_PDUMP_CMD_FIRST+4
+#define PVRSRV_BRIDGE_PDUMP_CMD_LAST			(PVRSRV_BRIDGE_PDUMP_CMD_FIRST+4)
 
 /*******************************************
-            DevmemPDumpBitmap          
+            DevmemPDumpBitmap
  *******************************************/
 
 /* Bridge in structure for DevmemPDumpBitmap */
@@ -88,7 +89,7 @@ typedef struct PVRSRV_BRIDGE_OUT_DEVMEMPDUMPBITMAP_TAG
 } __attribute__ ((packed)) PVRSRV_BRIDGE_OUT_DEVMEMPDUMPBITMAP;
 
 /*******************************************
-            PDumpImageDescriptor          
+            PDumpImageDescriptor
  *******************************************/
 
 /* Bridge in structure for PDumpImageDescriptor */
@@ -107,6 +108,7 @@ typedef struct PVRSRV_BRIDGE_IN_PDUMPIMAGEDESCRIPTOR_TAG
 	IMG_MEMLAYOUT eMemLayout;
 	IMG_FB_COMPRESSION eFBCompression;
 	const IMG_UINT32 *pui32FBCClearColour;
+	PDUMP_FBC_SWIZZLE eeFBCSwizzle;
 	IMG_DEV_VIRTADDR sHeaderDevAddr;
 	IMG_UINT32 ui32HeaderSize;
 	IMG_UINT32 ui32PDumpFlags;
@@ -119,7 +121,7 @@ typedef struct PVRSRV_BRIDGE_OUT_PDUMPIMAGEDESCRIPTOR_TAG
 } __attribute__ ((packed)) PVRSRV_BRIDGE_OUT_PDUMPIMAGEDESCRIPTOR;
 
 /*******************************************
-            PVRSRVPDumpComment          
+            PVRSRVPDumpComment
  *******************************************/
 
 /* Bridge in structure for PVRSRVPDumpComment */
@@ -136,7 +138,7 @@ typedef struct PVRSRV_BRIDGE_OUT_PVRSRVPDUMPCOMMENT_TAG
 } __attribute__ ((packed)) PVRSRV_BRIDGE_OUT_PVRSRVPDUMPCOMMENT;
 
 /*******************************************
-            PVRSRVPDumpSetFrame          
+            PVRSRVPDumpSetFrame
  *******************************************/
 
 /* Bridge in structure for PVRSRVPDumpSetFrame */
@@ -150,5 +152,28 @@ typedef struct PVRSRV_BRIDGE_OUT_PVRSRVPDUMPSETFRAME_TAG
 {
 	PVRSRV_ERROR eError;
 } __attribute__ ((packed)) PVRSRV_BRIDGE_OUT_PVRSRVPDUMPSETFRAME;
+
+/*******************************************
+            PDumpDataDescriptor
+ *******************************************/
+
+/* Bridge in structure for PDumpDataDescriptor */
+typedef struct PVRSRV_BRIDGE_IN_PDUMPDATADESCRIPTOR_TAG
+{
+	IMG_HANDLE hDevmemCtx;
+	IMG_UINT32 ui32StringSize;
+	const IMG_CHAR *puiFileName;
+	IMG_DEV_VIRTADDR sDataDevAddr;
+	IMG_UINT32 ui32DataSize;
+	IMG_UINT32 ui32ElementType;
+	IMG_UINT32 ui32ElementCount;
+	IMG_UINT32 ui32PDumpFlags;
+} __attribute__ ((packed)) PVRSRV_BRIDGE_IN_PDUMPDATADESCRIPTOR;
+
+/* Bridge out structure for PDumpDataDescriptor */
+typedef struct PVRSRV_BRIDGE_OUT_PDUMPDATADESCRIPTOR_TAG
+{
+	PVRSRV_ERROR eError;
+} __attribute__ ((packed)) PVRSRV_BRIDGE_OUT_PDUMPDATADESCRIPTOR;
 
 #endif /* COMMON_PDUMP_BRIDGE_H */

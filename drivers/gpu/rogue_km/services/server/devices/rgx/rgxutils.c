@@ -106,9 +106,9 @@ PVRSRV_ERROR RGXSetAPMState(const PVRSRV_DEVICE_NODE *psDeviceNode,
 	return eError;
 }
 
-PVRSRV_ERROR RGXQueryPdumpPanicEnable(const PVRSRV_DEVICE_NODE *psDeviceNode,
+PVRSRV_ERROR RGXQueryPdumpPanicDisable(const PVRSRV_DEVICE_NODE *psDeviceNode,
 	const void *pvPrivateData,
-	IMG_BOOL *pbEnabled)
+	IMG_BOOL *pbDisabled)
 {
 	PVRSRV_RGXDEV_INFO *psDevInfo;
 
@@ -121,14 +121,14 @@ PVRSRV_ERROR RGXQueryPdumpPanicEnable(const PVRSRV_DEVICE_NODE *psDeviceNode,
 
 	psDevInfo = psDeviceNode->pvDevice;
 
-	*pbEnabled = psDevInfo->bPDPEnabled;
+	*pbDisabled = !psDevInfo->bPDPEnabled;
 
 	return PVRSRV_OK;
 }
 
-PVRSRV_ERROR RGXSetPdumpPanicEnable(const PVRSRV_DEVICE_NODE *psDeviceNode,
+PVRSRV_ERROR RGXSetPdumpPanicDisable(const PVRSRV_DEVICE_NODE *psDeviceNode,
 	const void *pvPrivateData,
-	IMG_BOOL bEnable)
+	IMG_BOOL bDisable)
 {
 	PVRSRV_RGXDEV_INFO *psDevInfo;
 
@@ -141,7 +141,7 @@ PVRSRV_ERROR RGXSetPdumpPanicEnable(const PVRSRV_DEVICE_NODE *psDeviceNode,
 
 	psDevInfo = psDeviceNode->pvDevice;
 
-	psDevInfo->bPDPEnabled = bEnable;
+	psDevInfo->bPDPEnabled = !bDisable;
 
 	return PVRSRV_OK;
 }
@@ -163,35 +163,26 @@ PVRSRV_ERROR RGXSetDeviceFlags(PVRSRV_RGXDEV_INFO *psDevInfo,
 				IMG_UINT32 ui32Config,
 				IMG_BOOL bSetNotClear)
 {
-	IMG_UINT32 ui32DeviceFlags = 0;
-
 	if (!psDevInfo)
 	{
 		return PVRSRV_ERROR_INVALID_PARAMS;
 	}
 
-	if (ui32Config & RGXKMIF_DEVICE_STATE_ZERO_FREELIST)
+	if ((ui32Config & ~RGXKM_DEVICE_STATE_MASK) != 0)
 	{
-		ui32DeviceFlags |= RGXKM_DEVICE_STATE_ZERO_FREELIST;
-	}
-
-	if (ui32Config & RGXKMIF_DEVICE_STATE_DISABLE_DW_LOGGING_EN)
-	{
-		ui32DeviceFlags |= RGXKM_DEVICE_STATE_DISABLE_DW_LOGGING_EN;
-	}
-
-	if (ui32Config & RGXKMIF_DEVICE_STATE_DUST_REQUEST_INJECT_EN)
-	{
-		ui32DeviceFlags |= RGXKM_DEVICE_STATE_DUST_REQUEST_INJECT_EN;
+		PVR_DPF((PVR_DBG_ERROR,
+				 "%s: Bits outside of device state mask set (input: 0x%x, mask: 0x%x)",
+				 __func__, ui32Config, RGXKM_DEVICE_STATE_MASK));
+		return PVRSRV_ERROR_INVALID_PARAMS;
 	}
 
 	if (bSetNotClear)
 	{
-		psDevInfo->ui32DeviceFlags |= ui32DeviceFlags;
+		psDevInfo->ui32DeviceFlags |= ui32Config;
 	}
 	else
 	{
-		psDevInfo->ui32DeviceFlags &= ~ui32DeviceFlags;
+		psDevInfo->ui32DeviceFlags &= ~ui32Config;
 	}
 
 	return PVRSRV_OK;
@@ -199,33 +190,14 @@ PVRSRV_ERROR RGXSetDeviceFlags(PVRSRV_RGXDEV_INFO *psDevInfo,
 
 inline const char * RGXStringifyKickTypeDM(RGX_KICK_TYPE_DM eKickTypeDM)
 {
-	/*      
-	 *  This is based on the currently defined DMs.             
-	 *  If you need to modify the enum in include/rgx_common.h
-	 *  please keep this function up-to-date too.
-	 *
-	 *       typedef enum _RGXFWIF_DM_
-	 *       {
-	 *           RGXFWIF_DM_GP        = 0,
-	 *           RGXFWIF_DM_2D        = 1, 
-	 *           RGXFWIF_DM_TDM       = 1,
-	 *           RGXFWIF_DM_TA        = 2,
-	 *           RGXFWIF_DM_3D        = 3,
-	 *           RGXFWIF_DM_CDM       = 4,
-	 *           RGXFWIF_DM_RTU       = 5,
-	 *           RGXFWIF_DM_SHG       = 6,
-	 *           RGXFWIF_DM_LAST,
-	 *           RGXFWIF_DM_FORCE_I32 = 0x7fffffff   
-	 *       } RGXFWIF_DM;
-	 */
 	PVR_ASSERT(eKickTypeDM < RGX_KICK_TYPE_DM_LAST);
 
-	switch(eKickTypeDM) {
+	switch (eKickTypeDM) {
 		case RGX_KICK_TYPE_DM_GP:
 			return "GP ";
-		case RGX_KICK_TYPE_DM_TDM_2D:   
+		case RGX_KICK_TYPE_DM_TDM_2D:
 			return "TDM/2D ";
-		case RGX_KICK_TYPE_DM_TA:   
+		case RGX_KICK_TYPE_DM_TA:
 			return "TA ";
 		case RGX_KICK_TYPE_DM_3D:
 			return "3D ";

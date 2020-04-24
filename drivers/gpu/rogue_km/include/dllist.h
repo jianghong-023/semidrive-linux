@@ -41,15 +41,16 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */ /**************************************************************************/
 
-#ifndef _DLLIST_
-#define _DLLIST_
+#ifndef DLLIST_H
+#define DLLIST_H
 
 #include "img_types.h"
+#include "img_defs.h"
 
 /*!
 	Pointer to a linked list node
 */
-typedef struct _DLLIST_NODE_	*PDLLIST_NODE;
+typedef struct DLLIST_NODE_	*PDLLIST_NODE;
 
 
 /*!
@@ -60,11 +61,11 @@ typedef struct _DLLIST_NODE_	*PDLLIST_NODE;
  * clients may need to create a mirror the structure definition if it needs
  * to be used in a structure shared between host and device. Consider such
  * clients if any changes are made to this structure.
- */ 
-typedef struct _DLLIST_NODE_
+ */
+typedef struct DLLIST_NODE_
 {
-	struct _DLLIST_NODE_	*psPrevNode;
-	struct _DLLIST_NODE_	*psNextNode;
+	struct DLLIST_NODE_	*psPrevNode;
+	struct DLLIST_NODE_	*psNextNode;
 } DLLIST_NODE;
 
 
@@ -159,7 +160,7 @@ void dllist_add_to_tail(PDLLIST_NODE psListHead, PDLLIST_NODE psNewNode)
 /*************************************************************************/ /*!
 @Function       dllist_node_is_in_list
 
-@Description    Returns IMG_TRUE if psNode is in a list 
+@Description    Returns IMG_TRUE if psNode is in a list
 
 @Input          psNode             List node
 
@@ -192,7 +193,7 @@ PDLLIST_NODE dllist_get_next_node(PDLLIST_NODE psListHead)
 	{
 		return psListHead->psNextNode;
 	}
-} 
+}
 
 
 /*************************************************************************/ /*!
@@ -275,4 +276,30 @@ void dllist_replace_head(PDLLIST_NODE psOldHead, PDLLIST_NODE psNewHead)
 		 node != (list_head);											\
 		 node = prev, prev = (node)->psPrevNode)
 
-#endif	/* _DLLIST_ */
+
+/*************************************************************************/ /*!
+@Function       dllist_foreach
+
+@Description    Simplification of dllist_foreach_node.
+				Walk through all the nodes on the list.
+				Safe against removal of currently-iterated node.
+
+				Adds utility-macro dllist_cur() to typecast the current node.
+
+@Input          list_head			List node to start the operation
+
+*/
+/*****************************************************************************/
+#define dllist_foreach(list_head)	\
+	for (DLLIST_NODE *_DllNode = (list_head).psNextNode, *_DllNext = _DllNode->psNextNode;		\
+		 _DllNode != &(list_head);																\
+		 _DllNode = _DllNext, _DllNext = _DllNode->psNextNode)
+
+#define dllist_foreach_backwards(list_head)	\
+	for (DLLIST_NODE *_DllNode = (list_head).psPrevNode, *_DllPrev = _DllNode->psPrevNode;		\
+		 _DllNode != &(list_head);																\
+		 _DllNode = _DllPrev, _DllPrev = _DllNode->psPrevNode)
+
+#define dllist_cur(type, member)	IMG_CONTAINER_OF(_DllNode, type, member)
+
+#endif	/* DLLIST_H */

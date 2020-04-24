@@ -2,7 +2,7 @@
 @File
 @Title          RGX Bridge Functionality
 @Copyright      Copyright (c) Imagination Technologies Ltd. All Rights Reserved
-@Description    Header for the rgx Bridge code
+@Description    Header for the Rogue Bridge code
 @License        Dual MIT/GPLv2
 
 The contents of this file are subject to the MIT license as set out below.
@@ -41,16 +41,16 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */ /**************************************************************************/
 
-#if !defined(__RGX_BRIDGE_H__)
-#define __RGX_BRIDGE_H__
+#ifndef RGX_BRIDGE_H
+#define RGX_BRIDGE_H
 
 #include "pvr_bridge.h"
 
-#if defined (__cplusplus)
+#if defined(__cplusplus)
 extern "C" {
 #endif
 
-#include "rgx_fwif.h"
+#include "rgx_fwif_km.h"
 
 #define RGXFWINITPARAMS_VERSION   1
 #define RGXFWINITPARAMS_EXTENSION 128
@@ -60,19 +60,17 @@ extern "C" {
 
 #include "common_rgxtq2_bridge.h"
 #include "common_rgxtq_bridge.h"
-#if !defined(EXCLUDE_BREAKPOINT_BRIDGE)
-#include "common_breakpoint_bridge.h"
+#if !defined(EXCLUDE_RGXBREAKPOINT_BRIDGE)
+#include "common_rgxbreakpoint_bridge.h"
 #endif
-#include "common_debugmisc_bridge.h"
+#include "common_rgxfwdbg_bridge.h"
 #if defined(PDUMP)
 #include "common_rgxpdump_bridge.h"
 #endif
 #include "common_rgxhwperf_bridge.h"
-#include "common_rgxray_bridge.h"
-#if !defined(EXCLUDE_REGCONFIG_BRIDGE)
-#include "common_regconfig_bridge.h"
+#if !defined(EXCLUDE_RGXREGCONFIG_BRIDGE)
+#include "common_rgxregconfig_bridge.h"
 #endif
-#include "common_timerquery_bridge.h"
 #include "common_rgxkicksync_bridge.h"
 
 #include "common_rgxsignals_bridge.h"
@@ -84,19 +82,19 @@ extern "C" {
 
 /* *REMEMBER* to update PVRSRV_BRIDGE_RGX_LAST if you add/remove a bridge
  * group!
- * Also you need to ensure all PVRSRV_BRIDGE_RGX_xxx_DISPATCH_FIRST
- * offsets follow on from the previous bridge group's commands!
+ * Also you need to ensure all PVRSRV_BRIDGE_RGX_xxx_DISPATCH_FIRST offsets
+ * follow on from the previous bridge group's commands!
  *
  * If a bridge group is optional, ensure you *ALWAYS* define its index
- * (e.g. PVRSRV_BRIDGE_RGXCMP is always 151, even is the feature is
- * not defined). If an optional bridge group is not defined you must
- * still define PVRSRV_BRIDGE_RGX_xxx_DISPATCH_FIRST for it with an
- * assigned value of 0.
+ * (e.g. PVRSRV_BRIDGE_RGXCMP is always 151, even is the feature is not
+ * defined). If an optional bridge group is not defined you must still
+ * define PVRSRV_BRIDGE_RGX_xxx_DISPATCH_FIRST for it with an assigned
+ * value of 0.
  */
 
-/* The RGX bridge groups start at 128 (PVRSRV_BRIDGE_RGX_FIRST) rather than follow-on from the other
- * non-device bridge groups (meaning that they then won't be displaced if
- * other non-device bridge groups are added)
+/* The RGX bridge groups start at 128 (PVRSRV_BRIDGE_RGX_FIRST) rather than
+ * follow-on from the other non-device bridge groups (meaning that they then
+ * won't be displaced if other non-device bridge groups are added).
  */
 
 #define PVRSRV_BRIDGE_RGX_FIRST                  128UL
@@ -106,41 +104,39 @@ extern "C" {
 #define PVRSRV_BRIDGE_RGXTQ_DISPATCH_FIRST       (PVRSRV_BRIDGE_DISPATCH_LAST + 1)
 #define PVRSRV_BRIDGE_RGXTQ_DISPATCH_LAST        (PVRSRV_BRIDGE_RGXTQ_DISPATCH_FIRST + PVRSRV_BRIDGE_RGXTQ_CMD_LAST)
 
-
 /* 129: RGX Compute interface functions */
 #define PVRSRV_BRIDGE_RGXCMP                     129UL
 #	define PVRSRV_BRIDGE_RGXCMP_DISPATCH_FIRST   (PVRSRV_BRIDGE_RGXTQ_DISPATCH_LAST + 1)
 #	define PVRSRV_BRIDGE_RGXCMP_DISPATCH_LAST    (PVRSRV_BRIDGE_RGXCMP_DISPATCH_FIRST + PVRSRV_BRIDGE_RGXCMP_CMD_LAST)
 
-
 /* 130: RGX TA/3D interface functions */
 #define PVRSRV_BRIDGE_RGXTA3D                    130UL
-#define PVRSRV_BRIDGE_RGXTA3D_DISPATCH_FIRST     (PVRSRV_BRIDGE_RGXCMP_DISPATCH_LAST +1)
+#define PVRSRV_BRIDGE_RGXTA3D_DISPATCH_FIRST     (PVRSRV_BRIDGE_RGXCMP_DISPATCH_LAST + 1)
 #define PVRSRV_BRIDGE_RGXTA3D_DISPATCH_LAST      (PVRSRV_BRIDGE_RGXTA3D_DISPATCH_FIRST + PVRSRV_BRIDGE_RGXTA3D_CMD_LAST)
 
 /* 131: RGX Breakpoint interface functions */
-#define PVRSRV_BRIDGE_BREAKPOINT                 131UL
-#if !defined(EXCLUDE_BREAKPOINT_BRIDGE)
-#define PVRSRV_BRIDGE_BREAKPOINT_DISPATCH_FIRST  (PVRSRV_BRIDGE_RGXTA3D_DISPATCH_LAST + 1)
-#define PVRSRV_BRIDGE_BREAKPOINT_DISPATCH_LAST   (PVRSRV_BRIDGE_BREAKPOINT_DISPATCH_FIRST + PVRSRV_BRIDGE_BREAKPOINT_CMD_LAST)
+#define PVRSRV_BRIDGE_RGXBREAKPOINT                 131UL
+#if !defined(EXCLUDE_RGXBREAKPOINT_BRIDGE)
+#define PVRSRV_BRIDGE_RGXBREAKPOINT_DISPATCH_FIRST  (PVRSRV_BRIDGE_RGXTA3D_DISPATCH_LAST + 1)
+#define PVRSRV_BRIDGE_RGXBREAKPOINT_DISPATCH_LAST   (PVRSRV_BRIDGE_RGXBREAKPOINT_DISPATCH_FIRST + PVRSRV_BRIDGE_RGXBREAKPOINT_CMD_LAST)
 #else
-#define PVRSRV_BRIDGE_BREAKPOINT_DISPATCH_FIRST  0
-#define PVRSRV_BRIDGE_BREAKPOINT_DISPATCH_LAST   (PVRSRV_BRIDGE_RGXTA3D_DISPATCH_LAST)
+#define PVRSRV_BRIDGE_RGXBREAKPOINT_DISPATCH_FIRST  0
+#define PVRSRV_BRIDGE_RGXBREAKPOINT_DISPATCH_LAST   (PVRSRV_BRIDGE_RGXTA3D_DISPATCH_LAST)
 #endif
 
 /* 132: RGX Debug/Misc interface functions */
-#define PVRSRV_BRIDGE_DEBUGMISC                  132UL
-#define PVRSRV_BRIDGE_DEBUGMISC_DISPATCH_FIRST   (PVRSRV_BRIDGE_BREAKPOINT_DISPATCH_LAST + 1)
-#define PVRSRV_BRIDGE_DEBUGMISC_DISPATCH_LAST    (PVRSRV_BRIDGE_DEBUGMISC_DISPATCH_FIRST + PVRSRV_BRIDGE_DEBUGMISC_CMD_LAST)
+#define PVRSRV_BRIDGE_RGXFWDBG                   132UL
+#define PVRSRV_BRIDGE_RGXFWDBG_DISPATCH_FIRST    (PVRSRV_BRIDGE_RGXBREAKPOINT_DISPATCH_LAST + 1)
+#define PVRSRV_BRIDGE_RGXFWDBG_DISPATCH_LAST     (PVRSRV_BRIDGE_RGXFWDBG_DISPATCH_FIRST + PVRSRV_BRIDGE_RGXFWDBG_CMD_LAST)
 
 /* 133: RGX PDump interface functions */
 #define PVRSRV_BRIDGE_RGXPDUMP                   133UL
 #if defined(PDUMP)
-#define PVRSRV_BRIDGE_RGXPDUMP_DISPATCH_FIRST    (PVRSRV_BRIDGE_DEBUGMISC_DISPATCH_LAST +1)
+#define PVRSRV_BRIDGE_RGXPDUMP_DISPATCH_FIRST    (PVRSRV_BRIDGE_RGXFWDBG_DISPATCH_LAST + 1)
 #define PVRSRV_BRIDGE_RGXPDUMP_DISPATCH_LAST     (PVRSRV_BRIDGE_RGXPDUMP_DISPATCH_FIRST + PVRSRV_BRIDGE_RGXPDUMP_CMD_LAST)
 #else
 #define PVRSRV_BRIDGE_RGXPDUMP_DISPATCH_FIRST    0
-#define PVRSRV_BRIDGE_RGXPDUMP_DISPATCH_LAST     (PVRSRV_BRIDGE_DEBUGMISC_DISPATCH_LAST)
+#define PVRSRV_BRIDGE_RGXPDUMP_DISPATCH_LAST     (PVRSRV_BRIDGE_RGXFWDBG_DISPATCH_LAST)
 #endif
 
 /* 134: RGX HWPerf interface functions */
@@ -148,40 +144,30 @@ extern "C" {
 #define PVRSRV_BRIDGE_RGXHWPERF_DISPATCH_FIRST   (PVRSRV_BRIDGE_RGXPDUMP_DISPATCH_LAST + 1)
 #define PVRSRV_BRIDGE_RGXHWPERF_DISPATCH_LAST    (PVRSRV_BRIDGE_RGXHWPERF_DISPATCH_FIRST + PVRSRV_BRIDGE_RGXHWPERF_CMD_LAST)
 
-/* 135: RGX Ray Tracing interface functions */
-#define PVRSRV_BRIDGE_RGXRAY                     135UL
-#define PVRSRV_BRIDGE_RGXRAY_DISPATCH_FIRST      (PVRSRV_BRIDGE_RGXHWPERF_DISPATCH_LAST + 1)
-#define PVRSRV_BRIDGE_RGXRAY_DISPATCH_LAST       (PVRSRV_BRIDGE_RGXRAY_DISPATCH_FIRST + PVRSRV_BRIDGE_RGXRAY_CMD_LAST)
-
-/* 136: RGX Register Configuration interface functions */
-#define PVRSRV_BRIDGE_REGCONFIG                  136UL
-#if !defined(EXCLUDE_REGCONFIG_BRIDGE)
-#define PVRSRV_BRIDGE_REGCONFIG_DISPATCH_FIRST   (PVRSRV_BRIDGE_RGXRAY_DISPATCH_LAST + 1)
-#define PVRSRV_BRIDGE_REGCONFIG_DISPATCH_LAST    (PVRSRV_BRIDGE_REGCONFIG_DISPATCH_FIRST + PVRSRV_BRIDGE_REGCONFIG_CMD_LAST)
+/* 135: RGX Register Configuration interface functions */
+#define PVRSRV_BRIDGE_RGXREGCONFIG                  135UL
+#if !defined(EXCLUDE_RGXREGCONFIG_BRIDGE)
+#define PVRSRV_BRIDGE_RGXREGCONFIG_DISPATCH_FIRST   (PVRSRV_BRIDGE_RGXHWPERF_DISPATCH_LAST + 1)
+#define PVRSRV_BRIDGE_RGXREGCONFIG_DISPATCH_LAST    (PVRSRV_BRIDGE_RGXREGCONFIG_DISPATCH_FIRST + PVRSRV_BRIDGE_RGXREGCONFIG_CMD_LAST)
 #else
-#define PVRSRV_BRIDGE_REGCONFIG_DISPATCH_FIRST   0
-#define PVRSRV_BRIDGE_REGCONFIG_DISPATCH_LAST    (PVRSRV_BRIDGE_RGXRAY_DISPATCH_LAST)
+#define PVRSRV_BRIDGE_RGXREGCONFIG_DISPATCH_FIRST   0
+#define PVRSRV_BRIDGE_RGXREGCONFIG_DISPATCH_LAST    (PVRSRV_BRIDGE_RGXHWPERF_DISPATCH_LAST)
 #endif
 
-/* 137: RGX Timer Query interface functions */
-#define PVRSRV_BRIDGE_TIMERQUERY                 137UL
-#define PVRSRV_BRIDGE_TIMERQUERY_DISPATCH_FIRST  (PVRSRV_BRIDGE_REGCONFIG_DISPATCH_LAST + 1)
-#define PVRSRV_BRIDGE_TIMERQUERY_DISPATCH_LAST   (PVRSRV_BRIDGE_TIMERQUERY_DISPATCH_FIRST + PVRSRV_BRIDGE_TIMERQUERY_CMD_LAST)
-
-/* 138: RGX kicksync interface */
-#define PVRSRV_BRIDGE_RGXKICKSYNC                138UL
-#define PVRSRV_BRIDGE_RGXKICKSYNC_DISPATCH_FIRST (PVRSRV_BRIDGE_TIMERQUERY_DISPATCH_LAST + 1)
+/* 136: RGX kicksync interface */
+#define PVRSRV_BRIDGE_RGXKICKSYNC                136UL
+#define PVRSRV_BRIDGE_RGXKICKSYNC_DISPATCH_FIRST (PVRSRV_BRIDGE_RGXREGCONFIG_DISPATCH_LAST + 1)
 #define PVRSRV_BRIDGE_RGXKICKSYNC_DISPATCH_LAST  (PVRSRV_BRIDGE_RGXKICKSYNC_DISPATCH_FIRST + PVRSRV_BRIDGE_RGXKICKSYNC_CMD_LAST)
 
-/* 139: RGX signals interface */
-#define PVRSRV_BRIDGE_RGXSIGNALS                139UL
-#define PVRSRV_BRIDGE_RGXSIGNALS_DISPATCH_FIRST (PVRSRV_BRIDGE_RGXKICKSYNC_DISPATCH_LAST + 1)
-#define PVRSRV_BRIDGE_RGXSIGNALS_DISPATCH_LAST  (PVRSRV_BRIDGE_RGXSIGNALS_DISPATCH_FIRST + PVRSRV_BRIDGE_RGXSIGNALS_CMD_LAST)
+/* 137: RGX signals interface */
+#define PVRSRV_BRIDGE_RGXSIGNALS                 137UL
+#define PVRSRV_BRIDGE_RGXSIGNALS_DISPATCH_FIRST  (PVRSRV_BRIDGE_RGXKICKSYNC_DISPATCH_LAST + 1)
+#define PVRSRV_BRIDGE_RGXSIGNALS_DISPATCH_LAST   (PVRSRV_BRIDGE_RGXSIGNALS_DISPATCH_FIRST + PVRSRV_BRIDGE_RGXSIGNALS_CMD_LAST)
 
 
-#define PVRSRV_BRIDGE_RGXTQ2                      140UL
-#define PVRSRV_BRIDGE_RGXTQ2_DISPATCH_FIRST       (PVRSRV_BRIDGE_RGXSIGNALS_DISPATCH_LAST + 1)
-#define PVRSRV_BRIDGE_RGXTQ2_DISPATCH_LAST        (PVRSRV_BRIDGE_RGXTQ2_DISPATCH_FIRST + PVRSRV_BRIDGE_RGXTQ2_CMD_LAST)
+#define PVRSRV_BRIDGE_RGXTQ2                     138UL
+#define PVRSRV_BRIDGE_RGXTQ2_DISPATCH_FIRST      (PVRSRV_BRIDGE_RGXSIGNALS_DISPATCH_LAST + 1)
+#define PVRSRV_BRIDGE_RGXTQ2_DISPATCH_LAST       (PVRSRV_BRIDGE_RGXTQ2_DISPATCH_FIRST + PVRSRV_BRIDGE_RGXTQ2_CMD_LAST)
 
 #define PVRSRV_BRIDGE_RGX_LAST                   (PVRSRV_BRIDGE_RGXTQ2)
 #define PVRSRV_BRIDGE_RGX_DISPATCH_LAST          (PVRSRV_BRIDGE_RGXTQ2_DISPATCH_LAST)
@@ -197,21 +183,13 @@ static const IMG_UINT32 gui32RGXBridges =
 #if defined(SUPPORT_BREAKPOINT)
 	| (1U << (PVRSRV_BRIDGE_BREAKPOINT - PVRSRV_BRIDGE_RGX_FIRST))
 #endif
-#if defined(SUPPORT_DEBUGMISC)
-	| (1U << (PVRSRV_BRIDGE_DEBUGMISC - PVRSRV_BRIDGE_RGX_FIRST))
-#endif
+	| (1U << (PVRSRV_BRIDGE_RGXFWDBG - PVRSRV_BRIDGE_RGX_FIRST))
 #if defined(PDUMP)
 	| (1U << (PVRSRV_BRIDGE_RGXPDUMP - PVRSRV_BRIDGE_RGX_FIRST))
 #endif
 	| (1U << (PVRSRV_BRIDGE_RGXHWPERF - PVRSRV_BRIDGE_RGX_FIRST))
-#if defined(RGX_FEATURE_RAY_TRACING)
-	| (1U << (PVRSRV_BRIDGE_RGXRAY - PVRSRV_BRIDGE_RGX_FIRST))
-#endif
 #if defined(SUPPORT_REGCONFIG)
-	| (1U << (PVRSRV_BRIDGE_REGCONFIG - PVRSRV_BRIDGE_RGX_FIRST))
-#endif
-#if defined(SUPPORT_TIMERQUERY)
-	| (1U << (PVRSRV_BRIDGE_TIMERQUERY - PVRSRV_BRIDGE_RGX_FIRST))
+	| (1U << (PVRSRV_BRIDGE_RGXREGCONFIG - PVRSRV_BRIDGE_RGX_FIRST))
 #endif
 	| (1U << (PVRSRV_BRIDGE_RGXKICKSYNC - PVRSRV_BRIDGE_RGX_FIRST))
 #if defined(RGX_FEATURE_SIGNAL_SNOOPING)
@@ -228,8 +206,8 @@ static const IMG_UINT32 gui32RGXBridges =
 		0 /* no RGX bridges are currently optional */ \
 	)
 
-#if defined (__cplusplus)
+#if defined(__cplusplus)
 }
 #endif
 
-#endif /* __RGX_BRIDGE_H__ */
+#endif /* RGX_BRIDGE_H */

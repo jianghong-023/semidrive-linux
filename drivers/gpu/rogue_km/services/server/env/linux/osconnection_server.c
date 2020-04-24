@@ -75,7 +75,7 @@ PVRSRV_ERROR OSConnectionPrivateDataInit(IMG_HANDLE *phOsPrivateData, void *pvOS
 
 	if (*phOsPrivateData == NULL)
 	{
-		PVR_DPF((PVR_DBG_ERROR, "%s: OSAllocMem failed", __FUNCTION__));
+		PVR_DPF((PVR_DBG_ERROR, "%s: OSAllocMem failed", __func__));
 		return PVRSRV_ERROR_OUT_OF_MEMORY;
 	}
 
@@ -91,7 +91,7 @@ PVRSRV_ERROR OSConnectionPrivateDataInit(IMG_HANDLE *phOsPrivateData, void *pvOS
 	psIonConnection = (ENV_ION_CONNECTION_DATA *)OSAllocZMem(sizeof(ENV_ION_CONNECTION_DATA));
 	if (psIonConnection == NULL)
 	{
-		PVR_DPF((PVR_DBG_ERROR, "%s: OSAllocMem failed", __FUNCTION__));
+		PVR_DPF((PVR_DBG_ERROR, "%s: OSAllocMem failed", __func__));
 		return PVRSRV_ERROR_OUT_OF_MEMORY;
 	}
 
@@ -105,7 +105,7 @@ PVRSRV_ERROR OSConnectionPrivateDataInit(IMG_HANDLE *phOsPrivateData, void *pvOS
 	psEnvConnection->psIonData->psIonClient =
 		ion_client_create(psEnvConnection->psIonData->psIonDev,
 						  psEnvConnection->psIonData->azIonClientName);
- 
+
 	if (IS_ERR_OR_NULL(psEnvConnection->psIonData->psIonClient))
 	{
 		PVR_DPF((PVR_DBG_ERROR, "OSConnectionPrivateDataInit: Couldn't create "
@@ -118,7 +118,7 @@ PVRSRV_ERROR OSConnectionPrivateDataInit(IMG_HANDLE *phOsPrivateData, void *pvOS
 
 PVRSRV_ERROR OSConnectionPrivateDataDeInit(IMG_HANDLE hOsPrivateData)
 {
-	ENV_CONNECTION_DATA *psEnvConnection; 
+	ENV_CONNECTION_DATA *psEnvConnection;
 
 	if (hOsPrivateData == NULL)
 	{

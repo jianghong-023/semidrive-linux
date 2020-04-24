@@ -52,6 +52,9 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #include <video/adf_client.h>
 
+/* This header must always be included last */
+#include "kernel_compatibility.h"
+
 #ifdef DEBUG_VALIDATE
 #define val_dbg(dev, fmt, x...) dev_dbg(dev, fmt, x)
 #else
@@ -89,8 +92,7 @@ static long validate(struct adf_device *dev,
 	post_ext_size = sizeof(struct adf_post_ext) +
 		data.n_bufs * sizeof(struct adf_buffer_config_ext);
 
-	if (!access_ok(VERIFY_READ, data.bufs,
-		       sizeof(*data.bufs) * data.n_bufs)) {
+	if (!access_ok(data.bufs, sizeof(*data.bufs) * data.n_bufs)) {
 		err = -EFAULT;
 		goto err_out;
 	}
@@ -101,7 +103,7 @@ static long validate(struct adf_device *dev,
 		goto err_out;
 	}
 
-	if (!access_ok(VERIFY_READ, data.post_ext, post_ext_size)) {
+	if (!access_ok(data.post_ext, post_ext_size)) {
 		err = -EFAULT;
 		goto err_out;
 	}
@@ -112,7 +114,7 @@ static long validate(struct adf_device *dev,
 	}
 
 	if (data.n_interfaces) {
-		if (!access_ok(VERIFY_READ, data.interfaces,
+		if (!access_ok(data.interfaces,
 		     sizeof(*data.interfaces) * data.n_interfaces)) {
 			err = -EFAULT;
 			goto err_out;
@@ -226,7 +228,7 @@ struct adf_validate_config_ext __user *arg)
 {
 	int err;
 
-	if (!access_ok(VERIFY_READ, arg, sizeof(*arg))) {
+	if (!access_ok(arg, sizeof(*arg))) {
 		err = -EFAULT;
 		goto err_out;
 	}
@@ -266,7 +268,7 @@ static long adf_img_ioctl_validate_compat(struct adf_device *dev,
 	BUILD_BUG_ON_MSG(sizeof(struct adf_validate_config_ext) != 32,
 		"adf_validate_config_ext has unexpected size");
 
-	if (!access_ok(VERIFY_READ, arg_compat, sizeof(*arg_compat))) {
+	if (!access_ok(arg_compat, sizeof(*arg_compat))) {
 		err = -EFAULT;
 		goto err_out;
 	}

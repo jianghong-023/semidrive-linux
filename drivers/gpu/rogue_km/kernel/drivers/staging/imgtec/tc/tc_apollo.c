@@ -126,8 +126,8 @@ static int spi_read(struct tc_device *tc, u32 off, u32 *val)
 
 		if (cnt++ > 10000) {
 			dev_err(&tc->pdev->dev,
-				"spi_read: Time out reading SPI reg (0x%x)\n",
-				off);
+				"%s: Time out reading SPI reg (0x%x)\n",
+				__func__, off);
 			return -1;
 		}
 
@@ -361,14 +361,13 @@ static void apollo_set_mem_latency(struct tc_device *tc,
 {
 	u32 regval = 0;
 
-	if (mem_latency <= 4)
+	if (mem_latency <= 4) {
 		/* The total memory read latency cannot be lower than the
 		 * amount of cycles consumed by the hardware to do a read.
 		 * Set the memory read latency to 0 cycles.
 		 */
 		mem_latency = 0;
-	else
-	{
+	} else {
 		mem_latency -= 4;
 
 		dev_info(&tc->pdev->dev,
@@ -376,14 +375,13 @@ static void apollo_set_mem_latency(struct tc_device *tc,
 			 mem_latency);
 	}
 
-	if (mem_wresp_latency <= 2)
+	if (mem_wresp_latency <= 2) {
 		/* The total memory write latency cannot be lower than the
 		 * amount of cycles consumed by the hardware to do a write.
 		 * Set the memory write latency to 0 cycles.
 		 */
 		mem_wresp_latency = 0;
-	else
-	{
+	} else {
 		mem_wresp_latency -= 2;
 
 		dev_info(&tc->pdev->dev,
@@ -421,12 +419,10 @@ static void apollo_fpga_update_dut_clk_freq(struct tc_device *tc,
 	reg = ioread32(tc->tcf.registers + TCF_CLK_CTRL_SW_IF_VERSION);
 	reg = (reg & VERSION_MASK) >> VERSION_SHIFT;
 
-	if (reg >= 1)
-	{
+	if (reg >= 1) {
 		reg = ioread32(tc->tcf.registers + TCF_CLK_CTRL_DUT_CLK_INFO);
 
-		if ((reg != 0) && (reg != 0xbaadface) && (reg != 0xffffffff))
-		{
+		if ((reg != 0) && (reg != 0xbaadface) && (reg != 0xffffffff)) {
 			dev_info(dev, "TCF_CLK_CTRL_DUT_CLK_INFO = %08x\n", reg);
 			dev_info(dev, "Overriding provided DUT clock values: "
 				 "core %i, mem %i\n",
@@ -497,9 +493,8 @@ static int apollo_hard_reset(struct tc_device *tc,
 		  TCF_CLK_CTRL_CLK_AND_RST_CTRL);
 
 #if defined(SUPPORT_RGX)
-	if (tc->version == APOLLO_VERSION_TCF_5) {
+	if (tc->version == APOLLO_VERSION_TCF_5)
 		apollo_fpga_update_dut_clk_freq(tc, &core_clock, &mem_clock);
-	}
 
 	/* Set clock speed here, before reset. */
 	apollo_set_clocks(tc, core_clock, mem_clock, sys_clock);
@@ -576,7 +571,7 @@ static int apollo_hard_reset(struct tc_device *tc,
 	}
 
 	reg = ioread32(tc->tcf.registers + TCF_CLK_CTRL_SW_IF_VERSION);
-	reg = (reg & VERSION_MASK >> VERSION_SHIFT);
+	reg = (reg & VERSION_MASK) >> VERSION_SHIFT;
 
 	if (reg == 0) {
 		u32 build_inc;

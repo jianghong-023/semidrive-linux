@@ -175,7 +175,8 @@ static struct drm_framebuffer *
 pdp_fb_create(struct drm_device *dev,
 			struct drm_file *file,
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 5, 0)) || \
-    (defined(CHROMIUMOS_KERNEL) && (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 18, 0)))
+	(defined(CHROMIUMOS_KERNEL) && \
+	      (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 18, 0)))
 			const
 #endif
 			struct drm_mode_fb_cmd2 *mode_cmd)
@@ -187,19 +188,19 @@ pdp_fb_create(struct drm_device *dev,
 	case DRM_FORMAT_XRGB8888:
 		break;
 	default:
-		DRM_ERROR("pixel format not supported (format = %u)\n",
+		DRM_ERROR_RATELIMITED("pixel format not supported (format = %u)\n",
 			  mode_cmd->pixel_format);
 		return ERR_PTR(-EINVAL);
 	}
 
 	if (mode_cmd->flags & DRM_MODE_FB_INTERLACED) {
-		DRM_ERROR("interlaced framebuffers not supported\n");
+		DRM_ERROR_RATELIMITED("interlaced framebuffers not supported\n");
 		return ERR_PTR(-EINVAL);
 	}
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 1, 0))
 	if (mode_cmd->modifier[0] != DRM_FORMAT_MOD_NONE) {
-		DRM_ERROR("format modifier 0x%llx is not supported\n",
+		DRM_ERROR_RATELIMITED("format modifier 0x%llx is not supported\n",
 			  mode_cmd->modifier[0]);
 		return ERR_PTR(-EINVAL);
 	}
@@ -299,8 +300,8 @@ int pdp_modeset_early_init(struct pdp_drm_private *dev_priv)
 			goto err_config_cleanup;
 		}
 
-		err = drm_mode_connector_attach_encoder(dev_priv->connector,
-							dev_priv->encoder);
+		err = drm_connector_attach_encoder(dev_priv->connector,
+						   dev_priv->encoder);
 		if (err) {
 			DRM_ERROR("failed to attach [ENCODER:%d:%s] to [CONNECTOR:%d:%s] (err=%d)\n",
 				  dev_priv->encoder->base.id,

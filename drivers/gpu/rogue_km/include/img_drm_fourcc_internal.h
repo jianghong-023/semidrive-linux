@@ -57,21 +57,24 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  * - identifier for our driver: PVR
  * - category: FBCDC
  *   - compression tile dimension: 8x8, 16x4, 32x2
- *   - FBDC version: V0, V1, V2, V3, V7
+ *   - FBDC version: V0, V1, V2, V3, V7, V12
  */
 #define DRM_FORMAT_MOD_PVR_FBCDC_8x8_V0      fourcc_mod_code(PVR, 1)
 #define DRM_FORMAT_MOD_PVR_FBCDC_8x8_V0_FIX  fourcc_mod_code(PVR, 2) /* Fix for HW_BRN_37464 */
 #define DRM_FORMAT_MOD_PVR_FBCDC_8x8_V1      fourcc_mod_code(PVR, 3)
 #define DRM_FORMAT_MOD_PVR_FBCDC_8x8_V2      fourcc_mod_code(PVR, 4)
 #define DRM_FORMAT_MOD_PVR_FBCDC_8x8_V3      fourcc_mod_code(PVR, 5)
+#define DRM_FORMAT_MOD_PVR_FBCDC_8x8_V12     fourcc_mod_code(PVR, 15)
 /* DRM_FORMAT_MOD_PVR_FBCDC_8x8_V7 - moved to the public header */
 #define DRM_FORMAT_MOD_PVR_FBCDC_16x4_V0     fourcc_mod_code(PVR, 7)
 #define DRM_FORMAT_MOD_PVR_FBCDC_16x4_V0_FIX fourcc_mod_code(PVR, 8) /* Fix for HW_BRN_37464 */
 #define DRM_FORMAT_MOD_PVR_FBCDC_16x4_V1     fourcc_mod_code(PVR, 9)
 #define DRM_FORMAT_MOD_PVR_FBCDC_16x4_V2     fourcc_mod_code(PVR, 10)
 #define DRM_FORMAT_MOD_PVR_FBCDC_16x4_V3     fourcc_mod_code(PVR, 11)
+#define DRM_FORMAT_MOD_PVR_FBCDC_16x4_V12    fourcc_mod_code(PVR, 16)
 /* DRM_FORMAT_MOD_PVR_FBCDC_16x4_V7 - moved to the public header */
 #define DRM_FORMAT_MOD_PVR_FBCDC_32x2_V1     fourcc_mod_code(PVR, 13)
 #define DRM_FORMAT_MOD_PVR_FBCDC_32x2_V3     fourcc_mod_code(PVR, 14)
+#define DRM_FORMAT_MOD_PVR_FBCDC_32x2_V12    fourcc_mod_code(PVR, 17)
 
 #endif /* IMG_DRM_FOURCC_INTERNAL_H */

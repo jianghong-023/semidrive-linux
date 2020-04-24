@@ -59,10 +59,11 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #define PVRSRV_BRIDGE_RGXTQ_RGXDESTROYTRANSFERCONTEXT			PVRSRV_BRIDGE_RGXTQ_CMD_FIRST+1
 #define PVRSRV_BRIDGE_RGXTQ_RGXSUBMITTRANSFER			PVRSRV_BRIDGE_RGXTQ_CMD_FIRST+2
 #define PVRSRV_BRIDGE_RGXTQ_RGXSETTRANSFERCONTEXTPRIORITY			PVRSRV_BRIDGE_RGXTQ_CMD_FIRST+3
-#define PVRSRV_BRIDGE_RGXTQ_CMD_LAST			(PVRSRV_BRIDGE_RGXTQ_CMD_FIRST+3)
+#define PVRSRV_BRIDGE_RGXTQ_RGXSUBMITTRANSFER2			PVRSRV_BRIDGE_RGXTQ_CMD_FIRST+4
+#define PVRSRV_BRIDGE_RGXTQ_CMD_LAST			(PVRSRV_BRIDGE_RGXTQ_CMD_FIRST+4)
 
 /*******************************************
-            RGXCreateTransferContext          
+            RGXCreateTransferContext
  *******************************************/
 
 /* Bridge in structure for RGXCreateTransferContext */
@@ -72,6 +73,7 @@ typedef struct PVRSRV_BRIDGE_IN_RGXCREATETRANSFERCONTEXT_TAG
 	IMG_UINT32 ui32FrameworkCmdize;
 	IMG_BYTE *psFrameworkCmd;
 	IMG_HANDLE hPrivData;
+	IMG_UINT32 ui32PackedCCBSizeU8888;
 } __attribute__ ((packed)) PVRSRV_BRIDGE_IN_RGXCREATETRANSFERCONTEXT;
 
 /* Bridge out structure for RGXCreateTransferContext */
@@ -82,7 +84,7 @@ typedef struct PVRSRV_BRIDGE_OUT_RGXCREATETRANSFERCONTEXT_TAG
 } __attribute__ ((packed)) PVRSRV_BRIDGE_OUT_RGXCREATETRANSFERCONTEXT;
 
 /*******************************************
-            RGXDestroyTransferContext          
+            RGXDestroyTransferContext
  *******************************************/
 
 /* Bridge in structure for RGXDestroyTransferContext */
@@ -98,7 +100,7 @@ typedef struct PVRSRV_BRIDGE_OUT_RGXDESTROYTRANSFERCONTEXT_TAG
 } __attribute__ ((packed)) PVRSRV_BRIDGE_OUT_RGXDESTROYTRANSFERCONTEXT;
 
 /*******************************************
-            RGXSubmitTransfer          
+            RGXSubmitTransfer
  *******************************************/
 
 /* Bridge in structure for RGXSubmitTransfer */
@@ -140,7 +142,7 @@ typedef struct PVRSRV_BRIDGE_OUT_RGXSUBMITTRANSFER_TAG
 } __attribute__ ((packed)) PVRSRV_BRIDGE_OUT_RGXSUBMITTRANSFER;
 
 /*******************************************
-            RGXSetTransferContextPriority          
+            RGXSetTransferContextPriority
  *******************************************/
 
 /* Bridge in structure for RGXSetTransferContextPriority */
@@ -155,5 +157,44 @@ typedef struct PVRSRV_BRIDGE_OUT_RGXSETTRANSFERCONTEXTPRIORITY_TAG
 {
 	PVRSRV_ERROR eError;
 } __attribute__ ((packed)) PVRSRV_BRIDGE_OUT_RGXSETTRANSFERCONTEXTPRIORITY;
+
+/*******************************************
+            RGXSubmitTransfer2
+ *******************************************/
+
+/* Bridge in structure for RGXSubmitTransfer2 */
+typedef struct PVRSRV_BRIDGE_IN_RGXSUBMITTRANSFER2_TAG
+{
+	IMG_HANDLE hTransferContext;
+	IMG_UINT32 ui32ClientCacheOpSeqNum;
+	IMG_UINT32 ui32PrepareCount;
+	IMG_UINT32 *pui32ClientFenceCount;
+	IMG_HANDLE **phFenceUFOSyncPrimBlock;
+	IMG_UINT32 **pui32FenceSyncOffset;
+	IMG_UINT32 **pui32FenceValue;
+	IMG_UINT32 *pui32ClientUpdateCount;
+	IMG_HANDLE **phUpdateUFOSyncPrimBlock;
+	IMG_UINT32 **pui32UpdateSyncOffset;
+	IMG_UINT32 **pui32UpdateValue;
+	PVRSRV_FENCE hCheckFenceFD;
+	PVRSRV_TIMELINE h2DUpdateTimeline;
+	PVRSRV_TIMELINE h3DUpdateTimeline;
+	IMG_CHAR *puiUpdateFenceName;
+	IMG_UINT32 *pui32CommandSize;
+	IMG_UINT8 **pui8FWCommand;
+	IMG_UINT32 *pui32TQPrepareFlags;
+	IMG_UINT32 ui32ExtJobRef;
+	IMG_UINT32 ui32SyncPMRCount;
+	IMG_UINT32 *pui32SyncPMRFlags;
+	IMG_HANDLE *phSyncPMRs;
+} __attribute__ ((packed)) PVRSRV_BRIDGE_IN_RGXSUBMITTRANSFER2;
+
+/* Bridge out structure for RGXSubmitTransfer2 */
+typedef struct PVRSRV_BRIDGE_OUT_RGXSUBMITTRANSFER2_TAG
+{
+	PVRSRV_FENCE h2DUpdateFence;
+	PVRSRV_FENCE h3DUpdateFence;
+	PVRSRV_ERROR eError;
+} __attribute__ ((packed)) PVRSRV_BRIDGE_OUT_RGXSUBMITTRANSFER2;
 
 #endif /* COMMON_RGXTQ_BRIDGE_H */

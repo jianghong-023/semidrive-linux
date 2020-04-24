@@ -66,7 +66,7 @@ IMG_INTERNAL HTB_FLAG_EL_T g_auiHTBGroupEnable[HTB_FLAG_NUM_EL] = {0};
  @Input         hSrvHandle      Server Handle
 
  @Input         ui32NumFlagGroups Number of group enable flags words
- 
+
  @Input         aui32GroupEnable  Flags words controlling groups to be logged
 
  @Input         ui32LogLevel    Log level to record
@@ -107,7 +107,7 @@ HTBControl(
 /*************************************************************************/ /*!
 */ /**************************************************************************/
 static PVRSRV_ERROR
-_HTBLog(IMG_HANDLE hSrvHandle, IMG_UINT32 PID, IMG_UINT32 ui32TimeStampus, HTB_LOG_SFids SF, va_list args)
+_HTBLog(IMG_HANDLE hSrvHandle, IMG_UINT32 PID, IMG_UINT64 ui64TimeStampus, HTB_LOG_SFids SF, va_list args)
 {
 #if defined(__KERNEL__)
 	IMG_UINT32 i;
@@ -123,11 +123,11 @@ _HTBLog(IMG_HANDLE hSrvHandle, IMG_UINT32 PID, IMG_UINT32 ui32TimeStampus, HTB_L
 		aui32Args[i] = va_arg(args, IMG_UINT32);
 	}
 
-	return BridgeHTBLog(hSrvHandle, PID, ui32TimeStampus, SF, ui32NumArgs, aui32Args);
+	return BridgeHTBLog(hSrvHandle, PID, ui64TimeStampus, SF, ui32NumArgs, aui32Args);
 #else
 	PVR_UNREFERENCED_PARAMETER(hSrvHandle);
 	PVR_UNREFERENCED_PARAMETER(PID);
-	PVR_UNREFERENCED_PARAMETER(ui32TimeStampus);
+	PVR_UNREFERENCED_PARAMETER(ui64TimeStampus);
 	PVR_UNREFERENCED_PARAMETER(SF);
 	PVR_UNREFERENCED_PARAMETER(args);
 
@@ -147,7 +147,7 @@ _HTBLog(IMG_HANDLE hSrvHandle, IMG_UINT32 PID, IMG_UINT32 ui32TimeStampus, HTB_L
 								with a particular process, but performed by
 								another can be logged correctly.
 
- @Input			ui32TimeStampus	The timestamp to be associated with this log event
+ @Input			ui64TimeStampus	The timestamp to be associated with this log event
 
  @Input         SF    			The log event ID
 
@@ -157,12 +157,12 @@ _HTBLog(IMG_HANDLE hSrvHandle, IMG_UINT32 PID, IMG_UINT32 ui32TimeStampus, HTB_L
 
 */ /**************************************************************************/
 IMG_INTERNAL PVRSRV_ERROR
-HTBLog(IMG_HANDLE hSrvHandle, IMG_UINT32 PID, IMG_UINT32 ui32TimeStampus, IMG_UINT32 SF, ...)
+HTBLog(IMG_HANDLE hSrvHandle, IMG_UINT32 PID, IMG_UINT64 ui64TimeStampns, IMG_UINT32 SF, ...)
 {
 	PVRSRV_ERROR eError;
 	va_list args;
 	va_start(args, SF);
-	eError =_HTBLog(hSrvHandle, PID, ui32TimeStampus, SF, args);
+	eError =_HTBLog(hSrvHandle, PID, ui64TimeStampns, SF, args);
 	va_end(args);
 	return eError;
 }
@@ -183,9 +183,11 @@ IMG_INTERNAL PVRSRV_ERROR
 HTBLogSimple(IMG_HANDLE hSrvHandle, IMG_UINT32 SF, ...)
 {
 	PVRSRV_ERROR eError;
+	IMG_UINT64 ui64Timestamp;
 	va_list args;
 	va_start(args, SF);
-	eError = _HTBLog(hSrvHandle, OSGetCurrentProcessID(), OSClockus(), SF, args);
+	OSClockMonotonicns64(&ui64Timestamp);
+	eError = _HTBLog(hSrvHandle, OSGetCurrentProcessID(), ui64Timestamp, SF, args);
 	va_end(args);
 	return eError;
 }

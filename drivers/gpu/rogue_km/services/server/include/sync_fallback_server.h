@@ -71,9 +71,17 @@ PVRSRV_ERROR SyncFbTimelineCreateSW(IMG_UINT32 uiTimelineNameSize,
 PVRSRV_ERROR SyncFbFenceCreateSW(PVRSRV_TIMELINE_SERVER *psTimeline,
                                  IMG_UINT32 uiFenceNameSize,
                                  const IMG_CHAR *pszFenceName,
-                                 PVRSRV_FENCE_SERVER **ppsOutputFence);
+                                 PVRSRV_FENCE_SERVER **ppsOutputFence,
+                                 IMG_UINT64 *pui64SyncPtIdx);
+PVRSRV_ERROR SyncFbSWTimelineFenceCreateKM(PVRSRV_TIMELINE iSWTimeline,
+                                           const IMG_CHAR *pszFenceName,
+                                           PVRSRV_FENCE *piOutputFence,
+                                           IMG_UINT64* pui64SyncPtIdx);
 
-PVRSRV_ERROR SyncFbTimelineAdvanceSW(PVRSRV_TIMELINE_SERVER *psTimeline);
+PVRSRV_ERROR SyncFbTimelineAdvanceSW(PVRSRV_TIMELINE_SERVER *psTimeline,
+                                     IMG_UINT64 *pui64SyncPtIdx);
+PVRSRV_ERROR SyncFbSWTimelineAdvanceKM(void *pvSWTimelineObj,
+                                       IMG_UINT64* pui64SyncPtIdx);
 
 /*****************************************************************************/
 /*                                                                           */
@@ -107,9 +115,16 @@ PVRSRV_ERROR SyncFbFenceResolvePVR(PSYNC_CHECKPOINT_CONTEXT psContext,
 /*                                                                           */
 /*****************************************************************************/
 
+PVRSRV_ERROR SyncFbGetFenceObj(PVRSRV_FENCE iFence,
+                               void **ppvFenceObj);
+
+PVRSRV_ERROR SyncFbSWGetTimelineObj(PVRSRV_TIMELINE iSWTimeline,
+                                    void **ppvSWTimelineObj);
+
 PVRSRV_ERROR SyncFbTimelineRelease(PVRSRV_TIMELINE_SERVER *psTl);
 
 PVRSRV_ERROR SyncFbFenceRelease(PVRSRV_FENCE_SERVER *psFence);
+PVRSRV_ERROR SyncFbFenceReleaseKM(void *pvFenceObj);
 
 PVRSRV_ERROR SyncFbFenceDup(PVRSRV_FENCE_SERVER *psInFence,
                             PVRSRV_FENCE_SERVER **ppsOutFence);
@@ -126,22 +141,27 @@ PVRSRV_ERROR SyncFbFenceWait(PVRSRV_FENCE_SERVER *psFence,
 PVRSRV_ERROR SyncFbFenceDump(PVRSRV_FENCE_SERVER *psFence,
                              IMG_UINT32 uiLine,
                              IMG_UINT32 uiFileNameLength,
-                             const IMG_CHAR *pszFile);
-
-PVRSRV_ERROR SyncFbFenceDump2(PVRSRV_FENCE_SERVER *psFence,
-                             IMG_UINT32 uiLine,
-                             IMG_UINT32 uiFileNameLength,
                              const IMG_CHAR *pszFile,
                              IMG_UINT32 uiModuleLength,
                              const IMG_CHAR *pszModule,
                              IMG_UINT32 uiDescLength,
                              const IMG_CHAR *pszDesc);
 
+PVRSRV_ERROR SyncFbDumpFenceKM(void *pvSWFenceObj,
+	                           DUMPDEBUG_PRINTF_FUNC *pfnDumpDebugPrintf,
+	                           void *pvDumpDebugFile);
+
+PVRSRV_ERROR SyncFbSWDumpTimelineKM(void *pvSWTimelineObj,
+                                    DUMPDEBUG_PRINTF_FUNC *pfnDumpDebugPrintf,
+                                    void *pvDumpDebugFile);
+
 PVRSRV_ERROR SyncFbRegisterDevice(PVRSRV_DEVICE_NODE *psDeviceNode);
 
 PVRSRV_ERROR SyncFbDeregisterDevice(PVRSRV_DEVICE_NODE *psDeviceNode);
 
 IMG_UINT32 SyncFbDumpInfoOnStalledUFOs(IMG_UINT32 nr_ufos, IMG_UINT32 *vaddrs);
+
+IMG_BOOL SyncFbCheckpointHasSignalled(IMG_UINT32 ui32FwAddr, IMG_UINT32 ui32Value);
 
 /*****************************************************************************/
 /*                                                                           */

@@ -47,6 +47,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 /* include/ */
 #include "img_types.h"
+#include "img_defs.h"
 #include "pvr_debug.h"
 #include "pvrsrv_error.h"
 
@@ -85,17 +86,29 @@ OSMMapPMR(IMG_HANDLE hBridge,
 
     psPMR = hPMR;
 
-    eError = PMRAcquireKernelMappingData(psPMR,
-                                         0,
-                                         0,
-                                         &pvKernelAddress,
-                                         &uiLength,
-                                         &hPriv);
+    if (PMR_IsSparse(psPMR))
+    {
+        eError = PMRAcquireSparseKernelMappingData(psPMR,
+                                            0,
+                                            0,
+                                            &pvKernelAddress,
+                                            &uiLength,
+                                            &hPriv);
+    }
+    else
+    {
+        eError = PMRAcquireKernelMappingData(psPMR,
+                                            0,
+                                            0,
+                                            &pvKernelAddress,
+                                            &uiLength,
+                                            &hPriv);
+    }
     if (eError != PVRSRV_OK)
     {
         goto e0;
     }
-    
+
     *phOSMMapPrivDataOut = hPriv;
     *ppvMappingAddressOut = pvKernelAddress;
     *puiMappingLengthOut = uiLength;

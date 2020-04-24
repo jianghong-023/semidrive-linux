@@ -54,6 +54,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */ /**************************************************************************/
 
 #include "img_types.h"
+#include "img_defs.h"
 #include "pvr_debug.h"
 #include "pvrsrv_error.h"
 
@@ -75,7 +76,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "ossecure_export.h"
 #endif
 
-#if defined(PVR_RI_DEBUG)
+#if defined(PVRSRV_ENABLE_GPU_MEMORY_INFO)
 #include "ri_server.h"
 #endif
 
@@ -190,11 +191,6 @@ struct _PMR_
 
 	IMG_HANDLE hPDumpAllocHandle;
 
-	/* Whether PDumping of this PMR must be persistent
-	 * (i.e. it must be present in every future PDump stream as well)
-	 */
-	IMG_BOOL	bForcePersistent;
-
 	IMG_UINT32 uiNumPDumpBlocks;
 #endif
 
@@ -262,7 +258,7 @@ struct _PMR_
        anyway, just-in-case. */
 	struct _PMR_CTX_ *psContext;
 
-#if defined(PVR_RI_DEBUG)
+#if defined(PVRSRV_ENABLE_GPU_MEMORY_INFO)
 	/*
 	 * Stored handle to PMR RI entry
 	 */
@@ -337,7 +333,7 @@ _PMRCreate(PMR_SIZE_T uiLogicalSize,
 		if (uiLogicalSize != (uiChunkSize * ui32NumVirtChunks))
 		{
 			PVR_DPF((PVR_DBG_ERROR, "%s: Bad mapping size (uiLogicalSize = 0x%llx, uiChunkSize = 0x%llx, ui32NumVirtChunks = %d)",
-					__FUNCTION__, (unsigned long long)uiLogicalSize, (unsigned long long)uiChunkSize, ui32NumVirtChunks));
+					__func__, (unsigned long long)uiLogicalSize, (unsigned long long)uiChunkSize, ui32NumVirtChunks));
 			return PVRSRV_ERROR_PMR_BAD_MAPPINGTABLE_SIZE;
 		}
 
@@ -348,7 +344,7 @@ _PMRCreate(PMR_SIZE_T uiLogicalSize,
 			PVR_DPF((PVR_DBG_ERROR,
 					"%s: Bad chunk size, must be a multiple of the contiguity "
 					"(uiChunkSize = 0x%llx, uiLog2ContiguityGuarantee = %u)",
-					__FUNCTION__,
+					__func__,
 					(unsigned long long) uiChunkSize,
 					uiLog2ContiguityGuarantee));
 			return PVRSRV_ERROR_PMR_BAD_CHUNK_SIZE;
@@ -365,7 +361,7 @@ _PMRCreate(PMR_SIZE_T uiLogicalSize,
 	psPMR = (PMR *) pvPMRLinAddr;
 	psMappingTable = (PMR_MAPPING_TABLE *) (((IMG_CHAR *) pvPMRLinAddr) + sizeof(*psPMR));
 
-	eError = OSLockCreate(&psPMR->hLock, LOCK_TYPE_PASSIVE);
+	eError = OSLockCreate(&psPMR->hLock);
 	if (eError != PVRSRV_OK)
 	{
 		OSFreeMem(psPMR);
@@ -402,7 +398,7 @@ _PMRCreate(PMR_SIZE_T uiLogicalSize,
 	psPMR->bIsUnpinned = IMG_FALSE;
 	psPMR->szAnnotation[0] = '\0';
 
-#if defined(PVR_RI_DEBUG)
+#if defined(PVRSRV_ENABLE_GPU_MEMORY_INFO)
 	psPMR->hRIHandle = NULL;
 #endif
 
@@ -459,6 +455,12 @@ _UnrefAndMaybeDestroy(PMR *psPMR)
 
 	PVR_ASSERT(psPMR != NULL);
 
+	/* Acquire PMR factory lock if provided */
+	if(psPMR->psFuncTab->pfnGetPMRFactoryLock)
+	{
+		psPMR->psFuncTab->pfnGetPMRFactoryLock();
+	}
+
 	iRefCount = _Unref(psPMR);
 
 	if (iRefCount == 0)
@@ -482,6 +484,10 @@ _UnrefAndMaybeDestroy(PMR *psPMR)
 			 * */
 			if (PVRSRV_ERROR_PMR_STILL_REFERENCED == eError2)
 			{
+				if(psPMR->psFuncTab->pfnReleasePMRFactoryLock)
+				{
+					psPMR->psFuncTab->pfnReleasePMRFactoryLock();
+				}
 				return;
 			}
 			PVR_ASSERT (eError2 == PVRSRV_OK); /* can we do better? */
@@ -494,7 +500,7 @@ _UnrefAndMaybeDestroy(PMR *psPMR)
 		                psPMR->hPDumpAllocHandle);
 #endif
 
-#if defined (PVRSRV_ENABLE_LINUX_MMAP_STATS)
+#if defined(PVRSRV_ENABLE_LINUX_MMAP_STATS)
 		/* This PMR is about to be destroyed, update its mmap stats record (if present)
 		 * to avoid dangling pointer. Additionally, this is required because mmap stats
 		 * are identified by PMRs and a new PMR down the line "might" get the same address
@@ -508,7 +514,7 @@ _UnrefAndMaybeDestroy(PMR *psPMR)
 		PVR_ASSERT(OSAtomicRead(&psPMR->iLockCount) == (PVRSRV_CHECK_ON_DEMAND(psPMR->uiFlags) ? 0 : 1));
 #endif
 
-#if defined(PVR_RI_DEBUG)
+#if defined(PVRSRV_ENABLE_GPU_MEMORY_INFO)
 		{
 			PVRSRV_ERROR eError;
 
@@ -521,15 +527,21 @@ _UnrefAndMaybeDestroy(PMR *psPMR)
 				{
 					PVR_DPF((PVR_DBG_ERROR, "%s: RIDeletePMREntryKM failed: %s",
 							__func__,
-							PVRSRVGetErrorStringKM(eError)));
+							PVRSRVGetErrorString(eError)));
 					/* continue destroying the PMR */
 				}
 			}
 		}
-#endif /* if defined(PVR_RI_DEBUG) */
+#endif /* if defined(PVRSRV_ENABLE_GPU_MEMORY_INFO) */
 		psCtx = psPMR->psContext;
 
 		OSLockDestroy(psPMR->hLock);
+
+		/* Release PMR factory lock acquired if any */
+		if(psPMR->psFuncTab->pfnReleasePMRFactoryLock)
+		{
+			psPMR->psFuncTab->pfnReleasePMRFactoryLock();
+		}
 
 		OSFreeMem(psPMR);
 
@@ -539,6 +551,14 @@ _UnrefAndMaybeDestroy(PMR *psPMR)
 		OSLockAcquire(psCtx->hLock);
 		psCtx->uiNumLivePMRs --;
 		OSLockRelease(psCtx->hLock);
+	}
+	else
+	{
+		/* Release PMR factory lock acquired if any */
+		if(psPMR->psFuncTab->pfnReleasePMRFactoryLock)
+		{
+			psPMR->psFuncTab->pfnReleasePMRFactoryLock();
+		}
 	}
 }
 
@@ -903,7 +923,7 @@ PMRImportPMR(PMR_EXPORT *psPMRExport,
 	if (psPMR->uiKey != uiPassword)
 	{
 		PVR_DPF((PVR_DBG_ERROR,
-				"PMRImport: Import failed, password specified does not match the export\n"));
+				"PMRImport: Import failed, password specified does not match the export"));
 		return PVRSRV_ERROR_PMR_WRONG_PASSWORD_OR_STALE_PMR;
 	}
 
@@ -1046,7 +1066,7 @@ PVRSRV_ERROR PMRSecureImportPMR(CONNECTION_DATA *psConnection,
 
 	if (psPMR->psDevNode != psDevNode)
 	{
-		PVR_DPF((PVR_DBG_ERROR, "%s: PMR invalid for this device\n", __func__));
+		PVR_DPF((PVR_DBG_ERROR, "%s: PMR invalid for this device", __func__));
 		return PVRSRV_ERROR_PMR_NOT_PERMITTED;
 	}
 
@@ -1069,7 +1089,7 @@ PVRSRV_ERROR PMRSecureUnimportPMR(PMR *psPMR)
 }
 #endif
 
-#if defined(PVR_RI_DEBUG)
+#if defined(PVRSRV_ENABLE_GPU_MEMORY_INFO)
 PVRSRV_ERROR
 PMRStoreRIHandle(PMR *psPMR,
                  void *hRIHandle)
@@ -1098,10 +1118,7 @@ _PMRAcquireKernelMappingData(PMR *psPMR,
 
 	if (_PMRIsSparse(psPMR) && !bMapSparse)
 	{
-		/* Generally we don't support mapping of sparse allocations but if there
-           is a justified need we can do that by passing IMG_TRUE in bMapSparse.
-           Although the callback is supported by the PMR it will always map
-           the physical 1:1 as sparseness issues are handled here in the core */
+		/* Mapping of sparse allocations must be signalled. */
 		return PVRSRV_ERROR_PMR_NOT_PERMITTED;
 	}
 
@@ -1474,8 +1491,8 @@ PMR_ReadBytes(PMR *psPMR,
 			{
 				PVR_DPF((PVR_DBG_ERROR,
 						"%s: Failed to read chunk (eError = %s, uiRead = " IMG_SIZE_FMTSPEC " uiBytesToCopy = " IMG_SIZE_FMTSPEC ")",
-						__FUNCTION__,
-						PVRSRVGetErrorStringKM(eError),
+						__func__,
+						PVRSRVGetErrorString(eError),
 						uiRead,
 						uiBytesToCopy));
 				/* Bail out as soon as we hit an error */
@@ -1486,7 +1503,7 @@ PMR_ReadBytes(PMR *psPMR,
 		{
 			PVR_DPF((PVR_DBG_WARNING,
 					"%s: Invalid phys offset at logical offset (" IMG_DEVMEM_OFFSET_FMTSPEC ") logical size (" IMG_DEVMEM_OFFSET_FMTSPEC ")",
-					__FUNCTION__,
+					__func__,
 					uiLogicalOffset,
 					psPMR->uiLogicalSize));
 			/* Fill invalid chunks with 0 */
@@ -1643,8 +1660,8 @@ PMR_WriteBytes(PMR *psPMR,
 			{
 				PVR_DPF((PVR_DBG_ERROR,
 						"%s: Failed to read chunk (eError = %s, uiWrite = " IMG_SIZE_FMTSPEC " uiBytesToCopy = " IMG_SIZE_FMTSPEC ")",
-						__FUNCTION__,
-						PVRSRVGetErrorStringKM(eError),
+						__func__,
+						PVRSRVGetErrorString(eError),
 						uiWrite,
 						uiBytesToCopy));
 				/* Bail out as soon as we hit an error */
@@ -1924,7 +1941,6 @@ PMR_DevPhysAddr(const PMR *psPMR,
 				                           (IMG_CPU_PHYADDR *) &psDevAddrPtr[i]);
 				psDevAddrPtr[i].uiAddr = sDevPAddrCorrected.uiAddr;
 			}
-
 		}
 #endif
 	}
@@ -2174,8 +2190,8 @@ PMR_PDumpSymbolicAddr(const PMR *psPMR,
 
 /*!
  * @brief Writes a WRW command to the script2 buffer, representing a
- * 		  dword write to a physical allocation. Size is always
- * 		  sizeof(IMG_UINT32).
+ *        dword write to a physical allocation. Size is always
+ *        sizeof(IMG_UINT32).
  * @param psPMR - PMR object representing allocation
  * @param uiLogicalOffset - offset
  * @param ui32Value - value to write
@@ -2328,8 +2344,8 @@ PMRPDumpCopyMem32(PMR *psDstPMR,
 
 /*!
  * @brief Writes a WRW64 command to the script2 buffer, representing a
- * 		  dword write to a physical allocation. Size is always
- * 		  sizeof(IMG_UINT64).
+ *        dword write to a physical allocation. Size is always
+ *        sizeof(IMG_UINT64).
  * @param psPMR - PMR object representing allocation
  * @param uiLogicalOffset - offset
  * @param ui64Value - value to write
@@ -2351,7 +2367,6 @@ PMRPDumpLoadMemValue64(PMR *psPMR,
 
 
 	PVR_ASSERT(uiLogicalOffset + sizeof(ui64Value) <= psPMR->uiLogicalSize);
-	/* Especially make sure to not cross a block boundary */
 	/* Especially make sure to not cross a block boundary */
 	PVR_ASSERT(( ((uiLogicalOffset & (uiPMRPageSize-1)) + sizeof(ui64Value))
 			<= uiPMRPageSize));
@@ -2523,8 +2538,8 @@ PMRPDumpLoadMem(PMR *psPMR,
 	if (bZero)
 	{
 		PDumpCommentWithFlags(uiPDumpFlags,
-		                      "Zeroing allocation (%llu bytes)",
-		                      (unsigned long long) uiSize);
+		                      "Zeroing allocation (" IMG_DEVMEM_SIZE_FMTSPEC " bytes)",
+		                      uiSize);
 
 		/* get the zero page information. it is constant for this function */
 		PDumpGetParameterZeroPageInfo(&uiParamStreamFileOffset,
@@ -2593,7 +2608,7 @@ PMRPDumpLoadMem(PMR *psPMR,
 				                       &uiNumBytes);
 				PVR_ASSERT(eError == PVRSRV_OK);
 
-				eError = PDumpWriteBuffer(pcBuffer,
+				eError = PDumpWriteParameterBlob(pcBuffer,
 				                          uiNumBytes,
 				                          uiPDumpFlags,
 				                          &aszParamStreamFilename[0],
@@ -2620,7 +2635,6 @@ PMRPDumpLoadMem(PMR *psPMR,
 			                     pszParamStreamFileName,
 			                     uiParamStreamFileOffset,
 			                     uiPDumpFlags);
-
 			uiSizeRemain = uiSizeRemain - uiNumBytes;
 		}
 		uiCurrentOffset = uiNextSymName;
@@ -2710,7 +2724,7 @@ PMRPDumpPol32(const PMR *psPMR,
 
 	/* Make sure to not cross a block boundary */
 	PVR_ASSERT(( ((uiLogicalOffset & (uiPMRPageSize-1)) + sizeof(ui32Value))
-			< uiPMRPageSize));
+			<= uiPMRPageSize));
 
 	eError = PMR_PDumpSymbolicAddr(psPMR,
 	                               uiLogicalOffset,
@@ -3025,7 +3039,7 @@ PMRWritePMPageList(/* Target PMR, offset, and length */
 		/* Strictly speaking, it's possible to provoke this error in two ways:
 			(i) if it's not a whole multiple of the page size; or
 			(ii) if there are more than 4 billion pages.
-           The latter is unlikely. :)  but the check is required in order to justify the cast.
+			The latter is unlikely. :) but the check is required in order to justify the cast.
 		 */
 		eError = PVRSRV_ERROR_PMR_NOT_PAGE_MULTIPLE;
 		goto return_error;
@@ -3049,8 +3063,12 @@ PMRWritePMPageList(/* Target PMR, offset, and length */
 	/* the PMR into which we are writing must not be user CPU mappable: */
 	if (PVRSRV_CHECK_CPU_READABLE(uiFlags) || PVRSRV_CHECK_CPU_WRITEABLE(uiFlags))
 	{
-		PVR_DPF((PVR_DBG_ERROR, "masked flags = 0x%08x", (uiFlags & (PVRSRV_MEMALLOCFLAG_CPU_READABLE | PVRSRV_MEMALLOCFLAG_CPU_WRITEABLE))));
-		PVR_DPF((PVR_DBG_ERROR, "Page list PMR allows CPU mapping (0x%08x)", uiFlags));
+		PVR_DPF((PVR_DBG_ERROR,
+		         "Masked flags = 0x%" PVRSRV_MEMALLOCFLAGS_FMTSPEC,
+		         (uiFlags & (PVRSRV_MEMALLOCFLAG_CPU_READABLE | PVRSRV_MEMALLOCFLAG_CPU_WRITEABLE))));
+		PVR_DPF((PVR_DBG_ERROR,
+		         "Page list PMR allows CPU mapping (0x%" PVRSRV_MEMALLOCFLAGS_FMTSPEC ")",
+		         uiFlags));
 		eError = PVRSRV_ERROR_DEVICEMEM_INVALID_PMR_FLAGS;
 		goto return_error;
 	}
@@ -3113,7 +3131,6 @@ PMRWritePMPageList(/* Target PMR, offset, and length */
 		pasDevAddrPtr = asDevPAddr;
 		pbPageIsValid = abValid;
 	}
-
 
 	eError = PMR_DevPhysAddr(psReferencePMR, uiLog2PageSize, uiNumPages, 0,
 	                         pasDevAddrPtr, pbPageIsValid);
@@ -3423,7 +3440,7 @@ PMRDumpPageList(PMR *psPMR,
 		ui32ByteCount += OSSNPrintf(pszBuffer + ui32ByteCount, ui32SizePerCol + 1, "%08x ", (IMG_UINT32)(sDevAddrPtr.uiAddr >> uiLog2PageSize));
 		PVR_ASSERT(ui32ByteCount < ui32Col * ui32SizePerCol);
 
-		if (uiPageIndex % ui32Col == ui32Col -1)
+		if (uiPageIndex % ui32Col == ui32Col-1)
 		{
 			PVR_LOG(("      Phys Page: %s", pszBuffer));
 			ui32ByteCount = 0;
@@ -3456,7 +3473,7 @@ PMRInit(void)
 		goto out;
 	}
 
-	eError = OSLockCreate(&_gsSingletonPMRContext.hLock, LOCK_TYPE_PASSIVE);
+	eError = OSLockCreate(&_gsSingletonPMRContext.hLock);
 	if (eError != PVRSRV_OK)
 	{
 		PVR_DPF((PVR_DBG_ERROR, "%s: Error: failed to create lock", __func__));
@@ -3471,7 +3488,7 @@ PMRInit(void)
 
 	_gsSingletonPMRContext.uiNumLivePMRs = 0;
 
-#if defined (PVRSRV_ENABLE_LINUX_MMAP_STATS)
+#if defined(PVRSRV_ENABLE_LINUX_MMAP_STATS)
 	eError = MMapStatsInit();
 	if (eError != PVRSRV_OK)
 	{
@@ -3503,7 +3520,7 @@ PMRDeInit(void)
 		goto out;
 	}
 
-#if defined (PVRSRV_ENABLE_LINUX_MMAP_STATS)
+#if defined(PVRSRV_ENABLE_LINUX_MMAP_STATS)
 	MMapStatsDeInit();
 #endif
 

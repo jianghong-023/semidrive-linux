@@ -41,6 +41,7 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */ /**************************************************************************/
 
+#include "img_defs.h"
 #include "rgxbvnc.h"
 #define _RGXBVNC_C_
 #include "rgx_bvnc_table_km.h"
@@ -48,12 +49,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "oskm_apphint.h"
 #include "pvrsrv.h"
 
-#define MAX_BVNC_LEN (12)
-#define RGXBVNC_BUFFER_SIZE (((PVRSRV_MAX_DEVICES)*(MAX_BVNC_LEN))+1)
-
-/* List of BVNC strings given as module param & count */
-static IMG_PCHAR gazRGXBVNCList[PVRSRV_MAX_DEVICES];
-static IMG_UINT32 gui32RGXLoadTimeDevCount;
+#define RGXBVNC_BUFFER_SIZE (((PVRSRV_MAX_DEVICES)*(RGX_BVNC_STR_SIZE_MAX))+1)
 
 /* This function searches the given array for a given search value */
 static IMG_UINT64* _RGXSearchBVNCTable( IMG_UINT64 *pui64Array,
@@ -86,7 +82,7 @@ static IMG_UINT64* _RGXSearchBVNCTable( IMG_UINT64 *pui64Array,
 	return NULL;
 }
 #define RGX_SEARCH_BVNC_TABLE(t, b) (_RGXSearchBVNCTable((IMG_UINT64*)(t), \
-                                sizeof((t))/sizeof((t)[0]), (b), \
+                                ARRAY_SIZE(t), (b), \
                                 sizeof((t)[0])/sizeof(IMG_UINT64)) )
 
 
@@ -200,18 +196,6 @@ static void _RGXBvncParseFeatureValues(PVRSRV_RGXDEV_INFO *psDevInfo, IMG_UINT64
 		psDevInfo->sDevFeatureCfg.ui32FeaturesValues[RGX_FEATURE_META_IDX] = RGX_FEATURE_VALUE_DISABLED;
 	}
 
-	psDevInfo->sDevFeatureCfg.ui32MAXDMCount =	RGXFWIF_DM_MIN_CNT;
-	psDevInfo->sDevFeatureCfg.ui32MAXDMMTSCount =	RGXFWIF_DM_MIN_MTS_CNT;
-
-#if defined(RGX_FEATURE_RAY_TRACING)
-	/* ui64Features must be already initialized */
-	if (RGX_IS_FEATURE_SUPPORTED(psDevInfo, RAY_TRACING_DEPRECATED))
-	{
-		psDevInfo->sDevFeatureCfg.ui32MAXDMCount += RGXFWIF_RAY_TRACING_DM_CNT;
-		psDevInfo->sDevFeatureCfg.ui32MAXDMMTSCount += RGXFWIF_RAY_TRACING_DM_MTS_CNT;
-	}
-#endif
-
 	/* Get the max number of dusts in the core */
 	if (RGX_IS_FEATURE_VALUE_SUPPORTED(psDevInfo, NUM_CLUSTERS))
 	{
@@ -239,126 +223,110 @@ static void _RGXBvncParseFeatureValues(PVRSRV_RGXDEV_INFO *psDevInfo, IMG_UINT64
 	}
 }
 
-static void _RGXBvncAcquireAppHint(IMG_CHAR *pszBVNCAppHint,
-								  IMG_CHAR **apszRGXBVNCList,
-								  IMG_UINT32 ui32BVNCListCount,
-								  IMG_UINT32 *pui32BVNCCount)
+static void _RGXBvncAcquireAppHint(IMG_CHAR *pszBVNC, const IMG_UINT32 ui32RGXDevCount)
 {
-	IMG_CHAR *pszAppHintDefault = NULL;
+	IMG_CHAR *pszAppHintDefault = PVRSRV_APPHINT_RGXBVNC;
 	void *pvAppHintState = NULL;
-	IMG_UINT32 ui32BVNCIndex = 0;
+	IMG_UINT32 ui32BVNCCount = 0;
 	IMG_BOOL bRet;
+	IMG_CHAR szBVNCAppHint[RGXBVNC_BUFFER_SIZE];
+	IMG_CHAR *pszCurrentBVNC = szBVNCAppHint;
+	szBVNCAppHint[0] = '\0';
 
 	OSCreateKMAppHintState(&pvAppHintState);
-	pszAppHintDefault = PVRSRV_APPHINT_RGXBVNC;
 
 	bRet = (IMG_BOOL)OSGetKMAppHintSTRING(pvAppHintState,
-						 RGXBVNC,
-						 &pszAppHintDefault,
-						 pszBVNCAppHint,
-						 RGXBVNC_BUFFER_SIZE);
+						RGXBVNC,
+						&pszAppHintDefault,
+						szBVNCAppHint,
+						sizeof(szBVNCAppHint));
 
 	OSFreeKMAppHintState(pvAppHintState);
 
-	if (!bRet)
+	if (!bRet || (szBVNCAppHint[0] == '\0'))
 	{
-		*pui32BVNCCount = 0;
 		return;
 	}
 
-	while (*pszBVNCAppHint != '\0')
+	PVR_DPF((PVR_DBG_MESSAGE, "%s: BVNC module param list: %s",__func__, szBVNCAppHint));
+
+	while (*pszCurrentBVNC != '\0')
 	{
-		if (ui32BVNCIndex >= ui32BVNCListCount)
+		IMG_CHAR *pszNext = pszCurrentBVNC;
+
+		if (ui32BVNCCount >= PVRSRV_MAX_DEVICES)
 		{
 			break;
 		}
-		apszRGXBVNCList[ui32BVNCIndex++] = pszBVNCAppHint;
+
 		while (1)
 		{
-			if (*pszBVNCAppHint == ',')
+			if (*pszNext == ',')
 			{
-				pszBVNCAppHint[0] = '\0';
-				pszBVNCAppHint++;
+				pszNext[0] = '\0';
+				pszNext++;
 				break;
-			} else if (*pszBVNCAppHint == '\0')
+			} else if (*pszNext == '\0')
 			{
 				break;
 			}
-			pszBVNCAppHint++;
+			pszNext++;
 		}
+
+		if (ui32BVNCCount == ui32RGXDevCount)
+		{
+			strcpy(pszBVNC, pszCurrentBVNC);
+			return;
+		}
+
+		ui32BVNCCount++;
+		pszCurrentBVNC = pszNext;
 	}
-	*pui32BVNCCount = ui32BVNCIndex;
+
+	PVR_DPF((PVR_DBG_ERROR, "%s: Given module parameters list is shorter than "
+	"number of actual devices", __func__));
+
+	/* If only one BVNC parameter is specified, the same is applied for all RGX
+	 * devices detected */
+	if (1 == ui32BVNCCount)
+	{
+		strcpy(pszBVNC, szBVNCAppHint);
+	}
 }
 
 /* Function that parses the BVNC List passed as module parameter */
-static PVRSRV_ERROR _RGXBvncParseList(IMG_UINT64 *pB,
-									  IMG_UINT64 *pV,
-									  IMG_UINT64 *pN,
-									  IMG_UINT64 *pC,
+static PVRSRV_ERROR _RGXBvncParseList(IMG_UINT32 *pB,
+									  IMG_UINT32 *pV,
+									  IMG_UINT32 *pN,
+									  IMG_UINT32 *pC,
 									  const IMG_UINT32 ui32RGXDevCount)
 {
 	unsigned int ui32ScanCount = 0;
-	IMG_CHAR *pszBVNCString = NULL;
+	IMG_CHAR aszBVNCString[RGX_BVNC_STR_SIZE_MAX];
 
-	if (ui32RGXDevCount == 0) {
-		IMG_CHAR pszBVNCAppHint[RGXBVNC_BUFFER_SIZE];
-		pszBVNCAppHint[0] = '\0';
-		_RGXBvncAcquireAppHint(pszBVNCAppHint, gazRGXBVNCList, PVRSRV_MAX_DEVICES, &gui32RGXLoadTimeDevCount);
-	}
+	aszBVNCString[0] = '\0';
 
 	/* 4 components of a BVNC string is B, V, N & C */
 #define RGX_BVNC_INFO_PARAMS (4)
 
-	/* If only one BVNC parameter is specified, the same is applied for all RGX
-	 * devices detected */
-	if (1 == gui32RGXLoadTimeDevCount)
-	{
-		pszBVNCString = gazRGXBVNCList[0];
-	}else
-	{
+	_RGXBvncAcquireAppHint(aszBVNCString, ui32RGXDevCount);
 
-#if defined(DEBUG)
-		int i =0;
-		PVR_DPF((PVR_DBG_MESSAGE, "%s: No. of BVNC module params : %u", __func__, gui32RGXLoadTimeDevCount));
-		PVR_DPF((PVR_DBG_MESSAGE, "%s: BVNC module param list ... ",__func__));
-		for (i=0; i < gui32RGXLoadTimeDevCount; i++)
-		{
-			PVR_DPF((PVR_DBG_MESSAGE, "%s, ", gazRGXBVNCList[i]));
-		}
-#endif
-
-		if (gui32RGXLoadTimeDevCount == 0)
-			return PVRSRV_ERROR_INVALID_BVNC_PARAMS;
-
-		/* Total number of RGX devices detected should always be
-		 * less than the gazRGXBVNCList count */
-		if (ui32RGXDevCount < gui32RGXLoadTimeDevCount)
-		{
-			pszBVNCString = gazRGXBVNCList[ui32RGXDevCount];
-		}else
-		{
-			PVR_DPF((PVR_DBG_ERROR, "%s: Given module parameters list is shorter than "
-					"number of actual devices", __func__));
-			return PVRSRV_ERROR_INVALID_BVNC_PARAMS;
-		}
-	}
-
-	if (NULL == pszBVNCString)
+	if ('\0' == aszBVNCString[0])
 	{
 		return PVRSRV_ERROR_INVALID_BVNC_PARAMS;
 	}
 
 	/* Parse the given RGX_BVNC string */
-	ui32ScanCount = OSVSScanf(pszBVNCString, "%llu.%llu.%llu.%llu", pB, pV, pN, pC);
+	ui32ScanCount = OSVSScanf(aszBVNCString, RGX_BVNC_STR_FMTSPEC, pB, pV, pN, pC);
 	if (RGX_BVNC_INFO_PARAMS != ui32ScanCount)
 	{
-		ui32ScanCount = OSVSScanf(pszBVNCString, "%llu.%llup.%llu.%llu", pB, pV, pN, pC);
+		ui32ScanCount = OSVSScanf(aszBVNCString,RGX_BVNC_STRP_FMTSPEC, pB, pV, pN, pC);
 	}
 	if (RGX_BVNC_INFO_PARAMS != ui32ScanCount)
 	{
 		return PVRSRV_ERROR_INVALID_BVNC_PARAMS;
 	}
-	PVR_LOG(("BVNC module parameter honoured: %s", pszBVNCString));
+	PVR_LOG(("BVNC module parameter honoured: %s", aszBVNCString));
 
 	return PVRSRV_OK;
 }
@@ -368,19 +336,19 @@ static PVRSRV_ERROR _RGXBvncParseList(IMG_UINT64 *pB,
  * The config info includes features, errata, etc */
 PVRSRV_ERROR RGXBvncInitialiseConfiguration(PVRSRV_DEVICE_NODE *psDeviceNode)
 {
-	static IMG_UINT32 ui32RGXDevCnt;
+	static IMG_UINT32 ui32RGXDevCnt = 0;
 	PVRSRV_ERROR eError;
 	PVRSRV_RGXDEV_INFO	*psDevInfo = psDeviceNode->pvDevice;
-	IMG_UINT64 ui64BVNC=0, B=0, V=0, N=0, C=0;
+	IMG_UINT64 ui64BVNC=0;
+	IMG_UINT32 B=0, V=0, N=0, C=0;
 	IMG_UINT64 *pui64Cfg = NULL;
 
 	/* Check for load time RGX BVNC parameter */
 	eError = _RGXBvncParseList(&B,&V,&N,&C, ui32RGXDevCnt);
 	if (PVRSRV_OK == eError)
 	{
-		PVR_LOG(("Read BVNC %" IMG_UINT64_FMTSPEC ".%"
-			IMG_UINT64_FMTSPEC ".%" IMG_UINT64_FMTSPEC ".%"
-			IMG_UINT64_FMTSPEC " from driver load parameter", B, V, N, C));
+		PVR_LOG(("Read BVNC " RGX_BVNC_STR_FMTSPEC \
+				" from driver load parameter", B, V, N, C));
 
 		/* Extract the BVNC config from the Features table */
 		ui64BVNC = BVNC_PACK(B,0,N,C);
@@ -388,10 +356,22 @@ PVRSRV_ERROR RGXBvncInitialiseConfiguration(PVRSRV_DEVICE_NODE *psDeviceNode)
 		PVR_LOG_IF_FALSE((pui64Cfg != NULL), "Driver parameter BVNC configuration not found!");
 	}
 
+	{
+		void *pvAppHintState = NULL;
+		IMG_BOOL bAppHintDefault = PVRSRV_APPHINT_IGNOREHWREPORTEDBVNC;
+
+		OSCreateKMAppHintState(&pvAppHintState);
+		OSGetKMAppHintBOOL(pvAppHintState,
+							IgnoreHWReportedBVNC,
+							&bAppHintDefault,
+							&psDevInfo->bIgnoreHWReportedBVNC);
+		OSFreeKMAppHintState(pvAppHintState);
+	}
+
 #if !defined(NO_HARDWARE) && defined(SUPPORT_MULTIBVNC_RUNTIME_BVNC_ACQUISITION)
 
 	/* Try to detect the RGX BVNC from the HW device */
-	if ((NULL == pui64Cfg) && !PVRSRV_VZ_MODE_IS(DRIVER_MODE_GUEST))
+	if ((NULL == pui64Cfg) && !psDevInfo->bIgnoreHWReportedBVNC)
 	{
 		IMG_UINT64 ui32ID;
 		IMG_HANDLE hSysData;
@@ -442,9 +422,8 @@ PVRSRV_ERROR RGXBvncInitialiseConfiguration(PVRSRV_DEVICE_NODE *psDeviceNode)
 			C = (ui32CoreID & ~RGX_CR_CORE_ID_CONFIG_C_CLRMSK) >>
 													RGX_CR_CORE_ID_CONFIG_C_SHIFT;
 		}
-		PVR_LOG(("Read BVNC %" IMG_UINT64_FMTSPEC ".%"
-			IMG_UINT64_FMTSPEC ".%" IMG_UINT64_FMTSPEC ".%"
-			IMG_UINT64_FMTSPEC " from HW device registers",	B, V, N, C));
+		PVR_LOG(("Read BVNC " RGX_BVNC_STR_FMTSPEC \
+				" from HW device registers",	B, V, N, C));
 
 		/* Power-down the device */
 		if (psDeviceNode->psDevConfig->pfnPrePowerState)
@@ -463,25 +442,38 @@ PVRSRV_ERROR RGXBvncInitialiseConfiguration(PVRSRV_DEVICE_NODE *psDeviceNode)
 
 		/* Extract the BVNC config from the Features table */
 		ui64BVNC = BVNC_PACK(B,0,N,C);
-		pui64Cfg = RGX_SEARCH_BVNC_TABLE(gaFeatures, ui64BVNC);
-		PVR_LOG_IF_FALSE((pui64Cfg != NULL), "HW device BVNC configuration not found!");
+		if (ui64BVNC != 0)
+		{
+			pui64Cfg = RGX_SEARCH_BVNC_TABLE(gaFeatures, ui64BVNC);
+			PVR_LOG_IF_FALSE((pui64Cfg != NULL), "HW device BVNC configuration not found!");
+		}
+		else if (!PVRSRV_VZ_MODE_IS(DRIVER_MODE_GUEST))
+		{
+			/*
+			 * On host OS we should not get here as CORE_ID should not be zero, so flag an error.
+			 * On older cores, guest OS only has CORE_ID if defined(RGX_FEATURE_COREID_PER_OS)
+			 */
+			PVR_LOG_ERROR(PVRSRV_ERROR_DEVICE_REGISTER_FAILED, "CORE_ID register returns zero. Unknown BVNC");
+		}
 	}
 #endif
 
-	/* We reach here if the HW is not present, or we are running in a guest OS,
-	 * or HW is unstable during register read giving invalid values, or
-	 * runtime detection has been disabled - fall back to compile time BVNC */
 	if (NULL == pui64Cfg)
 	{
+		/* We reach here if the HW is not present,
+		 * or we are running in a guest OS with no COREID_PER_OS feature,
+		 * or HW is unstable during register read giving invalid values,
+		 * or runtime detection has been disabled - fall back to compile time BVNC
+		 */
 		B = RGX_BVNC_KM_B;
 		N = RGX_BVNC_KM_N;
 		C = RGX_BVNC_KM_C;
 		{
 			IMG_UINT32	ui32ScanCount = 0;
-			ui32ScanCount = OSVSScanf(RGX_BVNC_KM_V_ST, "%llu", &V);
+			ui32ScanCount = OSVSScanf(RGX_BVNC_KM_V_ST, "%u", &V);
 			if (1 != ui32ScanCount)
 			{
-				ui32ScanCount = OSVSScanf(RGX_BVNC_KM_V_ST, "%llup", &V);
+				ui32ScanCount = OSVSScanf(RGX_BVNC_KM_V_ST, "%up", &V);
 				if (1 != ui32ScanCount)
 				{
 					V = 0;
@@ -526,18 +518,17 @@ PVRSRV_ERROR RGXBvncInitialiseConfiguration(PVRSRV_DEVICE_NODE *psDeviceNode)
 	}
 
 	PVR_DPF((PVR_DBG_MESSAGE, "%s: BVNC ERN/BRN Cfg: 0x%016" IMG_UINT64_FMTSPECx
-	    " 0x%016" IMG_UINT64_FMTSPECx " \n", __func__, *pui64Cfg, pui64Cfg[1]));
+	    " 0x%016" IMG_UINT64_FMTSPECx, __func__, *pui64Cfg, pui64Cfg[1]));
 	psDevInfo->sDevFeatureCfg.ui64ErnsBrns = pui64Cfg[1];
 
-	psDevInfo->sDevFeatureCfg.ui32B = (IMG_UINT32)B;
-	psDevInfo->sDevFeatureCfg.ui32V = (IMG_UINT32)V;
-	psDevInfo->sDevFeatureCfg.ui32N = (IMG_UINT32)N;
-	psDevInfo->sDevFeatureCfg.ui32C = (IMG_UINT32)C;
+	psDevInfo->sDevFeatureCfg.ui32B = B;
+	psDevInfo->sDevFeatureCfg.ui32V = V;
+	psDevInfo->sDevFeatureCfg.ui32N = N;
+	psDevInfo->sDevFeatureCfg.ui32C = C;
 
 	/* Message to confirm configuration look up was a success */
-	PVR_LOG(("RGX Device initialised with BVNC %" IMG_UINT64_FMTSPEC ".%"
-		IMG_UINT64_FMTSPEC ".%" IMG_UINT64_FMTSPEC ".%"
-		IMG_UINT64_FMTSPEC, B, V, N, C));
+	PVR_LOG(("RGX Device registered with BVNC " RGX_BVNC_STR_FMTSPEC, \
+			B, V, N, C));
 
 	ui32RGXDevCnt++;
 

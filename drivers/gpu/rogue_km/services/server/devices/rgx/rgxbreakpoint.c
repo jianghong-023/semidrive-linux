@@ -70,28 +70,26 @@ PVRSRV_ERROR PVRSRVRGXSetBreakpointKM(CONNECTION_DATA    * psConnection,
 	OSLockAcquire(psDevInfo->hBPLock);
 #endif
 
-	if (psDevInfo->bBPSet == IMG_TRUE)
+	if (psDevInfo->bBPSet)
 	{
 		eError = PVRSRV_ERROR_BP_ALREADY_SET;
 		goto unlock;
 	}
-	
+
 	sBPCmd.eCmdType = RGXFWIF_KCCB_CMD_BP;
 	sBPCmd.uCmdData.sBPData.ui32BPAddr = ui32BPAddr;
 	sBPCmd.uCmdData.sBPData.ui32HandlerAddr = ui32HandlerAddr;
 	sBPCmd.uCmdData.sBPData.ui32BPDM = ui32DataMaster;
-	sBPCmd.uCmdData.sBPData.bEnable = IMG_TRUE;
-	sBPCmd.uCmdData.sBPData.ui32Flags = RGXFWIF_BPDATA_FLAGS_WRITE;
+	sBPCmd.uCmdData.sBPData.ui32BPDataFlags = RGXFWIF_BPDATA_FLAGS_WRITE | RGXFWIF_BPDATA_FLAGS_ENABLE;
 
-	RGXSetFirmwareAddress(&sBPCmd.uCmdData.sBPData.psFWMemContext, 
-				psFWMemContextMemDesc, 
-				0 , 
+	RGXSetFirmwareAddress(&sBPCmd.uCmdData.sBPData.psFWMemContext,
+				psFWMemContextMemDesc,
+				0 ,
 				RFW_FWADDR_NOREF_FLAG);
-		
+
 	eError = RGXScheduleCommand(psDevInfo,
 				eFWDataMaster,
 				&sBPCmd,
-				sizeof(sBPCmd),
 				0,
 				PDUMP_FLAGS_CONTINUOUS);
 	if (eError != PVRSRV_OK)
@@ -129,26 +127,24 @@ PVRSRV_ERROR PVRSRVRGXClearBreakpointKM(CONNECTION_DATA    * psConnection,
 	RGXFWIF_KCCB_CMD 	sBPCmd;
 
 	PVR_UNREFERENCED_PARAMETER(psConnection);
-	
+
 	sBPCmd.eCmdType = RGXFWIF_KCCB_CMD_BP;
 	sBPCmd.uCmdData.sBPData.ui32BPAddr = 0;
 	sBPCmd.uCmdData.sBPData.ui32HandlerAddr = 0;
-	sBPCmd.uCmdData.sBPData.bEnable = IMG_FALSE;
-	sBPCmd.uCmdData.sBPData.ui32Flags = RGXFWIF_BPDATA_FLAGS_WRITE | RGXFWIF_BPDATA_FLAGS_CTL;
+	sBPCmd.uCmdData.sBPData.ui32BPDataFlags = RGXFWIF_BPDATA_FLAGS_WRITE | RGXFWIF_BPDATA_FLAGS_CTL;
 
 #if !defined(PVRSRV_USE_BRIDGE_LOCK)
 	OSLockAcquire(psDevInfo->hBPLock);
 #endif
 
-	RGXSetFirmwareAddress(&sBPCmd.uCmdData.sBPData.psFWMemContext, 
-				psFWMemContextMemDesc, 
-				0 , 
+	RGXSetFirmwareAddress(&sBPCmd.uCmdData.sBPData.psFWMemContext,
+				psFWMemContextMemDesc,
+				0 ,
 				RFW_FWADDR_NOREF_FLAG);
 
 	eError = RGXScheduleCommand(psDevInfo,
 				psDevInfo->eBPDM,
 				&sBPCmd,
-				sizeof(sBPCmd),
 				0,
 				PDUMP_FLAGS_CONTINUOUS);
 	if (eError != PVRSRV_OK)
@@ -197,18 +193,16 @@ PVRSRV_ERROR PVRSRVRGXEnableBreakpointKM(CONNECTION_DATA    * psConnection,
 	}
 
 	sBPCmd.eCmdType = RGXFWIF_KCCB_CMD_BP;
-	sBPCmd.uCmdData.sBPData.bEnable = IMG_TRUE;
-	sBPCmd.uCmdData.sBPData.ui32Flags = RGXFWIF_BPDATA_FLAGS_CTL;
-	
-	RGXSetFirmwareAddress(&sBPCmd.uCmdData.sBPData.psFWMemContext, 
-				psFWMemContextMemDesc, 
-				0 , 
+	sBPCmd.uCmdData.sBPData.ui32BPDataFlags = RGXFWIF_BPDATA_FLAGS_CTL | RGXFWIF_BPDATA_FLAGS_ENABLE;
+
+	RGXSetFirmwareAddress(&sBPCmd.uCmdData.sBPData.psFWMemContext,
+				psFWMemContextMemDesc,
+				0 ,
 				RFW_FWADDR_NOREF_FLAG);
 
 	eError = RGXScheduleCommand(psDevInfo,
 				psDevInfo->eBPDM,
 				&sBPCmd,
-				sizeof(sBPCmd),
 				0,
 				PDUMP_FLAGS_CONTINUOUS);
 	if (eError != PVRSRV_OK)
@@ -253,20 +247,18 @@ PVRSRV_ERROR PVRSRVRGXDisableBreakpointKM(CONNECTION_DATA    * psConnection,
 		eError = PVRSRV_ERROR_BP_NOT_SET;
 		goto unlock;
 	}
-	
+
 	sBPCmd.eCmdType = RGXFWIF_KCCB_CMD_BP;
-	sBPCmd.uCmdData.sBPData.bEnable = IMG_FALSE;
-	sBPCmd.uCmdData.sBPData.ui32Flags = RGXFWIF_BPDATA_FLAGS_CTL;
-	
-	RGXSetFirmwareAddress(&sBPCmd.uCmdData.sBPData.psFWMemContext, 
-				psFWMemContextMemDesc, 
-				0 , 
+	sBPCmd.uCmdData.sBPData.ui32BPDataFlags = RGXFWIF_BPDATA_FLAGS_CTL;
+
+	RGXSetFirmwareAddress(&sBPCmd.uCmdData.sBPData.psFWMemContext,
+				psFWMemContextMemDesc,
+				0 ,
 				RFW_FWADDR_NOREF_FLAG);
-	
+
 	eError = RGXScheduleCommand(psDevInfo,
 				psDevInfo->eBPDM,
 				&sBPCmd,
-				sizeof(sBPCmd),
 				0,
 				PDUMP_FLAGS_CONTINUOUS);
 	if (eError != PVRSRV_OK)
@@ -303,11 +295,12 @@ PVRSRV_ERROR PVRSRVRGXOverallocateBPRegistersKM(CONNECTION_DATA    * psConnectio
 	RGXFWIF_KCCB_CMD 	sBPCmd;
 
 	PVR_UNREFERENCED_PARAMETER(psConnection);
-	
+
 	sBPCmd.eCmdType = RGXFWIF_KCCB_CMD_BP;
-	sBPCmd.uCmdData.sBPData.ui32Flags = RGXFWIF_BPDATA_FLAGS_REGS;
+	sBPCmd.uCmdData.sBPData.ui32BPDataFlags = RGXFWIF_BPDATA_FLAGS_REGS;
 	sBPCmd.uCmdData.sBPData.ui32TempRegs = ui32TempRegs;
 	sBPCmd.uCmdData.sBPData.ui32SharedRegs = ui32SharedRegs;
+	sBPCmd.uCmdData.sBPData.psFWMemContext.ui32Addr = 0U;
 
 #if !defined(PVRSRV_USE_BRIDGE_LOCK)
 	OSLockAcquire(psDevInfo->hBPLock);
@@ -316,7 +309,6 @@ PVRSRV_ERROR PVRSRVRGXOverallocateBPRegistersKM(CONNECTION_DATA    * psConnectio
 	eError = RGXScheduleCommand(psDeviceNode->pvDevice,
 				RGXFWIF_DM_GP,
 				&sBPCmd,
-				sizeof(sBPCmd),
 				0,
 				PDUMP_FLAGS_CONTINUOUS);
 	if (eError != PVRSRV_OK)
@@ -340,7 +332,6 @@ unlock:
 
 	return eError;
 }
-
 
 /******************************************************************************
  End of file (rgxbreakpoint.c)

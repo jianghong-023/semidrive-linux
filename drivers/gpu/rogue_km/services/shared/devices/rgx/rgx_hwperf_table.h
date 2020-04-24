@@ -1,7 +1,6 @@
 /*************************************************************************/ /*!
 @File
 @Title          HWPerf counter table header
-
 @Copyright      Copyright (c) Imagination Technologies Ltd. All Rights Reserved
 @Description    Utility functions used internally for HWPerf data retrieval
 @License        Dual MIT/GPLv2
@@ -42,47 +41,51 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */ /**************************************************************************/
 
-#if !defined (__RGX_HWPERF_TABLE_H__)
-#define __RGX_HWPERF_TABLE_H__
+#ifndef RGX_HWPERF_TABLE_H
+#define RGX_HWPERF_TABLE_H
 
 #include "img_types.h"
+#include "img_defs.h"
 #include "rgx_fwif_hwperf.h"
-
-
+#if defined(__KERNEL__)
+#include "rgxdevice.h"
+#endif
 /*****************************************************************************/
 
 /* Forward declaration */
-typedef struct _RGXFW_HWPERF_CNTBLK_TYPE_MODEL_ RGXFW_HWPERF_CNTBLK_TYPE_MODEL;
+typedef struct RGXFW_HWPERF_CNTBLK_TYPE_MODEL_ RGXFW_HWPERF_CNTBLK_TYPE_MODEL;
 
 /* Function pointer type for functions to check dynamic power state of
  * counter block instance. Used only in firmware. */
-typedef IMG_BOOL (*PFN_RGXFW_HWPERF_CNTBLK_POWERED)(
+typedef bool (*PFN_RGXFW_HWPERF_CNTBLK_POWERED)(
 		RGX_HWPERF_CNTBLK_ID eBlkType,
 		IMG_UINT8 ui8UnitId);
 
 /* Counter block run-time info */
-typedef struct _RGX_HWPERF_CNTBLK_RT_INFO_
+typedef struct
 {
-	IMG_UINT32 uiNumUnits;              /* Number of instances of this block type in the core */
+	IMG_UINT32 uiNumUnits;             /* Number of instances of this block type in the core */
 } RGX_HWPERF_CNTBLK_RT_INFO;
 
 /* Function pointer type for functions to check block is valid and present
  * on that RGX Device at runtime. It may have compile logic or run-time
  * logic depending on where the code executes: server, srvinit or firmware.
- * Values in the psRtInfo output parameter are only valid if true returned. */
+ * Values in the psRtInfo output parameter are only valid if true returned.
+ */
 typedef IMG_BOOL (*PFN_RGXFW_HWPERF_CNTBLK_PRESENT)(
-		const struct _RGXFW_HWPERF_CNTBLK_TYPE_MODEL_* psBlkTypeDesc,
+		const struct RGXFW_HWPERF_CNTBLK_TYPE_MODEL_* psBlkTypeDesc,
 		void *pvDev_km,
 		RGX_HWPERF_CNTBLK_RT_INFO *psRtInfo);
 
 /* This structure encodes properties of a type of performance counter block.
  * The structure is sometimes referred to as a block type descriptor. These
- * properties contained in this structure represent the columns in the
- * block type model table variable below. There values vary depending on
- * the build BVNC and core type.
+ * properties contained in this structure represent the columns in the block
+ * type model table variable below. These values vary depending on the build
+ * BVNC and core type.
  * Each direct block has a unique type descriptor and each indirect group has
- * a type descriptor. */
-struct _RGXFW_HWPERF_CNTBLK_TYPE_MODEL_
+ * a type descriptor.
+ */
+struct RGXFW_HWPERF_CNTBLK_TYPE_MODEL_
 {
 	/* Could use RGXFW_ALIGN_DCACHEL here but then we would waste 40% of the cache line? */
 	IMG_UINT32 uiCntBlkIdBase;         /* The starting block id for this block type */
@@ -101,10 +104,15 @@ struct _RGXFW_HWPERF_CNTBLK_TYPE_MODEL_
 
 /*****************************************************************************/
 
+#if defined(__KERNEL__) /* Server context */
+IMG_UINT32 rgx_units_indirect_by_phantom(PVRSRV_DEVICE_FEATURE_CONFIG *psFeatCfg);
+IMG_UINT32 rgx_units_phantom_indirect_by_dust(PVRSRV_DEVICE_FEATURE_CONFIG *psFeatCfg);
+IMG_UINT32 rgx_units_phantom_indirect_by_cluster(PVRSRV_DEVICE_FEATURE_CONFIG *psFeatCfg);
+#endif /* defined(__KERNEL__) */
+
 IMG_INTERNAL IMG_UINT32 RGXGetHWPerfBlockConfig(const RGXFW_HWPERF_CNTBLK_TYPE_MODEL **ppsModel);
 
-
-#endif /*  __RGX_HWPERF_TABLE_H__ */
+#endif /* RGX_HWPERF_TABLE_H */
 
 /******************************************************************************
  End of file (rgx_hwperf_table.h)

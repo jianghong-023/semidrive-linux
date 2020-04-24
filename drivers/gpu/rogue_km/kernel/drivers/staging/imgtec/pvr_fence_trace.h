@@ -54,161 +54,164 @@ struct pvr_fence_context;
 
 DECLARE_EVENT_CLASS(pvr_fence_context,
 
-			TP_PROTO(struct pvr_fence_context *fctx),
+	TP_PROTO(struct pvr_fence_context *fctx),
+	TP_ARGS(fctx),
 
-			TP_ARGS(fctx),
+	TP_STRUCT__entry(
+		__string(name, fctx->name)
+		__array(char, val, 128)
+	),
 
-			TP_STRUCT__entry(
-							 __string(name, fctx->name)
-							 __array(char, val, 128)
-							),
+	TP_fast_assign(
+		__assign_str(name, fctx->name)
+		pvr_context_value_str(fctx, __entry->val,
+			sizeof(__entry->val));
+	),
 
-			TP_fast_assign(
-							__assign_str(name, fctx->name)
-							pvr_context_value_str(fctx, __entry->val, sizeof(__entry->val));
-						  ),
-
-			TP_printk("name=%s val=%s",
-					  __get_str(name),
-					  __entry->val
-					 )
+	TP_printk("name=%s val=%s",
+		  __get_str(name),
+		  __entry->val
+	)
 );
 
 DEFINE_EVENT(pvr_fence_context, pvr_fence_context_create,
-
-			 TP_PROTO(struct pvr_fence_context *fctx),
-
-			 TP_ARGS(fctx)
+	TP_PROTO(struct pvr_fence_context *fctx),
+	TP_ARGS(fctx)
 );
 
 DEFINE_EVENT(pvr_fence_context, pvr_fence_context_destroy,
-
-			 TP_PROTO(struct pvr_fence_context *fctx),
-
-			 TP_ARGS(fctx)
+	TP_PROTO(struct pvr_fence_context *fctx),
+	TP_ARGS(fctx)
 );
 
 DEFINE_EVENT(pvr_fence_context, pvr_fence_context_destroy_kref,
-
-			 TP_PROTO(struct pvr_fence_context *fctx),
-
-			 TP_ARGS(fctx)
+	TP_PROTO(struct pvr_fence_context *fctx),
+	TP_ARGS(fctx)
 );
 
 DEFINE_EVENT(pvr_fence_context, pvr_fence_context_signal_fences,
-
-			 TP_PROTO(struct pvr_fence_context *fctx),
-
-			 TP_ARGS(fctx)
+	TP_PROTO(struct pvr_fence_context *fctx),
+	TP_ARGS(fctx)
 );
 
 DECLARE_EVENT_CLASS(pvr_fence,
+	TP_PROTO(struct pvr_fence *fence),
+	TP_ARGS(fence),
 
-			TP_PROTO(struct pvr_fence *fence),
+	TP_STRUCT__entry(
+		__string(driver,
+			fence->base.ops->get_driver_name(&fence->base))
+		__string(timeline,
+			fence->base.ops->get_timeline_name(&fence->base))
+		__array(char, val, 128)
+		__field(u64, context)
+	),
 
-			TP_ARGS(fence),
+	TP_fast_assign(
+		__assign_str(driver,
+			fence->base.ops->get_driver_name(&fence->base))
+		__assign_str(timeline,
+			fence->base.ops->get_timeline_name(&fence->base))
+		fence->base.ops->fence_value_str(&fence->base,
+			__entry->val, sizeof(__entry->val));
+		__entry->context = fence->base.context;
+	),
 
-			TP_STRUCT__entry(
-							 __string(driver, fence->base.ops->get_driver_name(&fence->base))
-							 __string(timeline, fence->base.ops->get_timeline_name(&fence->base))
-							 __array(char, val, 128)
-							 __field(u64, context)
-							),
-
-			TP_fast_assign(
-						    __assign_str(driver, fence->base.ops->get_driver_name(&fence->base))
-							__assign_str(timeline, fence->base.ops->get_timeline_name(&fence->base))
-							fence->base.ops->fence_value_str(&fence->base, __entry->val, sizeof(__entry->val));
-							__entry->context = fence->base.context;
-						  ),
-
-			TP_printk("driver=%s timeline=%s ctx=%llu val=%s",
-					  __get_str(driver), __get_str(timeline),  __entry->context, __entry->val
-					 )
+	TP_printk("driver=%s timeline=%s ctx=%llu val=%s",
+		  __get_str(driver), __get_str(timeline),
+		  __entry->context, __entry->val
+	)
 );
 
 DEFINE_EVENT(pvr_fence, pvr_fence_create,
-
-			 TP_PROTO(struct pvr_fence *fence),
-
-			 TP_ARGS(fence)
+	TP_PROTO(struct pvr_fence *fence),
+	TP_ARGS(fence)
 );
 
 DEFINE_EVENT(pvr_fence, pvr_fence_release,
-
-			 TP_PROTO(struct pvr_fence *fence),
-
-			 TP_ARGS(fence)
+	TP_PROTO(struct pvr_fence *fence),
+	TP_ARGS(fence)
 );
 
 DEFINE_EVENT(pvr_fence, pvr_fence_enable_signaling,
-
-			 TP_PROTO(struct pvr_fence *fence),
-
-			 TP_ARGS(fence)
+	TP_PROTO(struct pvr_fence *fence),
+	TP_ARGS(fence)
 );
 
 DEFINE_EVENT(pvr_fence, pvr_fence_signal_fence,
-
-			 TP_PROTO(struct pvr_fence *fence),
-
-			 TP_ARGS(fence)
+	TP_PROTO(struct pvr_fence *fence),
+	TP_ARGS(fence)
 );
 
 DECLARE_EVENT_CLASS(pvr_fence_foreign,
+	TP_PROTO(struct pvr_fence *fence),
+	TP_ARGS(fence),
 
-			TP_PROTO(struct pvr_fence *fence),
+	TP_STRUCT__entry(
+		__string(driver,
+			fence->base.ops->get_driver_name(&fence->base))
+		__string(timeline,
+			fence->base.ops->get_timeline_name(&fence->base))
+		__array(char, val, 128)
+		__field(u64, context)
+		__string(foreign_driver,
+			fence->fence->ops->get_driver_name ?
+			fence->fence->ops->get_driver_name(fence->fence) :
+			"unknown")
+		__string(foreign_timeline,
+			fence->fence->ops->get_timeline_name ?
+			fence->fence->ops->get_timeline_name(fence->fence) :
+			"unknown")
+		__array(char, foreign_val, 128)
+		__field(u64, foreign_context)
+	),
 
-			TP_ARGS(fence),
+	TP_fast_assign(
+		__assign_str(driver,
+			fence->base.ops->get_driver_name(&fence->base))
+		__assign_str(timeline,
+			fence->base.ops->get_timeline_name(&fence->base))
+		fence->base.ops->fence_value_str(&fence->base, __entry->val,
+			sizeof(__entry->val));
+		__entry->context = fence->base.context;
+		__assign_str(foreign_driver,
+			fence->fence->ops->get_driver_name ?
+			fence->fence->ops->get_driver_name(fence->fence) :
+			"unknown")
+		__assign_str(foreign_timeline,
+			fence->fence->ops->get_timeline_name ?
+			fence->fence->ops->get_timeline_name(fence->fence) :
+			"unknown")
+		fence->fence->ops->fence_value_str ?
+			fence->fence->ops->fence_value_str(
+				fence->fence, __entry->foreign_val,
+				sizeof(__entry->foreign_val)) :
+			(void) strlcpy(__entry->foreign_val,
+				"unknown", sizeof(__entry->foreign_val));
+		__entry->foreign_context = fence->fence->context;
+	),
 
-			TP_STRUCT__entry(
-							 __string(driver, fence->base.ops->get_driver_name(&fence->base))
-							 __string(timeline, fence->base.ops->get_timeline_name(&fence->base))
-							 __array(char, val, 128)
-							 __field(u64, context)
-							 __string(foreign_driver, fence->fence->ops->get_driver_name ? fence->fence->ops->get_driver_name(fence->fence) : "unknown")
-							 __string(foreign_timeline, fence->fence->ops->get_timeline_name ? fence->fence->ops->get_timeline_name(fence->fence) : "unknown")
-							 __array(char, foreign_val, 128)
-							 __field(u64, foreign_context)
-							),
-
-			TP_fast_assign(
-						    __assign_str(driver, fence->base.ops->get_driver_name(&fence->base))
-							__assign_str(timeline, fence->base.ops->get_timeline_name(&fence->base))
-							fence->base.ops->fence_value_str(&fence->base, __entry->val, sizeof(__entry->val));
-							__entry->context = fence->base.context;
-							__assign_str(foreign_driver, fence->fence->ops->get_driver_name ? fence->fence->ops->get_driver_name(fence->fence) : "unknown")
-							__assign_str(foreign_timeline, fence->fence->ops->get_timeline_name ? fence->fence->ops->get_timeline_name(fence->fence) : "unknown")
-							fence->fence->ops->fence_value_str ? fence->fence->ops->fence_value_str(fence->fence, __entry->foreign_val, sizeof(__entry->foreign_val)) : 
-																strlcpy(__entry->foreign_val, "unknown", sizeof(__entry->foreign_val));
-							__entry->foreign_context = fence->fence->context;
-						  ),
-
-			TP_printk("driver=%s timeline=%s ctx=%llu val=%s foreign: driver=%s timeline=%s ctx=%llu val=%s",
-					  __get_str(driver), __get_str(timeline), __entry->context, __entry->val,
-					  __get_str(foreign_driver), __get_str(foreign_timeline),  __entry->foreign_context, __entry->foreign_val
-					  )
+	TP_printk("driver=%s timeline=%s ctx=%llu val=%s foreign: driver=%s timeline=%s ctx=%llu val=%s",
+		  __get_str(driver), __get_str(timeline), __entry->context,
+		  __entry->val, __get_str(foreign_driver),
+		  __get_str(foreign_timeline), __entry->foreign_context,
+		  __entry->foreign_val
+	)
 );
 
 DEFINE_EVENT(pvr_fence_foreign, pvr_fence_foreign_create,
-
-			 TP_PROTO(struct pvr_fence *fence),
-
-			 TP_ARGS(fence)
+	TP_PROTO(struct pvr_fence *fence),
+	TP_ARGS(fence)
 );
 
 DEFINE_EVENT(pvr_fence_foreign, pvr_fence_foreign_release,
-
-			 TP_PROTO(struct pvr_fence *fence),
-
-			 TP_ARGS(fence)
+	TP_PROTO(struct pvr_fence *fence),
+	TP_ARGS(fence)
 );
 
 DEFINE_EVENT(pvr_fence_foreign, pvr_fence_foreign_signal,
-
-			 TP_PROTO(struct pvr_fence *fence),
-
-			 TP_ARGS(fence)
+	TP_PROTO(struct pvr_fence *fence),
+	TP_ARGS(fence)
 );
 
 #endif /* _TRACE_PVR_FENCE_H */

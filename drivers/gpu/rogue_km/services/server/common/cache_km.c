@@ -62,7 +62,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "lock_types.h"
 #include "allocmem.h"
 #include "process_stats.h"
-#if defined(PVR_RI_DEBUG) && defined(DEBUG)
+#if defined(PVRSRV_ENABLE_GPU_MEMORY_INFO) && defined(DEBUG)
 #include "ri_server.h"
 #endif
 #include "devicemem.h"
@@ -81,7 +81,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #define CACHEOP_STATS_ITEMS_MAX 			32
 #define INCR_WRAP(x)						((x+1) >= CACHEOP_STATS_ITEMS_MAX ? 0 : (x+1))
 #define DECR_WRAP(x)						((x-1) < 0 ? (CACHEOP_STATS_ITEMS_MAX-1) : (x-1))
-#if defined(PVR_RI_DEBUG) && defined(DEBUG)
+#if defined(PVRSRV_ENABLE_GPU_MEMORY_INFO) && defined(DEBUG)
 /* Refer to CacheOpStatsExecLogHeader() for header item names */
 #define CACHEOP_RI_PRINTF_HEADER			"%-8s %-10s %-10s %-5s %-16s %-16s %-10s %-10s %-18s %-18s %-12s"
 #define CACHEOP_RI_PRINTF					"%-8d %-10s %-10s %-5s 0x%-14llx 0x%-14llx 0x%-8llx 0x%-8llx %-18llu %-18llu 0x%-10x\n"
@@ -116,6 +116,7 @@ typedef struct _CACHEOP_WORK_ITEM_
 	IMG_DEVMEM_OFFSET_T uiOffset;
 	PVRSRV_TIMELINE iTimeline;
 	SYNC_TIMELINE_OBJ sSWTimelineObj;
+	PVRSRV_DEVICE_NODE *psDevNode;
 #if defined(CACHEOP_DEBUG)
 	IMG_UINT64 ui64EnqueuedTime;
 	IMG_UINT64 ui64DequeuedTime;
@@ -125,7 +126,7 @@ typedef struct _CACHEOP_WORK_ITEM_
 	IMG_BOOL bRBF;
 	IMG_BOOL bUMF;
 	IMG_PID pid;
-#if defined(PVR_RI_DEBUG) && defined(DEBUG)
+#if defined(PVRSRV_ENABLE_GPU_MEMORY_INFO) && defined(DEBUG)
 	RGXFWIF_DM eFenceOpType;
 #endif
 #endif
@@ -146,7 +147,7 @@ typedef struct _CACHEOP_STATS_EXEC_ITEM_
 	IMG_BOOL bRBF;
 	IMG_BOOL bUMF;
 	IMG_BOOL bDeferred;
-#if defined(PVR_RI_DEBUG) && defined(DEBUG)
+#if defined(PVRSRV_ENABLE_GPU_MEMORY_INFO) && defined(DEBUG)
 	IMG_DEV_VIRTADDR sDevVAddr;
 	IMG_DEV_PHYADDR sDevPAddr;
 	RGXFWIF_DM eFenceOpType;
@@ -232,7 +233,7 @@ typedef struct _CACHEOP_WORK_QUEUE_
 	ATOMIC_T hCompletedSeqNum;
 /*
   CacheOp information page
-  + psInfoPageMemDesc:
+  + psInfoPagePMR:
 	- Single system-wide OS page that is multi-mapped in UM/KM.
 	- Mapped into clients using read-only memory protection.
 	- Mapped into server using read/write memory protection.
@@ -243,7 +244,6 @@ typedef struct _CACHEOP_WORK_QUEUE_
  */
 	PMR *psInfoPagePMR;
 	IMG_UINT32 *pui32InfoPage;
-	DEVMEM_MEMDESC *psInfoPageMemDesc;
 /*
   CacheOp deferred work-item queue
   + CACHEOP_INDICES_LOG2_SIZE
@@ -292,16 +292,12 @@ typedef struct _CACHEOP_WORK_QUEUE_
 	- Event object to drive CacheOp worker thread sleep/wake-ups.
   + hClientWakeUpEvtObj
 	- Event object to unblock stalled clients waiting on queue.
-  +  uiWorkerThreadPid
-	- CacheOp thread process id
  */
 	CACHEOP_CONFIG	eConfig;
 	IMG_UINT32		ui32Config;
-	IMG_BOOL		bConfigTuning;
 	IMG_HANDLE		hWorkerThread;
 	IMG_HANDLE 		hDeferredLock;
 	IMG_HANDLE 		hGlobalFlushLock;
-	IMG_PID			uiWorkerThreadPid;
 	IMG_HANDLE		hThreadWakeUpEvtObj;
 	IMG_HANDLE		hClientWakeUpEvtObj;
 	IMG_UINT32		ui32FenceWaitTimeUs;
@@ -354,13 +350,12 @@ static INLINE IMG_UINT64 DivBy10(IMG_UINT64 uiNum)
 }
 
 /* Callback to dump info of cacheop thread in debug_dump */
-static void CacheOpThreadDumpInfo(IMG_HANDLE hDbgReqestHandle,
-				  DUMPDEBUG_PRINTF_FUNC* pfnDumpDebugPrintf,
-				  void *pvDumpDebugFile)
+static void CacheOpThreadDumpInfo(DUMPDEBUG_PRINTF_FUNC* pfnDumpDebugPrintf,
+				  				void *pvDumpDebugFile)
 {
 	PVR_DUMPDEBUG_LOG("    Configuration: QSZ: %d, UKT: %d, KDFT: %d, "
 			  "KGFT: %d, LINESIZE: %d, PGSIZE: %d, KDF: %s, "
-			  "URBF: %s, KGF: %s, KRBF: %s ",
+			  "URBF: %s, KGF: %s, KRBF: %s",
 			  CACHEOP_INDICES_MAX,
 			  gsCwq.pui32InfoPage[CACHEOP_INFO_UMKMTHRESHLD],
 			  gsCwq.pui32InfoPage[CACHEOP_INFO_KMDFTHRESHLD],
@@ -380,7 +375,7 @@ static void CacheOpThreadDumpInfo(IMG_HANDLE hDbgReqestHandle,
 static INLINE void CacheOpStatsExecLogHeader(IMG_CHAR szBuffer[CACHEOP_MAX_DEBUG_MESSAGE_LEN])
 {
 	OSSNPrintf(szBuffer, CACHEOP_MAX_DEBUG_MESSAGE_LEN,
-#if defined(PVR_RI_DEBUG) && defined(DEBUG)
+#if defined(PVRSRV_ENABLE_GPU_MEMORY_INFO) && defined(DEBUG)
 				CACHEOP_RI_PRINTF_HEADER,
 #else
 				CACHEOP_PRINTF_HEADER,
@@ -389,7 +384,7 @@ static INLINE void CacheOpStatsExecLogHeader(IMG_CHAR szBuffer[CACHEOP_MAX_DEBUG
 				"CacheOp",
 				"  Type",
 				"Mode",
-#if defined(PVR_RI_DEBUG) && defined(DEBUG)
+#if defined(PVRSRV_ENABLE_GPU_MEMORY_INFO) && defined(DEBUG)
 				"DevVAddr",
 				"DevPAddr",
 #endif
@@ -437,7 +432,7 @@ static void CacheOpStatsExecLogWrite(CACHEOP_WORK_ITEM *psCacheOpWorkItem)
 	/* During early system initialisation, only non-fence & non-PMR CacheOps are processed */
 	gsCwq.asStatsExecuted[i32WriteOffset].bIsFence = gsCwq.bInit && !psCacheOpWorkItem->psPMR;
 	CACHEOP_PVR_ASSERT(gsCwq.asStatsExecuted[i32WriteOffset].pid);
-#if defined(PVR_RI_DEBUG) && defined(DEBUG)
+#if defined(PVRSRV_ENABLE_GPU_MEMORY_INFO) && defined(DEBUG)
 	if (gsCwq.bInit && psCacheOpWorkItem->psPMR)
 	{
 		IMG_CPU_PHYADDR sDevPAddr;
@@ -517,7 +512,7 @@ static void CacheOpStatsExecLogWrite(CACHEOP_WORK_ITEM *psCacheOpWorkItem)
 		/* This operation queues only UM CacheOp in per-PID process statistics database */
 		PVRSRVStatsUpdateCacheOpStats(gsCwq.asStatsExecuted[i32WriteOffset].uiCacheOp,
 						gsCwq.asStatsExecuted[i32WriteOffset].ui32OpSeqNum,
-#if defined(PVR_RI_DEBUG) && defined(DEBUG)
+#if defined(PVRSRV_ENABLE_GPU_MEMORY_INFO) && defined(DEBUG)
 						gsCwq.asStatsExecuted[i32WriteOffset].sDevVAddr,
 						gsCwq.asStatsExecuted[i32WriteOffset].sDevPAddr,
 						gsCwq.asStatsExecuted[i32WriteOffset].eFenceOpType,
@@ -533,7 +528,7 @@ static void CacheOpStatsExecLogWrite(CACHEOP_WORK_ITEM *psCacheOpWorkItem)
 						psCacheOpWorkItem->pid);
 	}
 
-#if defined(PVR_RI_DEBUG) && defined(DEBUG)
+#if defined(PVRSRV_ENABLE_GPU_MEMORY_INFO) && defined(DEBUG)
 e0:
 #endif
 	OSLockRelease(gsCwq.hStatsExecLock);
@@ -612,7 +607,7 @@ static void CacheOpStatsExecLogRead(void *pvFilePtr, void *pvData,
 			IMG_CHAR *pszFenceType = "";
 			pszCacheOpType = "Fence";
 
-#if defined(PVR_RI_DEBUG) && defined(DEBUG)
+#if defined(PVRSRV_ENABLE_GPU_MEMORY_INFO) && defined(DEBUG)
 			pszMode = gsCwq.asStatsExecuted[i32ReadOffset].uiCacheOp != PVRSRV_CACHE_OP_GLOBAL ? "" : "  GF  ";
 			switch (gsCwq.asStatsExecuted[i32ReadOffset].eFenceOpType)
 			{
@@ -636,14 +631,6 @@ static void CacheOpStatsExecLogRead(void *pvFilePtr, void *pvData,
 					pszFenceType = "  CDM ";
 					break;
 
-				case RGXFWIF_DM_RTU:
-					pszFenceType = "  RTU ";
-					break;
-
-				case RGXFWIF_DM_SHG:
-					pszFenceType = "  SHG ";
-					break;
-
 				default:
 					CACHEOP_PVR_ASSERT(0);
 					break;
@@ -654,7 +641,7 @@ static void CacheOpStatsExecLogRead(void *pvFilePtr, void *pvData,
 				gsCwq.asStatsExecuted[i32ReadOffset].uiCacheOp != PVRSRV_CACHE_OP_GLOBAL ? "" : "   GF ";
 #endif
 			pfnOSStatsPrintf(pvFilePtr,
-#if defined(PVR_RI_DEBUG) && defined(DEBUG)
+#if defined(PVRSRV_ENABLE_GPU_MEMORY_INFO) && defined(DEBUG)
 							CACHEOP_RI_PRINTF,
 #else
 							CACHEOP_PRINTF,
@@ -663,7 +650,7 @@ static void CacheOpStatsExecLogRead(void *pvFilePtr, void *pvData,
 							pszCacheOpType,
 							pszFenceType,
 							pszMode,
-#if defined(PVR_RI_DEBUG) && defined(DEBUG)
+#if defined(PVRSRV_ENABLE_GPU_MEMORY_INFO) && defined(DEBUG)
 							"",
 							"",
 #endif
@@ -754,7 +741,7 @@ static void CacheOpStatsExecLogRead(void *pvFilePtr, void *pvData,
 			}
 
 			pfnOSStatsPrintf(pvFilePtr,
-#if defined(PVR_RI_DEBUG) && defined(DEBUG)
+#if defined(PVRSRV_ENABLE_GPU_MEMORY_INFO) && defined(DEBUG)
 							CACHEOP_RI_PRINTF,
 #else
 							CACHEOP_PRINTF,
@@ -763,7 +750,7 @@ static void CacheOpStatsExecLogRead(void *pvFilePtr, void *pvData,
 							pszCacheOpType,
 							pszFlushype,
 							pszFlushSource,
-#if defined(PVR_RI_DEBUG) && defined(DEBUG)
+#if defined(PVRSRV_ENABLE_GPU_MEMORY_INFO) && defined(DEBUG)
 							gsCwq.asStatsExecuted[i32ReadOffset].sDevVAddr.uiAddr,
 							gsCwq.asStatsExecuted[i32ReadOffset].sDevPAddr.uiAddr,
 #endif
@@ -798,7 +785,7 @@ static INLINE void CacheOpStatsReset(void)
 	gsCwq.ui32ClientSync    = 0;
 	gsCwq.ui32ServerRBF     = 0;
 	gsCwq.ui32ServerASync   = 0;
-	gsCwq.ui32ServerSyncVA   = 0;
+	gsCwq.ui32ServerSyncVA  = 0;
 	gsCwq.ui32ServerSync    = 0;
 	gsCwq.ui32ServerGF      = 0;
 	gsCwq.ui32ServerDGF     = 0;
@@ -815,7 +802,6 @@ static void CacheOpConfigUpdate(IMG_UINT32 ui32Config)
 	/* Step 0, set the gsCwq.eConfig bits */
 	if (!(ui32Config & (CACHEOP_CONFIG_LAST - 1)))
 	{
-		gsCwq.bConfigTuning = IMG_FALSE;
 		gsCwq.eConfig = CACHEOP_CONFIG_KRBF | CACHEOP_CONFIG_KDF;
 		if (! gsCwq.bNoGlobalFlushImpl)
 		{
@@ -828,8 +814,6 @@ static void CacheOpConfigUpdate(IMG_UINT32 ui32Config)
 	}
 	else
 	{
-		gsCwq.bConfigTuning = IMG_TRUE;
-
 		if (ui32Config & CACHEOP_CONFIG_KRBF)
 		{
 			gsCwq.eConfig |= CACHEOP_CONFIG_KRBF;
@@ -1201,14 +1185,16 @@ static INLINE IMG_BOOL CacheOpFenceCheck(IMG_UINT32 ui32CompletedSeqNum,
 	return (ui32RebasedCompletedNum >= ui32RebasedFenceNum);
 }
 
-static INLINE PVRSRV_ERROR CacheOpTimelineBind(CACHEOP_WORK_ITEM *psCacheOpWorkItem,
+static INLINE PVRSRV_ERROR CacheOpTimelineBind(PVRSRV_DEVICE_NODE *psDevNode,
+											   CACHEOP_WORK_ITEM *psCacheOpWorkItem,
 											   PVRSRV_TIMELINE iTimeline)
 {
 	PVRSRV_ERROR eError;
 
 	/* Always default the incoming CacheOp work-item to safe values */
-	psCacheOpWorkItem->sSWTimelineObj = (SYNC_TIMELINE_OBJ)(uintptr_t)NULL;
+	SyncClearTimelineObj(&psCacheOpWorkItem->sSWTimelineObj);
 	psCacheOpWorkItem->iTimeline = PVRSRV_NO_TIMELINE;
+	psCacheOpWorkItem->psDevNode = psDevNode;
 	if (iTimeline == PVRSRV_NO_TIMELINE)
 	{
 		return PVRSRV_OK;
@@ -1233,11 +1219,12 @@ static INLINE PVRSRV_ERROR CacheOpTimelineExec(CACHEOP_WORK_ITEM *psCacheOpWorkI
 	{
 		return PVRSRV_OK;
 	}
-	CACHEOP_PVR_ASSERT(psCacheOpWorkItem->sSWTimelineObj);
+	CACHEOP_PVR_ASSERT(psCacheOpWorkItem->sSWTimelineObj.pvTlObj);
 
 #if defined(PVR_USE_FENCE_SYNC_MODEL)
-	eError = SyncSWTimelineAdvanceKM(psCacheOpWorkItem->sSWTimelineObj);
-	(void) SyncSWTimelineReleaseKM(psCacheOpWorkItem->sSWTimelineObj);
+	eError = SyncSWTimelineAdvanceKM(psCacheOpWorkItem->psDevNode,
+	                                 &psCacheOpWorkItem->sSWTimelineObj);
+	(void) SyncSWTimelineReleaseKM(&psCacheOpWorkItem->sSWTimelineObj);
 #else
 	eError = PVRSRV_ERROR_NOT_IMPLEMENTED;
 #endif
@@ -1378,7 +1365,7 @@ static INLINE void CacheOpExecRangeBased(PVRSRV_DEVICE_NODE *psDevNode,
 			break;
 		default:
 			PVR_DPF((PVR_DBG_ERROR,	"%s: Invalid cache operation type %d",
-					__FUNCTION__, uiCacheOp));
+					__func__, uiCacheOp));
 			break;
 	}
 
@@ -1416,7 +1403,8 @@ static INLINE void CacheOpExecRangeBasedVA(PVRSRV_DEVICE_NODE *psDevNode,
 			OSCPUCacheFlushRangeKM(psDevNode, pbStart, pbEnd, sCpuPhyAddrUnused, sCpuPhyAddrUnused);
 			break;
 		default:
-			PVR_DPF((PVR_DBG_ERROR,	"%s: Invalid cache operation type %d", __FUNCTION__, uiCacheOp));
+			PVR_DPF((PVR_DBG_ERROR,	"%s: Invalid cache operation type %d",
+					 __func__, uiCacheOp));
 			break;
 	}
 
@@ -1437,21 +1425,23 @@ static INLINE PVRSRV_ERROR CacheOpValidateVAOffset(PMR *psPMR,
 	struct mm_struct *mm = current->mm;
 	struct vm_area_struct *vma;
 #endif
+	void __user *pvAddr;
 
 	if (! pvAddress)
 	{
 		/* As pvAddress is optional, NULL is expected from UM/KM requests */
+		pvAddr = NULL;
 		goto e0;
 	}
 
 #if !defined(LINUX) || defined(CACHEFLUSH_NO_KMRBF_USING_UMVA)
-	pvAddress = NULL;
+	pvAddr = NULL;
 #else
 	/* Validate VA, assume most basic address limit access_ok() check */
-	pvAddress = (void*)(uintptr_t)((uintptr_t)pvAddress + uiOffset);
-	if (! access_ok(VERIFY_READ, pvAddress, uiSize))
+	pvAddr = (void __user *)(uintptr_t)((uintptr_t)pvAddress + uiOffset);
+	if (!access_ok(pvAddr, uiSize))
 	{
-		pvAddress = NULL;
+		pvAddr = NULL;
 		if (! mm)
 		{
 			/* Bad KM request, don't silently ignore */
@@ -1463,13 +1453,13 @@ static INLINE PVRSRV_ERROR CacheOpValidateVAOffset(PMR *psPMR,
 	{
 		down_read(&mm->mmap_sem);
 
-		vma = find_vma(mm, (unsigned long)(uintptr_t)pvAddress);
+		vma = find_vma(mm, (unsigned long)(uintptr_t)pvAddr);
 		if (!vma ||
-			vma->vm_start > (unsigned long)(uintptr_t)pvAddress ||
+			vma->vm_start > (unsigned long)(uintptr_t)pvAddr ||
 			vma->vm_end - vma->vm_start > (unsigned long)(uintptr_t)uiSize)
 		{
 			/* Out of range mm_struct->vm_area VA */
-			pvAddress = NULL;
+			pvAddr = NULL;
 		}
 		else if (vma->vm_private_data != psPMR)
 		{
@@ -1478,17 +1468,17 @@ static INLINE PVRSRV_ERROR CacheOpValidateVAOffset(PMR *psPMR,
 			   this VA as the client user space mapping could be removed without
 			   us knowing which might induce CPU fault during cache maintenance.
 			*/
-			pvAddress = NULL;
+			pvAddr = NULL;
 		}
 		else if ((uintptr_t)pvAddress < (uintptr_t)gsCwq.uiPageSize)
 		{
 			/* Silently suppress UM NULL page pointers */
-			pvAddress = NULL;		
+			pvAddr = NULL;
 		}
 
 		up_read(&mm->mmap_sem);
 	}
-	else 
+	else
 	{
 		pgd_t *pgd;
 		p4d_t *p4d;
@@ -1501,50 +1491,50 @@ static INLINE PVRSRV_ERROR CacheOpValidateVAOffset(PMR *psPMR,
 			For KM requests perform additional VA validation, so we walk the
 			kernel page-table structures to be sure VA is safe to use.
 		*/
-		pgd = pgd_offset(mm, (uintptr_t)pvAddress);
+		pgd = pgd_offset(mm, (uintptr_t)pvAddr);
 		if (pgd_none(*pgd) || unlikely(pgd_bad(*pgd)))
 		{
 			eError = PVRSRV_ERROR_INVALID_CPU_ADDR;
-			pvAddress = NULL;
+			pvAddr = NULL;
 			goto e0;
 		}
 
-		p4d = p4d_offset(pgd, (uintptr_t)pvAddress);
+		p4d = p4d_offset(pgd, (uintptr_t)pvAddr);
 		if (p4d_none(*p4d) || unlikely(p4d_bad(*p4d)))
 		{
 			eError = PVRSRV_ERROR_INVALID_CPU_ADDR;
-			pvAddress = NULL;
+			pvAddr = NULL;
 			goto e0;
 		}
 
-		pud = pud_offset(p4d, (uintptr_t)pvAddress);
+		pud = pud_offset(p4d, (uintptr_t)pvAddr);
 		if (pud_none(*pud) || unlikely(pud_bad(*pud)))
 		{
 			eError = PVRSRV_ERROR_INVALID_CPU_ADDR;
-			pvAddress = NULL;
+			pvAddr = NULL;
 			goto e0;
 		}
 
-		pmd = pmd_offset(pud, (uintptr_t)pvAddress);
+		pmd = pmd_offset(pud, (uintptr_t)pvAddr);
 		if (pmd_none(*pmd) || unlikely(pmd_bad(*pmd)))
 		{
 			eError = PVRSRV_ERROR_INVALID_CPU_ADDR;
-			pvAddress = NULL;
+			pvAddr = NULL;
 			goto e0;
 		}
 
-		ptep = pte_offset_map(pmd, (uintptr_t)pvAddress);
+		ptep = pte_offset_map(pmd, (uintptr_t)pvAddr);
 		if (!ptep || !pte_present(*ptep))
 		{
 			eError = PVRSRV_ERROR_INVALID_CPU_ADDR;
-			pvAddress = NULL;
+			pvAddr = NULL;
 			goto e0;
 		}
 	}
 #endif
 
 e0:
-	*ppvOutAddress = pvAddress;
+	*ppvOutAddress = (IMG_CPU_VIRTADDR __force) pvAddr;
 	return eError;
 }
 
@@ -1612,13 +1602,13 @@ static PVRSRV_ERROR CacheOpPMRExec (PMR *psPMR,
 
 	if (! bIsRequestValidated)
 	{
-		IMG_DEVMEM_SIZE_T uiLogicalSize;
+		IMG_DEVMEM_SIZE_T uiLPhysicalSize;
 
 		/* Need to validate parameters before proceeding */
-		eError = PMR_LogicalSize(psPMR, &uiLogicalSize);
-		PVR_LOGR_IF_ERROR(eError, "PMR_LogicalSize");
+		eError = PMR_PhysicalSize(psPMR, &uiLPhysicalSize);
+		PVR_LOGR_IF_ERROR(eError, "uiLPhysicalSize");
 
-		PVR_LOGR_IF_FALSE(((uiOffset+uiSize) <= uiLogicalSize), CACHEOP_DEVMEM_OOR_ERROR_STRING, PVRSRV_ERROR_DEVICEMEM_OUT_OF_RANGE);
+		PVR_LOGR_IF_FALSE(((uiOffset+uiSize) <= uiLPhysicalSize), CACHEOP_DEVMEM_OOR_ERROR_STRING, PVRSRV_ERROR_DEVICEMEM_OUT_OF_RANGE);
 
 		eError = PMRLockSysPhysAddresses(psPMR);
 		PVR_LOGR_IF_ERROR(eError, "PMRLockSysPhysAddresses");
@@ -1665,9 +1655,9 @@ static PVRSRV_ERROR CacheOpPMRExec (PMR *psPMR,
 
 		if (gsCwq.uiCacheOpAddrType == PVRSRV_CACHE_OP_ADDR_TYPE_PHYSICAL)
 		{
-			PVR_DPF((PVR_DBG_WARNING,	
+			PVR_DPF((PVR_DBG_WARNING,
 					"%s: Invalid vaddress 0x%p in CPU d-cache maint. op, using paddress",
-					__FUNCTION__,
+					__func__,
 					pvAddress));
 
 			/* We can still proceed as kernel/cpu uses CPU PA for d-cache maintenance */
@@ -1675,9 +1665,9 @@ static PVRSRV_ERROR CacheOpPMRExec (PMR *psPMR,
 		}
 		else if (CacheOpGlobalFlush() == PVRSRV_OK)
 		{
-			PVR_DPF((PVR_DBG_WARNING,	
+			PVR_DPF((PVR_DBG_WARNING,
 					"%s: Invalid vaddress 0x%p in CPU d-cache maint. op, used global flush",
-					__FUNCTION__,
+					__func__,
 					pvAddress));
 
 			/* Saved by global flush impl. */
@@ -1690,7 +1680,7 @@ static PVRSRV_ERROR CacheOpPMRExec (PMR *psPMR,
 			/*
 			 * The approach here is to attempt a reacquisition of the PMR kernel VA and see if
 			 * said VA corresponds to the parameter VA, if so fail requested cache maint. op.
-			 * cause this indicates some kind of internal, memory and/or meta-data corruption 
+			 * cause this indicates some kind of internal, memory and/or meta-data corruption
 			 * else we reissue the request using this (re)acquired alias PMR kernel VA.
 			 */
 			if (PMR_IsSparse(psPMR))
@@ -1719,7 +1709,7 @@ static PVRSRV_ERROR CacheOpPMRExec (PMR *psPMR,
 			{
 				PVR_DPF((PVR_DBG_ERROR,
 						"%s: Invalid vaddress 0x%p in CPU d-cache maint. op, no alt. so failing request",
-						__FUNCTION__,
+						__func__,
 						pvAddress));
 
 				eError = PMRReleaseKernelMappingData(psPMR, hPrivOut);
@@ -1732,7 +1722,7 @@ static PVRSRV_ERROR CacheOpPMRExec (PMR *psPMR,
 			{
 				PVR_DPF((PVR_DBG_WARNING,
 						"%s: Bad vaddress 0x%p in CPU d-cache maint. op, using reacquired vaddress 0x%p",
-						__FUNCTION__,
+						__func__,
 						pvAddress,
 						pbCpuVirtAddr));
 
@@ -1754,7 +1744,7 @@ static PVRSRV_ERROR CacheOpPMRExec (PMR *psPMR,
 				   future expectation of PMRAcquireKernelMappingData(), we proceed */
 				PVR_DPF((PVR_DBG_WARNING,
 						"%s: Bad vaddress %p in CPU d-cache maint. op, will use reacquired vaddress",
-						__FUNCTION__,
+						__func__,
 						pvAddress));
 
 				eError = PMRReleaseKernelMappingData(psPMR, hPrivOut);
@@ -2144,21 +2134,29 @@ static PVRSRV_ERROR CacheOpQListExecRangeBased(void)
 		if (eError != PVRSRV_OK)
 		{
 #if defined(CACHEOP_DEBUG)
-			PVR_LOG(("Deferred CacheOpPMRExec failed: PID:%d PMR:%p Offset:%" IMG_UINT64_FMTSPECX " Size:%" IMG_UINT64_FMTSPECX " CacheOp:%d, error: %d",
-					(IMG_UINT32)psCacheOpWorkItem->pid,
-					psCacheOpWorkItem->psPMR,
-					psCacheOpWorkItem->uiOffset,
-					psCacheOpWorkItem->uiSize,
-					psCacheOpWorkItem->uiCacheOp,
-					eError));
+#define PID_FMTSPEC " PID:%u"
+#define CACHE_OP_WORK_PID psCacheOpWorkItem->pid
 #else
-			PVR_LOG(("Deferred CacheOpPMRExec failed: PMR:%p Offset: %" IMG_UINT64_FMTSPECX "Size:%" IMG_UINT64_FMTSPECX " CacheOp:%d, error: %d",
+#define PID_FMTSPEC "%s"
+#define CACHE_OP_WORK_PID ""
+#endif
+
+			PVR_LOG(("Deferred CacheOpPMRExec failed:"
+					 PID_FMTSPEC
+					 " PMR:%p"
+					 " Offset:%" IMG_UINT64_FMTSPECX
+					 " Size:%" IMG_UINT64_FMTSPECX
+					 " CacheOp:%d,"
+					 " error: %d",
+					CACHE_OP_WORK_PID,
 					psCacheOpWorkItem->psPMR,
 					psCacheOpWorkItem->uiOffset,
 					psCacheOpWorkItem->uiSize,
 					psCacheOpWorkItem->uiCacheOp,
 					eError));
-#endif
+
+#undef PID_FMTSPEC
+#undef CACHE_OP_WORK_PID
 		}
 		else if (bUsedGlobalFlush)
 		{
@@ -2273,9 +2271,6 @@ static void CacheOpThread(void *pvData)
 	IMG_HANDLE hOSEvent;
 	PVRSRV_ERROR eError;
 
-	/* Store the process id (pid) of the CacheOp-up thread */
-	gsCwq.uiWorkerThreadPid = OSGetCurrentProcessID();
-
 	/* Open CacheOp thread event object, abort driver if event object open fails */
 	eError = OSEventObjectOpen(gsCwq.hThreadWakeUpEvtObj, &hOSEvent);
 	PVR_LOG_IF_ERROR(eError, "OSEventObjectOpen");
@@ -2285,7 +2280,7 @@ static void CacheOpThread(void *pvData)
 	{
 		/* Sleep-wait here until when signalled for new queued CacheOp work items;
 		   when woken-up, drain deferred queue completely before next event-wait */
-		eError = OSEventObjectWaitKernel(hOSEvent, CACHEOP_THREAD_WAIT_TIMEOUT);
+		(void) OSEventObjectWaitKernel(hOSEvent, CACHEOP_THREAD_WAIT_TIMEOUT);
 		while (CacheOpIdxSpan(&gsCwq.hWriteCounter, &gsCwq.hReadCounter))
 		{
 			eError = CacheOpQListExec();
@@ -2300,7 +2295,8 @@ static void CacheOpThread(void *pvData)
 	PVR_LOG_IF_ERROR(eError, "OSEventObjectClose");
 }
 
-static PVRSRV_ERROR CacheOpBatchExecTimeline(PVRSRV_TIMELINE iTimeline,
+static PVRSRV_ERROR CacheOpBatchExecTimeline(PVRSRV_DEVICE_NODE *psDevNode,
+											 PVRSRV_TIMELINE iTimeline,
 											 IMG_BOOL bUsedGlobalFlush,
 											 IMG_UINT32 ui32CurrentFenceSeqNum,
 											 IMG_UINT32 *pui32NextFenceSeqNum)
@@ -2310,7 +2306,7 @@ static PVRSRV_ERROR CacheOpBatchExecTimeline(PVRSRV_TIMELINE iTimeline,
 	CACHEOP_WORK_ITEM sCacheOpWorkItem = { };
 	CACHEOP_WORK_ITEM *psCacheOpWorkItem = NULL;
 
-	eError = CacheOpTimelineBind(&sCacheOpWorkItem, iTimeline);
+	eError = CacheOpTimelineBind(psDevNode, &sCacheOpWorkItem, iTimeline);
 	PVR_LOGR_IF_ERROR(eError, "CacheOpTimelineBind");
 
 	OSLockAcquire(gsCwq.hDeferredLock);
@@ -2337,6 +2333,7 @@ static PVRSRV_ERROR CacheOpBatchExecTimeline(PVRSRV_TIMELINE iTimeline,
 		psCacheOpWorkItem->uiOffset = (IMG_DEVMEM_OFFSET_T)0;
 		psCacheOpWorkItem->uiSize = (IMG_DEVMEM_SIZE_T)0;
 		psCacheOpWorkItem->ui32GFSeqNum = 0;
+		psCacheOpWorkItem->psDevNode = psDevNode;
 		/* Defer timeline using information page PMR */
 		psCacheOpWorkItem->psPMR = gsCwq.psInfoPagePMR;
 		eError = PMRLockSysPhysAddresses(psCacheOpWorkItem->psPMR);
@@ -2418,7 +2415,8 @@ e0:
 	return eError;
 }
 
-static PVRSRV_ERROR CacheOpBatchExecRangeBased(PMR **ppsPMR,
+static PVRSRV_ERROR CacheOpBatchExecRangeBased(PVRSRV_DEVICE_NODE *psDevNode,
+											PMR **ppsPMR,
 											IMG_CPU_VIRTADDR *pvAddress,
 											IMG_DEVMEM_OFFSET_T *puiOffset,
 											IMG_DEVMEM_SIZE_T *puiSize,
@@ -2572,7 +2570,7 @@ static PVRSRV_ERROR CacheOpBatchExecRangeBased(PMR **ppsPMR,
 
 		/* Timeline need to be looked-up (i.e. bind) in the user context
 		   before deferring into the CacheOp thread kernel context */
-		eError = CacheOpTimelineBind(psCacheOpWorkItem, PVRSRV_NO_TIMELINE);
+		eError = CacheOpTimelineBind(psDevNode, psCacheOpWorkItem, PVRSRV_NO_TIMELINE);
 		PVR_LOGG_IF_ERROR(eError, "CacheOpTimelineBind", e1);
 
 		/* Prepare & enqueue next deferred work item for CacheOp thread */
@@ -2583,6 +2581,7 @@ static PVRSRV_ERROR CacheOpBatchExecRangeBased(PMR **ppsPMR,
 		psCacheOpWorkItem->uiOffset = puiOffset[ui32Idx];
 		psCacheOpWorkItem->uiSize = puiSize[ui32Idx];
 		psCacheOpWorkItem->psPMR = ppsPMR[ui32Idx];
+		psCacheOpWorkItem->psDevNode = psDevNode;
 #if defined(CACHEOP_DEBUG)
 		psCacheOpWorkItem->ui64EnqueuedTime = OSClockns64();
 		psCacheOpWorkItem->pid = sCacheOpWorkItem.pid;
@@ -2636,14 +2635,16 @@ e0:
 	if (bBatchHasTimeline)
 	{
 		PVRSRV_ERROR eError2;
-		eError2 = CacheOpBatchExecTimeline(uiTimeline, bUseGlobalFlush, uiCurrentFenceSeqNum, pui32NextFenceSeqNum);
+		eError2 = CacheOpBatchExecTimeline(psDevNode, uiTimeline, bUseGlobalFlush,
+										   uiCurrentFenceSeqNum, pui32NextFenceSeqNum);
 		eError = (eError2 == PVRSRV_ERROR_RETRY) ? eError2 : eError;
 	}
 
 	return eError;
 }
 
-static PVRSRV_ERROR CacheOpBatchExecGlobal(PMR **ppsPMR,
+static PVRSRV_ERROR CacheOpBatchExecGlobal(PVRSRV_DEVICE_NODE *psDevNode,
+									PMR **ppsPMR,
 									IMG_CPU_VIRTADDR *pvAddress,
 									IMG_DEVMEM_OFFSET_T *puiOffset,
 									IMG_DEVMEM_SIZE_T *puiSize,
@@ -2759,7 +2760,7 @@ static PVRSRV_ERROR CacheOpBatchExecGlobal(PMR **ppsPMR,
 	PVR_LOGG_IF_ERROR(eError, "PMRLockSysPhysAddresses", e0);
 
 	/* Timeline object has to be looked-up here in user context */
-	eError = CacheOpTimelineBind(psCacheOpWorkItem, uiTimeline);
+	eError = CacheOpTimelineBind(psDevNode, psCacheOpWorkItem, uiTimeline);
 	PVR_LOGG_IF_ERROR(eError, "CacheOpTimelineBind", e0);
 
 	/* Prepare & enqueue next deferred work item for CacheOp thread */
@@ -2799,7 +2800,8 @@ static PVRSRV_ERROR CacheOpBatchExecGlobal(PMR **ppsPMR,
 exec_timeline:
 	if (bUseGlobalFlush && bBatchHasTimeline)
 	{
-		eError = CacheOpBatchExecTimeline(uiTimeline, bUseGlobalFlush, uiCurrentFenceSeqNum, pui32NextFenceSeqNum);
+		eError = CacheOpBatchExecTimeline(psDevNode, uiTimeline, bUseGlobalFlush,
+										  uiCurrentFenceSeqNum, pui32NextFenceSeqNum);
 	}
 
 #if	defined(CACHEOP_DEBUG)
@@ -2834,7 +2836,8 @@ e0:
 	if (bBatchHasTimeline)
 	{
 		PVRSRV_ERROR eError2;
-		eError2 = CacheOpBatchExecTimeline(uiTimeline, IMG_FALSE, uiCurrentFenceSeqNum, pui32NextFenceSeqNum);
+		eError2 = CacheOpBatchExecTimeline(psDevNode, uiTimeline, IMG_FALSE,
+										   uiCurrentFenceSeqNum, pui32NextFenceSeqNum);
 		eError = (eError2 == PVRSRV_ERROR_RETRY) ? eError2 : eError;
 	}
 
@@ -2884,7 +2887,8 @@ PVRSRV_ERROR CacheOpExec (PPVRSRV_DEVICE_NODE psDevNode,
 				OSCPUCacheFlushRangeKM(psDevNode, pvVirtStart, pvVirtEnd, sCPUPhysStart, sCPUPhysEnd);
 				break;
 			default:
-				PVR_DPF((PVR_DBG_ERROR,	"%s: Invalid cache operation type %d", __FUNCTION__, uiCacheOp));
+				PVR_DPF((PVR_DBG_ERROR,	"%s: Invalid cache operation type %d",
+						 __func__, uiCacheOp));
 				break;
 		}
 		eError = PVRSRV_OK;
@@ -2967,7 +2971,9 @@ e0:
 	return eError;
 }
 
-PVRSRV_ERROR CacheOpQueue (IMG_UINT32 ui32NumCacheOps,
+PVRSRV_ERROR CacheOpQueue (CONNECTION_DATA *psConnection,
+						   PVRSRV_DEVICE_NODE *psDevNode,
+						   IMG_UINT32 ui32NumCacheOps,
 						   PMR **ppsPMR,
 						   IMG_UINT64 *puiAddress,
 						   IMG_DEVMEM_OFFSET_T *puiOffset,
@@ -2981,6 +2987,9 @@ PVRSRV_ERROR CacheOpQueue (IMG_UINT32 ui32NumCacheOps,
 	PVRSRV_ERROR eError;
 	PVRSRV_TIMELINE uiTimeline = (PVRSRV_TIMELINE)ui32OpTimeline;
 	IMG_CPU_VIRTADDR *pvAddress = (IMG_CPU_VIRTADDR*)(uintptr_t)puiAddress;
+
+	PVR_UNREFERENCED_PARAMETER(psConnection);
+
 #if !defined(CACHEFLUSH_ISA_SUPPORTS_GLOBAL_FLUSH)
 	PVR_LOGR_IF_FALSE((ui32ClientGFSeqNum == 0),
 					  "CacheOpQueue(ui32ClientGFSeqNum > 0)",
@@ -3002,14 +3011,15 @@ PVRSRV_ERROR CacheOpQueue (IMG_UINT32 ui32NumCacheOps,
 	/* Ensure any single timeline CacheOp request is processed immediately */
 	else if (ui32NumCacheOps == 1 && puiCacheOp[0] == PVRSRV_CACHE_OP_TIMELINE)
 	{
-		eError = CacheOpBatchExecTimeline(uiTimeline, IMG_TRUE, uiCurrentFenceSeqNum, pui32NextFenceSeqNum);
+		eError = CacheOpBatchExecTimeline(psDevNode, uiTimeline, IMG_TRUE, uiCurrentFenceSeqNum, pui32NextFenceSeqNum);
 	}
 	/* Services client explicitly requested a GF or config is GF only (i.e. no KRBF support), this takes priority */
 	else if (CacheOpConfigSupports(CACHEOP_CONFIG_KGF) &&
 			 ((puiCacheOp[ui32NumCacheOps-1] & PVRSRV_CACHE_OP_GLOBAL) || !CacheOpConfigSupports(CACHEOP_CONFIG_KRBF)))
 	{
 		eError =
-			CacheOpBatchExecGlobal(ppsPMR,
+			CacheOpBatchExecGlobal(psDevNode,
+								   ppsPMR,
 								   pvAddress,
 								   puiOffset,
 								   puiSize,
@@ -3030,7 +3040,8 @@ PVRSRV_ERROR CacheOpQueue (IMG_UINT32 ui32NumCacheOps,
 		}
 
 		eError =
-			CacheOpBatchExecRangeBased(ppsPMR,
+			CacheOpBatchExecRangeBased(psDevNode,
+									   ppsPMR,
 									   pvAddress,
 									   puiOffset,
 									   puiSize,
@@ -3059,7 +3070,7 @@ PVRSRV_ERROR CacheOpFence (RGXFWIF_DM eFenceOpType, IMG_UINT32 ui32FenceOpSeqNum
 	sCacheOpWorkItem.ui32OpSeqNum = ui32FenceOpSeqNum;
 	sCacheOpWorkItem.ui64EnqueuedTime = OSClockns64();
 	uiTimeNow = sCacheOpWorkItem.ui64EnqueuedTime;
-#if defined(PVR_RI_DEBUG) && defined(DEBUG)
+#if defined(PVRSRV_ENABLE_GPU_MEMORY_INFO) && defined(DEBUG)
 	sCacheOpWorkItem.eFenceOpType = eFenceOpType;
 #endif
 	sCacheOpWorkItem.uiSize = (uintptr_t) OSAtomicRead(&gsCwq.hCompletedSeqNum);
@@ -3247,11 +3258,11 @@ PVRSRV_ERROR CacheOpInit2 (void)
 	PVR_LOGG_IF_ERROR(eError, "OSEventObjectCreate", e0);
 
 	/* Appending work-items is not concurrent, lock protects against this */
-	eError = OSLockCreate((POS_LOCK*)&gsCwq.hDeferredLock, LOCK_TYPE_PASSIVE);
+	eError = OSLockCreate((POS_LOCK*)&gsCwq.hDeferredLock);
 	PVR_LOGG_IF_ERROR(eError, "OSLockCreate", e0);
 
 	/* Apphint read/write is not concurrent, so lock protects against this */
-	eError = OSLockCreate((POS_LOCK*)&gsCwq.hConfigLock, LOCK_TYPE_PASSIVE);
+	eError = OSLockCreate((POS_LOCK*)&gsCwq.hConfigLock);
 	PVR_LOGG_IF_ERROR(eError, "OSLockCreate", e0);
 
 	/* Determine CPU cache ISA maintenance mechanism available, GF and UMF */
@@ -3295,7 +3306,6 @@ PVRSRV_ERROR CacheOpInit2 (void)
 	gsCwq.bSupportsUMFlush = IMG_FALSE;
 #endif
 
-	gsCwq.psInfoPageMemDesc = psPVRSRVData->psInfoPageMemDesc;
 	gsCwq.pui32InfoPage = psPVRSRVData->pui32InfoPage;
 	gsCwq.psInfoPagePMR = psPVRSRVData->psInfoPagePMR;
 
@@ -3338,8 +3348,6 @@ PVRSRV_ERROR CacheOpInit2 (void)
 	gsCwq.pvConfigTune = OSCreateStatisticEntry("cacheop_config",
 											NULL,
 											CacheOpConfigRead,
-											NULL,
-											NULL,
 											NULL);
 	PVR_LOGG_IF_FALSE(gsCwq.pvConfigTune, "OSCreateStatisticEntry", e0);
 
@@ -3432,11 +3440,9 @@ void CacheOpDeInit2 (void)
 
 	if (gsCwq.pvConfigTune)
 	{
-		OSRemoveStatisticEntry(gsCwq.pvConfigTune);
-		gsCwq.pvConfigTune = NULL;
+		OSRemoveStatisticEntry(&gsCwq.pvConfigTune);
 	}
 
-	gsCwq.psInfoPageMemDesc = NULL;
 	gsCwq.pui32InfoPage = NULL;
 	gsCwq.psInfoPagePMR = NULL;
 }
@@ -3459,7 +3465,7 @@ PVRSRV_ERROR CacheOpInit (void)
 	gsCwq.uiCacheOpAddrType = OSCPUCacheOpAddressType();
 
 	/* More information regarding these atomic counters can be found
-	   in the CACHEOP_WORK_QUEUE type definition at top of file  */
+	   in the CACHEOP_WORK_QUEUE type definition at top of file */
 	OSAtomicWrite(&gsCwq.hCompletedSeqNum, 0);
 	OSAtomicWrite(&gsCwq.hCommonSeqNum, 0);
 	OSAtomicWrite(&gsCwq.hDeferredSize, 0);
@@ -3475,12 +3481,12 @@ PVRSRV_ERROR CacheOpInit (void)
 	}
 
 	/* Lock prevents multiple threads from issuing surplus to requirement GF */
-	eError = OSLockCreate((POS_LOCK*)&gsCwq.hGlobalFlushLock, LOCK_TYPE_PASSIVE);
+	eError = OSLockCreate((POS_LOCK*)&gsCwq.hGlobalFlushLock);
 	PVR_LOGG_IF_ERROR(eError, "OSLockCreate", e0);
 
 #if defined(CACHEOP_DEBUG)
 	/* debugfs file read-out is not concurrent, so lock protects against this */
-	eError = OSLockCreate((POS_LOCK*)&gsCwq.hStatsExecLock, LOCK_TYPE_PASSIVE);
+	eError = OSLockCreate((POS_LOCK*)&gsCwq.hStatsExecLock);
 	PVR_LOGG_IF_ERROR(eError, "OSLockCreate", e0);
 
 	gsCwq.i32StatsExecWriteIdx = 0;
@@ -3490,8 +3496,6 @@ PVRSRV_ERROR CacheOpInit (void)
 	gsCwq.pvStatsEntry = OSCreateStatisticEntry("cacheop_history",
 												NULL,
 												CacheOpStatsExecLogRead,
-												NULL,
-												NULL,
 												NULL);
 	PVR_LOGG_IF_ERROR(eError, "OSCreateStatisticEntry", e0);
 #endif
@@ -3511,8 +3515,7 @@ void CacheOpDeInit (void)
 
 	if (gsCwq.pvStatsEntry)
 	{
-		OSRemoveStatisticEntry(gsCwq.pvStatsEntry);
-		gsCwq.pvStatsEntry = NULL;
+		OSRemoveStatisticEntry(&gsCwq.pvStatsEntry);
 	}
 #endif
 	if (gsCwq.hGlobalFlushLock)

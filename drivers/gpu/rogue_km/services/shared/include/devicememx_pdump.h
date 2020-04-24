@@ -63,7 +63,7 @@ DevmemXPDumpLoadMem(DEVMEMX_PHYSDESC *psMemDescPhys,
 #else
 
 #ifdef INLINE_IS_PRAGMA
-#pragma inline(PVRSRVDevMemXPDumpLoadMem)
+#pragma inline(DevmemXPDumpLoadMem)
 #endif
 
 static INLINE void

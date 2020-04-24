@@ -50,6 +50,14 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "kerneldisplay.h"
 #include "sync_server.h"
 
+#define DC_MAX_DEVICE_COUNT		(1)
+#define DC_MAX_PANEL_COUNT		(1)
+#define DC_MAX_FORMATS			(1)
+#define DC_MAX_DIMENSIONS		(1)
+#define DC_MAX_PIPE_COUNT		(1)
+#define DC_MAX_SRV_SYNC_COUNT	(1)
+#define DC_MAX_PLANES			(4)
+
 typedef struct _DC_DEVICE_ DC_DEVICE;
 typedef struct _DC_DISPLAY_CONTEXT_ DC_DISPLAY_CONTEXT;
 typedef struct _DC_BUFFER_ DC_BUFFER;
@@ -165,10 +173,4 @@ IMG_UINT32 DCDeviceGetIndex(IMG_HANDLE hDevice);
 IMG_HANDLE DCDeviceGetDeviceAtIndex(IMG_UINT32 ui32DeviceIndex);
 #endif
 
-#if defined(SUPPORT_DRM_EXT)
-/* FIXME: Temporary workaround. Awaiting buildpkg refresh. */
-#define OSMemCopy(a,b,c) memcpy(a,b,c)
-#endif
-
 #endif /*_DC_SERVER_H_  */
-

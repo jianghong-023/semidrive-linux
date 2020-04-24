@@ -56,7 +56,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #define PVRSRV_BRIDGE_SYNCTRACKING_CMD_LAST			(PVRSRV_BRIDGE_SYNCTRACKING_CMD_FIRST+1)
 
 /*******************************************
-            SyncRecordRemoveByHandle          
+            SyncRecordRemoveByHandle
  *******************************************/
 
 /* Bridge in structure for SyncRecordRemoveByHandle */
@@ -72,7 +72,7 @@ typedef struct PVRSRV_BRIDGE_OUT_SYNCRECORDREMOVEBYHANDLE_TAG
 } __attribute__ ((packed)) PVRSRV_BRIDGE_OUT_SYNCRECORDREMOVEBYHANDLE;
 
 /*******************************************
-            SyncRecordAdd          
+            SyncRecordAdd
  *******************************************/
 
 /* Bridge in structure for SyncRecordAdd */

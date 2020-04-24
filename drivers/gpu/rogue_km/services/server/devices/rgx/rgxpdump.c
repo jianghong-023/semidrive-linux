@@ -61,6 +61,17 @@ static PVRSRV_ERROR _MetaDumpSignatureBufferKM(CONNECTION_DATA * psConnection,
 	PVRSRV_RGXDEV_INFO	*psDevInfo = psDeviceNode->pvDevice;
 
 	PVR_UNREFERENCED_PARAMETER(psConnection);
+
+#if defined(SUPPORT_FIRMWARE_GCOV)
+	/* Gcov */
+	PDumpCommentWithFlags(ui32PDumpFlags, "** Gcov Buffer");
+	DevmemPDumpSaveToFileVirtual(psDevInfo->psFirmwareGcovBufferMemDesc,
+									 0,
+									 psDevInfo->ui32FirmwareGcovSize,
+									 "firmware_gcov.img",
+									 0,
+									 ui32PDumpFlags);
+#endif
 	/* TA signatures */
 	PDumpCommentWithFlags(ui32PDumpFlags, "** Dump TA signatures and checksums Buffer");
 	DevmemPDumpSaveToFileVirtual(psDevInfo->psRGXFWSigTAChecksMemDesc,
@@ -78,27 +89,18 @@ static PVRSRV_ERROR _MetaDumpSignatureBufferKM(CONNECTION_DATA * psConnection,
 								 "out.3dsig",
 								 0,
 								 ui32PDumpFlags);
-#if defined(RGX_FEATURE_RAY_TRACING)
-	if(RGX_IS_FEATURE_SUPPORTED(psDevInfo, RAY_TRACING_DEPRECATED))
+
+	if (RGX_IS_FEATURE_SUPPORTED(psDevInfo, TDM_PDS_CHECKSUM))
 	{
-		/* RT signatures */
-		PDumpCommentWithFlags(ui32PDumpFlags, "** Dump RTU signatures and checksums Buffer");
-		DevmemPDumpSaveToFileVirtual(psDevInfo->psRGXFWSigRTChecksMemDesc,
+		/* TDM signatures */
+		PDumpCommentWithFlags(ui32PDumpFlags, "** Dump TDM signatures and checksums Buffer");
+		DevmemPDumpSaveToFileVirtual(psDevInfo->psRGXFWSigTDM2DChecksMemDesc,
 									 0,
-									 psDevInfo->ui32SigRTChecksSize,
-									 "out.rtsig",
-									 0,
-									 ui32PDumpFlags);
-		/* SH signatures */
-		PDumpCommentWithFlags(ui32PDumpFlags, "** Dump SHG signatures and checksums Buffer");
-		DevmemPDumpSaveToFileVirtual(psDevInfo->psRGXFWSigSHChecksMemDesc,
-									 0,
-									 psDevInfo->ui32SigSHChecksSize,
-									 "out.shsig",
+									 psDevInfo->ui32SigTDM2DChecksSize,
+									 "out.tdmsig",
 									 0,
 									 ui32PDumpFlags);
 	}
-#endif
 
 	return PVRSRV_OK;
 }
@@ -114,7 +116,7 @@ static PVRSRV_ERROR _MetaDumpTraceBufferKM(CONNECTION_DATA * psConnection,
 
 	/* Dump trace buffers */
 	PDumpCommentWithFlags(ui32PDumpFlags, "** Dump trace buffers");
-	for(ui32ThreadNum = 0, ui32OutFileOffset = 0; ui32ThreadNum < RGXFW_THREAD_NUM; ui32ThreadNum++)
+	for (ui32ThreadNum = 0, ui32OutFileOffset = 0; ui32ThreadNum < RGXFW_THREAD_NUM; ui32ThreadNum++)
 	{
 		/*
 		 * Some compilers cannot cope with the use of offsetof() below - the specific problem being the use of
@@ -134,8 +136,18 @@ static PVRSRV_ERROR _MetaDumpTraceBufferKM(CONNECTION_DATA * psConnection,
 								ui32PDumpFlags);
 		ui32OutFileOffset += ui32Size;
 
+		/* next, dump size of trace buffer in DWords */
+		ui32Size = sizeof(IMG_UINT32);
+		DevmemPDumpSaveToFileVirtual(psDevInfo->psRGXFWIfTraceBufCtlMemDesc,
+								offsetof(RGXFWIF_TRACEBUF, ui32TraceBufSizeInDWords),
+								ui32Size,
+								"out.trace",
+								ui32OutFileOffset,
+								ui32PDumpFlags);
+		ui32OutFileOffset += ui32Size;
+
 		/* trace buffer */
-		ui32Size = RGXFW_TRACE_BUFFER_SIZE * sizeof(IMG_UINT32);
+		ui32Size = psDevInfo->psRGXFWIfTraceBuf->ui32TraceBufSizeInDWords * sizeof(IMG_UINT32);
 		PVR_ASSERT(psDevInfo->psRGXFWIfTraceBufferMemDesc[ui32ThreadNum]);
 		DevmemPDumpSaveToFileVirtual(psDevInfo->psRGXFWIfTraceBufferMemDesc[ui32ThreadNum],
 								0, /* 0 offset in the trace buffer mem desc */
@@ -144,7 +156,7 @@ static PVRSRV_ERROR _MetaDumpTraceBufferKM(CONNECTION_DATA * psConnection,
 								ui32OutFileOffset,
 								ui32PDumpFlags);
 		ui32OutFileOffset += ui32Size;
-		
+
 		/* assert info buffer */
 		ui32Size = RGXFW_TRACE_BUFFER_ASSERT_SIZE * sizeof(IMG_CHAR)
 				+ RGXFW_TRACE_BUFFER_ASSERT_SIZE * sizeof(IMG_CHAR)
@@ -159,7 +171,7 @@ static PVRSRV_ERROR _MetaDumpTraceBufferKM(CONNECTION_DATA * psConnection,
 								ui32PDumpFlags);
 		ui32OutFileOffset += ui32Size;
 	}
-	
+
 	/* FW HWPerf buffer is always allocated when PDUMP is defined, irrespective of HWPerf events being enabled/disabled */
 	PVR_ASSERT(psDevInfo->psRGXFWIfHWPerfBufMemDesc);
 
@@ -201,29 +213,19 @@ static PVRSRV_ERROR _MipsDumpSignatureBufferKM(CONNECTION_DATA * psConnection,
 								 psDevInfo->ui32Sig3DChecksSize,
 								 "out.3dsig",
 								 0);
-#if defined(RGX_FEATURE_RAY_TRACING)
-	if(RGX_IS_FEATURE_SUPPORTED(psDevInfo, RAY_TRACING_DEPRECATED))
-	{
-		/* RT signatures */
-		PDumpCommentWithFlags(ui32PDumpFlags, "** Dump RTU signatures and checksums Buffer");
-		DevmemPDumpSaveToFile(psDevInfo->psRGXFWSigRTChecksMemDesc,
-									 0,
-									 psDevInfo->ui32SigRTChecksSize,
-									 "out.rtsig",
-									 0);
 
-		/* SH signatures */
-		PDumpCommentWithFlags(ui32PDumpFlags, "** Dump SHG signatures and checksums Buffer");
-		DevmemPDumpSaveToFile(psDevInfo->psRGXFWSigSHChecksMemDesc,
+	if (RGX_IS_FEATURE_SUPPORTED(psDevInfo, TDM_PDS_CHECKSUM))
+	{
+		/* TDM signatures */
+		PDumpCommentWithFlags(ui32PDumpFlags, "** Dump TDM signatures and checksums Buffer");
+		DevmemPDumpSaveToFile(psDevInfo->psRGXFWSigTDM2DChecksMemDesc,
 									 0,
-									 psDevInfo->ui32SigSHChecksSize,
-									 "out.shsig",
+									 psDevInfo->ui32SigTDM2DChecksSize,
+									 "out.tdmsig",
 									 0);
 	}
-#endif
 
 	return PVRSRV_OK;
-
 }
 
 static PVRSRV_ERROR _MipsDumpTraceBufferKM(CONNECTION_DATA *psConnection,
@@ -237,7 +239,7 @@ static PVRSRV_ERROR _MipsDumpTraceBufferKM(CONNECTION_DATA *psConnection,
 
 	/* Dump trace buffers */
 	PDumpCommentWithFlags(ui32PDumpFlags, "** Dump trace buffers");
-	for(ui32ThreadNum = 0, ui32OutFileOffset = 0; ui32ThreadNum < RGXFW_THREAD_NUM; ui32ThreadNum++)
+	for (ui32ThreadNum = 0, ui32OutFileOffset = 0; ui32ThreadNum < RGXFW_THREAD_NUM; ui32ThreadNum++)
 	{
 		/*
 		 * Some compilers cannot cope with the use of offsetof() below - the specific problem being the use of
@@ -260,8 +262,17 @@ static PVRSRV_ERROR _MipsDumpTraceBufferKM(CONNECTION_DATA *psConnection,
 								ui32OutFileOffset);
 		ui32OutFileOffset += ui32Size;
 
+		/* next, dump size of trace buffer in DWords */
+		ui32Size = sizeof(IMG_UINT32);
+		DevmemPDumpSaveToFile(psDevInfo->psRGXFWIfTraceBufCtlMemDesc,
+								offsetof(RGXFWIF_TRACEBUF, ui32TraceBufSizeInDWords),
+								ui32Size,
+								"out.trace",
+								ui32OutFileOffset);
+		ui32OutFileOffset += ui32Size;
+
 		/* trace buffer */
-		ui32Size = RGXFW_TRACE_BUFFER_SIZE * sizeof(IMG_UINT32);
+		ui32Size = psDevInfo->psRGXFWIfTraceBuf->ui32TraceBufSizeInDWords * sizeof(IMG_UINT32);
 		PVR_ASSERT(psDevInfo->psRGXFWIfTraceBufferMemDesc[ui32ThreadNum]);
 		DevmemPDumpSaveToFile(psDevInfo->psRGXFWIfTraceBufferMemDesc[ui32ThreadNum],
 								0, /* 0 offset in the trace buffer mem desc */
@@ -269,7 +280,7 @@ static PVRSRV_ERROR _MipsDumpTraceBufferKM(CONNECTION_DATA *psConnection,
 								"out.trace",
 								ui32OutFileOffset);
 		ui32OutFileOffset += ui32Size;
-		
+
 		/* assert info buffer */
 		ui32Size = RGXFW_TRACE_BUFFER_ASSERT_SIZE * sizeof(IMG_CHAR)
 				+ RGXFW_TRACE_BUFFER_ASSERT_SIZE * sizeof(IMG_CHAR)
@@ -301,9 +312,9 @@ static PVRSRV_ERROR _MipsDumpTraceBufferKM(CONNECTION_DATA *psConnection,
 PVRSRV_ERROR PVRSRVPDumpSignatureBufferKM(CONNECTION_DATA * psConnection,
                                           PVRSRV_DEVICE_NODE	*psDeviceNode,
                                           IMG_UINT32			ui32PDumpFlags)
-{	
-	if( (psDeviceNode->pfnCheckDeviceFeature) &&
-			PVRSRV_IS_FEATURE_SUPPORTED(psDeviceNode, MIPS))
+{
+	if ( (psDeviceNode->pfnCheckDeviceFeature) &&
+		 PVRSRV_IS_FEATURE_SUPPORTED(psDeviceNode, MIPS))
 	{
 		return _MipsDumpSignatureBufferKM(psConnection,
 										  psDeviceNode,
@@ -321,9 +332,9 @@ PVRSRV_ERROR PVRSRVPDumpSignatureBufferKM(CONNECTION_DATA * psConnection,
 PVRSRV_ERROR PVRSRVPDumpTraceBufferKM(CONNECTION_DATA *psConnection,
                                       PVRSRV_DEVICE_NODE *psDeviceNode,
                                       IMG_UINT32 ui32PDumpFlags)
-{	
-	if( (psDeviceNode->pfnCheckDeviceFeature) &&
-			PVRSRV_IS_FEATURE_SUPPORTED(psDeviceNode, MIPS))
+{
+	if ( (psDeviceNode->pfnCheckDeviceFeature) &&
+		 PVRSRV_IS_FEATURE_SUPPORTED(psDeviceNode, MIPS))
 	{
 		return _MipsDumpTraceBufferKM(psConnection, psDeviceNode, ui32PDumpFlags);
 	}else
@@ -332,7 +343,7 @@ PVRSRV_ERROR PVRSRVPDumpTraceBufferKM(CONNECTION_DATA *psConnection,
 	}
 }
 
-PVRSRV_ERROR RGXPDumpOutputImageHdr(PVRSRV_DEVICE_NODE *psDeviceNode,
+PVRSRV_ERROR RGXPDumpPrepareOutputImageDescriptorHdr(PVRSRV_DEVICE_NODE *psDeviceNode,
 									IMG_UINT32 ui32HeaderSize,
 									IMG_UINT32 ui32DataSize,
 									IMG_UINT32 ui32LogicalWidth,
@@ -343,10 +354,18 @@ PVRSRV_ERROR RGXPDumpOutputImageHdr(PVRSRV_DEVICE_NODE *psDeviceNode,
 									IMG_MEMLAYOUT eMemLayout,
 									IMG_FB_COMPRESSION eFBCompression,
 									const IMG_UINT32 *paui32FBCClearColour,
+									PDUMP_FBC_SWIZZLE eFBCSwizzle,
 									IMG_PBYTE pbyPDumpImageHdr)
 {
 	IMG_PUINT32 pui32Word;
 	IMG_UINT32 ui32HeaderDataSize;
+
+	/* Validate parameters */
+	if (((IMAGE_HEADER_SIZE & ~(HEADER_WORD1_SIZE_CLRMSK >> HEADER_WORD1_SIZE_SHIFT)) != 0) ||
+		((IMAGE_HEADER_VERSION & ~(HEADER_WORD1_VERSION_CLRMSK >> HEADER_WORD1_VERSION_SHIFT)) != 0))
+	{
+		return PVRSRV_ERROR_INVALID_PARAMS;
+	}
 
 	pui32Word = (IMG_PUINT32) pbyPDumpImageHdr;
 	pui32Word[0] = (IMAGE_HEADER_TYPE << HEADER_WORD0_TYPE_SHIFT);
@@ -359,15 +378,15 @@ PVRSRV_ERROR RGXPDumpOutputImageHdr(PVRSRV_DEVICE_NODE *psDeviceNode,
 		ui32HeaderDataSize += ui32HeaderSize;
 	}
 	pui32Word[2] = ui32HeaderDataSize << HEADER_WORD2_DATA_SIZE_SHIFT;
-	
+
 	pui32Word[3] = ui32LogicalWidth << IMAGE_HEADER_WORD3_LOGICAL_WIDTH_SHIFT;
 	pui32Word[4] = ui32LogicalHeight << IMAGE_HEADER_WORD4_LOGICAL_HEIGHT_SHIFT;
-	
+
 	pui32Word[5] = ePixFmt << IMAGE_HEADER_WORD5_FORMAT_SHIFT;
-	
+
 	pui32Word[6] = ui32PhysicalWidth << IMAGE_HEADER_WORD6_PHYSICAL_WIDTH_SHIFT;
 	pui32Word[7] = ui32PhysicalHeight << IMAGE_HEADER_WORD7_PHYSICAL_HEIGHT_SHIFT;
-	
+
 	pui32Word[8] = IMAGE_HEADER_WORD8_STRIDE_POSITIVE | IMAGE_HEADER_WORD8_BIFTYPE_NONE;
 
 	switch (eMemLayout)
@@ -397,6 +416,19 @@ PVRSRV_ERROR RGXPDumpOutputImageHdr(PVRSRV_DEVICE_NODE *psDeviceNode,
 		case 3:
 			pui32Word[9] |= IMAGE_HEADER_WORD9_FBCCOMPAT_V3_REMAP;
 			break;
+		case 4:
+			pui32Word[9] |= IMAGE_HEADER_WORD9_FBCCOMPAT_V4;
+
+			if (eFBCompression == IMG_FB_COMPRESSION_DIRECT_LOSSY_8x8  ||
+				eFBCompression == IMG_FB_COMPRESSION_DIRECT_LOSSY_16x4 ||
+				eFBCompression == IMG_FB_COMPRESSION_DIRECT_LOSSY_32x2)
+			{
+				pui32Word[9] |= IMAGE_HEADER_WORD9_LOSSY_ON;
+			}
+
+			pui32Word[9] |= (eFBCSwizzle << IMAGE_HEADER_WORD9_SWIZZLE_SHIFT) & IMAGE_HEADER_WORD9_SWIZZLE_CLRMSK;
+
+			break;
 		default:
 			PVR_DPF((PVR_DBG_ERROR, "Unsupported algorithm - %d",
 					PVRSRV_GET_DEVICE_FEATURE_VALUE(psDeviceNode, FBCDC_ALGORITHM)));
@@ -409,14 +441,17 @@ PVRSRV_ERROR RGXPDumpOutputImageHdr(PVRSRV_DEVICE_NODE *psDeviceNode,
 	case IMG_FB_COMPRESSION_NONE:
 		break;
 	case IMG_FB_COMPRESSION_DIRECT_8x8:
+	case IMG_FB_COMPRESSION_DIRECT_LOSSY_8x8:
 		pui32Word[8] |= IMAGE_HEADER_WORD8_FBCTYPE_8X8;
 		pui32Word[9] |= IMAGE_HEADER_WORD9_FBCDECOR_ENABLE;
 		break;
 	case IMG_FB_COMPRESSION_DIRECT_16x4:
+	case IMG_FB_COMPRESSION_DIRECT_LOSSY_16x4:
 		pui32Word[8] |= IMAGE_HEADER_WORD8_FBCTYPE_16x4;
 		pui32Word[9] |= IMAGE_HEADER_WORD9_FBCDECOR_ENABLE;
 		break;
 	case IMG_FB_COMPRESSION_DIRECT_32x2:
+	case IMG_FB_COMPRESSION_DIRECT_LOSSY_32x2:
 		pui32Word[9] |= IMAGE_HEADER_WORD9_FBCDECOR_ENABLE;
 		break;
 	default:
@@ -428,7 +463,35 @@ PVRSRV_ERROR RGXPDumpOutputImageHdr(PVRSRV_DEVICE_NODE *psDeviceNode,
 	pui32Word[11] = paui32FBCClearColour[1];
 	pui32Word[12] = paui32FBCClearColour[2];
 	pui32Word[13] = paui32FBCClearColour[3];
-	
+
+	return PVRSRV_OK;
+}
+
+PVRSRV_ERROR RGXPDumpPrepareOutputDataDescriptorHdr(PVRSRV_DEVICE_NODE *psDeviceNode,
+									IMG_UINT32 ui32DataSize,
+									IMG_UINT32 ui32ElementType,
+									IMG_UINT32 ui32ElementCount,
+									IMG_PBYTE pbyPDumpDataHdr)
+{
+	IMG_PUINT32 pui32Word;
+
+	/* Validate parameters */
+	if (((DATA_HEADER_SIZE & ~(HEADER_WORD1_SIZE_CLRMSK >> HEADER_WORD1_SIZE_SHIFT)) != 0) ||
+		((DATA_HEADER_VERSION & ~(HEADER_WORD1_VERSION_CLRMSK >> HEADER_WORD1_VERSION_SHIFT)) != 0))
+	{
+		return PVRSRV_ERROR_INVALID_PARAMS;
+	}
+
+	pui32Word = (IMG_PUINT32) pbyPDumpDataHdr;
+
+	pui32Word[0] = (DATA_HEADER_TYPE << HEADER_WORD0_TYPE_SHIFT);
+	pui32Word[1] = (DATA_HEADER_SIZE << HEADER_WORD1_SIZE_SHIFT) |
+				   (DATA_HEADER_VERSION << HEADER_WORD1_VERSION_SHIFT);
+	pui32Word[2] = ui32DataSize << HEADER_WORD2_DATA_SIZE_SHIFT;
+
+	pui32Word[3] = ui32ElementType << DATA_HEADER_WORD3_ELEMENT_TYPE_SHIFT;
+	pui32Word[4] = ui32ElementCount << DATA_HEADER_WORD4_ELEMENT_COUNT_SHIFT;
+
 	return PVRSRV_OK;
 }
 #endif /* PDUMP */

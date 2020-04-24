@@ -1,6 +1,9 @@
 /*******************************************************************************
+@File
 @Title          Direct client bridge for pdumpctrl
 @Copyright      Copyright (c) Imagination Technologies Ltd. All Rights Reserved
+@Description    Implements the client side of the bridge for pdumpctrl
+                which is used in calls from Server context.
 @License        Dual MIT/GPLv2
 
 The contents of this file are subject to the MIT license as set out below.
@@ -103,5 +106,15 @@ BridgePVRSRVPDumpIsLastCaptureFrame(IMG_HANDLE hBridge,
 
 	eError = PDumpIsLastCaptureFrameKM(pbpbIsLastCaptureFrame);
 
+	return eError;
+}
+
+IMG_INTERNAL PVRSRV_ERROR IMG_CALLCONV
+BridgePVRSRVPDumpForceCaptureStop(IMG_HANDLE hBridge)
+{
+	PVRSRV_ERROR eError;
+	PVR_UNREFERENCED_PARAMETER(hBridge);
+
+	eError = PDumpForceCaptureStopKM();
 	return eError;
 }

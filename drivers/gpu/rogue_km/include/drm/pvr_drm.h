@@ -3,6 +3,7 @@
 /*************************************************************************/ /*!
 @File
 @Title          PVR DRM definitions shared between kernel and user space.
+@Codingstyle    LinuxKernel
 @Copyright      Copyright (c) Imagination Technologies Ltd. All Rights Reserved
 @License        Dual MIT/GPLv2
 
@@ -69,25 +70,16 @@ struct drm_pvr_srvkm_cmd {
 	__u32 out_data_size;
 };
 
-struct drm_pvr_dbgdrv_cmd {
-	__u32 cmd;
-	__u32 pad;
-	__u64 in_data_ptr;
-	__u64 out_data_ptr;
-	__u32 in_data_size;
-	__u32 out_data_size;
-};
-
 /*
  * DRM command numbers, relative to DRM_COMMAND_BASE.
  * These defines must be prefixed with "DRM_".
  */
 #define DRM_PVR_SRVKM_CMD		0 /* Used for PVR Services ioctls */
-#define DRM_PVR_DBGDRV_CMD		1 /* Debug driver (PDUMP) ioctls */
 
 
 /* These defines must be prefixed with "DRM_IOCTL_". */
-#define	DRM_IOCTL_PVR_SRVKM_CMD		DRM_IOWR(DRM_COMMAND_BASE + DRM_PVR_SRVKM_CMD, struct drm_pvr_srvkm_cmd)
-#define	DRM_IOCTL_PVR_DBGDRV_CMD	DRM_IOWR(DRM_COMMAND_BASE + DRM_PVR_DBGDRV_CMD, struct drm_pvr_dbgdrv_cmd)
+#define	DRM_IOCTL_PVR_SRVKM_CMD	\
+	DRM_IOWR(DRM_COMMAND_BASE + DRM_PVR_SRVKM_CMD, \
+		 struct drm_pvr_srvkm_cmd)
 
 #endif /* defined(__PVR_DRM_H__) */

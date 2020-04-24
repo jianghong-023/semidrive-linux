@@ -53,11 +53,11 @@ static inline void pvr_fence_cleanup(void)
 {
 }
 #else
+#include "services_kernel_client.h"
 #include "pvr_linux_fence.h"
 #include <linux/list.h>
 #include <linux/spinlock.h>
 #include <linux/workqueue.h>
-#include <linux/completion.h>
 
 struct _SYNC_CHECKPOINT_CONTEXT;
 struct _SYNC_CHECKPOINT;
@@ -67,7 +67,6 @@ struct _SYNC_CHECKPOINT;
  * @lock: protects the context and fences created on the context
  * @name: fence context name (used for debugging)
  * @dbg_request_handle: handle for callback used to dump debug data
- * @sync_checkpoint_context: context used to create services sync checkpoints
  * @fence_context: fence context with which to associate fences
  * @fence_seqno: sequence number to use for the next fence
  * @fence_wq: work queue for signalled fence work
@@ -86,8 +85,6 @@ struct pvr_fence_context {
 	spinlock_t lock;
 	char name[32];
 	void *dbg_request_handle;
-
-	struct _SYNC_CHECKPOINT_CONTEXT *sync_checkpoint_context;
 	u64 fence_context;
 	atomic_t fence_seqno;
 
@@ -102,10 +99,7 @@ struct pvr_fence_context {
 	struct list_head deferred_free_list;
 
 	struct kref kref;
-	struct delayed_work destroy_work;
-	unsigned int destroy_retries_left;
-	unsigned int destroy_delay_ms;
-	struct completion *global_complete;
+	struct work_struct destroy_work;
 };
 
 /**
@@ -126,6 +120,10 @@ struct pvr_fence {
 
 	struct dma_fence *fence;
 	struct _SYNC_CHECKPOINT *sync_checkpoint;
+
+#if defined(PVRSRV_SYNC_CHECKPOINT_CCB)
+	struct hlist_node ufo_lookup;
+#endif
 
 	struct list_head fence_head;
 	struct list_head signal_head;
@@ -155,39 +153,51 @@ static inline struct pvr_fence *to_pvr_fence(struct dma_fence *fence)
 	return NULL;
 }
 
-struct pvr_fence_context *pvr_fence_context_create(void *dev_cookie,
-						   struct workqueue_struct *fence_status_wq,
-						   const char *name);
-struct pvr_fence_context *pvr_global_fence_context_create(void *dev_cookie,
-							  struct workqueue_struct *fence_status_wq,
-							  const char *name);
+struct pvr_fence_context *
+pvr_fence_context_create(void *dev_cookie,
+			 struct workqueue_struct *fence_status_wq,
+			 const char *name);
 void pvr_fence_context_destroy(struct pvr_fence_context *fctx);
 void pvr_context_value_str(struct pvr_fence_context *fctx, char *str, int size);
 
-struct pvr_fence *pvr_fence_create(struct pvr_fence_context *fctx,
-				   int timeline_fd, const char *name);
-struct pvr_fence *pvr_fence_create_from_fence(struct pvr_fence_context *fctx,
-					      struct dma_fence *fence,
-					      const char *name);
+struct pvr_fence *
+pvr_fence_create(struct pvr_fence_context *fctx,
+		 struct _SYNC_CHECKPOINT_CONTEXT *sync_checkpoint_ctx,
+		 int timeline_fd, const char *name);
+struct pvr_fence *
+pvr_fence_create_from_fence(struct pvr_fence_context *fctx,
+			    struct _SYNC_CHECKPOINT_CONTEXT *sync_checkpoint_ctx,
+			    struct dma_fence *fence,
+			    PVRSRV_FENCE fence_fd,
+			    const char *name);
 void pvr_fence_destroy(struct pvr_fence *pvr_fence);
 int pvr_fence_sw_signal(struct pvr_fence *pvr_fence);
 int pvr_fence_sw_error(struct pvr_fence *pvr_fence);
 
 int pvr_fence_get_checkpoints(struct pvr_fence **pvr_fences, u32 nr_fences,
 			      struct _SYNC_CHECKPOINT **fence_checkpoints);
-struct _SYNC_CHECKPOINT *pvr_fence_get_checkpoint(struct pvr_fence *update_fence);
+struct _SYNC_CHECKPOINT *
+pvr_fence_get_checkpoint(struct pvr_fence *update_fence);
 
 void pvr_fence_context_signal_fences_nohw(void *data);
 
+void pvr_fence_context_free_deferred_callback(void *data);
+
 u32 pvr_fence_dump_info_on_stalled_ufos(struct pvr_fence_context *fctx,
-                                        u32 nr_ufos,
-                                        u32 *vaddrs);
+					u32 nr_ufos,
+					u32 *vaddrs);
+
+#if defined(PVRSRV_SYNC_CHECKPOINT_CCB)
+enum tag_img_bool pvr_fence_checkpoint_ufo_has_signalled(u32 fwaddr, u32 value);
+
+void pvr_fence_check_state(void);
+#endif
 
 static inline void pvr_fence_cleanup(void)
 {
 	/*
-	 * Ensure any outstanding work needed to destroy PVR fence
-	 * contexts has completed, by flushing the global workqueue.
+	 * Ensure all PVR fence contexts have been destroyed, by flushing
+	 * the global workqueue.
 	 */
 	flush_scheduled_work();
 }

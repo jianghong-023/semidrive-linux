@@ -60,7 +60,7 @@ PVRSRV_ERROR InfoPageCreate(PVRSRV_DATA *psData)
 
     PVR_ASSERT(psData != NULL);
 
-    /* Create the CacheOp information page */
+    /* Allocate single page of memory for driver information page */
     eError = DevmemAllocateExportable(psData->psHostMemDeviceNode,
                                       OSGetPageSize(),
                                       OSGetPageSize(),
@@ -74,13 +74,12 @@ PVRSRV_ERROR InfoPageCreate(PVRSRV_DATA *psData)
                                        (void **) &psData->pui32InfoPage);
     PVR_LOGG_IF_ERROR(eError, "DevmemAllocateExportable", e0);
 
-    /* This PMR is also used for deferring timelines, global flush & logging KM
-     * requests in debug */
+    /* Look-up the memory descriptor PMR handle */
     eError = DevmemLocalGetImportHandle(psData->psInfoPageMemDesc,
                                         (void **) &psData->psInfoPagePMR);
     PVR_LOGG_IF_ERROR(eError, "DevmemLocalGetImportHandle", e0);
 
-    eError = OSLockCreate(&psData->hInfoPageLock, LOCK_TYPE_PASSIVE);
+    eError = OSLockCreate(&psData->hInfoPageLock);
     PVR_LOGG_IF_ERROR(eError, "OSLockCreate", e0);
 
     return PVRSRV_OK;

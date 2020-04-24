@@ -65,6 +65,7 @@ PVRSRV_ERROR PVRSRVRGXTDMCreateTransferContextKM(
 	IMG_UINT32                  ui32FrameworkCommandSize,
 	IMG_PBYTE                   pabyFrameworkCommand,
 	IMG_HANDLE                  hMemCtxPrivData,
+	IMG_UINT32					ui32PackedCCBSizeU88,
 	RGX_SERVER_TQ_TDM_CONTEXT **ppsTransferContext);
 
 
@@ -83,13 +84,15 @@ PVRSRV_ERROR PVRSRVRGXTDMSubmitTransferKM(
 	SYNC_PRIMITIVE_BLOCK     ** pauiClientUpdateUFOSyncPrimBlock,
 	IMG_UINT32                * paui32ClientUpdateSyncOffset,
 	IMG_UINT32                * paui32ClientUpdateValue,
+#if defined(SUPPORT_SERVER_SYNC_IMPL)
 	IMG_UINT32                  ui32ServerSyncCount,
 	IMG_UINT32                * paui32ServerSyncFlags,
 	SERVER_SYNC_PRIMITIVE    ** papsServerSyncs,
+#endif
 	PVRSRV_FENCE                iCheckFence,
 	PVRSRV_TIMELINE             iUpdateTimeline,
 	PVRSRV_FENCE              * piUpdateFence,
-	IMG_CHAR                    szUpdateFenceName[32],
+	IMG_CHAR                    szUpdateFenceName[PVRSRV_SYNC_NAME_LENGTH],
 	IMG_UINT32                  ui32FWCommandSize,
 	IMG_UINT8                 * pui8FWCommand,
 	IMG_UINT32                  ui32ExtJobRef,
@@ -106,10 +109,11 @@ PVRSRV_ERROR PVRSRVRGXTDMSetTransferContextPriorityKM(CONNECTION_DATA *psConnect
 												   RGX_SERVER_TQ_TDM_CONTEXT *psTransferContext,
 												   IMG_UINT32 ui32Priority);
 
-/* Debug - check if transfer context is waiting on a fence */
-void CheckForStalledTDMTransferCtxt(PVRSRV_RGXDEV_INFO *psDevInfo,
-					DUMPDEBUG_PRINTF_FUNC *pfnDumpDebugPrintf,
-					void *pvDumpDebugFile);
+/* Debug - Dump debug info of TDM transfer contexts on this device */
+void DumpTDMTransferCtxtsInfo(PVRSRV_RGXDEV_INFO *psDevInfo,
+                              DUMPDEBUG_PRINTF_FUNC *pfnDumpDebugPrintf,
+                              void *pvDumpDebugFile,
+                              IMG_UINT32 ui32VerbLevel);
 
 /* Debug/Watchdog - check if client transfer contexts are stalled */
 IMG_UINT32 CheckForStalledClientTDMTransferCtxt(PVRSRV_RGXDEV_INFO *psDevInfo);

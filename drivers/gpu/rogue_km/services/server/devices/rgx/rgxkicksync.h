@@ -2,7 +2,7 @@
 @File           rgxkicksync.h
 @Title          Server side of the sync only kick API
 @Copyright      Copyright (c) Imagination Technologies Ltd. All Rights Reserved
-@Description    
+@Description
 @License        Dual MIT/GPLv2
 
 The contents of this file are subject to the MIT license as set out below.
@@ -53,13 +53,14 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 typedef struct _RGX_SERVER_KICKSYNC_CONTEXT_ RGX_SERVER_KICKSYNC_CONTEXT;
 
 /**************************************************************************/ /*!
-@Function       CheckForStalledKickSyncCtxt
-@Description    Function that checks if a kick sync ctx is stalled
+@Function       DumpKickSyncCtxtsInfo
+@Description    Function that dumps debug info of kick sync ctxs on this device
 @Return         none
  */ /**************************************************************************/
-void CheckForStalledKickSyncCtxt(PVRSRV_RGXDEV_INFO *psDevInfo,
-                                 DUMPDEBUG_PRINTF_FUNC *pfnDumpDebugPrintf,
-                                 void *pvDumpDebugFile);
+void DumpKickSyncCtxtsInfo(PVRSRV_RGXDEV_INFO *psDevInfo,
+                           DUMPDEBUG_PRINTF_FUNC *pfnDumpDebugPrintf,
+                           void *pvDumpDebugFile,
+                           IMG_UINT32 ui32VerbLevel);
 
 /**************************************************************************/ /*!
 @Function       CheckForStalledClientKickSyncCtxt
@@ -76,6 +77,7 @@ IMG_UINT32 CheckForStalledClientKickSyncCtxt(PVRSRV_RGXDEV_INFO *psDevInfo);
 PVRSRV_ERROR PVRSRVRGXCreateKickSyncContextKM(CONNECTION_DATA             * psConnection,
                                               PVRSRV_DEVICE_NODE          * psDeviceNode,
                                               IMG_HANDLE					hMemCtxPrivData,
+											  IMG_UINT32					ui32PackedCCBSizeU88,
                                               RGX_SERVER_KICKSYNC_CONTEXT ** ppsKicksyncContext);
 
 
@@ -106,15 +108,15 @@ PVRSRV_ERROR PVRSRVRGXKickSyncKM(RGX_SERVER_KICKSYNC_CONTEXT * psKicksyncContext
                                  SYNC_PRIMITIVE_BLOCK           ** pauiClientUpdateUFOSyncPrimBlock,
                                  IMG_UINT32                  * paui32ClientUpdateSyncOffset,
                                  IMG_UINT32                  * paui32ClientUpdateValue,
-
+#if defined(SUPPORT_SERVER_SYNC_IMPL)
                                  IMG_UINT32                    ui32ServerSyncPrims,
                                  IMG_UINT32                  * paui32ServerSyncFlags,
                                  SERVER_SYNC_PRIMITIVE      ** pasServerSyncs,
-
+#endif
                                  PVRSRV_FENCE                  iCheckFence,
                                  PVRSRV_TIMELINE               iUpdateTimeline,
                                  PVRSRV_FENCE                * piUpdateFence,
-                                 IMG_CHAR                      szUpdateFenceName[32],
+                                 IMG_CHAR                      szUpdateFenceName[PVRSRV_SYNC_NAME_LENGTH],
 
                                  IMG_UINT32                    ui32ExtJobRef);
 

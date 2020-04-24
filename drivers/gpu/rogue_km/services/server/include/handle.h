@@ -44,6 +44,8 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #if !defined(__HANDLE_H__)
 #define __HANDLE_H__
 
+#include "lock_types.h"
+
 /*
  * Handle API
  * ----------
@@ -110,14 +112,12 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  *
  * Deallocate a handle of given type.
  *
- * PVRSRV_ERROR PVRSRVGetParentHandle(PVRSRV_HANDLE_BASE *psBase,
- * 	void **phParent, IMG_HANDLE hHandle, PVRSRV_HANDLE_TYPE eType);
- *
  * Return the parent of a handle in *phParent, or NULL if the handle has
  * no parent.
  */
 
 #include "img_types.h"
+#include "img_defs.h"
 #include "hash.h"
 
 typedef enum
@@ -177,8 +177,6 @@ PVRSRV_ERROR PVRSRVLookupHandleUnlocked(PVRSRV_HANDLE_BASE *psBase, void **ppvDa
 
 PVRSRV_ERROR PVRSRVLookupSubHandle(PVRSRV_HANDLE_BASE *psBase, void **ppvData, IMG_HANDLE hHandle, PVRSRV_HANDLE_TYPE eType, IMG_HANDLE hAncestor);
 
-PVRSRV_ERROR PVRSRVGetParentHandle(PVRSRV_HANDLE_BASE *psBase, IMG_HANDLE *phParent, IMG_HANDLE hHandle, PVRSRV_HANDLE_TYPE eType);
-
 PVRSRV_ERROR PVRSRVReleaseHandle(PVRSRV_HANDLE_BASE *psBase, IMG_HANDLE hHandle, PVRSRV_HANDLE_TYPE eType);
 PVRSRV_ERROR PVRSRVReleaseHandleUnlocked(PVRSRV_HANDLE_BASE *psBase, IMG_HANDLE hHandle, PVRSRV_HANDLE_TYPE eType);
 
@@ -195,8 +193,10 @@ PVRSRV_ERROR PVRSRVHandleInit(void);
 
 PVRSRV_ERROR PVRSRVHandleDeInit(void);
 
-void LockHandle(void);
-void UnlockHandle(void);
+PVRSRV_HANDLE_BASE *PVRSRVRetrieveProcessHandleBase(void);
+
+void LockHandle(PVRSRV_HANDLE_BASE *psBase);
+void UnlockHandle(PVRSRV_HANDLE_BASE *psBase);
 
 
 #endif /* !defined(__HANDLE_H__) */

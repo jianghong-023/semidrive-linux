@@ -1,14 +1,14 @@
-/* 
+/*
 * sysinfo.h
-* 
-* Copyright (c) 2018 Semidrive Semiconductor. 
-* All rights reserved. 
-* 
-* Description: System abstraction layer . 
-* 
-* Revision History: 
-* ----------------- 
-* 011, 01/14/2019 Lili create this file 
+*
+* Copyright (c) 2018 Semidrive Semiconductor.
+* All rights reserved.
+*
+* Description: System abstraction layer .
+*
+* Revision History:
+* -----------------
+* 011, 01/14/2019 Lili create this file
 */
 
 #if !defined(__SYSINFO_H__)

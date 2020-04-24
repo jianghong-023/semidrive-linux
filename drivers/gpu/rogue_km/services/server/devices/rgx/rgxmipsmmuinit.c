@@ -44,6 +44,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #include "device.h"
 #include "img_types.h"
+#include "img_defs.h"
 #include "mmu_common.h"
 #include "pdump_mmu.h"
 #include "rgxheapconfig.h"
@@ -184,7 +185,7 @@ PVRSRV_ERROR RGXMipsMMUInit_Register(PVRSRV_DEVICE_NODE *psDeviceNode)
 	sRGXMMUPCEConfig.uiAddrMask = 0; /* Mask to get significant address bits of PC entry */
 
 	sRGXMMUPCEConfig.uiAddrShift = 0; /* Shift this many bits to get PD address in PC entry */
-	sRGXMMUPCEConfig.uiAddrLog2Align = (IMG_UINT32)RGXMIPSFW_LOG2_PAGE_SIZE; /* Alignment of PD AND PC */
+	sRGXMMUPCEConfig.uiAddrLog2Align = (IMG_UINT32)RGXMIPSFW_LOG2_PAGE_SIZE_4K; /* Alignment of PD AND PC */
 
 	sRGXMMUPCEConfig.uiProtMask = RGX_MIPS_MMUCTRL_PCE_PROTMASK; //Mask to get the status bits of the PC */
 	sRGXMMUPCEConfig.uiProtShift = 0; /* Shift this many bits to have status bits starting with bit 0 */
@@ -204,9 +205,8 @@ PVRSRV_ERROR RGXMipsMMUInit_Register(PVRSRV_DEVICE_NODE *psDeviceNode)
 	sRGXMMUTopLevelDevVAddrConfig.uiNumEntriesPD = 0;
 
 	sRGXMMUTopLevelDevVAddrConfig.uiPTIndexMask = IMG_UINT64_C(0xfffffff000); /* Get the PT address bits from a 40 bit virt. address (in a 64bit UINT) */
-	sRGXMMUTopLevelDevVAddrConfig.uiPTIndexShift = (IMG_UINT32)RGXMIPSFW_LOG2_PAGE_SIZE;
-	sRGXMMUTopLevelDevVAddrConfig.uiNumEntriesPT = RGX_FIRMWARE_RAW_HEAP_SIZE >> sRGXMMUTopLevelDevVAddrConfig.uiPTIndexShift;
-
+	sRGXMMUTopLevelDevVAddrConfig.uiPTIndexShift = (IMG_UINT32)RGXMIPSFW_LOG2_PAGE_SIZE_4K;
+	sRGXMMUTopLevelDevVAddrConfig.uiNumEntriesPT = (1U << RGXMIPSFW_LOG2_PAGETABLE_PAGE_SIZE) >> RGXMIPSFW_LOG2_PTE_ENTRY_SIZE;
 /*
  *
  *  Configuration for heaps with 4kB Data-Page size
@@ -221,7 +221,7 @@ PVRSRV_ERROR RGXMipsMMUInit_Register(PVRSRV_DEVICE_NODE *psDeviceNode)
 	/* No PD used for MIPS */
 	sRGXMMUPDEConfig_4KBDP.uiAddrMask = 0;
 	sRGXMMUPDEConfig_4KBDP.uiAddrShift = 0;
-	sRGXMMUPDEConfig_4KBDP.uiAddrLog2Align = (IMG_UINT32)RGXMIPSFW_LOG2_PAGE_SIZE;
+	sRGXMMUPDEConfig_4KBDP.uiAddrLog2Align = (IMG_UINT32)RGXMIPSFW_LOG2_PAGE_SIZE_4K;
 
 	sRGXMMUPDEConfig_4KBDP.uiVarCtrlMask = IMG_UINT64_C(0x0);
 	sRGXMMUPDEConfig_4KBDP.uiVarCtrlShift = 0;
@@ -250,7 +250,7 @@ PVRSRV_ERROR RGXMipsMMUInit_Register(PVRSRV_DEVICE_NODE *psDeviceNode)
 	}
 
 	sRGXMMUPTEConfig_4KBDP.uiAddrShift = RGXMIPSFW_ENTRYLO_PFN_SHIFT;
-	sRGXMMUPTEConfig_4KBDP.uiAddrLog2Align = (IMG_UINT32)RGXMIPSFW_LOG2_PAGE_SIZE;
+	sRGXMMUPTEConfig_4KBDP.uiAddrLog2Align = (IMG_UINT32)RGXMIPSFW_LOG2_PAGE_SIZE_4K;
 
 	sRGXMMUPTEConfig_4KBDP.uiProtMask = RGXMIPSFW_ENTRYLO_DVG | ~RGXMIPSFW_ENTRYLO_CACHE_POLICY_CLRMSK;
 	sRGXMMUPTEConfig_4KBDP.uiProtShift = 0;
@@ -385,17 +385,28 @@ PVRSRV_ERROR RGXMipsMMUInit_Register(PVRSRV_DEVICE_NODE *psDeviceNode)
 	 * Setup sRGXMMUPTEConfig_64KBDP.
 	 *
 	 */
-	sRGXMMUPTEConfig_64KBDP.uiBytesPerEntry = 0;
+	sRGXMMUPTEConfig_64KBDP.uiBytesPerEntry = 1 << RGXMIPSFW_LOG2_PTE_ENTRY_SIZE;
 
-	sRGXMMUPTEConfig_64KBDP.uiAddrMask = 0;
-	sRGXMMUPTEConfig_64KBDP.uiAddrShift = 0;
-	sRGXMMUPTEConfig_64KBDP.uiAddrLog2Align = 0;
+	if (bPhysBusAbove32Bit)
+	{
+		sRGXMMUPTEConfig_64KBDP.uiAddrMask = RGXMIPSFW_ENTRYLO_PFN_MASK_ABOVE_32BIT;
+		gui32CachedPolicy = RGXMIPSFW_CACHED_POLICY_ABOVE_32BIT;
+	}
+	else
+	{
+		sRGXMMUPTEConfig_64KBDP.uiAddrMask = RGXMIPSFW_ENTRYLO_PFN_MASK;
+		gui32CachedPolicy = RGXMIPSFW_CACHED_POLICY;
+	}
 
-	sRGXMMUPTEConfig_64KBDP.uiProtMask = 0;
+	/* Even while using 64K pages, MIPS still aligns addresses to 4K */
+	sRGXMMUPTEConfig_64KBDP.uiAddrShift = RGXMIPSFW_ENTRYLO_PFN_SHIFT;
+	sRGXMMUPTEConfig_64KBDP.uiAddrLog2Align = (IMG_UINT32)RGXMIPSFW_LOG2_PAGE_SIZE_4K;
+
+	sRGXMMUPTEConfig_64KBDP.uiProtMask = RGXMIPSFW_ENTRYLO_DVG | ~RGXMIPSFW_ENTRYLO_CACHE_POLICY_CLRMSK;
 	sRGXMMUPTEConfig_64KBDP.uiProtShift = 0;
 
-	sRGXMMUPTEConfig_64KBDP.uiValidEnMask = 0;
-	sRGXMMUPTEConfig_64KBDP.uiValidEnShift = 0;
+	sRGXMMUPTEConfig_64KBDP.uiValidEnMask = RGXMIPSFW_ENTRYLO_VALID_EN;
+	sRGXMMUPTEConfig_64KBDP.uiValidEnShift = RGXMIPSFW_ENTRYLO_VALID_SHIFT;
 
 	/*
 	 * Setup sRGXMMUDevVAddrConfig_64KBDP.
@@ -408,13 +419,13 @@ PVRSRV_ERROR RGXMipsMMUInit_Register(PVRSRV_DEVICE_NODE *psDeviceNode)
 	sRGXMMUDevVAddrConfig_64KBDP.uiPDIndexShift = 0;
 	sRGXMMUDevVAddrConfig_64KBDP.uiNumEntriesPD = 0;
 
-	sRGXMMUDevVAddrConfig_64KBDP.uiPTIndexMask = 0;
-	sRGXMMUDevVAddrConfig_64KBDP.uiPTIndexShift = 0;
-	sRGXMMUDevVAddrConfig_64KBDP.uiNumEntriesPT = 0;
+	sRGXMMUDevVAddrConfig_64KBDP.uiPTIndexMask = IMG_UINT64_C(0x00ffff0000);
+	sRGXMMUDevVAddrConfig_64KBDP.uiPTIndexShift = (IMG_UINT32)RGXMIPSFW_LOG2_PAGE_SIZE_64K;
+	sRGXMMUDevVAddrConfig_64KBDP.uiNumEntriesPT = RGX_FIRMWARE_RAW_HEAP_SIZE >> sRGXMMUDevVAddrConfig_64KBDP.uiPTIndexShift;
 
-	sRGXMMUDevVAddrConfig_64KBDP.uiPageOffsetMask = 0;
+	sRGXMMUDevVAddrConfig_64KBDP.uiPageOffsetMask = IMG_UINT64_C(0x000000ffff);
 	sRGXMMUDevVAddrConfig_64KBDP.uiPageOffsetShift = 0;
-	sRGXMMUDevVAddrConfig_64KBDP.uiOffsetInBytes = 0;
+	sRGXMMUDevVAddrConfig_64KBDP.uiOffsetInBytes = RGX_FIRMWARE_RAW_HEAP_BASE & IMG_UINT64_C(0x00ffffffff);
 
 	/*
 	 * Setup gsPageSizeConfig64KB.
@@ -767,16 +778,16 @@ static IMG_UINT32 RGXDerivePTEProt4(IMG_UINT32 uiProtFlags)
 {
 	IMG_UINT32 ui32MMUFlags = 0;
 
-	if(((MMU_PROTFLAGS_READABLE|MMU_PROTFLAGS_WRITEABLE) & uiProtFlags) == (MMU_PROTFLAGS_READABLE|MMU_PROTFLAGS_WRITEABLE))
+	if (((MMU_PROTFLAGS_READABLE|MMU_PROTFLAGS_WRITEABLE) & uiProtFlags) == (MMU_PROTFLAGS_READABLE|MMU_PROTFLAGS_WRITEABLE))
 	{
 		/* read/write */
 		ui32MMUFlags |= RGXMIPSFW_ENTRYLO_DIRTY_EN;
 	}
-	else if(MMU_PROTFLAGS_READABLE & uiProtFlags)
+	else if (MMU_PROTFLAGS_READABLE & uiProtFlags)
 	{
 		/* read only */
 	}
-	else if(MMU_PROTFLAGS_WRITEABLE & uiProtFlags)
+	else if (MMU_PROTFLAGS_WRITEABLE & uiProtFlags)
 	{
 		/* write only */
 		ui32MMUFlags |= RGXMIPSFW_ENTRYLO_READ_INHIBIT_EN;
@@ -787,7 +798,7 @@ static IMG_UINT32 RGXDerivePTEProt4(IMG_UINT32 uiProtFlags)
 	}
 
 	/* cache coherency */
-	if(MMU_PROTFLAGS_CACHE_COHERENT & uiProtFlags)
+	if (MMU_PROTFLAGS_CACHE_COHERENT & uiProtFlags)
 	{
 		PVR_DPF((PVR_DBG_ERROR, "RGXDerivePTEProt4: cache coherency not supported for MIPS caches"));
 	}
@@ -851,8 +862,9 @@ static PVRSRV_ERROR RGXGetPageSizeConfigCB(IMG_UINT32 uiLog2DataPageSize,
 	switch (uiLog2DataPageSize)
 	{
 	case RGXMIPSFW_LOG2_PAGE_SIZE_64K:
-		/* FW will use 4k and GPU 64k */
-	case RGXMIPSFW_LOG2_PAGE_SIZE:
+		psPageSizeConfig = &gsPageSizeConfig64KB;
+		break;
+	case RGXMIPSFW_LOG2_PAGE_SIZE_4K:
 		psPageSizeConfig = &gsPageSizeConfig4KB;
 		break;
 	default:
@@ -904,8 +916,9 @@ static PVRSRV_ERROR RGXPutPageSizeConfigCB(IMG_HANDLE hPriv)
 	switch (uiLog2DataPageSize)
 	{
 	case RGXMIPSFW_LOG2_PAGE_SIZE_64K:
-		/* FW will use 4k and GPU 64k */
-	case RGXMIPSFW_LOG2_PAGE_SIZE:
+		psPageSizeConfig = &gsPageSizeConfig64KB;
+		break;
+	case RGXMIPSFW_LOG2_PAGE_SIZE_4K:
 		psPageSizeConfig = &gsPageSizeConfig4KB;
 		break;
 	default:

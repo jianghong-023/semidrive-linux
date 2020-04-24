@@ -25,8 +25,8 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 */ /**************************************************************************/
 
-#ifndef _POWERVR_TYPES_H_
-#define _POWERVR_TYPES_H_
+#ifndef POWERVR_TYPES_H
+#define POWERVR_TYPES_H
 
 #if defined (__cplusplus)
 extern "C" {
@@ -45,11 +45,11 @@ extern "C" {
 typedef void *IMG_CPU_VIRTADDR;
 
 /* device virtual address */
-typedef struct _IMG_DEV_VIRTADDR
+typedef struct
 {
 	uint64_t  uiAddr;
 #define IMG_CAST_TO_DEVVADDR_UINT(var)		(uint64_t)(var)
-	
+
 } IMG_DEV_VIRTADDR;
 
 typedef uint64_t IMG_DEVMEM_SIZE_T;

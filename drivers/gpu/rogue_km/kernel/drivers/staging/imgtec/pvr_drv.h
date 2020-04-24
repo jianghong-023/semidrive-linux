@@ -76,13 +76,6 @@ void pvr_drm_unload(struct drm_device *ddev);
 #endif
 #endif
 
-#if defined(PDUMP)
-int dbgdrv_init(void);
-void dbgdrv_cleanup(void);
-int dbgdrv_ioctl(struct drm_device *dev, void *arg, struct drm_file *file);
-int dbgdrv_ioctl_compat(struct file *file, unsigned int cmd, unsigned long arg);
-#endif
-
 int PVRSRV_BridgeDispatchKM(struct drm_device *dev, void *arg,
 			    struct drm_file *file);
 int PVRSRV_MMap(struct file *file, struct vm_area_struct *ps_vma);

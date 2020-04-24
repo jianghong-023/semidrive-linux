@@ -59,12 +59,6 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #ifndef __pvrsrv_defined_struct_enum__
 
-/* rgx_fwif_shared.h */
-
-struct _RGXFWIF_DEV_VIRTADDR_ {
-	__u32 ui32Addr;
-};
-
 /* sync_external.h */
 
 struct PVRSRV_CLIENT_SYNC_PRIM {
@@ -78,16 +72,7 @@ struct PVRSRV_CLIENT_SYNC_PRIM_OP {
 	__u32 ui32UpdateValue;
 };
 
-typedef	enum tag_img_bool
-{
-	IMG_FALSE		= 0,
-	IMG_TRUE		= 1,
-	IMG_FORCE_ALIGN = 0x7FFFFFFF
-} IMG_BOOL, *IMG_PBOOL;
-
 #else /* __pvrsrv_defined_struct_enum__ */
-
-struct _RGXFWIF_DEV_VIRTADDR_;
 
 struct PVRSRV_CLIENT_SYNC_PRIM;
 struct PVRSRV_CLIENT_SYNC_PRIM_OP;
@@ -126,6 +111,8 @@ void PVRSRVCheckStatus(void *hCmdCompCallerHandle);
 #define DEBUG_REQUEST_VERBOSITY_MEDIUM 1
 #define DEBUG_REQUEST_VERBOSITY_HIGH   2
 #define DEBUG_REQUEST_VERBOSITY_MAX    DEBUG_REQUEST_VERBOSITY_HIGH
+
+#define DD_VERB_LVL_ENABLED(_verbLvl, _verbLvlChk) ((_verbLvl) >= (_verbLvlChk))
 
 #ifndef _DBGNOTIFY_PFNS_
 typedef void (DUMPDEBUG_PRINTF_FUNC)(void *pvDumpDebugFile,
@@ -168,17 +155,6 @@ enum PVRSRV_ERROR SyncPrimGetFirmwareAddr(
 enum PVRSRV_ERROR SyncPrimSet(struct PVRSRV_CLIENT_SYNC_PRIM *psSync,
 	__u32 ui32Value);
 
-/* pdump_km.h */
-
-#ifdef PDUMP
-enum PVRSRV_ERROR __printf(1, 2) PDumpComment(char *fmt, ...);
-#else
-static inline enum PVRSRV_ERROR __printf(1, 2) PDumpComment(char *fmt, ...)
-{
-	return PVRSRV_OK;
-}
-#endif
-
 /* osfunc.h */
 #if defined(PVRSRV_USE_BRIDGE_LOCK)
 void OSAcquireBridgeLock(void);
@@ -196,47 +172,11 @@ enum PVRSRV_ERROR PVRSRVDeviceCreate(void *pvOSDevice,
 	struct _PVRSRV_DEVICE_NODE_ **ppsDeviceNode);
 enum PVRSRV_ERROR PVRSRVDeviceDestroy(
 	struct _PVRSRV_DEVICE_NODE_ *psDeviceNode);
-const char *PVRSRVGetErrorStringKM(enum PVRSRV_ERROR eError);
+const char *PVRSRVGetErrorString(enum PVRSRV_ERROR eError);
 
-
-/* This is the function that kick code will call in order to obtain a list of the PSYNC_CHECKPOINTs
- * for a given PVRSRV_FENCE passed to a kick function.
- * The OS native sync code will allocate the memory to hold the returned list of PSYNC_CHECKPOINT ptrs.
- * The caller will free this memory once it has finished referencing it.
- *
- * Input: fence                     The input (check) fence
- * Output: nr_checkpoints           The number of PVRSRV_SYNC_CHECKPOINT ptrs returned in the
- *                                  checkpoint_handles parameter.
- * Output: fence_uid                Unique ID of the check fence
- * Input/Output: checkpoint_handles The returned list of PVRSRV_SYNC_CHECKPOINTs.
- */
-enum PVRSRV_ERROR
-pvr_sync_resolve_fence(PSYNC_CHECKPOINT_CONTEXT psSyncCheckpointContext, PVRSRV_FENCE fence, u32 *nr_checkpoints, PSYNC_CHECKPOINT **checkpoint_handles, u64 *fence_uid);
 #ifndef _CHECKPOINT_PFNS_
 typedef PVRSRV_ERROR (*PFN_SYNC_CHECKPOINT_FENCE_RESOLVE_FN)(PSYNC_CHECKPOINT_CONTEXT psSyncCheckpointContext, PVRSRV_FENCE fence, u32 *nr_checkpoints, PSYNC_CHECKPOINT **checkpoint_handles, u64 *fence_uid);
 
-
-/* This is the function that kick code will call in order to obtain a new PVRSRV_FENCE from the
- * OS native sync code and the PSYNC_CHECKPOINT used in that fence.
- * The OS native sync code needs to implement a function meeting this specification.
- *
- * Input: fence_name               A string to annotate the fence with (for debug).
- * Input: timeline                 The timeline on which the new fence is to be created.
- * Output: new_fence               The new PVRSRV_FENCE to be returned by the kick call.
- * Output: fence_uid               Unique ID of the update fence.
- * Output: fence_finalise_data     Pointer to data needed to finalise the fence.
- * Output: new_checkpoint_handle   The PSYNC_CHECKPOINT used by the new fence.
- */
-enum PVRSRV_ERROR
-pvr_sync_create_fence(const char *fence_name,
-                      PVRSRV_TIMELINE timeline,
-                      PSYNC_CHECKPOINT_CONTEXT psSyncCheckpointContext,
-                      PVRSRV_FENCE *new_fence,
-                      u64 *fence_uid,
-                      void **fence_finalise_data,
-                      PSYNC_CHECKPOINT *new_checkpoint_handle,
-                      void **timeline_update_sync,
-                      __u32 *timeline_update_value);
 #ifndef _CHECKPOINT_PFNS_
 typedef PVRSRV_ERROR (*PFN_SYNC_CHECKPOINT_FENCE_CREATE_FN)(
 		const char *fence_name,
@@ -250,58 +190,23 @@ typedef PVRSRV_ERROR (*PFN_SYNC_CHECKPOINT_FENCE_CREATE_FN)(
 		__u32 *timeline_update_value);
 #endif
 
-/* This is the function that kick code will call in order to 'rollback' a created
- * output fence should an error occur when submitting the kick.
- * The OS native sync code needs to implement a function meeting this specification.
- *
- * Input: fence_to_rollback   The PVRSRV_FENCE to be 'rolled back'. The fence
- *                            should be destroyed and any actions taken due to
- *                            its creation that need to be undone should be
- *                            reverted.
- * Input: finalise_data       The finalise data for the fence to be 'rolled back'.
- */
-enum PVRSRV_ERROR
-pvr_sync_rollback_fence_data(PVRSRV_FENCE fence_to_rollback, void* finalise_data);
 #ifndef _CHECKPOINT_PFNS_
 typedef PVRSRV_ERROR (*PFN_SYNC_CHECKPOINT_FENCE_ROLLBACK_DATA_FN)(PVRSRV_FENCE fence_to_rollback, void *finalise_data);
 #endif
 
-/* This is the function that kick code will call in order to 'finalise' a created
- * output fence just prior to returning from the kick function.
- * The OS native sync code needs to implement a function meeting this
- * specification - the implementation may be a nop if the OS does not need to
- * perform any actions at this point.
- *
- * Input: fence_fd            The PVRSRV_FENCE to be 'finalised'. This value
- *                            will have been returned by an earlier call to
- *                            pvr_sync_create_fence().
- * Input: finalise_data       The finalise data returned by an earlier call
- *                            to pvr_sync_create_fence().
- */
-enum PVRSRV_ERROR
-pvr_sync_finalise_fence (PVRSRV_FENCE fence_fd, void *finalise_data);
 #ifndef _CHECKPOINT_PFNS_
 typedef PVRSRV_ERROR (*PFN_SYNC_CHECKPOINT_FENCE_FINALISE_FN)(PVRSRV_FENCE fence_to_finalise, void *finalise_data);
 #endif
 
-/* This is the function that driver code will call in order to request the
- * sync implementation to output debug information relating to any sync
- * checkpoints it may have created which appear in the provided array of
- * FW addresses of Unified Fence Objects (UFOs).
- *
- * Input: nr_ufos             The number of FW addresses provided in the
- *                            vaddrs parameter.
- * Input: vaddrs              The array of FW addresses of UFOs. The sync
- *                            implementation should check each of these to
- *                            see if any relate to sync checkpoints it has
- *                            created and where they do output debug information
- *                            pertaining to the native/fallback sync with
- *                            which it is associated.
- */
-u32
-pvr_sync_dump_info_on_stalled_ufos(u32 nr_ufos, u32 *vaddrs);
 #ifndef _CHECKPOINT_PFNS_
 typedef __u32 (*PFN_SYNC_CHECKPOINT_DUMP_INFO_ON_STALLED_UFOS_FN)(__u32 num_ufos, __u32 *vaddrs);
+#endif
+
+#ifndef _CHECKPOINT_PFNS_
+typedef enum tag_img_bool (*PFN_SYNC_CHECKPOINT_UFO_HAS_SIGNALLED_FN)(
+	__u32 ui32FwAddr, __u32 ui32Value);
+typedef enum PVRSRV_ERROR (*PFN_SYNC_CHECKPOINT_SIGNAL_WAITERS_FN)(void);
+typedef void(*PFN_SYNC_CHECKPOINT_CHECK_STATE_FN)(void);
 #endif
 
 /* This is the function that kick code will call in a NO_HARDWARE build only after
@@ -312,20 +217,36 @@ typedef __u32 (*PFN_SYNC_CHECKPOINT_DUMP_INFO_ON_STALLED_UFOS_FN)(__u32 num_ufos
 #ifndef _CHECKPOINT_PFNS_
 typedef void (*PFN_SYNC_CHECKPOINT_NOHW_UPDATE_TIMELINES_FN)(void *private_data);
 typedef void (*PFN_SYNC_CHECKPOINT_FREE_CHECKPOINT_LIST_MEM_FN)(void *mem_ptr);
+
+#define SYNC_CHECKPOINT_IMPL_MAX_STRLEN 20
+
+typedef struct {
+	PFN_SYNC_CHECKPOINT_FENCE_RESOLVE_FN pfnFenceResolve;
+	PFN_SYNC_CHECKPOINT_FENCE_CREATE_FN pfnFenceCreate;
+	PFN_SYNC_CHECKPOINT_FENCE_ROLLBACK_DATA_FN pfnFenceDataRollback;
+	PFN_SYNC_CHECKPOINT_FENCE_FINALISE_FN pfnFenceFinalise;
+	PFN_SYNC_CHECKPOINT_NOHW_UPDATE_TIMELINES_FN pfnNoHWUpdateTimelines;
+	PFN_SYNC_CHECKPOINT_FREE_CHECKPOINT_LIST_MEM_FN pfnFreeCheckpointListMem;
+	PFN_SYNC_CHECKPOINT_DUMP_INFO_ON_STALLED_UFOS_FN pfnDumpInfoOnStalledUFOs;
+#if defined(PVRSRV_SYNC_CHECKPOINT_CCB)
+	PFN_SYNC_CHECKPOINT_UFO_HAS_SIGNALLED_FN pfnCheckpointHasSignalled;
+	PFN_SYNC_CHECKPOINT_CHECK_STATE_FN pfnCheckState;
+	PFN_SYNC_CHECKPOINT_SIGNAL_WAITERS_FN pfnSignalWaiters;
+#endif
+	char pszImplName[SYNC_CHECKPOINT_IMPL_MAX_STRLEN];
+} PFN_SYNC_CHECKPOINT_STRUCT;
+
+enum PVRSRV_ERROR SyncCheckpointRegisterFunctions(PFN_SYNC_CHECKPOINT_STRUCT *psSyncCheckpointPfns);
+
 #define _CHECKPOINT_PFNS_
 #endif
-enum PVRSRV_ERROR SyncCheckpointRegisterFunctions(PFN_SYNC_CHECKPOINT_FENCE_RESOLVE_FN pfnFenceResolve,
-                                                  PFN_SYNC_CHECKPOINT_FENCE_CREATE_FN pfnFenceCreate,
-                                                  PFN_SYNC_CHECKPOINT_FENCE_ROLLBACK_DATA_FN pfnFenceDataRollback,
-                                                  PFN_SYNC_CHECKPOINT_FENCE_FINALISE_FN pfnFenceFinalise,
-                                                  PFN_SYNC_CHECKPOINT_NOHW_UPDATE_TIMELINES_FN pfnNoHWUpdateTimelines,
-                                                  PFN_SYNC_CHECKPOINT_FREE_CHECKPOINT_LIST_MEM_FN pfnFreeCheckpointListMem,
-                                                  PFN_SYNC_CHECKPOINT_DUMP_INFO_ON_STALLED_UFOS_FN pfnDumpInfoOnStalledUFOs);
 
 /* sync_checkpoint.h */
 enum PVRSRV_ERROR SyncCheckpointContextCreate(struct _PVRSRV_DEVICE_NODE_ *psDevConnection, PSYNC_CHECKPOINT_CONTEXT *phSyncCheckpointContext);
 enum PVRSRV_ERROR SyncCheckpointContextDestroy(PSYNC_CHECKPOINT_CONTEXT hSyncCheckpointContext);
-enum PVRSRV_ERROR SyncCheckpointAlloc(PSYNC_CHECKPOINT_CONTEXT psSyncContext, PVRSRV_TIMELINE timeline, const char *pszCheckpointName, PSYNC_CHECKPOINT *ppsSyncCheckpoint);
+void SyncCheckpointContextRef(PSYNC_CHECKPOINT_CONTEXT psContext);
+void SyncCheckpointContextUnref(PSYNC_CHECKPOINT_CONTEXT psContext);
+enum PVRSRV_ERROR SyncCheckpointAlloc(PSYNC_CHECKPOINT_CONTEXT psSyncContext, PVRSRV_TIMELINE timeline, PVRSRV_FENCE fence, const char *pszCheckpointName, PSYNC_CHECKPOINT *ppsSyncCheckpoint);
 void SyncCheckpointSignal(PSYNC_CHECKPOINT psSyncCheckpoint, u32 fence_sync_flags);
 void SyncCheckpointError(PSYNC_CHECKPOINT psSyncCheckpoint, u32 fence_sync_flags);
 enum tag_img_bool SyncCheckpointIsSignalled(PSYNC_CHECKPOINT psSyncCheckpoint, u32 fence_sync_flags);

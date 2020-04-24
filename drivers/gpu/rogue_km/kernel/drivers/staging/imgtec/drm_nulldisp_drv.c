@@ -64,8 +64,11 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include <drm/drm_modes.h>
 #include <drm/drm_plane_helper.h>
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 0, 0))
+#include <drm/drm_atomic_helper.h>
+#endif
+
 #include "img_drm_fourcc_internal.h"
-#include <pvr_drm_display_external.h>
 #include <pvrversion.h>
 
 #include <drm/drm_fourcc.h>
@@ -91,7 +94,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #define NULLDISP_FB_WIDTH_MIN 0
 #define NULLDISP_FB_WIDTH_MAX 4096
 #define NULLDISP_FB_HEIGHT_MIN 0
-#define NULLDISP_FB_HEIGHT_MAX 2160
+#define NULLDISP_FB_HEIGHT_MAX 4096
 
 #define NULLDISP_DEFAULT_WIDTH 640
 #define NULLDISP_DEFAULT_HEIGHT 480
@@ -138,7 +141,8 @@ struct nulldisp_display_device {
 #if defined(LMA)
 	struct pdp_gem_private *pdp_gem_priv;
 #endif
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(4, 8, 0))
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(4, 8, 0)) || \
+	(LINUX_VERSION_CODE >= KERNEL_VERSION(5, 0, 0))
 	struct drm_connector *connector;
 #endif
 };
@@ -199,14 +203,17 @@ static const uint64_t nulldisp_primary_plane_modifiers[] = {
 	DRM_FORMAT_MOD_PVR_FBCDC_8x8_V2,
 	DRM_FORMAT_MOD_PVR_FBCDC_8x8_V3,
 	DRM_FORMAT_MOD_PVR_FBCDC_8x8_V7,
+	DRM_FORMAT_MOD_PVR_FBCDC_8x8_V12,
 	DRM_FORMAT_MOD_PVR_FBCDC_16x4_V0,
 	DRM_FORMAT_MOD_PVR_FBCDC_16x4_V0_FIX,
 	DRM_FORMAT_MOD_PVR_FBCDC_16x4_V1,
 	DRM_FORMAT_MOD_PVR_FBCDC_16x4_V2,
 	DRM_FORMAT_MOD_PVR_FBCDC_16x4_V3,
 	DRM_FORMAT_MOD_PVR_FBCDC_16x4_V7,
+	DRM_FORMAT_MOD_PVR_FBCDC_16x4_V12,
 	DRM_FORMAT_MOD_PVR_FBCDC_32x2_V1,
 	DRM_FORMAT_MOD_PVR_FBCDC_32x2_V3,
+	DRM_FORMAT_MOD_PVR_FBCDC_32x2_V12,
 	DRM_FORMAT_MOD_INVALID
 };
 
@@ -237,7 +244,7 @@ nulldisp_get_module_params(void)
  ******************************************************************************/
 static inline void
 nulldisp_drm_fb_set_format(struct drm_framebuffer *fb,
-                           u32 pixel_format)
+			   u32 pixel_format)
 {
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 11, 0))
 	fb->format = drm_format_info(pixel_format);
@@ -287,6 +294,73 @@ static inline void nulldisp_drm_fb_set_modifier(struct drm_framebuffer *fb,
  * Plane functions
  ******************************************************************************/
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 0, 0))
+static int nulldisp_primary_helper_update(struct drm_plane *plane,
+					  struct drm_crtc *crtc,
+					  struct drm_framebuffer *fb,
+					  int crtc_x, int crtc_y,
+					  unsigned int crtc_w,
+					  unsigned int crtc_h,
+					  uint32_t src_x, uint32_t src_y,
+					  uint32_t src_w, uint32_t src_h,
+					  struct drm_modeset_acquire_ctx *ctx)
+{
+	struct nulldisp_display_device *nulldisp_dev = crtc->dev->dev_private;
+	struct drm_plane_state plane_state = {
+		.plane = plane,
+		.crtc = crtc,
+		.fb = fb,
+		.crtc_x = crtc_x,
+		.crtc_y = crtc_y,
+		.crtc_w = crtc_w,
+		.crtc_h = crtc_h,
+		.src_x = src_x,
+		.src_y = src_y,
+		.src_w = src_w,
+		.src_h = src_h,
+		.alpha = DRM_BLEND_ALPHA_OPAQUE,
+		.rotation = DRM_MODE_ROTATE_0,
+	};
+	struct drm_crtc_state crtc_state = {
+		.crtc = crtc,
+		.enable = crtc->enabled,
+		.adjusted_mode = crtc->mode,
+		.mode = crtc->mode,
+	};
+	struct drm_mode_set set = {
+		.fb = fb,
+		.crtc = crtc,
+		.mode = &crtc->mode,
+		.x = src_x >> 16, /* convert from fixed point */
+		.y = src_y >> 16, /* convert from fixed point */
+		.connectors = &nulldisp_dev->connector,
+		.num_connectors = 1,
+	};
+	int err;
+
+	BUG_ON(nulldisp_dev->connector->encoder == NULL);
+	BUG_ON(nulldisp_dev->connector->encoder->crtc != crtc);
+
+	err = drm_atomic_helper_check_plane_state(&plane_state, &crtc_state,
+						  DRM_PLANE_HELPER_NO_SCALING,
+						  DRM_PLANE_HELPER_NO_SCALING,
+						  false, false);
+	if (err)
+		return err;
+
+	if (!plane_state.visible)
+		return -EINVAL;
+
+	return crtc->funcs->set_config(&set, ctx);
+}
+
+static int nulldisp_primary_helper_disable(struct drm_plane *plane,
+					   struct drm_modeset_acquire_ctx *ctx)
+{
+	return -EINVAL;
+}
+#endif /* (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 0, 0)) */
+
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 14, 0))
 static bool nulldisp_primary_format_mod_supported(struct drm_plane *plane,
 						  uint32_t format,
@@ -301,8 +375,13 @@ static bool nulldisp_primary_format_mod_supported(struct drm_plane *plane,
 #endif
 
 static const struct drm_plane_funcs nulldisp_primary_plane_funcs = {
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 0, 0))
+	.update_plane = nulldisp_primary_helper_update,
+	.disable_plane = nulldisp_primary_helper_disable,
+#else
 	.update_plane = drm_primary_helper_update,
 	.disable_plane = drm_primary_helper_disable,
+#endif
 	.destroy = drm_primary_helper_destroy,
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 14, 0))
 	.format_mod_supported = nulldisp_primary_format_mod_supported,
@@ -505,32 +584,16 @@ static void nulldisp_flip_work(struct work_struct *w)
 	struct nulldisp_display_device *nulldisp_dev = dev->dev_private;
 	struct nulldisp_framebuffer *nulldisp_fb =
 		to_nulldisp_framebuffer(crtc->primary->fb);
-	u64 addr[NULLDISP_MAX_PLANES],
-	    size[NULLDISP_MAX_PLANES];
-	int i;
 
 	/*
 	 * To prevent races with disconnect requests from user space,
 	 * set the timeout before sending the flip request.
 	 */
-	for (i = 0; i < nulldisp_drm_fb_num_planes(crtc->primary->fb); i++) {
-		struct drm_gem_object *obj = nulldisp_fb->obj[i];
-
-		if (drm_gem_create_mmap_offset(obj)) {
-			DRM_ERROR("Failed to get mmap offset for buffer[%d] = %p\n", i, obj);
-			goto fail_cancel;
-		}
-
-		addr[i] = drm_vma_node_offset_addr(&obj->vma_node);
-		size[i] = obj->size;
-	}
-
 	nulldisp_set_flip_to(nulldisp_crtc);
 
 	if (nlpvrdpy_send_flip(nulldisp_dev->nlpvrdpy,
 			       &nulldisp_fb->base,
-			       &addr[0],
-			       &size[0]))
+			       &nulldisp_fb->obj[0]))
 		goto fail_cancel;
 
 	return;
@@ -762,8 +825,9 @@ static bool nulldisp_queue_vblank_work(struct nulldisp_crtc *nulldisp_crtc)
 		vrefresh = crtc->hwmode.vrefresh;
 	} else {
 		vrefresh = vrefresh_default;
-		DRM_ERROR("vertical refresh rate is zero, defaulting to %d\n",
-			  vrefresh);
+		DRM_INFO_ONCE(
+			"vertical refresh rate is zero, defaulting to %d\n",
+			vrefresh);
 	}
 
 	/* Returns false if work already queued, else true */
@@ -905,30 +969,11 @@ nulldisp_connector_add_preferred_mode(struct drm_connector *connector,
 				      uint32_t vdisplay,
 				      uint32_t vrefresh)
 {
-	/*
-	 * The DRM core validates the mode information, so to create
-	 * a mode with an arbitrary width, height and vrefresh values,
-	 * we duplicate a valid mode and then override the relevant
-	 * values.
-	 *
-	 * The mode parameters are based on the 'drm_dmt_modes[]'
-	 * mode 4096x2160@60Hz from 'drm_edid.c'. This is the highest
-	 * standard resolution mode in the 4.14 kernel. These mode parameters
-	 * are also valid for any lower resolution mode.
-	 */
-	struct drm_display_mode base_mode = {
-		DRM_MODE("", DRM_MODE_TYPE_PREFERRED, 556744, hdisplay,
-			 4104, 4136, 4176, 0, vdisplay, 2208, 2216, 2222, 0, 0)
-	};
 	struct drm_display_mode *preferred_mode;
-	struct drm_device *dev = connector->dev;
 
-	/* Override the base mode parameters */
-	snprintf(&base_mode.name[0], ARRAY_SIZE(base_mode.name), "%dx%d",
-		 hdisplay, vdisplay);
-	base_mode.vrefresh = vrefresh;
-
-	preferred_mode = drm_mode_duplicate(dev, &base_mode);
+	preferred_mode = drm_cvt_mode(connector->dev,
+				      hdisplay, vdisplay, vrefresh,
+				      false, false, false);
 	if (!preferred_mode) {
 		DRM_DEBUG_DRIVER("[CONNECTOR:%s]:create mode %dx%d@%d failed\n",
 				 connector->name,
@@ -938,6 +983,8 @@ nulldisp_connector_add_preferred_mode(struct drm_connector *connector,
 
 		return false;
 	}
+
+	preferred_mode->type = DRM_MODE_TYPE_PREFERRED | DRM_MODE_TYPE_DRIVER;
 
 	drm_mode_probed_add(connector, preferred_mode);
 
@@ -983,7 +1030,7 @@ nulldisp_connector_helper_get_modes(struct drm_connector *connector)
 
 	/* Sort the connector modes by relevance */
 	drm_mode_sort(&connector->probed_modes);
-	
+
 	return modes_count;
 }
 
@@ -1039,7 +1086,7 @@ static void nulldisp_connector_destroy(struct drm_connector *connector)
 			 connector->base.id,
 			 connector->name);
 
-	drm_mode_connector_update_edid_property(connector, NULL);
+	drm_connector_update_edid_property(connector, NULL);
 	drm_connector_cleanup(connector);
 
 	kfree(connector);
@@ -1239,42 +1286,26 @@ nulldisp_framebuffer_create_handle(struct drm_framebuffer *framebuffer,
 static int
 nulldisp_framebuffer_dirty(struct drm_framebuffer *framebuffer,
 			   struct drm_file *file_priv,
-			   unsigned flags,
-			   unsigned color,
+			   unsigned int flags,
+			   unsigned int color,
 			   struct drm_clip_rect *clips,
-			   unsigned num_clips)
+			   unsigned int num_clips)
 {
 	struct nulldisp_framebuffer *nulldisp_fb =
 		to_nulldisp_framebuffer(framebuffer);
 	struct nulldisp_display_device *nulldisp_dev =
 		framebuffer->dev->dev_private;
 	struct nulldisp_crtc *nulldisp_crtc = nulldisp_dev->nulldisp_crtc;
-	u64 addr[NULLDISP_MAX_PLANES],
-	    size[NULLDISP_MAX_PLANES];
-	int i;
 
 	/*
 	 * To prevent races with disconnect requests from user space,
 	 * set the timeout before sending the copy request.
 	 */
-	for (i = 0; i < nulldisp_drm_fb_num_planes(framebuffer); i++) {
-		struct drm_gem_object *obj = nulldisp_fb->obj[i];
-
-		if (drm_gem_create_mmap_offset(obj)) {
-			DRM_ERROR("Failed to get mmap offset for buffer[%d] = %p\n", i, obj);
-			goto fail_flush;
-		}
-
-		addr[i] = drm_vma_node_offset_addr(&obj->vma_node);
-		size[i] = obj->size;
-	}
-
 	nulldisp_set_copy_to(nulldisp_crtc);
 
 	if (nlpvrdpy_send_copy(nulldisp_dev->nlpvrdpy,
 			       &nulldisp_fb->base,
-			       &addr[0],
-			       &size[0]))
+			       &nulldisp_fb->obj[0]))
 		goto fail_flush;
 
 	wait_for_completion(&nulldisp_crtc->copy_done);
@@ -1318,7 +1349,7 @@ nulldisp_framebuffer_init(struct drm_device *dev,
 	fb->height       = mode_cmd->height;
 	fb->flags        = mode_cmd->flags;
 
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 1, 0))	
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 1, 0))
 	nulldisp_drm_fb_set_modifier(fb, mode_cmd->modifier[0]);
 #endif
 
@@ -1483,7 +1514,7 @@ static int nulldisp_early_load(struct drm_device *dev)
 		goto err_config_cleanup;
 	}
 
-	err = drm_mode_connector_attach_encoder(connector, encoder);
+	err = drm_connector_attach_encoder(connector, encoder);
 	if (err) {
 		DRM_ERROR("failed to attach [ENCODER:%d:%s] to "
 			  "[CONNECTOR:%d:%s] (err=%d)\n",
@@ -1764,10 +1795,10 @@ static int nulldisp_gem_object_create_ioctl(struct drm_device *dev,
 					    struct drm_file *file)
 {
 	struct drm_nulldisp_gem_create *args = data;
-	struct nulldisp_display_device *nulldisp_dev = dev->dev_private;	
+	struct nulldisp_display_device *nulldisp_dev = dev->dev_private;
 	struct drm_pdp_gem_create pdp_args;
 	int err;
-	
+
 	if (args->flags) {
 		DRM_ERROR("invalid flags: %#08x\n", args->flags);
 		return -EINVAL;
@@ -1778,7 +1809,7 @@ static int nulldisp_gem_object_create_ioctl(struct drm_device *dev,
 		return -EINVAL;
 	}
 
-	/* 
+	/*
 	 * Remapping of nulldisp create args to pdp create args.
 	 *
 	 * Note: even though the nulldisp and pdp args are identical
@@ -1792,7 +1823,6 @@ static int nulldisp_gem_object_create_ioctl(struct drm_device *dev,
 					       nulldisp_dev->pdp_gem_priv,
 					       &pdp_args,
 					       file);
-	
 	if (!err)
 		args->handle = pdp_args.handle;
 
@@ -2006,7 +2036,7 @@ static int nulldisp_probe(struct platform_device *pdev)
 
 	ret = nulldisp_early_load(ddev);
 	if (ret)
-		goto err_drm_dev_unref;
+		goto err_drm_dev_put;
 
 	ret = drm_dev_register(ddev, 0);
 	if (ret)
@@ -2031,8 +2061,8 @@ err_drm_dev_unregister:
 	drm_dev_unregister(ddev);
 err_drm_dev_late_unload:
 	nulldisp_late_unload(ddev);
-err_drm_dev_unref:
-	drm_dev_unref(ddev);
+err_drm_dev_put:
+	drm_dev_put(ddev);
 	return	ret;
 #else
 	return drm_platform_init(&nulldisp_drm_driver, pdev);
@@ -2056,7 +2086,7 @@ static int nulldisp_remove(struct platform_device *pdev)
 
 	nulldisp_late_unload(ddev);
 
-	drm_dev_unref(ddev);
+	drm_dev_put(ddev);
 #else
 	drm_put_dev(ddev);
 #endif
@@ -2100,10 +2130,10 @@ static struct platform_device_info nulldisp_device_info = {
 	.dma_mask	= DMA_BIT_MASK(64),
 #elif defined(NO_HARDWARE)
 	/*
-	* Not all cores have 40 bit physical support, but this
-	* will work unless > 32 bit address is returned on those cores.
-	* In the future this will be fixed more correctly.
-	*/
+	 * Not all cores have 40 bit physical support, but this
+	 * will work unless > 32 bit address is returned on those cores.
+	 * In the future this will be fixed more correctly.
+	 */
 	.dma_mask	= DMA_BIT_MASK(40),
 #else
 	.dma_mask	= DMA_BIT_MASK(32),

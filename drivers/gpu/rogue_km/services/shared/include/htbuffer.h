@@ -52,6 +52,7 @@ extern "C" {
 #endif
 
 #include "img_types.h"
+#include "img_defs.h"
 #include "pvrsrv_error.h"
 #include "htbuffer_sf.h"
 #include "htbuffer_types.h"
@@ -95,7 +96,7 @@ extern "C" {
 
 */ /**************************************************************************/
 IMG_INTERNAL PVRSRV_ERROR
-HTBLog(IMG_HANDLE hSrvHandle, IMG_UINT32 PID, IMG_UINT32 ui32TimeStampus, IMG_UINT32 SF, ...);
+HTBLog(IMG_HANDLE hSrvHandle, IMG_UINT32 PID, IMG_UINT64 ui64TimeStampns, IMG_UINT32 SF, ...);
 
 
 /*************************************************************************/ /*!

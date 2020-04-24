@@ -39,21 +39,21 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */ /**************************************************************************/
 
-#ifndef _RGXDEFS_KM_H_
-#define _RGXDEFS_KM_H_
+#ifndef RGXDEFS_KM_H
+#define RGXDEFS_KM_H
 
+#if defined(RGX_BVNC_CORE_KM_HEADER) && defined(RGX_BNC_CONFIG_KM_HEADER)
 #include RGX_BVNC_CORE_KM_HEADER
 #include RGX_BNC_CONFIG_KM_HEADER
+#endif
 
-#define __IMG_EXPLICIT_INCLUDE_HWDEFS
+#define IMG_EXPLICIT_INCLUDE_HWDEFS
 #if defined(__KERNEL__)
 #include "rgx_cr_defs_km.h"
-#else
-#include RGX_BVNC_CORE_HEADER
-#include RGX_BNC_CONFIG_HEADER
-#include "rgx_cr_defs.h"
 #endif
-#undef __IMG_EXPLICIT_INCLUDE_HWDEFS
+#undef IMG_EXPLICIT_INCLUDE_HWDEFS
+
+#include "rgx_heap_firmware.h"
 
 /* The following Macros are picked up through BVNC headers for PDUMP and
  * no hardware operations to be compatible with old build infrastructure.
@@ -78,48 +78,54 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 /******************************************************************************
  * RGX Version name
  *****************************************************************************/
-#define _RGX_BVNC_ST2(S)	#S
-#define _RGX_BVNC_ST(S)		_RGX_BVNC_ST2(S)
-#define RGX_BVNC_KM			_RGX_BVNC_ST(RGX_BVNC_KM_B) "." _RGX_BVNC_ST(RGX_BVNC_KM_V) "." _RGX_BVNC_ST(RGX_BVNC_KM_N) "." _RGX_BVNC_ST(RGX_BVNC_KM_C)
-#define RGX_BVNC_KM_V_ST	_RGX_BVNC_ST(RGX_BVNC_KM_V)
+#define RGX_BVNC_ST2(S)	#S
+#define RGX_BVNC_ST(S)		RGX_BVNC_ST2(S)
+#define RGX_BVNC_KM			RGX_BVNC_ST(RGX_BVNC_KM_B) "." RGX_BVNC_ST(RGX_BVNC_KM_V) "." RGX_BVNC_ST(RGX_BVNC_KM_N) "." RGX_BVNC_ST(RGX_BVNC_KM_C)
+#define RGX_BVNC_KM_V_ST	RGX_BVNC_ST(RGX_BVNC_KM_V)
+
+/* Maximum string size is [bb.vvvp.nnnn.cccc\0], includes null char */
+#define RGX_BVNC_STR_SIZE_MAX (2+1+4+1+4+1+4+1)
+#define RGX_BVNC_STR_FMTSPEC  "%u.%u.%u.%u"
+#define RGX_BVNC_STRP_FMTSPEC "%u.%up.%u.%u"
+
 
 /******************************************************************************
  * RGX Defines
  *****************************************************************************/
 
-#define			BVNC_FIELD_MASK			((1 << BVNC_FIELD_WIDTH) - 1)
-#define         C_POSITION              (0)
-#define         N_POSITION              ((C_POSITION) + (BVNC_FIELD_WIDTH))
-#define         V_POSITION              ((N_POSITION) + (BVNC_FIELD_WIDTH))
-#define         B_POSITION              ((V_POSITION) + (BVNC_FIELD_WIDTH))
+#define BVNC_FIELD_MASK     ((1 << BVNC_FIELD_WIDTH) - 1)
+#define C_POSITION          (0)
+#define N_POSITION          ((C_POSITION) + (BVNC_FIELD_WIDTH))
+#define V_POSITION          ((N_POSITION) + (BVNC_FIELD_WIDTH))
+#define B_POSITION          ((V_POSITION) + (BVNC_FIELD_WIDTH))
 
-#define         B_POSTION_MASK          (((IMG_UINT64)(BVNC_FIELD_MASK) << (B_POSITION)))
-#define         V_POSTION_MASK          (((IMG_UINT64)(BVNC_FIELD_MASK) << (V_POSITION)))
-#define         N_POSTION_MASK          (((IMG_UINT64)(BVNC_FIELD_MASK) << (N_POSITION)))
-#define         C_POSTION_MASK          (((IMG_UINT64)(BVNC_FIELD_MASK) << (C_POSITION)))
+#define B_POSTION_MASK      (((IMG_UINT64)(BVNC_FIELD_MASK) << (B_POSITION)))
+#define V_POSTION_MASK      (((IMG_UINT64)(BVNC_FIELD_MASK) << (V_POSITION)))
+#define N_POSTION_MASK      (((IMG_UINT64)(BVNC_FIELD_MASK) << (N_POSITION)))
+#define C_POSTION_MASK      (((IMG_UINT64)(BVNC_FIELD_MASK) << (C_POSITION)))
 
-#define         GET_B(x)                (((x) & (B_POSTION_MASK)) >> (B_POSITION))
-#define         GET_V(x)                (((x) & (V_POSTION_MASK)) >> (V_POSITION))
-#define         GET_N(x)                (((x) & (N_POSTION_MASK)) >> (N_POSITION))
-#define         GET_C(x)                (((x) & (C_POSTION_MASK)) >> (C_POSITION))
+#define GET_B(x)            (((x) & (B_POSTION_MASK)) >> (B_POSITION))
+#define GET_V(x)            (((x) & (V_POSTION_MASK)) >> (V_POSITION))
+#define GET_N(x)            (((x) & (N_POSTION_MASK)) >> (N_POSITION))
+#define GET_C(x)            (((x) & (C_POSTION_MASK)) >> (C_POSITION))
 
-#define         BVNC_PACK(B,V,N,C)      ((((IMG_UINT64)B)) << (B_POSITION) | \
-                                         (((IMG_UINT64)V)) << (V_POSITION) | \
-                                         (((IMG_UINT64)N)) << (N_POSITION) | \
-                                         (((IMG_UINT64)C)) << (C_POSITION) \
-                                        )
+#define BVNC_PACK(B,V,N,C)  ((((IMG_UINT64)B)) << (B_POSITION) | \
+                             (((IMG_UINT64)V)) << (V_POSITION) | \
+                             (((IMG_UINT64)N)) << (N_POSITION) | \
+                             (((IMG_UINT64)C)) << (C_POSITION) \
+                            )
 
-#define RGX_CR_CORE_ID_CONFIG_N_SHIFT                     (8U)
-#define RGX_CR_CORE_ID_CONFIG_C_SHIFT                     (0U)
+#define RGX_CR_CORE_ID_CONFIG_N_SHIFT    (8U)
+#define RGX_CR_CORE_ID_CONFIG_C_SHIFT    (0U)
 
-#define RGX_CR_CORE_ID_CONFIG_N_CLRMSK                    (0XFFFF00FFU)
-#define RGX_CR_CORE_ID_CONFIG_C_CLRMSK                    (0XFFFFFF00U)
+#define RGX_CR_CORE_ID_CONFIG_N_CLRMSK   (0XFFFF00FFU)
+#define RGX_CR_CORE_ID_CONFIG_C_CLRMSK   (0XFFFFFF00U)
 
 /* The default number of OSID is 1, higher number implies VZ enabled firmware */
-#if !defined(RGXFW_NATIVE) && defined(PVRSRV_VZ_NUM_OSID) && (PVRSRV_VZ_NUM_OSID +1> 1)
+#if !defined(RGXFW_NATIVE) && defined(PVRSRV_VZ_NUM_OSID) && (PVRSRV_VZ_NUM_OSID + 1U > 1U)
 #define RGXFW_NUM_OS PVRSRV_VZ_NUM_OSID
 #else
-#define RGXFW_NUM_OS 1
+#define RGXFW_NUM_OS 1U
 #endif
 
 #define RGXFW_MAX_NUM_OS                                  (8U)
@@ -143,10 +149,10 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #define RGX_META_COREMEM_128K     (128*1024)
 #define RGX_META_COREMEM_256K     (256*1024)
 
-#if !defined(__KERNEL__)
+#if !defined(SUPPORT_MULTIBVNC)
 #if (!defined(SUPPORT_TRUSTED_DEVICE) || defined(RGX_FEATURE_META_DMA)) && \
     (defined(RGX_FEATURE_META_COREMEM_SIZE) && RGX_FEATURE_META_COREMEM_SIZE != 0)
-#define RGX_META_COREMEM_SIZE     (RGX_FEATURE_META_COREMEM_SIZE*1024)
+#define RGX_META_COREMEM_SIZE     (RGX_FEATURE_META_COREMEM_SIZE*1024U)
 #define RGX_META_COREMEM          (1)
 #define RGX_META_COREMEM_CODE     (1)
 #if !defined(FIX_HW_BRN_50767) && (RGXFW_NUM_OS == 1)
@@ -161,19 +167,10 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #endif
 #endif
 
-/* ISP requires valid state on all three pipes regardless of the number of
- * active pipes/tiles in flight.
- */
-#define RGX_MAX_NUM_PIPES	3
-
-#define GET_ROGUE_CACHE_LINE_SIZE(x)				(((IMG_INT32)x) > 0) ? ((x)/8) : (0)
+#define GET_ROGUE_CACHE_LINE_SIZE(x)    ((((IMG_INT32)x) > 0) ? ((x)/8) : (0))
 
 
-#define MAX_HW_TA3DCONTEXTS	2
-
-/* useful extra defines for clock ctrl*/
-#define RGX_CR_CLK_CTRL_ALL_ON   (IMG_UINT64_C(0x5555555555555555)&RGX_CR_CLK_CTRL_MASKFULL)
-#define RGX_CR_CLK_CTRL_ALL_AUTO (IMG_UINT64_C(0xaaaaaaaaaaaaaaaa)&RGX_CR_CLK_CTRL_MASKFULL)
+#define MAX_HW_TA3DCONTEXTS	2U
 
 #define RGX_CR_SOFT_RESET_DUST_n_CORE_EN	(RGX_CR_SOFT_RESET_DUST_A_CORE_EN | \
 											 RGX_CR_SOFT_RESET_DUST_B_CORE_EN | \
@@ -196,17 +193,17 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #define RGX_S7_SOFT_RESET_JONES (RGX_CR_SOFT_RESET_PM_EN  | \
                                  RGX_CR_SOFT_RESET_VDM_EN | \
-								 RGX_CR_SOFT_RESET_ISP_EN)
+                                 RGX_CR_SOFT_RESET_ISP_EN)
 
 #define RGX_S7_SOFT_RESET_JONES_ALL (RGX_S7_SOFT_RESET_JONES  | \
-									 RGX_CR_SOFT_RESET_BIF_EN | \
+                                     RGX_CR_SOFT_RESET_BIF_EN | \
                                      RGX_CR_SOFT_RESET_SLC_EN | \
-								     RGX_CR_SOFT_RESET_GARTEN_EN)
+                                     RGX_CR_SOFT_RESET_GARTEN_EN)
 
 #define RGX_S7_SOFT_RESET2 (RGX_CR_SOFT_RESET2_BLACKPEARL_EN | \
                             RGX_CR_SOFT_RESET2_PIXEL_EN | \
-							RGX_CR_SOFT_RESET2_CDM_EN | \
-							RGX_CR_SOFT_RESET2_VERTEX_EN)
+                            RGX_CR_SOFT_RESET2_CDM_EN | \
+                            RGX_CR_SOFT_RESET2_VERTEX_EN)
 
 
 
@@ -216,17 +213,21 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #define RGX_BIF_PM_VIRTUAL_PAGE_ALIGNSHIFT		(14)
 #define RGX_BIF_PM_VIRTUAL_PAGE_SIZE			(1 << RGX_BIF_PM_VIRTUAL_PAGE_ALIGNSHIFT)
 
-#define RGX_BIF_PM_FREELIST_BASE_ADDR_ALIGNSIZE	(16)
+#define RGX_BIF_PM_FREELIST_BASE_ADDR_ALIGNSIZE	(16U)
 
-/* To get the number of required Dusts, divide the number of clusters by 2 and round up */
-#define RGX_REQ_NUM_DUSTS(CLUSTERS)    ((CLUSTERS + 1) / 2)
+/* To get the number of required Dusts, divide the number of
+ * clusters by 2 and round up
+ */
+#define RGX_REQ_NUM_DUSTS(CLUSTERS)    ((CLUSTERS + 1U) / 2U)
 
-/* To get the number of required Bernado/Phantom, divide the number of clusters by 4 and round up */
-#define RGX_REQ_NUM_PHANTOMS(CLUSTERS) ((CLUSTERS + 3) / 4)
-#define RGX_REQ_NUM_BERNADOS(CLUSTERS) ((CLUSTERS + 3) / 4)
-#define RGX_REQ_NUM_BLACKPEARLS(CLUSTERS) ((CLUSTERS + 3) / 4)
+/* To get the number of required Bernado/Phantom(s), divide
+ * the number of clusters by 4 and round up
+ */
+#define RGX_REQ_NUM_PHANTOMS(CLUSTERS) ((CLUSTERS + 3U) / 4U)
+#define RGX_REQ_NUM_BERNADOS(CLUSTERS) ((CLUSTERS + 3U) / 4U)
+#define RGX_REQ_NUM_BLACKPEARLS(CLUSTERS) ((CLUSTERS + 3U) / 4U)
 
-#if !defined(__KERNEL__)
+#if !defined(SUPPORT_MULTIBVNC)
 # define RGX_NUM_PHANTOMS (RGX_REQ_NUM_PHANTOMS(RGX_FEATURE_NUM_CLUSTERS))
 #endif
 
@@ -236,42 +237,13 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #define RGX_FEATURE_CDM_CONTROL_STREAM_FORMAT (1)
 #endif
 
-/* META second thread feature depending on META variants and available CoreMem*/
+/* META second thread feature depending on META variants and
+ * available CoreMem
+ */
 #if defined(RGX_FEATURE_META) && (RGX_FEATURE_META == MTP218 || RGX_FEATURE_META == MTP219) && defined(RGX_FEATURE_S7_TOP_INFRASTRUCTURE) && (RGX_FEATURE_META_COREMEM_SIZE == 256)
 #define RGXFW_META_SUPPORT_2ND_THREAD
 #endif
 
-/*
-   Start at 903GiB. Size of 32MB per OSID (see rgxheapconfig.h)
-   NOTE:
-		The firmware heaps bases and sizes are defined here to
-		simplify #include dependencies, see rgxheapconfig.h
-		for the full RGX virtual address space layout.
-
-   The config heap takes up the last 64 KBytes from the total firmware heap space.
-   It is intended to act as a storage space for the kernel and firmware CCB offset storage.
-   The Main Firmware heap size is reduced accordingly but most of the map / unmap functions must take
-   into consideration the entire range (i.e. main and config heap) */
-
-#define RGX_FIRMWARE_HEAP_SHIFT						RGX_FW_HEAP_SHIFT
-#define RGX_FIRMWARE_RAW_HEAP_BASE					(0xE1C0000000ULL)
-#define RGX_FIRMWARE_RAW_HEAP_SIZE					(1U << RGX_FIRMWARE_HEAP_SHIFT)
-#define RGX_FIRMWARE_CONFIG_HEAP_SIZE				(0x10000U)   /* 64K */
-#define RGX_FIRMWARE_META_MAIN_HEAP_SIZE			(RGX_FIRMWARE_RAW_HEAP_SIZE - RGX_FIRMWARE_CONFIG_HEAP_SIZE)
-/*
- * MIPS FW needs space in the Main heap to map GPU memory.
- * This space is taken from the MAIN heap, to avoid creating a new heap.
- */
-#define RGX_FIRMWARE_MIPS_GPU_MAP_RESERVED_SIZE		(0x100000U)  /* 1M */
-#define RGX_FIRMWARE_MIPS_MAIN_HEAP_SIZE			(RGX_FIRMWARE_RAW_HEAP_SIZE - RGX_FIRMWARE_CONFIG_HEAP_SIZE - RGX_FIRMWARE_MIPS_GPU_MAP_RESERVED_SIZE)
-
-/* Hypervisor sub-heap order: MAIN + CONFIG */
-#define RGX_FIRMWARE_HYPERV_MAIN_HEAP_BASE			RGX_FIRMWARE_RAW_HEAP_BASE
-#define RGX_FIRMWARE_HYPERV_CONFIG_HEAP_BASE		(RGX_FIRMWARE_HYPERV_MAIN_HEAP_BASE + RGX_FIRMWARE_RAW_HEAP_SIZE - RGX_FIRMWARE_CONFIG_HEAP_SIZE)
-
-/* Guest sub-heap order: CONFIG + MAIN */
-#define RGX_FIRMWARE_GUEST_CONFIG_HEAP_BASE			RGX_FIRMWARE_RAW_HEAP_BASE
-#define RGX_FIRMWARE_GUEST_MAIN_HEAP_BASE			(RGX_FIRMWARE_GUEST_CONFIG_HEAP_BASE + RGX_FIRMWARE_CONFIG_HEAP_SIZE)
 
 /******************************************************************************
  * WA HWBRNs
@@ -301,12 +273,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #define RGX_CR_JONES_IDLE_MASKFULL                        (IMG_UINT64_C(0x0000000000003FFF))
 #endif
 
-
-#define DPX_MAX_RAY_CONTEXTS 4 /* FIXME should this be in dpx file? */
-#define DPX_MAX_FBA_AP 16
-#define DPX_MAX_FBA_FILTER_WIDTH 24
-
-#if !defined(__KERNEL__)
+#if !defined(SUPPORT_MULTIBVNC)
 #if !defined(RGX_FEATURE_SLC_SIZE_IN_BYTES)
 #if defined(RGX_FEATURE_SLC_SIZE_IN_KILOBYTES)
 #define RGX_FEATURE_SLC_SIZE_IN_BYTES (RGX_FEATURE_SLC_SIZE_IN_KILOBYTES * 1024)
@@ -316,16 +283,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #endif
 #endif
 
-#if defined(__KERNEL__)
-
-#define RGX_GET_NUM_RASTERISATION_MODULES(DEV_FEATURE_CFG)                                         \
-	(                                                                                          \
-	 ((DEV_FEATURE_CFG).ui64Features & RGX_FEATURE_ROGUEXE_BIT_MASK) != 0 ?                    \
-	  (DEV_FEATURE_CFG).ui32FeaturesValues[RGX_FEATURE_NUM_CLUSTERS_IDX] :                     \
-	  RGX_REQ_NUM_PHANTOMS((DEV_FEATURE_CFG).ui32FeaturesValues[RGX_FEATURE_NUM_CLUSTERS_IDX]) \
-	)
-
-#else
+#if !defined(SUPPORT_MULTIBVNC)
 
 #if defined(RGX_FEATURE_ROGUEXE)
 #define RGX_NUM_RASTERISATION_MODULES	RGX_FEATURE_NUM_CLUSTERS
@@ -333,8 +291,9 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #define RGX_NUM_RASTERISATION_MODULES	RGX_NUM_PHANTOMS
 #endif
 
-#define RGX_GET_NUM_RASTERISATION_MODULES(DEV_FEATURE_CFG) RGX_NUM_RASTERISATION_MODULES
+#endif /* defined(SUPPORT_MULTIBVNC) */
 
-#endif /* !__KERNEL__ */
+/* GPU CR timer tick in GPU cycles */
+#define RGX_CRTIME_TICK_IN_CYCLES (256U)
 
-#endif /* _RGXDEFS_KM_H_ */
+#endif /* RGXDEFS_KM_H */

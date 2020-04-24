@@ -60,7 +60,7 @@ CopyFromUserWrapper(CONNECTION_DATA *psConnection,
 					void __user *pvSrc,
 					IMG_UINT32 ui32Size);
 PVRSRV_ERROR
-CopyToUserWrapper(CONNECTION_DATA *psConnection, 
+CopyToUserWrapper(CONNECTION_DATA *psConnection,
 				  IMG_UINT32 ui32DispatchTableEntry,
 				  void __user *pvDest,
 				  void *pvSrc,
@@ -81,7 +81,7 @@ typedef struct _PVRSRV_BRIDGE_DISPATCH_TABLE_ENTRY
 {
 	BridgeWrapperFunction pfFunction; /*!< The wrapper function that validates the ioctl
 										arguments before calling into srvkm proper */
-	POS_LOCK	hBridgeLock;	/*!< The bridge lock which needs to be acquired 
+	POS_LOCK	hBridgeLock;	/*!< The bridge lock which needs to be acquired
 						before calling the above wrapper */
 	IMG_BOOL    bUseLock;                 /*!< Specify whether to use a bridge lock at all */
 #if defined(DEBUG_BRIDGE_KM)
@@ -118,7 +118,7 @@ _SetDispatchTableEntry(IMG_UINT32 ui32BridgeGroup,
 					   const IMG_CHAR *pszFunctionName,
 					   POS_LOCK hBridgeLock,
 					   const IMG_CHAR* pszBridgeLockName,
-					   IMG_BOOL bUseLock );
+					   IMG_BOOL bUseLock);
 void
 UnsetDispatchTableEntry(IMG_UINT32 ui32BridgeGroup,
 					   	IMG_UINT32 ui32Index);
@@ -150,8 +150,8 @@ void BridgeGlobalStatsUnlock(void);
 extern PVRSRV_BRIDGE_GLOBAL_STATS g_BridgeGlobalStats;
 #endif
 
-PVRSRV_ERROR BridgeInit(void);
-void BridgeDeinit(void);
+PVRSRV_ERROR BridgeDispatcherInit(void);
+void BridgeDispatcherDeinit(void);
 
 PVRSRV_ERROR BridgedDispatchKM(CONNECTION_DATA * psConnection,
 					  PVRSRV_BRIDGE_PACKAGE   * psBridgePackageKM);

@@ -43,8 +43,8 @@ COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
 IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */ /**************************************************************************/
-#ifndef _RGXFW_LOG_HELPER_H_
-#define _RGXFW_LOG_HELPER_H_
+#ifndef RGXFW_LOG_HELPER_H
+#define RGXFW_LOG_HELPER_H
 
 #include "rgx_fwif_sf.h"
 
@@ -57,11 +57,15 @@ static IMG_CHAR *const groups[]= {
 /*  idToStringID : Search SFs tuples {id,string} for a matching id.
  *   return index to array if found or RGXFW_SF_LAST if none found.
  *   bsearch could be used as ids are in increasing order. */
+#if defined(RGX_FIRMWARE)
 static IMG_UINT32 idToStringID(IMG_UINT32 ui32CheckData, const RGXFW_STID_FMT *const psSFs)
+#else
+static IMG_UINT32 idToStringID(IMG_UINT32 ui32CheckData, const RGXKM_STID_FMT *const psSFs)
+#endif
 {
-	IMG_UINT32 i = 0, ui32Id = RGXFW_SF_LAST ;
+	IMG_UINT32 i = 0, ui32Id = (IMG_UINT32)RGXFW_SF_LAST;
 
-	for ( i = 0 ; psSFs[i].ui32Id != RGXFW_SF_LAST ; i++)
+	for ( i = 0 ; psSFs[i].ui32Id != (IMG_UINT32)RGXFW_SF_LAST ; i++)
 	{
 		if ( ui32CheckData == psSFs[i].ui32Id )
 		{
@@ -72,5 +76,4 @@ static IMG_UINT32 idToStringID(IMG_UINT32 ui32CheckData, const RGXFW_STID_FMT *c
 	return ui32Id;
 }
 
-#endif /* _RGXFW_LOG_HELPER_H_ */
-
+#endif /* RGXFW_LOG_HELPER_H */

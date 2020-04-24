@@ -41,6 +41,7 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */ /**************************************************************************/
 #include "allocmem.h"
+#include "img_defs.h"
 #include "physheap.h"
 #include "rgxdevice.h"
 #include "pvrsrv_device.h"
@@ -110,8 +111,17 @@ PVRSRV_ERROR SysVzRegisterFwPhysHeap(PVRSRV_DEVICE_CONFIG *psDevConfig)
 
 		psPhysHeapConfig = SysVzGetPhysHeapConfig(psDevConfig, eHeap);
 		PVR_LOGR_IF_FALSE((NULL != psPhysHeapConfig), "SysVzGetPhysHeapConfig", PVRSRV_ERROR_INVALID_PARAMS);
+		PVR_LOGR_IF_FALSE((NULL != psPhysHeapConfig->pasRegions), "SysVzGetPhysHeapConfig", PVRSRV_ERROR_INTERNAL_ERROR);
 
-		sDevPAddr.uiAddr = psPhysHeapConfig->pasRegions[0].sStartAddr.uiAddr;
+		if(psPhysHeapConfig->psMemFuncs->pfnCpuPAddrToDevPAddr != NULL)
+		{
+			psPhysHeapConfig->psMemFuncs->pfnCpuPAddrToDevPAddr(psPhysHeapConfig->hPrivData, 1, &sDevPAddr, &psPhysHeapConfig->pasRegions[0].sStartAddr);
+		}
+		else
+		{
+			sDevPAddr.uiAddr = psPhysHeapConfig->pasRegions[0].sStartAddr.uiAddr;
+		}
+
 		PVR_LOGR_IF_FALSE((0 != sDevPAddr.uiAddr), "SysVzGetPhysHeapConfig", PVRSRV_ERROR_INVALID_PARAMS);
 		ui64DevPSize = psPhysHeapConfig->pasRegions[0].uiSize;
 		PVR_LOGR_IF_FALSE((0 != ui64DevPSize), "SysVzGetPhysHeapConfig", PVRSRV_ERROR_INVALID_PARAMS);
@@ -313,8 +323,8 @@ PVRSRV_ERROR SysVzGetPhysHeapAddrSize(PVRSRV_DEVICE_CONFIG *psDevConfig,
 		{
 			PVR_DPF((PVR_DBG_ERROR,
 					 "%s: VMM/PVZ pfnGetDevPhysHeapAddrSize() must be implemented (%s)",
-					__FUNCTION__,
-					PVRSRVGetErrorStringKM(eError)));
+					 __func__,
+					 PVRSRVGetErrorString(eError)));
 		}
 
 		goto e0;
@@ -349,8 +359,8 @@ PVRSRV_ERROR SysVzGetPhysHeapOrigin(PVRSRV_DEVICE_CONFIG *psDevConfig,
 		{
 			PVR_DPF((PVR_DBG_ERROR,
 					 "%s: VMM/PVZ pfnGetDevPhysHeapOrigin() must be implemented (%s)",
-					__FUNCTION__,
-					PVRSRVGetErrorStringKM(eError)));
+					__func__,
+					PVRSRVGetErrorString(eError)));
 		}
 
 		goto e0;
@@ -387,7 +397,7 @@ PVRSRV_ERROR SysVzPvzCreateDevPhysHeaps(IMG_UINT32 ui32OSID,
 	psDeviceNode = psPVRSRVData->psDeviceNodeList;
 	psDevConfig = psDeviceNode->psDevConfig;
 
-	/* Default is a kernel managed UMA 
+	/* Default is a kernel managed UMA
 	   physheap memory configuration */
 	*pui64FwPhysHeapSize = (IMG_UINT64)0;
 	*pui64FwPhysHeapAddr = (IMG_UINT64)0;
@@ -523,6 +533,12 @@ PVRSRV_ERROR SysVzPvzRegisterFwPhysHeap(IMG_UINT32 ui32OSID,
 			eError = psDeviceNode->pfnMMUCacheInvalidateKick(psDeviceNode,&sync,IMG_TRUE);
 			PVR_LOGG_IF_ERROR(eError, "SysVzGetPhysHeapOrigin failed to invalidate MMU cache", e0);
 
+			if (eError == PVRSRV_OK)
+			{
+				/* Everything is ready for the firmware to start interacting with this OS */
+				PVRSRV_RGXDEV_INFO *psDevInfo = psDeviceNode->pvDevice;
+				eError = RGXFWSetFwOsState(psDevInfo, ui32OSID, RGXFWIF_OS_ONLINE);
+			}
 		}
 	}
 #else

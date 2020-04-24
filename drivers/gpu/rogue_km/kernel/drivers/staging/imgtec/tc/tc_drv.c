@@ -524,7 +524,7 @@ static int tc_init(struct pci_dev *pdev, const struct pci_device_id *id)
 
 err_out:
 	if (err)
-		dev_err(&pdev->dev, "tc_init failed\n");
+		dev_err(&pdev->dev, "%s: failed\n", __func__);
 
 	return err;
 

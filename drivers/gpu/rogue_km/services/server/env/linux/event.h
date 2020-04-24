@@ -1,6 +1,6 @@
 /*************************************************************************/ /*!
 @File
-@Title          Event Object 
+@Title          Event Object
 @Copyright      Copyright (c) Imagination Technologies Ltd. All Rights Reserved
 @License        Dual MIT/GPLv2
 
@@ -52,3 +52,4 @@ PVRSRV_ERROR LinuxEventObjectWait(IMG_HANDLE hOSEventObject,
 #if defined(PVRSRV_SERVER_THREADS_INDEFINITE_SLEEP)
 PVRSRV_ERROR LinuxEventObjectWaitUntilSignalled(IMG_HANDLE hOSEventObject);
 #endif
+void LinuxEventObjectDumpDebugInfo(IMG_HANDLE hOSEventObject);

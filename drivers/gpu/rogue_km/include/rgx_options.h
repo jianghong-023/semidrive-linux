@@ -40,167 +40,179 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */ /**************************************************************************/
 
-/* Each build option listed here is packed into a dword which
- * provides up to log2(RGX_BUILD_OPTIONS_MASK_KM + 1) flags for KM 
- * and (32 - log2(RGX_BUILD_OPTIONS_MASK_KM + 1)) flags for UM.
- * The corresponding bit is set if the build option
- * was enabled at compile time.
+/* Each build option listed here is packed into a dword which provides up to
+ *  log2(RGX_BUILD_OPTIONS_MASK_KM + 1) flags for KM and
+ *  (32 - log2(RGX_BUILD_OPTIONS_MASK_KM + 1)) flags for UM.
+ * The corresponding bit is set if the build option was enabled at compile
+ * time.
  *
- * In order to extract the enabled build flags the INTERNAL_TEST
- * switch should be enabled in a client program which includes this
- * header. Then the client can test specific build flags by reading
- * the bit value at ##OPTIONNAME##_SET_OFFSET in RGX_BUILD_OPTIONS_KM 
- * RGX_BUILD_OPTIONS.
+ * In order to extract the enabled build flags the INTERNAL_TEST switch should
+ * be enabled in a client program which includes this header. Then the client
+ * can test specific build flags by reading the bit value at
+ *  ##OPTIONNAME##_SET_OFFSET
+ * in RGX_BUILD_OPTIONS_KM or RGX_BUILD_OPTIONS.
  *
  * IMPORTANT: add new options to unused bits or define a new dword
- * (e.g. RGX_BUILD_OPTIONS_KM2 or RGX_BUILD_OPTIONS2) so that the bitfield 
- * remains backwards
- * compatible.
+ * (e.g. RGX_BUILD_OPTIONS_KM2 or RGX_BUILD_OPTIONS2) so that the bitfield
+ * remains backwards compatible.
  */
+
+#ifndef RGX_OPTIONS_H
+#define RGX_OPTIONS_H
 
 #define RGX_BUILD_OPTIONS_MASK_KM 0x0000FFFFUL
 
-#if defined(NO_HARDWARE) || defined (INTERNAL_TEST)
+#if defined(NO_HARDWARE) || defined(INTERNAL_TEST)
 	#define NO_HARDWARE_SET_OFFSET	OPTIONS_BIT0
 	#define OPTIONS_BIT0		(0x1ul << 0)
 	#if OPTIONS_BIT0 > RGX_BUILD_OPTIONS_MASK_KM
 	#error "Bit exceeds reserved range"
 	#endif
 #else
-	#define OPTIONS_BIT0		0x0
+	#define OPTIONS_BIT0		0x0UL
 #endif /* NO_HARDWARE */
 
 
-#if defined(PDUMP) || defined (INTERNAL_TEST)
+#if defined(PDUMP) || defined(INTERNAL_TEST)
 	#define PDUMP_SET_OFFSET	OPTIONS_BIT1
 	#define OPTIONS_BIT1		(0x1ul << 1)
 	#if OPTIONS_BIT1 > RGX_BUILD_OPTIONS_MASK_KM
 	#error "Bit exceeds reserved range"
 	#endif
 #else
-	#define OPTIONS_BIT1		0x0
+	#define OPTIONS_BIT1		0x0UL
 #endif /* PDUMP */
 
 
-#if defined (INTERNAL_TEST)
+#if defined(INTERNAL_TEST)
 	#define UNUSED_SET_OFFSET	OPTIONS_BIT2
 	#define OPTIONS_BIT2		(0x1ul << 2)
 	#if OPTIONS_BIT2 > RGX_BUILD_OPTIONS_MASK_KM
 	#error "Bit exceeds reserved range"
 	#endif
 #else
-	#define OPTIONS_BIT2		0x0
-#endif /* SUPPORT_META_SLAVE_BOOT */
+	#define OPTIONS_BIT2		0x0UL
+#endif
 
 /* No longer used */
-#if defined (INTERNAL_TEST)
+#if defined(INTERNAL_TEST)
 	#define OPTIONS_BIT3		(0x1ul << 3)
 	#if OPTIONS_BIT3 > RGX_BUILD_OPTIONS_MASK_KM
 	#error "Bit exceeds reserved range"
 	#endif
 #else
-	#define OPTIONS_BIT3		0x0
+	#define OPTIONS_BIT3		0x0UL
 #endif
 
 
-#if defined(SUPPORT_RGX) || defined (INTERNAL_TEST)
+#if defined(SUPPORT_RGX) || defined(INTERNAL_TEST)
 	#define SUPPORT_RGX_SET_OFFSET	OPTIONS_BIT4
 	#define OPTIONS_BIT4		(0x1ul << 4)
 	#if OPTIONS_BIT4 > RGX_BUILD_OPTIONS_MASK_KM
 	#error "Bit exceeds reserved range"
 	#endif
 #else
-	#define OPTIONS_BIT4		0x0
+	#define OPTIONS_BIT4		0x0UL
 #endif /* SUPPORT_RGX */
 
 
-#if defined(SUPPORT_SECURE_EXPORT) || defined (INTERNAL_TEST)
+#if defined(SUPPORT_SECURE_EXPORT) || defined(INTERNAL_TEST)
 	#define SUPPORT_SECURE_EXPORT_SET_OFFSET	OPTIONS_BIT5
 	#define OPTIONS_BIT5		(0x1ul << 5)
 	#if OPTIONS_BIT5 > RGX_BUILD_OPTIONS_MASK_KM
 	#error "Bit exceeds reserved range"
 	#endif
 #else
-	#define OPTIONS_BIT5		0x0
+	#define OPTIONS_BIT5		0x0UL
 #endif /* SUPPORT_SECURE_EXPORT */
 
 
-#if defined(SUPPORT_INSECURE_EXPORT) || defined (INTERNAL_TEST)
+#if defined(SUPPORT_INSECURE_EXPORT) || defined(INTERNAL_TEST)
 	#define SUPPORT_INSECURE_EXPORT_SET_OFFSET	OPTIONS_BIT6
 	#define OPTIONS_BIT6		(0x1ul << 6)
 	#if OPTIONS_BIT6 > RGX_BUILD_OPTIONS_MASK_KM
 	#error "Bit exceeds reserved range"
 	#endif
 #else
-	#define OPTIONS_BIT6	0x0
+	#define OPTIONS_BIT6		0x0UL
 #endif /* SUPPORT_INSECURE_EXPORT */
 
 
-#if defined(SUPPORT_VFP) || defined (INTERNAL_TEST)
+#if defined(SUPPORT_VFP) || defined(INTERNAL_TEST)
 	#define SUPPORT_VFP_SET_OFFSET	OPTIONS_BIT7
 	#define OPTIONS_BIT7		(0x1ul << 7)
 	#if OPTIONS_BIT7 > RGX_BUILD_OPTIONS_MASK_KM
 	#error "Bit exceeds reserved range"
 	#endif
 #else
-	#define OPTIONS_BIT7		0x0
+	#define OPTIONS_BIT7		0x0UL
 #endif /* SUPPORT_VFP */
 
-#if defined(SUPPORT_WORKLOAD_ESTIMATION) || defined (INTERNAL_TEST)
+#if defined(SUPPORT_WORKLOAD_ESTIMATION) || defined(INTERNAL_TEST)
 	#define SUPPORT_WORKLOAD_ESTIMATION_OFFSET	OPTIONS_BIT8
 	#define OPTIONS_BIT8		(0x1ul << 8)
 	#if OPTIONS_BIT8 > RGX_BUILD_OPTIONS_MASK_KM
 	#error "Bit exceeds reserved range"
 	#endif
 #else
-	#define OPTIONS_BIT8		0x0
-#endif /* SUPPORT_WORKLOAD_ESTIMAITON */
+	#define OPTIONS_BIT8		0x0UL
+#endif /* SUPPORT_WORKLOAD_ESTIMATION */
 #define OPTIONS_WORKLOAD_ESTIMATION_MASK	(0x1ul << 8)
 
-#if defined(SUPPORT_PDVFS) || defined (INTERNAL_TEST)
+#if defined(SUPPORT_PDVFS) || defined(INTERNAL_TEST)
 	#define SUPPORT_PDVFS_OFFSET	OPTIONS_BIT9
 	#define OPTIONS_BIT9		(0x1ul << 9)
 	#if OPTIONS_BIT9 > RGX_BUILD_OPTIONS_MASK_KM
 	#error "Bit exceeds reserved range"
 	#endif
 #else
-	#define OPTIONS_BIT9		0x0
+	#define OPTIONS_BIT9		0x0UL
 #endif /* SUPPORT_PDVFS */
 #define OPTIONS_PDVFS_MASK	(0x1ul << 9)
 
-#if defined(DEBUG) || defined (INTERNAL_TEST)
+#if defined(DEBUG) || defined(INTERNAL_TEST)
 	#define DEBUG_SET_OFFSET	OPTIONS_BIT10
 	#define OPTIONS_BIT10		(0x1ul << 10)
 	#if OPTIONS_BIT10 > RGX_BUILD_OPTIONS_MASK_KM
 	#error "Bit exceeds reserved range"
 	#endif
 #else
-	#define OPTIONS_BIT10		0x0
+	#define OPTIONS_BIT10		0x0UL
 #endif /* DEBUG */
-/* The bit position of this should be the
- * same as DEBUG_SET_OFFSET option when
- * defined */
+/* The bit position of this should be the same as DEBUG_SET_OFFSET option
+ * when defined.
+ */
 #define OPTIONS_DEBUG_MASK	(0x1ul << 10)
 
-#if defined(SUPPORT_BUFFER_SYNC) || defined (INTERNAL_TEST)
+#if defined(SUPPORT_BUFFER_SYNC) || defined(INTERNAL_TEST)
 	#define SUPPORT_BUFFER_SYNC_SET_OFFSET	OPTIONS_BIT11
 	#define OPTIONS_BIT11		(0x1ul << 11)
 	#if OPTIONS_BIT11 > RGX_BUILD_OPTIONS_MASK_KM
 	#error "Bit exceeds reserved range"
 	#endif
 #else
-	#define OPTIONS_BIT11		0x0
+	#define OPTIONS_BIT11		0x0UL
 #endif /* SUPPORT_BUFFER_SYNC */
 
-#if defined(RGX_FW_IRQ_OS_COUNTERS)
+#if defined(RGX_FW_IRQ_OS_COUNTERS) || defined(INTERNAL_TEST)
 	#define SUPPORT_FW_IRQ_REG_COUNTERS		OPTIONS_BIT12
 	#define OPTIONS_BIT12		(0x1ul << 12)
 	#if OPTIONS_BIT12 > RGX_BUILD_OPTIONS_MASK_KM
 	#error "Bit exceeds reserved range"
 	#endif
 #else
-	#define OPTIONS_BIT12		0x0
+	#define OPTIONS_BIT12		0x0UL
 #endif /* RGX_FW_IRQ_OS_COUNTERS */
+
+#if defined(SUPPORT_SERVER_SYNC_IMPL) || defined(INTERNAL_TEST)
+	#define SUPPORT_SERVER_SYNC_IMPL_OFFSET OPTIONS_BIT13
+	#define OPTIONS_BIT13     (0x1ul << 13)
+	#if OPTIONS_BIT13 > RGX_BUILD_OPTIONS_MASK_KM
+	#error "Bit exceeds reserved range"
+	#endif
+#else
+	#define OPTIONS_BIT13     0x0UL
+#endif
 
 #define RGX_BUILD_OPTIONS_KM	\
 	(OPTIONS_BIT0  |\
@@ -214,20 +226,19 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 	 OPTIONS_BIT9  |\
 	 OPTIONS_BIT10 |\
 	 OPTIONS_BIT11 |\
-	 OPTIONS_BIT12)
+	 OPTIONS_BIT12 |\
+	 OPTIONS_BIT13)
 
 
-#if defined(SUPPORT_PERCONTEXT_FREELIST) || defined (INTERNAL_TEST)
+#if defined(SUPPORT_PERCONTEXT_FREELIST) || defined(INTERNAL_TEST)
 	#define OPTIONS_BIT31		(0x1ul << 31)
 	#if OPTIONS_BIT31 <= RGX_BUILD_OPTIONS_MASK_KM
 	#error "Bit exceeds reserved range"
 	#endif
 	#define SUPPORT_PERCONTEXT_FREELIST_SET_OFFSET	OPTIONS_BIT31
 #else
-	#define OPTIONS_BIT31		0x0
+	#define OPTIONS_BIT31		0x0U
 #endif /* SUPPORT_PERCONTEXT_FREELIST */
-
-#define _KM_RGX_BUILD_OPTIONS_ RGX_BUILD_OPTIONS
 
 #define RGX_BUILD_OPTIONS (RGX_BUILD_OPTIONS_KM | OPTIONS_BIT31)
 
@@ -235,3 +246,5 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
                         ~(OPTIONS_DEBUG_MASK               | \
                           OPTIONS_WORKLOAD_ESTIMATION_MASK | \
                           OPTIONS_PDVFS_MASK))
+
+#endif /* RGX_OPTIONS_H */

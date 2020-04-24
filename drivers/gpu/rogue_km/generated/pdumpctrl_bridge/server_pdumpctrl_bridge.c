@@ -39,7 +39,7 @@ PURPOSE AND NONINFRINGEMENT; AND (B) IN NO EVENT SHALL THE AUTHORS OR
 COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
 IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-********************************************************************************/
+*******************************************************************************/
 
 #include <linux/uaccess.h>
 
@@ -147,8 +147,25 @@ PVRSRVBridgePVRSRVPDumpIsLastCaptureFrame(IMG_UINT32 ui32DispatchTableEntry,
 	return 0;
 }
 
-/* *************************************************************************** 
- * Server bridge dispatch related glue 
+static IMG_INT
+PVRSRVBridgePVRSRVPDumpForceCaptureStop(IMG_UINT32 ui32DispatchTableEntry,
+					PVRSRV_BRIDGE_IN_PVRSRVPDUMPFORCECAPTURESTOP
+					* psPVRSRVPDumpForceCaptureStopIN,
+					PVRSRV_BRIDGE_OUT_PVRSRVPDUMPFORCECAPTURESTOP
+					* psPVRSRVPDumpForceCaptureStopOUT,
+					CONNECTION_DATA * psConnection)
+{
+
+	PVR_UNREFERENCED_PARAMETER(psConnection);
+	PVR_UNREFERENCED_PARAMETER(psPVRSRVPDumpForceCaptureStopIN);
+
+	psPVRSRVPDumpForceCaptureStopOUT->eError = PDumpForceCaptureStopKM();
+
+	return 0;
+}
+
+/* ***************************************************************************
+ * Server bridge dispatch related glue
  */
 
 static POS_LOCK pPDUMPCTRLBridgeLock;
@@ -162,9 +179,7 @@ PVRSRV_ERROR DeinitPDUMPCTRLBridge(void);
  */
 PVRSRV_ERROR InitPDUMPCTRLBridge(void)
 {
-	PVR_LOGR_IF_ERROR(OSLockCreate
-			  (&pPDUMPCTRLBridgeLock, LOCK_TYPE_PASSIVE),
-			  "OSLockCreate");
+	PVR_LOGR_IF_ERROR(OSLockCreate(&pPDUMPCTRLBridgeLock), "OSLockCreate");
 
 	SetDispatchTableEntry(PVRSRV_BRIDGE_PDUMPCTRL,
 			      PVRSRV_BRIDGE_PDUMPCTRL_PVRSRVPDUMPGETSTATE,
@@ -184,6 +199,11 @@ PVRSRV_ERROR InitPDUMPCTRLBridge(void)
 	SetDispatchTableEntry(PVRSRV_BRIDGE_PDUMPCTRL,
 			      PVRSRV_BRIDGE_PDUMPCTRL_PVRSRVPDUMPISLASTCAPTUREFRAME,
 			      PVRSRVBridgePVRSRVPDumpIsLastCaptureFrame,
+			      pPDUMPCTRLBridgeLock, bUseLock);
+
+	SetDispatchTableEntry(PVRSRV_BRIDGE_PDUMPCTRL,
+			      PVRSRV_BRIDGE_PDUMPCTRL_PVRSRVPDUMPFORCECAPTURESTOP,
+			      PVRSRVBridgePVRSRVPDumpForceCaptureStop,
 			      pPDUMPCTRLBridgeLock, bUseLock);
 
 	return PVRSRV_OK;
@@ -207,6 +227,9 @@ PVRSRV_ERROR DeinitPDUMPCTRLBridge(void)
 
 	UnsetDispatchTableEntry(PVRSRV_BRIDGE_PDUMPCTRL,
 				PVRSRV_BRIDGE_PDUMPCTRL_PVRSRVPDUMPISLASTCAPTUREFRAME);
+
+	UnsetDispatchTableEntry(PVRSRV_BRIDGE_PDUMPCTRL,
+				PVRSRV_BRIDGE_PDUMPCTRL_PVRSRVPDUMPFORCECAPTURESTOP);
 
 	return PVRSRV_OK;
 }

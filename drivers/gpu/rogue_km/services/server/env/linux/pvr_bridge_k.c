@@ -76,12 +76,6 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 PVRSRV_ERROR InitDMABUFBridge(void);
 PVRSRV_ERROR DeinitDMABUFBridge(void);
 
-#if defined(SUPPORT_DRM_EXT)
-#define CAST_BRIDGE_CMD_PTR_TO_PTR(ptr) (ptr)
-#else
-#define CAST_BRIDGE_CMD_PTR_TO_PTR(ptr) (void __user *)(uintptr_t)(ptr)
-#endif
-
 #if defined(MODULE_TEST)
 /************************************************************************/
 // additional includes for services testing
@@ -141,11 +135,10 @@ PVRSRV_ERROR OSPlatformBridgeInit(void)
 #if defined(DEBUG_BRIDGE_KM)
 	{
 		IMG_INT iResult;
-		iResult = PVRDebugFSCreateEntry("bridge_stats",
+		iResult = PVRDebugFSCreateFile("bridge_stats",
 					NULL,
 					&gsBridgeStatsReadOps,
 					BridgeStatsWrite,
-					NULL,
 					NULL,
 					&g_BridgeDispatchTable[0],
 					&gpsPVRDebugFSBridgeStatsEntry);
@@ -175,7 +168,7 @@ PVRSRV_ERROR OSPlatformBridgeDeInit(void)
 #if defined(DEBUG_BRIDGE_KM)
 	if (gpsPVRDebugFSBridgeStatsEntry != NULL)
 	{
-		PVRDebugFSRemoveEntry(&gpsPVRDebugFSBridgeStatsEntry);
+		PVRDebugFSRemoveFile(&gpsPVRDebugFSBridgeStatsEntry);
 	}
 #endif
 
@@ -255,7 +248,7 @@ static int BridgeStatsSeqShow(struct seq_file *psSeqFile, void *pvData)
 			   "Total number of bytes copied via copy_from_user = %u\n"
 			   "Total number of bytes copied via copy_to_user = %u\n"
 			   "Total number of bytes copied via copy_*_user = %u\n\n"
-			   "%3s: %-60s | %-48s | %10s | %20s | %20s | %20s | %20s \n",
+			   "%3s: %-60s | %-48s | %10s | %20s | %20s | %20s | %20s\n",
 			   g_BridgeGlobalStats.ui32IOCTLCount,
 			   g_BridgeGlobalStats.ui32TotalCopyFromUserBytes,
 			   g_BridgeGlobalStats.ui32TotalCopyToUserBytes,
@@ -275,15 +268,15 @@ static int BridgeStatsSeqShow(struct seq_file *psSeqFile, void *pvData)
 		IMG_UINT32 ui32Remainder;
 
 		seq_printf(psSeqFile,
-			   "%3d: %-60s   %-48s   %-10u   %-20u   %-20u   %-20llu   %-20llu\n",
+			   "%3d: %-60s   %-48s   %-10u   %-20u   %-20u   %-20" IMG_UINT64_FMTSPEC "   %-20" IMG_UINT64_FMTSPEC "\n",
 			   (IMG_UINT32)(((size_t)psEntry-(size_t)g_BridgeDispatchTable)/sizeof(*g_BridgeDispatchTable)),
 			   psEntry->pszIOCName,
 			   (psEntry->pfFunction != NULL) ? psEntry->pszFunctionName : "(null)",
 			   psEntry->ui32CallCount,
 			   psEntry->ui32CopyFromUserTotalBytes,
 			   psEntry->ui32CopyToUserTotalBytes,
-			   (unsigned long long) OSDivide64r64(psEntry->ui64TotalTimeNS, 1000, &ui32Remainder),
-			   (unsigned long long) OSDivide64r64(psEntry->ui64MaxTimeNS, 1000, &ui32Remainder));
+			   OSDivide64r64(psEntry->ui64TotalTimeNS, 1000, &ui32Remainder),
+			   OSDivide64r64(psEntry->ui64MaxTimeNS, 1000, &ui32Remainder));
 	}
 
 	return 0;
@@ -370,8 +363,8 @@ PVRSRV_ERROR LinuxBridgeBlockClientsAccess(IMG_BOOL bShutdown)
 	}
 
 	/* now wait for any threads currently in the server to exit */
-	while(OSAtomicRead(&g_iNumActiveDriverThreads) != 0 ||
-	      (OSAtomicRead(&g_iNumActiveKernelThreads) != 0 && !bShutdown))
+	while (OSAtomicRead(&g_iNumActiveDriverThreads) != 0 ||
+		   (OSAtomicRead(&g_iNumActiveKernelThreads) != 0 && !bShutdown))
 	{
 		if (OSAtomicRead(&g_iNumActiveDriverThreads) != 0)
 		{
@@ -413,7 +406,7 @@ PVRSRV_ERROR LinuxBridgeUnblockClientsAccess(void)
 	if (eError != PVRSRV_OK)
 	{
 		PVR_DPF((PVR_DBG_ERROR, "%s: OSEventObjectSignal failed: %s",
-		        __func__, PVRSRVGetErrorStringKM(eError)));
+		        __func__, PVRSRVGetErrorString(eError)));
 	}
 
 	return eError;
@@ -429,7 +422,7 @@ static PVRSRV_ERROR LinuxBridgeSignalIfSuspended(void)
 		if (eError != PVRSRV_OK)
 		{
 			PVR_DPF((PVR_DBG_ERROR, "%s: Failed to signal driver thread event"
-			        " object: %s", __func__, PVRSRVGetErrorStringKM(eError)));
+			        " object: %s", __func__, PVRSRVGetErrorString(eError)));
 		}
 	}
 
@@ -478,7 +471,7 @@ static PVRSRV_ERROR _WaitForDriverUnsuspend(void)
 	return PVRSRV_OK;
 }
 
-static PVRSRV_ERROR PVRSRVDriverThreadEnter(void)
+PVRSRV_ERROR PVRSRVDriverThreadEnter(void)
 {
 	PVRSRV_ERROR eError;
 
@@ -513,7 +506,7 @@ static PVRSRV_ERROR PVRSRVDriverThreadEnter(void)
 		{
 			PVR_DPF((PVR_DBG_ERROR, "%s: Failed to wait for driver"
 			        " unsuspend: %s", __func__,
-			        PVRSRVGetErrorStringKM(eError)));
+			        PVRSRVGetErrorString(eError)));
 			return eError;
 		}
 	}
@@ -521,7 +514,7 @@ static PVRSRV_ERROR PVRSRVDriverThreadEnter(void)
 	return PVRSRV_OK;
 }
 
-static INLINE void PVRSRVDriverThreadExit(void)
+void PVRSRVDriverThreadExit(void)
 {
 	OSAtomicDecrement(&g_iNumActiveDriverThreads);
 	/* if the driver is being suspended then we need to signal the
@@ -542,7 +535,7 @@ PVRSRV_BridgeDispatchKM(struct drm_device __maybe_unused *dev, void *arg, struct
 
 	if (psConnection == NULL)
 	{
-		PVR_DPF((PVR_DBG_ERROR, "%s: Connection is closed", __FUNCTION__));
+		PVR_DPF((PVR_DBG_ERROR, "%s: Connection is closed", __func__));
 		return -EFAULT;
 	}
 
@@ -558,16 +551,16 @@ PVRSRV_BridgeDispatchKM(struct drm_device __maybe_unused *dev, void *arg, struct
 	{
 		PVR_DPF((PVR_DBG_ERROR, "%s: PVRSRVDriverThreadEnter failed: %s",
 		        __func__,
-		        PVRSRVGetErrorStringKM(error)));
+		        PVRSRVGetErrorString(error)));
 		goto e0;
 	}
 
 	sBridgePackageKM.ui32BridgeID = psSrvkmCmd->bridge_id;
 	sBridgePackageKM.ui32FunctionID = psSrvkmCmd->bridge_func_id;
 	sBridgePackageKM.ui32Size = sizeof(sBridgePackageKM);
-	sBridgePackageKM.pvParamIn = CAST_BRIDGE_CMD_PTR_TO_PTR(psSrvkmCmd->in_data_ptr);
+	sBridgePackageKM.pvParamIn = (void __user *)(uintptr_t)psSrvkmCmd->in_data_ptr;
 	sBridgePackageKM.ui32InBufferSize = psSrvkmCmd->in_data_size;
-	sBridgePackageKM.pvParamOut = CAST_BRIDGE_CMD_PTR_TO_PTR(psSrvkmCmd->out_data_ptr);
+	sBridgePackageKM.pvParamOut = (void __user *)(uintptr_t)psSrvkmCmd->out_data_ptr;
 	sBridgePackageKM.ui32OutBufferSize = psSrvkmCmd->out_data_size;
 
 	error = BridgedDispatchKM(psConnection, &sBridgePackageKM);
@@ -619,7 +612,7 @@ PVRSRV_MMap(struct file *pFile, struct vm_area_struct *ps_vma)
 	if (eError != PVRSRV_OK)
 	{
 		PVR_DPF((PVR_DBG_ERROR, "%s: PMRMMapPMR failed (%s)",
-				__func__, PVRSRVGetErrorStringKM(eError)));
+				__func__, PVRSRVGetErrorString(eError)));
 		goto e0;
 	}
 

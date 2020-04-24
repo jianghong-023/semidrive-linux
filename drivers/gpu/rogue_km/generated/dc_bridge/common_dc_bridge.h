@@ -84,7 +84,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #define PVRSRV_BRIDGE_DC_CMD_LAST			(PVRSRV_BRIDGE_DC_CMD_FIRST+25)
 
 /*******************************************
-            DCDevicesQueryCount          
+            DCDevicesQueryCount
  *******************************************/
 
 /* Bridge in structure for DCDevicesQueryCount */
@@ -101,7 +101,7 @@ typedef struct PVRSRV_BRIDGE_OUT_DCDEVICESQUERYCOUNT_TAG
 } __attribute__ ((packed)) PVRSRV_BRIDGE_OUT_DCDEVICESQUERYCOUNT;
 
 /*******************************************
-            DCDevicesEnumerate          
+            DCDevicesEnumerate
  *******************************************/
 
 /* Bridge in structure for DCDevicesEnumerate */
@@ -121,7 +121,7 @@ typedef struct PVRSRV_BRIDGE_OUT_DCDEVICESENUMERATE_TAG
 } __attribute__ ((packed)) PVRSRV_BRIDGE_OUT_DCDEVICESENUMERATE;
 
 /*******************************************
-            DCDeviceAcquire          
+            DCDeviceAcquire
  *******************************************/
 
 /* Bridge in structure for DCDeviceAcquire */
@@ -138,7 +138,7 @@ typedef struct PVRSRV_BRIDGE_OUT_DCDEVICEACQUIRE_TAG
 } __attribute__ ((packed)) PVRSRV_BRIDGE_OUT_DCDEVICEACQUIRE;
 
 /*******************************************
-            DCDeviceRelease          
+            DCDeviceRelease
  *******************************************/
 
 /* Bridge in structure for DCDeviceRelease */
@@ -154,7 +154,7 @@ typedef struct PVRSRV_BRIDGE_OUT_DCDEVICERELEASE_TAG
 } __attribute__ ((packed)) PVRSRV_BRIDGE_OUT_DCDEVICERELEASE;
 
 /*******************************************
-            DCGetInfo          
+            DCGetInfo
  *******************************************/
 
 /* Bridge in structure for DCGetInfo */
@@ -171,7 +171,7 @@ typedef struct PVRSRV_BRIDGE_OUT_DCGETINFO_TAG
 } __attribute__ ((packed)) PVRSRV_BRIDGE_OUT_DCGETINFO;
 
 /*******************************************
-            DCPanelQueryCount          
+            DCPanelQueryCount
  *******************************************/
 
 /* Bridge in structure for DCPanelQueryCount */
@@ -188,7 +188,7 @@ typedef struct PVRSRV_BRIDGE_OUT_DCPANELQUERYCOUNT_TAG
 } __attribute__ ((packed)) PVRSRV_BRIDGE_OUT_DCPANELQUERYCOUNT;
 
 /*******************************************
-            DCPanelQuery          
+            DCPanelQuery
  *******************************************/
 
 /* Bridge in structure for DCPanelQuery */
@@ -209,7 +209,7 @@ typedef struct PVRSRV_BRIDGE_OUT_DCPANELQUERY_TAG
 } __attribute__ ((packed)) PVRSRV_BRIDGE_OUT_DCPANELQUERY;
 
 /*******************************************
-            DCFormatQuery          
+            DCFormatQuery
  *******************************************/
 
 /* Bridge in structure for DCFormatQuery */
@@ -230,7 +230,7 @@ typedef struct PVRSRV_BRIDGE_OUT_DCFORMATQUERY_TAG
 } __attribute__ ((packed)) PVRSRV_BRIDGE_OUT_DCFORMATQUERY;
 
 /*******************************************
-            DCDimQuery          
+            DCDimQuery
  *******************************************/
 
 /* Bridge in structure for DCDimQuery */
@@ -251,7 +251,7 @@ typedef struct PVRSRV_BRIDGE_OUT_DCDIMQUERY_TAG
 } __attribute__ ((packed)) PVRSRV_BRIDGE_OUT_DCDIMQUERY;
 
 /*******************************************
-            DCSetBlank          
+            DCSetBlank
  *******************************************/
 
 /* Bridge in structure for DCSetBlank */
@@ -268,7 +268,7 @@ typedef struct PVRSRV_BRIDGE_OUT_DCSETBLANK_TAG
 } __attribute__ ((packed)) PVRSRV_BRIDGE_OUT_DCSETBLANK;
 
 /*******************************************
-            DCSetVSyncReporting          
+            DCSetVSyncReporting
  *******************************************/
 
 /* Bridge in structure for DCSetVSyncReporting */
@@ -285,7 +285,7 @@ typedef struct PVRSRV_BRIDGE_OUT_DCSETVSYNCREPORTING_TAG
 } __attribute__ ((packed)) PVRSRV_BRIDGE_OUT_DCSETVSYNCREPORTING;
 
 /*******************************************
-            DCLastVSyncQuery          
+            DCLastVSyncQuery
  *******************************************/
 
 /* Bridge in structure for DCLastVSyncQuery */
@@ -302,7 +302,7 @@ typedef struct PVRSRV_BRIDGE_OUT_DCLASTVSYNCQUERY_TAG
 } __attribute__ ((packed)) PVRSRV_BRIDGE_OUT_DCLASTVSYNCQUERY;
 
 /*******************************************
-            DCSystemBufferAcquire          
+            DCSystemBufferAcquire
  *******************************************/
 
 /* Bridge in structure for DCSystemBufferAcquire */
@@ -320,7 +320,7 @@ typedef struct PVRSRV_BRIDGE_OUT_DCSYSTEMBUFFERACQUIRE_TAG
 } __attribute__ ((packed)) PVRSRV_BRIDGE_OUT_DCSYSTEMBUFFERACQUIRE;
 
 /*******************************************
-            DCSystemBufferRelease          
+            DCSystemBufferRelease
  *******************************************/
 
 /* Bridge in structure for DCSystemBufferRelease */
@@ -336,7 +336,7 @@ typedef struct PVRSRV_BRIDGE_OUT_DCSYSTEMBUFFERRELEASE_TAG
 } __attribute__ ((packed)) PVRSRV_BRIDGE_OUT_DCSYSTEMBUFFERRELEASE;
 
 /*******************************************
-            DCDisplayContextCreate          
+            DCDisplayContextCreate
  *******************************************/
 
 /* Bridge in structure for DCDisplayContextCreate */
@@ -353,7 +353,7 @@ typedef struct PVRSRV_BRIDGE_OUT_DCDISPLAYCONTEXTCREATE_TAG
 } __attribute__ ((packed)) PVRSRV_BRIDGE_OUT_DCDISPLAYCONTEXTCREATE;
 
 /*******************************************
-            DCDisplayContextConfigureCheck          
+            DCDisplayContextConfigureCheck
  *******************************************/
 
 /* Bridge in structure for DCDisplayContextConfigureCheck */
@@ -372,7 +372,7 @@ typedef struct PVRSRV_BRIDGE_OUT_DCDISPLAYCONTEXTCONFIGURECHECK_TAG
 } __attribute__ ((packed)) PVRSRV_BRIDGE_OUT_DCDISPLAYCONTEXTCONFIGURECHECK;
 
 /*******************************************
-            DCDisplayContextConfigure          
+            DCDisplayContextConfigure
  *******************************************/
 
 /* Bridge in structure for DCDisplayContextConfigure */
@@ -400,7 +400,7 @@ typedef struct PVRSRV_BRIDGE_OUT_DCDISPLAYCONTEXTCONFIGURE_TAG
 } __attribute__ ((packed)) PVRSRV_BRIDGE_OUT_DCDISPLAYCONTEXTCONFIGURE;
 
 /*******************************************
-            DCDisplayContextDestroy          
+            DCDisplayContextDestroy
  *******************************************/
 
 /* Bridge in structure for DCDisplayContextDestroy */
@@ -416,7 +416,7 @@ typedef struct PVRSRV_BRIDGE_OUT_DCDISPLAYCONTEXTDESTROY_TAG
 } __attribute__ ((packed)) PVRSRV_BRIDGE_OUT_DCDISPLAYCONTEXTDESTROY;
 
 /*******************************************
-            DCBufferAlloc          
+            DCBufferAlloc
  *******************************************/
 
 /* Bridge in structure for DCBufferAlloc */
@@ -435,7 +435,7 @@ typedef struct PVRSRV_BRIDGE_OUT_DCBUFFERALLOC_TAG
 } __attribute__ ((packed)) PVRSRV_BRIDGE_OUT_DCBUFFERALLOC;
 
 /*******************************************
-            DCBufferImport          
+            DCBufferImport
  *******************************************/
 
 /* Bridge in structure for DCBufferImport */
@@ -455,7 +455,7 @@ typedef struct PVRSRV_BRIDGE_OUT_DCBUFFERIMPORT_TAG
 } __attribute__ ((packed)) PVRSRV_BRIDGE_OUT_DCBUFFERIMPORT;
 
 /*******************************************
-            DCBufferFree          
+            DCBufferFree
  *******************************************/
 
 /* Bridge in structure for DCBufferFree */
@@ -471,7 +471,7 @@ typedef struct PVRSRV_BRIDGE_OUT_DCBUFFERFREE_TAG
 } __attribute__ ((packed)) PVRSRV_BRIDGE_OUT_DCBUFFERFREE;
 
 /*******************************************
-            DCBufferUnimport          
+            DCBufferUnimport
  *******************************************/
 
 /* Bridge in structure for DCBufferUnimport */
@@ -487,7 +487,7 @@ typedef struct PVRSRV_BRIDGE_OUT_DCBUFFERUNIMPORT_TAG
 } __attribute__ ((packed)) PVRSRV_BRIDGE_OUT_DCBUFFERUNIMPORT;
 
 /*******************************************
-            DCBufferPin          
+            DCBufferPin
  *******************************************/
 
 /* Bridge in structure for DCBufferPin */
@@ -504,7 +504,7 @@ typedef struct PVRSRV_BRIDGE_OUT_DCBUFFERPIN_TAG
 } __attribute__ ((packed)) PVRSRV_BRIDGE_OUT_DCBUFFERPIN;
 
 /*******************************************
-            DCBufferUnpin          
+            DCBufferUnpin
  *******************************************/
 
 /* Bridge in structure for DCBufferUnpin */
@@ -520,7 +520,7 @@ typedef struct PVRSRV_BRIDGE_OUT_DCBUFFERUNPIN_TAG
 } __attribute__ ((packed)) PVRSRV_BRIDGE_OUT_DCBUFFERUNPIN;
 
 /*******************************************
-            DCBufferAcquire          
+            DCBufferAcquire
  *******************************************/
 
 /* Bridge in structure for DCBufferAcquire */
@@ -537,7 +537,7 @@ typedef struct PVRSRV_BRIDGE_OUT_DCBUFFERACQUIRE_TAG
 } __attribute__ ((packed)) PVRSRV_BRIDGE_OUT_DCBUFFERACQUIRE;
 
 /*******************************************
-            DCBufferRelease          
+            DCBufferRelease
  *******************************************/
 
 /* Bridge in structure for DCBufferRelease */

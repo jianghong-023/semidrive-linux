@@ -40,7 +40,7 @@ COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
 IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */ /**************************************************************************/
- 
+
 #ifndef TLCLIENT_H_
 #define TLCLIENT_H_
 
@@ -59,7 +59,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 /**************************************************************************/ /*!
  @Function		TLClientOpenStream
  @Description	Open a descriptor onto an existing kernel transport stream.
- @Input			hSrvHandle    	Address of a pointer to a connection object
+ @Input			hDevConnection  Address of a pointer to a connection object
  @Input			pszName			Address of the stream name string, no longer
  	 	 	 	 	 	 	 	than PRVSRVTL_MAX_STREAM_NAME_SIZE.
  @Input			ui32Mode		Unused
@@ -71,7 +71,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  @Return		PVRSRV_ERROR:			       for other system codes
 */ /***************************************************************************/
 IMG_INTERNAL
-PVRSRV_ERROR TLClientOpenStream(IMG_HANDLE hSrvHandle,
+PVRSRV_ERROR TLClientOpenStream(SHARED_DEV_CONNECTION hDevConnection,
 		const IMG_CHAR* pszName,
 		IMG_UINT32   ui32Mode,
 		IMG_HANDLE*  phSD);
@@ -82,21 +82,21 @@ PVRSRV_ERROR TLClientOpenStream(IMG_HANDLE hSrvHandle,
  @Description	Close and release the stream connection to Services kernel
 				server transport layer. Any outstanding Acquire will be
 				released.
- @Input			hSrvHandle      Address of a pointer to a connection object
+ @Input			hDevConnection  Address of a pointer to a connection object
  @Input			hSD				Handle of the stream object to close
  @Return		PVRSRV_ERROR_HANDLE_NOT_FOUND: when SD handle is not known
  @Return		PVRSRV_ERROR_STREAM_ERROR: 	  internal driver state error
  @Return		PVRSRV_ERROR:				  for system codes
 */ /***************************************************************************/
 IMG_INTERNAL
-PVRSRV_ERROR TLClientCloseStream(IMG_HANDLE hSrvHandle,
+PVRSRV_ERROR TLClientCloseStream(SHARED_DEV_CONNECTION hDevConnection,
 		IMG_HANDLE hSD);
 
 /**************************************************************************/ /*!
  @Function      TLClientDiscoverStreams
  @Description   Finds all streams that's name starts with pszNamePattern and
                 ends with a number.
- @Input         hSrvHandle      Address of a pointer to a connection object
+ @Input         hDevConnection  Address of a pointer to a connection object
  @Input         pszNamePattern  Name pattern. Must be beginning of a string.
  @Output        pui32Streams    Array of numbers from end of the discovered
                 names.
@@ -106,7 +106,7 @@ PVRSRV_ERROR TLClientCloseStream(IMG_HANDLE hSrvHandle,
  @Return		PVRSRV_ERROR    for system codes
 */ /***************************************************************************/
 IMG_INTERNAL
-PVRSRV_ERROR TLClientDiscoverStreams(IMG_HANDLE hSrvHandle,
+PVRSRV_ERROR TLClientDiscoverStreams(SHARED_DEV_CONNECTION hDevConnection,
 		const IMG_CHAR *pszNamePattern,
 		IMG_CHAR aszStreams[][PRVSRVTL_MAX_STREAM_NAME_SIZE],
 		IMG_UINT32 *pui32NumFound);
@@ -115,14 +115,14 @@ PVRSRV_ERROR TLClientDiscoverStreams(IMG_HANDLE hSrvHandle,
  @Function      TLClientReserveStream
  @Description   Reserves a region with given size in the stream. If the stream
                 is already reserved the function will return an error.
- @Input         hSrvHandle      Address of a pointer to a connection object
+ @Input         hDevConnection  Address of a pointer to a connection object
  @Input         hSD             Handle of the stream object to close
  @Output        ppui8Data       pointer to the buffer
  @Input         ui32Size        size of the data
  @Return
 */ /***************************************************************************/
 IMG_INTERNAL
-PVRSRV_ERROR TLClientReserveStream(IMG_HANDLE hSrvHandle,
+PVRSRV_ERROR TLClientReserveStream(SHARED_DEV_CONNECTION hDevConnection,
 		IMG_HANDLE hSD,
 		IMG_UINT8 **ppui8Data,
 		IMG_UINT32 ui32Size);
@@ -131,7 +131,7 @@ PVRSRV_ERROR TLClientReserveStream(IMG_HANDLE hSrvHandle,
  @Function      TLClientStreamReserve2
  @Description   Reserves a region with given size in the stream. If the stream
                 is already reserved the function will return an error.
- @Input         hSrvHandle      Address of a pointer to a connection object
+ @Input         hDevConnection  Address of a pointer to a connection object
  @Input         hSD             Handle of the stream object to close
  @Output        ppui8Data       pointer to the buffer
  @Input         ui32Size        size of the data
@@ -140,7 +140,7 @@ PVRSRV_ERROR TLClientReserveStream(IMG_HANDLE hSrvHandle,
  @Return
 */ /***************************************************************************/
 IMG_INTERNAL
-PVRSRV_ERROR TLClientReserveStream2(IMG_HANDLE hSrvHandle,
+PVRSRV_ERROR TLClientReserveStream2(SHARED_DEV_CONNECTION hDevConnection,
 		IMG_HANDLE hSD,
 		IMG_UINT8 **ppui8Data,
 		IMG_UINT32 ui32Size,
@@ -153,13 +153,13 @@ PVRSRV_ERROR TLClientReserveStream2(IMG_HANDLE hSrvHandle,
                 allows next reserves.
                 This function call has to be preceded by the call to
                 TLClientReserveStream or TLClientReserveStream2.
- @Input         hSrvHandle      Address of a pointer to a connection object
+ @Input         hDevConnection  Address of a pointer to a connection object
  @Input         hSD             Handle of the stream object to close
  @Input         ui32Size        Size of the data
  @Return
 */ /***************************************************************************/
 IMG_INTERNAL
-PVRSRV_ERROR TLClientCommitStream(IMG_HANDLE hSrvHandle,
+PVRSRV_ERROR TLClientCommitStream(SHARED_DEV_CONNECTION hDevConnection,
 		IMG_HANDLE hSD,
 		IMG_UINT32 ui32Size);
 
@@ -174,7 +174,7 @@ PVRSRV_ERROR TLClientCommitStream(IMG_HANDLE hSrvHandle,
  	 	 	 	waiting then a resource unavailable error will be returned
  	 	 	 	to the caller. Clients must pair this call with a
  	 	 	 	ReleaseData call.
- @Input			hSrvHandle  	Address of a pointer to a connection object
+ @Input			hDevConnection  Address of a pointer to a connection object
  @Input			hSD				Handle of the stream object to read
  @Output		ppPacketBuf		Address of a pointer to an byte buffer. On exit
 								pointer contains address of buffer to read from
@@ -188,7 +188,7 @@ PVRSRV_ERROR TLClientCommitStream(IMG_HANDLE hSrvHandle,
  @Return		PVRSRV_ERROR:					   for other system codes
 */ /***************************************************************************/
 IMG_INTERNAL
-PVRSRV_ERROR TLClientAcquireData(IMG_HANDLE hSrvHandle,
+PVRSRV_ERROR TLClientAcquireData(SHARED_DEV_CONNECTION hDevConnection,
 		IMG_HANDLE  hSD,
 		IMG_PBYTE*  ppPacketBuf,
 		IMG_UINT32* puiBufLen);
@@ -199,7 +199,7 @@ PVRSRV_ERROR TLClientAcquireData(IMG_HANDLE hSrvHandle,
  @Description   Called after client has read the stream data out of the buffer
                 The data is subsequently flushed from the stream buffer to make
                 room for more data packets from the stream source.
- @Input         hSrvHandle      Address of a pointer to a connection object
+ @Input         hDevConnection  Address of a pointer to a connection object
  @Input         hSD             Handle of the stream object to read
  @Return        PVRSRV_ERROR_RESOURCE_UNAVAILABLE: when stream no longer exists
  @Return        PVRSRV_ERROR_HANDLE_NOT_FOUND:   when SD handle not known to TL
@@ -208,7 +208,7 @@ PVRSRV_ERROR TLClientAcquireData(IMG_HANDLE hSrvHandle,
  @Return        PVRSRV_ERROR:                    for system codes
 */ /***************************************************************************/
 IMG_INTERNAL
-PVRSRV_ERROR TLClientReleaseData(IMG_HANDLE hSrvHandle,
+PVRSRV_ERROR TLClientReleaseData(SHARED_DEV_CONNECTION hDevConnection,
 		IMG_HANDLE hSD);
 
 /**************************************************************************/ /*!
@@ -219,7 +219,7 @@ PVRSRV_ERROR TLClientReleaseData(IMG_HANDLE hSrvHandle,
                 packet from the stream.
                 The data is subsequently flushed from the stream buffer to make
                 room for more data packets from the stream source.
- @Input         hSrvHandle      Address of a pointer to a connection object
+ @Input         hDevConnection  Address of a pointer to a connection object
  @Input         hSD             Handle of the stream object to read
  @Input         uiActualReadLen Size of data read, in bytes. Must be on a TL
                                 packet boundary.
@@ -231,19 +231,19 @@ PVRSRV_ERROR TLClientReleaseData(IMG_HANDLE hSrvHandle,
  @Return        PVRSRV_ERROR:                    for system codes
 */ /***************************************************************************/
 IMG_INTERNAL
-PVRSRV_ERROR TLClientReleaseDataLess(IMG_HANDLE hSrvHandle,
+PVRSRV_ERROR TLClientReleaseDataLess(SHARED_DEV_CONNECTION hDevConnection,
 		IMG_HANDLE hSD, IMG_UINT32 uiActualReadLen);
 
 /**************************************************************************/ /*!
  @Function      TLClientWriteData
  @Description   Writes data to the stream.
- @Input         hSrvHandle      Address of a pointer to a connection object
+ @Input         hDevConnection  Address of a pointer to a connection object
  @Input         hSD             Handle of the stream object to read
  @Input         ui32Size        Size of the data
  @Input         pui8Data        Pointer to data
 */ /***************************************************************************/
 IMG_INTERNAL
-PVRSRV_ERROR TLClientWriteData(IMG_HANDLE hSrvHandle,
+PVRSRV_ERROR TLClientWriteData(SHARED_DEV_CONNECTION hDevConnection,
 		IMG_HANDLE hSD,
 		IMG_UINT32 ui32Size,
 		IMG_BYTE *pui8Data);

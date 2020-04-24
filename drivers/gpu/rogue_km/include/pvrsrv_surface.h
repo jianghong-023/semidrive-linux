@@ -47,6 +47,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #define _PVRSRV_SURFACE_H_
 
 #include "img_types.h"
+#include "img_defs.h"
 #include <powervr/buffer_attribs.h>
 
 #define PVRSRV_SURFACE_TRANSFORM_NONE      (0 << 0)		/*!< No transformation */

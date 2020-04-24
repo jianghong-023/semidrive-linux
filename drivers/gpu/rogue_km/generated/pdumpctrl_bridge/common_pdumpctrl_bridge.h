@@ -55,10 +55,11 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #define PVRSRV_BRIDGE_PDUMPCTRL_PVRSRVPDUMPGETFRAME			PVRSRV_BRIDGE_PDUMPCTRL_CMD_FIRST+1
 #define PVRSRV_BRIDGE_PDUMPCTRL_PVRSRVPDUMPSETDEFAULTCAPTUREPARAMS			PVRSRV_BRIDGE_PDUMPCTRL_CMD_FIRST+2
 #define PVRSRV_BRIDGE_PDUMPCTRL_PVRSRVPDUMPISLASTCAPTUREFRAME			PVRSRV_BRIDGE_PDUMPCTRL_CMD_FIRST+3
-#define PVRSRV_BRIDGE_PDUMPCTRL_CMD_LAST			(PVRSRV_BRIDGE_PDUMPCTRL_CMD_FIRST+3)
+#define PVRSRV_BRIDGE_PDUMPCTRL_PVRSRVPDUMPFORCECAPTURESTOP			PVRSRV_BRIDGE_PDUMPCTRL_CMD_FIRST+4
+#define PVRSRV_BRIDGE_PDUMPCTRL_CMD_LAST			(PVRSRV_BRIDGE_PDUMPCTRL_CMD_FIRST+4)
 
 /*******************************************
-            PVRSRVPDumpGetState          
+            PVRSRVPDumpGetState
  *******************************************/
 
 /* Bridge in structure for PVRSRVPDumpGetState */
@@ -75,7 +76,7 @@ typedef struct PVRSRV_BRIDGE_OUT_PVRSRVPDUMPGETSTATE_TAG
 } __attribute__ ((packed)) PVRSRV_BRIDGE_OUT_PVRSRVPDUMPGETSTATE;
 
 /*******************************************
-            PVRSRVPDumpGetFrame          
+            PVRSRVPDumpGetFrame
  *******************************************/
 
 /* Bridge in structure for PVRSRVPDumpGetFrame */
@@ -92,7 +93,7 @@ typedef struct PVRSRV_BRIDGE_OUT_PVRSRVPDUMPGETFRAME_TAG
 } __attribute__ ((packed)) PVRSRV_BRIDGE_OUT_PVRSRVPDUMPGETFRAME;
 
 /*******************************************
-            PVRSRVPDumpSetDefaultCaptureParams          
+            PVRSRVPDumpSetDefaultCaptureParams
  *******************************************/
 
 /* Bridge in structure for PVRSRVPDumpSetDefaultCaptureParams */
@@ -112,7 +113,7 @@ typedef struct PVRSRV_BRIDGE_OUT_PVRSRVPDUMPSETDEFAULTCAPTUREPARAMS_TAG
 } __attribute__ ((packed)) PVRSRV_BRIDGE_OUT_PVRSRVPDUMPSETDEFAULTCAPTUREPARAMS;
 
 /*******************************************
-            PVRSRVPDumpIsLastCaptureFrame          
+            PVRSRVPDumpIsLastCaptureFrame
  *******************************************/
 
 /* Bridge in structure for PVRSRVPDumpIsLastCaptureFrame */
@@ -127,5 +128,21 @@ typedef struct PVRSRV_BRIDGE_OUT_PVRSRVPDUMPISLASTCAPTUREFRAME_TAG
 	IMG_BOOL bpbIsLastCaptureFrame;
 	PVRSRV_ERROR eError;
 } __attribute__ ((packed)) PVRSRV_BRIDGE_OUT_PVRSRVPDUMPISLASTCAPTUREFRAME;
+
+/*******************************************
+            PVRSRVPDumpForceCaptureStop
+ *******************************************/
+
+/* Bridge in structure for PVRSRVPDumpForceCaptureStop */
+typedef struct PVRSRV_BRIDGE_IN_PVRSRVPDUMPFORCECAPTURESTOP_TAG
+{
+	IMG_UINT32 ui32EmptyStructPlaceholder;
+} __attribute__ ((packed)) PVRSRV_BRIDGE_IN_PVRSRVPDUMPFORCECAPTURESTOP;
+
+/* Bridge out structure for PVRSRVPDumpForceCaptureStop */
+typedef struct PVRSRV_BRIDGE_OUT_PVRSRVPDUMPFORCECAPTURESTOP_TAG
+{
+	PVRSRV_ERROR eError;
+} __attribute__ ((packed)) PVRSRV_BRIDGE_OUT_PVRSRVPDUMPFORCECAPTURESTOP;
 
 #endif /* COMMON_PDUMPCTRL_BRIDGE_H */

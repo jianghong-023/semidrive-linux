@@ -56,6 +56,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include <linux/scatterlist.h>
 
 #include "img_types.h"
+#include "img_defs.h"
 #include "pvr_debug.h"
 #include "pvrsrv_error.h"
 #include "pvrsrv_memallocflags.h"
@@ -67,7 +68,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "private_data.h"
 #include "module_common.h"
 
-#if defined(PVR_RI_DEBUG)
+#if defined(PVRSRV_ENABLE_GPU_MEMORY_INFO)
 #include "ri_server.h"
 #endif
 
@@ -85,8 +86,11 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  * and using our dmabuf.
  */
 
-static int PVRDmaBufOpsAttach(struct dma_buf *psDmaBuf, struct device *psDev,
-                           struct dma_buf_attachment *psAttachment)
+static int PVRDmaBufOpsAttach(struct dma_buf *psDmaBuf,
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(4, 19, 0))
+							  struct device *psDev,
+#endif
+							  struct dma_buf_attachment *psAttachment)
 {
 	return -ENOSYS;
 }
@@ -128,7 +132,9 @@ static const struct dma_buf_ops sPVRDmaBufOps =
 	.unmap_dma_buf = PVRDmaBufOpsUnmap,
 	.release       = PVRDmaBufOpsRelease,
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 12, 0))
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(4, 19, 0))
 	.map_atomic    = PVRDmaBufOpsKMap,
+#endif
 	.map           = PVRDmaBufOpsKMap,
 #else
 	.kmap_atomic   = PVRDmaBufOpsKMap,
@@ -182,16 +188,14 @@ static PVRSRV_ERROR PMRFinalizeDmaBuf(PMR_IMPL_PRIVDATA pvPriv)
 	PMR *psPMR;
 	PVRSRV_ERROR eError = PVRSRV_OK;
 
-	mutex_lock(&g_HashLock);
-
 	if (psDmaBuf->ops != &sPVRDmaBufOps)
 	{
-		if(g_psDmaBufHash)
+		if (g_psDmaBufHash)
 		{
 			/* We have a hash table so check if we've seen this dmabuf before */
 			psPMR = (PMR *) HASH_Retrieve(g_psDmaBufHash, (uintptr_t) psDmaBuf);
 
-			if(psPMR)
+			if (psPMR)
 			{
 				if (!PMRIsPMRLive(psPMR))
 				{
@@ -219,9 +223,8 @@ static PVRSRV_ERROR PMRFinalizeDmaBuf(PMR_IMPL_PRIVDATA pvPriv)
 
 	}
 
-	if(PVRSRV_OK != eError)
+	if (PVRSRV_OK != eError)
 	{
-		mutex_unlock(&g_HashLock);
 		return eError;
 	}
 
@@ -274,12 +277,10 @@ exit:
 		eError = psPrivData->pfnDestroy(psPrivData->psPhysHeap, psPrivData->psAttachment);
 		if (eError != PVRSRV_OK)
 		{
-			mutex_unlock(&g_HashLock);
 			return eError;
 		}
 	}
 
-	mutex_unlock(&g_HashLock);
 	OSFreeMem(psPrivData->pasDevPhysAddr);
 	OSFreeMem(psPrivData);
 
@@ -296,6 +297,16 @@ static PVRSRV_ERROR PMRUnlockPhysAddressesDmaBuf(PMR_IMPL_PRIVDATA pvPriv)
 {
 	PVR_UNREFERENCED_PARAMETER(pvPriv);
 	return PVRSRV_OK;
+}
+
+static void PMRGetFactoryLock(void)
+{
+	mutex_lock(&g_HashLock);
+}
+
+static void PMRReleaseFactoryLock(void)
+{
+	mutex_unlock(&g_HashLock);
 }
 
 static PVRSRV_ERROR PMRDevPhysAddrDmaBuf(PMR_IMPL_PRIVDATA pvPriv,
@@ -437,6 +448,8 @@ static PMR_IMPL_FUNCTAB _sPMRDmaBufFuncTab =
 	.pfnReleaseKernelMappingData	= PMRReleaseKernelMappingDataDmaBuf,
 	.pfnMMap			= PMRMMapDmaBuf,
 	.pfnFinalize			= PMRFinalizeDmaBuf,
+	.pfnGetPMRFactoryLock = PMRGetFactoryLock,
+	.pfnReleasePMRFactoryLock = PMRReleaseFactoryLock,
 };
 
 /*****************************************************************************
@@ -580,7 +593,7 @@ PhysmemCreateNewDmaBufBackedPMR(PVRSRV_DEVICE_NODE *psDevNode,
 		goto errUnmap;
 	}
 
-	if  (WARN_ON(ui32PageCount != ui32NumPhysChunks * uiPagesPerChunk))
+	if (WARN_ON(ui32PageCount != ui32NumPhysChunks * uiPagesPerChunk))
 	{
 		PVR_DPF((PVR_DBG_ERROR, "%s: Requested physical chunks and actual "
 				"number of physical dma buf pages don't match",
@@ -617,7 +630,7 @@ PhysmemCreateNewDmaBufBackedPMR(PVRSRV_DEVICE_NODE *psDevNode,
 				if (WARN_ON(sg == table->sgl))
 				{
 					PVR_DPF((PVR_DBG_ERROR, "%s: Failed to fill phys. address "
-							"array ",
+							"array",
 							 __func__));
 					eError = PVRSRV_ERROR_INVALID_PARAMS;
 					goto errUnmap;
@@ -661,7 +674,7 @@ PhysmemCreateNewDmaBufBackedPMR(PVRSRV_DEVICE_NODE *psDevNode,
 	if (eError != PVRSRV_OK)
 	{
 		PVR_DPF((PVR_DBG_ERROR, "%s: Failed to create PMR (%s)",
-				 __func__, PVRSRVGetErrorStringKM(eError)));
+				 __func__, PVRSRVGetErrorString(eError)));
 		goto errFreePhysAddr;
 	}
 
@@ -770,8 +783,8 @@ fail_dma_buf:
 	dma_buf_put(psDmaBuf);
 
 fail_pmr_ref:
-	PMRUnrefPMR(psPMR);
 	mutex_unlock(&g_HashLock);
+	PMRUnrefPMR(psPMR);
 
 	PVR_ASSERT(eError != PVRSRV_OK);
 	return eError;
@@ -857,9 +870,11 @@ PhysmemImportSparseDmaBuf(CONNECTION_DATA *psConnection,
 	/* Terminate string from bridge to prevent corrupt annotations in RI */
 	if (pszName != NULL)
 	{
-		IMG_CHAR* pszName0 = (IMG_CHAR*) pszName; 
+		IMG_CHAR* pszName0 = (IMG_CHAR*) pszName;
 		pszName0[ui32NameSize-1] = '\0';
 	}
+
+	mutex_lock(&g_HashLock);
 
 	/* Get the buffer handle */
 	psDmaBuf = dma_buf_get(fd);
@@ -870,8 +885,6 @@ PhysmemImportSparseDmaBuf(CONNECTION_DATA *psConnection,
 		eError = PVRSRV_ERROR_BAD_MAPPING;
 		goto errReturn;
 	}
-
-	mutex_lock(&g_HashLock);
 
 	if (psDmaBuf->ops == &sPVRDmaBufOps)
 	{
@@ -884,7 +897,7 @@ PhysmemImportSparseDmaBuf(CONNECTION_DATA *psConnection,
 		psPMRDevNode = PMR_DeviceNode(psPMR);
 		if (psPMRDevNode != psDevNode)
 		{
-			PVR_DPF((PVR_DBG_ERROR, "%s: PMR invalid for this device\n",
+			PVR_DPF((PVR_DBG_ERROR, "%s: PMR invalid for this device",
 					 __func__));
 			eError = PVRSRV_ERROR_PMR_NOT_PERMITTED;
 			goto err;
@@ -927,7 +940,7 @@ PhysmemImportSparseDmaBuf(CONNECTION_DATA *psConnection,
 	eError = PVRSRV_OK;
 
 err:
-	if(psPMR || (PVRSRV_OK != eError))
+	if (psPMR || (PVRSRV_OK != eError))
 	{
 		mutex_unlock(&g_HashLock);
 		dma_buf_put(psDmaBuf);
@@ -1044,7 +1057,7 @@ errDMADetach:
 	dma_buf_detach(psDmaBuf, psAttachment);
 
 errUnlockAndDMAPut:
-	if(IMG_TRUE == bHashTableCreated)
+	if (IMG_TRUE == bHashTableCreated)
 	{
 		HASH_Delete(g_psDmaBufHash);
 		g_psDmaBufHash = NULL;

@@ -73,8 +73,7 @@ int netlink_gem_mmap(struct file *file, struct vm_area_struct *vma)
 		return -EINVAL;
 
 	/* Allow Netlink clients to mmap any object for reading */
-	if (!capable(CAP_SYS_RAWIO) || (vma->vm_flags & VM_WRITE))
-	{
+	if (!capable(CAP_SYS_RAWIO) || (vma->vm_flags & VM_WRITE)) {
 		if (!drm_vma_node_is_allowed(node, file_priv)) {
 			err = -EACCES;
 			goto exit_unref_obj;
@@ -107,8 +106,7 @@ int netlink_gem_mmap(struct file *file, struct vm_area_struct *vma)
 	}
 
 	/* Allow Netlink clients to mmap any object for reading */
-	if (!capable(CAP_SYS_RAWIO) || (vma->vm_flags & VM_WRITE))
-	{
+	if (!capable(CAP_SYS_RAWIO) || (vma->vm_flags & VM_WRITE)) {
 		if (!drm_vma_node_is_allowed(node, file_priv)) {
 			err = -EACCES;
 			goto exit_unlock;

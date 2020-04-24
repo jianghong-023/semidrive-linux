@@ -42,6 +42,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #define __DC_OSFUNCS_H__
 
 #include "img_types.h"
+#include "img_defs.h"
 #include "physheap.h"
 #include "kerneldisplay.h"
 #include "pvrsrv.h"
@@ -190,7 +191,7 @@ typedef pthread_spinlock_t DC_SPINLOCK;
 # define DC_OSSpinLockCreate(psLock) pthread_spin_init(psLock, PTHREAD_PROCESS_PRIVATE)
 # define DC_OSSpinLockDestroy(psLock) pthread_spin_destroy(psLock)
 # define DC_OSSpinLockIRQSave(psLock, ulIRQFlags) PVR_UNREFERENCED_PARAMETER(ulIRQFlags); pthread_spin_lock(psLock)
-# define DC_OSSpinUnlockIRQRestore(psLock, ulIRQFlags) PVR_UNREFERENCED_PARAMETER(ulIRQFlags); pthread_spin_unlock(psLock) 
+# define DC_OSSpinUnlockIRQRestore(psLock, ulIRQFlags) PVR_UNREFERENCED_PARAMETER(ulIRQFlags); pthread_spin_unlock(psLock)
 
 # define DC_OSSpinLock(psLock) pthread_spin_lock(psLock)
 # define DC_OSSpinUnlock(psLock) pthread_spin_unlock(psLock)
@@ -234,7 +235,7 @@ PVRSRV_ERROR DC_OSWorkQueueAddWorkItem(IMG_HANDLE hQueue, IMG_HANDLE hWorkItem);
 
 #if defined(LINUX)
 
-#include <asm/atomic.h>
+#include <linux/atomic.h>
 
 #define DC_OSAtomicRead(pCounter) atomic_read(pCounter)
 #define DC_OSAtomicWrite(pCounter, i) atomic_set(pCounter, i)

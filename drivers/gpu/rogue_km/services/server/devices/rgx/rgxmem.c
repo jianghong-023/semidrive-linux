@@ -57,12 +57,13 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "sync_internal.h"
 #include "rgx_memallocflags.h"
 #include "rgx_bvnc_defs_km.h"
+#include "info_page.h"
 /*
 	FIXME:
 	For now just get global state, but what we really want is to do
 	this per memory context
 */
-/* 
+/*
  * TestAndReset of gui32CacheOps is protected by the device power-lock,
  * in the following way:
  *
@@ -104,7 +105,7 @@ void RGXMMUCacheInvalidate(PVRSRV_DEVICE_NODE *psDeviceNode,
 		case MMU_LEVEL_2:	gui32CacheOpps |= RGXFWIF_MMUCACHEDATA_FLAGS_PD;
 							break;
 		case MMU_LEVEL_1:	gui32CacheOpps |= RGXFWIF_MMUCACHEDATA_FLAGS_PT;
-							if(!(RGX_IS_FEATURE_SUPPORTED(psDevInfo, SLC_VIVT)))
+							if (!(RGX_IS_FEATURE_SUPPORTED(psDevInfo, SLC_VIVT)))
 							{
 								gui32CacheOpps |= RGXFWIF_MMUCACHEDATA_FLAGS_TLB;
 							}
@@ -156,8 +157,7 @@ PVRSRV_ERROR _PrepareAndSubmitCacheCommand(PVRSRV_DEVICE_NODE *psDeviceNode,
 #endif
 
 	/* Schedule MMU cache command */
-	eError = RGXSendCommand(psDevInfo, eDM, &sFlushCmd, sizeof(RGXFWIF_KCCB_CMD),
-	                        PDUMP_FLAGS_CONTINUOUS);
+	eError = RGXSendCommand(psDevInfo, eDM, &sFlushCmd, PDUMP_FLAGS_CONTINUOUS);
 	if (eError != PVRSRV_OK)
 	{
 		PVR_DPF((PVR_DBG_ERROR, "%s: Failed to schedule MMU cache command to "
@@ -178,7 +178,7 @@ PVRSRV_ERROR RGXMMUCacheInvalidateKick(PVRSRV_DEVICE_NODE *psDeviceNode,
 	if (eError != PVRSRV_OK)
 	{
 		PVR_DPF((PVR_DBG_WARNING, "%s: failed to acquire powerlock (%s)",
-					__func__, PVRSRVGetErrorStringKM(eError)));
+					__func__, PVRSRVGetErrorString(eError)));
 		goto RGXMMUCacheInvalidateKick_exit;
 	}
 
@@ -198,7 +198,7 @@ PVRSRV_ERROR RGXMMUCacheInvalidateKick(PVRSRV_DEVICE_NODE *psDeviceNode,
 	if (eError != PVRSRV_OK)
 	{
 		PVR_DPF((PVR_DBG_WARNING, "%s: failed to transition RGX to ON (%s)",
-					__func__, PVRSRVGetErrorStringKM(eError)));
+					__func__, PVRSRVGetErrorString(eError)));
 		goto _PowerUnlockAndReturnErr;
 	}
 
@@ -252,7 +252,6 @@ PVRSRV_ERROR RGXPreKickCacheCommand(PVRSRV_RGXDEV_INFO *psDevInfo,
 	return eError;
 }
 
-#if defined(SUPPORT_PAGE_FAULT_DEBUG)
 /* page fault debug is the only current use case for needing to find process info
  * after that process device memory context has been destroyed
  */
@@ -295,7 +294,6 @@ static void _RecordUnregisteredMemoryContext(PVRSRV_RGXDEV_INFO *psDevInfo, SERV
 	OSStringLCopy(psRecord->szProcessName, psServerMMUContext->szProcessName, sizeof(psRecord->szProcessName));
 }
 
-#endif
 
 void RGXUnregisterMemoryContext(IMG_HANDLE hPrivData)
 {
@@ -306,15 +304,16 @@ void RGXUnregisterMemoryContext(IMG_HANDLE hPrivData)
 	dllist_remove_node(&psServerMMUContext->sNode);
 	OSWRLockReleaseWrite(psDevInfo->hMemoryCtxListLock);
 
-#if defined(SUPPORT_PAGE_FAULT_DEBUG)
-	_RecordUnregisteredMemoryContext(psDevInfo, psServerMMUContext);
-#endif
+	if (GetInfoPageDebugFlagsKM() & DEBUG_FEATURE_PAGE_FAULT_DEBUG_ENABLED)
+	{
+		_RecordUnregisteredMemoryContext(psDevInfo, psServerMMUContext);
+	}
 
 	/*
 	 * Release the page catalogue address acquired in RGXRegisterMemoryContext().
 	 */
 	MMU_ReleaseBaseAddr(NULL /* FIXME */);
-	
+
 	/*
 	 * Free the firmware memory context.
 	 */
@@ -326,7 +325,7 @@ void RGXUnregisterMemoryContext(IMG_HANDLE hPrivData)
 
 /*
  * RGXRegisterMemoryContext
- */ 
+ */
 PVRSRV_ERROR RGXRegisterMemoryContext(PVRSRV_DEVICE_NODE	*psDeviceNode,
 									  MMU_CONTEXT			*psMMUContext,
 									  IMG_HANDLE			*hPrivData)
@@ -343,7 +342,7 @@ PVRSRV_ERROR RGXRegisterMemoryContext(PVRSRV_DEVICE_NODE	*psDeviceNode,
 		/*
 		 * This must be the creation of the Kernel memory context. Take a copy
 		 * of the MMU context for use when programming the BIF.
-		 */ 
+		 */
 		psDevInfo->psKernelMMUCtx = psMMUContext;
 	}
 	else
@@ -391,7 +390,7 @@ PVRSRV_ERROR RGXRegisterMemoryContext(PVRSRV_DEVICE_NODE	*psDeviceNode,
 					eError));
 			goto fail_alloc_fw_ctx;
 		}
-		
+
 		/*
 			Temporarily map the firmware memory context to the kernel.
 		*/
@@ -403,7 +402,7 @@ PVRSRV_ERROR RGXRegisterMemoryContext(PVRSRV_DEVICE_NODE	*psDeviceNode,
 					eError));
 			goto fail_acquire_cpu_addr;
 		}
-		
+
 		/*
 		 * Write the new memory context's page catalogue into the firmware memory
 		 * context for the client.
@@ -420,7 +419,7 @@ PVRSRV_ERROR RGXRegisterMemoryContext(PVRSRV_DEVICE_NODE	*psDeviceNode,
 		/*
 		 * Set default values for the rest of the structure.
 		 */
-		psFWMemContext->uiPageCatBaseRegID = -1;
+		psFWMemContext->uiPageCatBaseRegID = RGXFW_BIF_INVALID_PCREG;
 		psFWMemContext->uiBreakpointAddr = 0;
 		psFWMemContext->uiBPHandlerAddr = 0;
 		psFWMemContext->uiBreakpointCtl = 0;
@@ -446,14 +445,14 @@ PVRSRV_ERROR RGXRegisterMemoryContext(PVRSRV_DEVICE_NODE	*psDeviceNode,
 			 * Dump the Mem context allocation
 			 */
 			DevmemPDumpLoadMem(psFWMemContextMemDesc, 0, sizeof(*psFWMemContext), PDUMP_FLAGS_CONTINUOUS);
-			
+
 
 			/*
 			 * Obtain a symbolic addr of the mem context structure
 			 */
-			eError = DevmemPDumpPageCatBaseToSAddr(psFWMemContextMemDesc, 
-												   &uiOffset, 
-												   aszName, 
+			eError = DevmemPDumpPageCatBaseToSAddr(psFWMemContextMemDesc,
+												   &uiOffset,
+												   aszName,
 												   PHYSMEM_PDUMP_MEMSPNAME_SYMB_ADDR_MAX_LENGTH);
 
 			if (eError != PVRSRV_OK)
@@ -496,13 +495,9 @@ PVRSRV_ERROR RGXRegisterMemoryContext(PVRSRV_DEVICE_NODE	*psDeviceNode,
 		psServerMMUContext->uiPID = OSGetCurrentClientProcessIDKM();
 		psServerMMUContext->psMMUContext = psMMUContext;
 		psServerMMUContext->psFWMemContextMemDesc = psFWMemContextMemDesc;
-		if (OSSNPrintf(psServerMMUContext->szProcessName,
-						RGXMEM_SERVER_MMU_CONTEXT_MAX_NAME,
-						"%s",
-						OSGetCurrentClientProcessNameKM()) == RGXMEM_SERVER_MMU_CONTEXT_MAX_NAME)
-		{
-			psServerMMUContext->szProcessName[RGXMEM_SERVER_MMU_CONTEXT_MAX_NAME-1] = '\0';
-		}
+		OSStringLCopy(psServerMMUContext->szProcessName,
+		              OSGetCurrentClientProcessNameKM(),
+		              sizeof(psServerMMUContext->szProcessName));
 
 		PDUMPCOMMENTWITHFLAGS(PDUMP_FLAGS_CONTINUOUS, "New memory context: Process Name: %s PID: %u (0x%08X)",
 										psServerMMUContext->szProcessName,
@@ -516,7 +511,7 @@ PVRSRV_ERROR RGXRegisterMemoryContext(PVRSRV_DEVICE_NODE	*psDeviceNode,
 		MMU_SetDeviceData(psMMUContext, psFWMemContextMemDesc);
 		*hPrivData = psServerMMUContext;
 	}
-			
+
 	return PVRSRV_OK;
 
 #if defined(PDUMP)
@@ -624,7 +619,7 @@ IMG_BOOL RGXPCAddrToProcessInfo(PVRSRV_RGXDEV_INFO *psDevInfo, IMG_DEV_PHYADDR s
 		}
 	}
 
-	if(psServerMMUContext != NULL)
+	if (psServerMMUContext != NULL)
 	{
 		psInfo->uiPID = psServerMMUContext->uiPID;
 		OSStringLCopy(psInfo->szProcessName, psServerMMUContext->szProcessName, sizeof(psInfo->szProcessName));
@@ -639,13 +634,13 @@ IMG_BOOL RGXPCAddrToProcessInfo(PVRSRV_RGXDEV_INFO *psDevInfo, IMG_DEV_PHYADDR s
 
 		eError = MMU_AcquireBaseAddr(psDevInfo->psKernelMMUCtx, &sKernelPCDevPAddr);
 
-		if(eError != PVRSRV_OK)
+		if (eError != PVRSRV_OK)
 		{
 			PVR_LOG(("Failed to get PC address for kernel memory context"));
 		}
 		else
 		{
-			if(sPCAddress.uiAddr == sKernelPCDevPAddr.uiAddr)
+			if (sPCAddress.uiAddr == sKernelPCDevPAddr.uiAddr)
 			{
 				psInfo->uiPID = RGXMEM_SERVER_PID_FIRMWARE;
 				OSStringLCopy(psInfo->szProcessName, "Firmware", sizeof(psInfo->szProcessName));
@@ -654,15 +649,16 @@ IMG_BOOL RGXPCAddrToProcessInfo(PVRSRV_RGXDEV_INFO *psDevInfo, IMG_DEV_PHYADDR s
 			}
 		}
 	}
-#if defined(SUPPORT_PAGE_FAULT_DEBUG)
-	if(bRet == IMG_FALSE)
+
+	if ((GetInfoPageDebugFlagsKM() & DEBUG_FEATURE_PAGE_FAULT_DEBUG_ENABLED) &&
+		(bRet == IMG_FALSE))
 	{
 		/* no active memory context found with the given PC address.
 		 * Check the list of most recently freed memory contexts.
 		 */
-		 IMG_UINT32 i;
+		IMG_UINT32 i;
 
-		 OSLockAcquire(psDevInfo->hMMUCtxUnregLock);
+		OSLockAcquire(psDevInfo->hMMUCtxUnregLock);
 
 		/* iterate through the list of unregistered memory contexts
 		 * from newest (one before the head) to the oldest (the current head)
@@ -677,7 +673,7 @@ IMG_BOOL RGXPCAddrToProcessInfo(PVRSRV_RGXDEV_INFO *psDevInfo, IMG_DEV_PHYADDR s
 
 			psRecord = &gasUnregisteredMemCtxs[i];
 
-			if(psRecord->sPCDevPAddr.uiAddr == sPCAddress.uiAddr)
+			if (psRecord->sPCDevPAddr.uiAddr == sPCAddress.uiAddr)
 			{
 				psInfo->uiPID = psRecord->uiPID;
 				OSStringLCopy(psInfo->szProcessName, psRecord->szProcessName, sizeof(psInfo->szProcessName));
@@ -690,7 +686,7 @@ IMG_BOOL RGXPCAddrToProcessInfo(PVRSRV_RGXDEV_INFO *psDevInfo, IMG_DEV_PHYADDR s
 		OSLockRelease(psDevInfo->hMMUCtxUnregLock);
 
 	}
-#endif
+
 	return bRet;
 }
 
@@ -714,7 +710,7 @@ IMG_BOOL RGXPCPIDToProcessInfo(PVRSRV_RGXDEV_INFO *psDevInfo, IMG_PID uiPID,
 		}
 	}
 
-	if(psServerMMUContext != NULL)
+	if (psServerMMUContext != NULL)
 	{
 		psInfo->uiPID = psServerMMUContext->uiPID;
 		OSStringLCopy(psInfo->szProcessName, psServerMMUContext->szProcessName, sizeof(psInfo->szProcessName));
@@ -722,23 +718,24 @@ IMG_BOOL RGXPCPIDToProcessInfo(PVRSRV_RGXDEV_INFO *psDevInfo, IMG_PID uiPID,
 		bRet = IMG_TRUE;
 	}
 	/* else check if the input PID corresponds to the firmware */
-	else if(uiPID == RGXMEM_SERVER_PID_FIRMWARE)
+	else if (uiPID == RGXMEM_SERVER_PID_FIRMWARE)
 	{
 		psInfo->uiPID = RGXMEM_SERVER_PID_FIRMWARE;
 		OSStringLCopy(psInfo->szProcessName, "Firmware", sizeof(psInfo->szProcessName));
 		psInfo->bUnregistered = IMG_FALSE;
 		bRet = IMG_TRUE;
 	}
-#if defined(SUPPORT_PAGE_FAULT_DEBUG)
-	/* if the PID didn't correspond to an active context or the
-	 * FW address then see if it matches a recently unregistered context
-	 */
-	if(bRet == IMG_FALSE)
+
+	if ((GetInfoPageDebugFlagsKM() & DEBUG_FEATURE_PAGE_FAULT_DEBUG_ENABLED) &&
+		(bRet == IMG_FALSE))
 	{
+		/* if the PID didn't correspond to an active context or the
+		 * FW address then see if it matches a recently unregistered context
+		 */
 		const IMG_UINT32 ui32Mask = UNREGISTERED_MEMORY_CONTEXTS_HISTORY_SIZE - 1;
 		IMG_UINT32 i, j;
 
-		 OSLockAcquire(psDevInfo->hMMUCtxUnregLock);
+		OSLockAcquire(psDevInfo->hMMUCtxUnregLock);
 
 		for (i = (gui32UnregisteredMemCtxsHead - 1) & ui32Mask, j = 0;
 		     j < UNREGISTERED_MEMORY_CONTEXTS_HISTORY_SIZE;
@@ -746,7 +743,7 @@ IMG_BOOL RGXPCPIDToProcessInfo(PVRSRV_RGXDEV_INFO *psDevInfo, IMG_PID uiPID,
 		{
 			UNREGISTERED_MEMORY_CONTEXT *psRecord = &gasUnregisteredMemCtxs[i];
 
-			if(psRecord->uiPID == uiPID)
+			if (psRecord->uiPID == uiPID)
 			{
 				psInfo->uiPID = psRecord->uiPID;
 				OSStringLCopy(psInfo->szProcessName, psRecord->szProcessName, sizeof(psInfo->szProcessName));
@@ -757,9 +754,8 @@ IMG_BOOL RGXPCPIDToProcessInfo(PVRSRV_RGXDEV_INFO *psDevInfo, IMG_PID uiPID,
 		}
 
 		OSLockRelease(psDevInfo->hMMUCtxUnregLock);
-
 	}
-#endif
+
 	return bRet;
 }
 

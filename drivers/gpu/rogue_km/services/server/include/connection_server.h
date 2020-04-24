@@ -46,6 +46,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 
 #include "img_types.h"
+#include "img_defs.h"
 #include "handle.h"
 #include "pvrsrv_cleanup.h"
 
@@ -54,7 +55,7 @@ extern IMG_UINT64 gui64TimesliceLimit;
 /* Counter number of handle data freed during the current time slice */
 extern IMG_UINT32 gui32HandleDataFreeCounter;
 /* Set the maximum time the freeing of the resources can keep the lock */
-#define CONNECTION_DEFERRED_CLEANUP_TIMESLICE_NS 3000 * 1000 /* 3ms */
+#define CONNECTION_DEFERRED_CLEANUP_TIMESLICE_NS (3000 * 1000) /* 3ms */
 
 typedef struct _CONNECTION_DATA_
 {
@@ -108,16 +109,6 @@ static INLINE
 IMG_HANDLE PVRSRVConnectionPrivateData(CONNECTION_DATA *psConnection)
 {
 	return (psConnection != NULL) ? psConnection->hOsPrivateData : NULL;
-}
-
-
-#ifdef INLINE_IS_PRAGMA
-#pragma inline(PVRSRVGetDevData)
-#endif
-static INLINE
-PVRSRV_DEVICE_NODE * PVRSRVGetDevData(CONNECTION_DATA *psConnection)
-{
-	return OSGetDevData(psConnection);
 }
 
 #endif /* !defined(_CONNECTION_SERVER_H_) */

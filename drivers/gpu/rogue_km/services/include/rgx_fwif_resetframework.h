@@ -40,13 +40,13 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */ /**************************************************************************/
 
-#if !defined(_RGX_FWIF_RESETFRAMEWORK_H)
-#define _RGX_FWIF_RESETFRAMEWORK_H
+#if !defined(RGX_FWIF_RESETFRAMEWORK_H)
+#define RGX_FWIF_RESETFRAMEWORK_H
 
 #include "img_types.h"
 #include "rgx_fwif_shared.h"
 
-typedef struct _RGXFWIF_RF_REGISTERS_
+typedef struct
 {
 #if RGX_FEATURE_CDM_CONTROL_STREAM_FORMAT == 2
 	IMG_UINT64	uCDMReg_CDM_CB_QUEUE;
@@ -57,9 +57,9 @@ typedef struct _RGXFWIF_RF_REGISTERS_
 #endif
 } RGXFWIF_RF_REGISTERS;
 
-#define RGXFWIF_RF_FLAG_ENABLE 0x00000001 /*!< enables the reset framework in the firmware */
+#define RGXFWIF_RF_FLAG_ENABLE 0x00000001U /*!< enables the reset framework in the firmware */
 
-typedef struct _RGXFWIF_RF_CMD_
+typedef struct
 {
 	IMG_UINT32           ui32Flags;
 
@@ -71,4 +71,4 @@ typedef struct _RGXFWIF_RF_CMD_
 /* to opaquely allocate and copy in the kernel */
 #define RGXFWIF_RF_CMD_SIZE  sizeof(RGXFWIF_RF_CMD)
 
-#endif /* _RGX_FWIF_RESETFRAMEWORK_H */
+#endif /* RGX_FWIF_RESETFRAMEWORK_H */

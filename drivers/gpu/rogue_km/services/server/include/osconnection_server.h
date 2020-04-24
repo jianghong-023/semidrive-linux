@@ -45,6 +45,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #define _OSCONNECTION_SERVER_H_
 
 #include "handle.h"
+#include "osfunc.h"
 
 
 #if defined(__linux__) || defined(__QNXNTO__) || defined(INTEGRITY_OS)
@@ -96,7 +97,7 @@ static INLINE PVRSRV_ERROR OSConnectionPrivateDataDeInit(IMG_HANDLE hOsPrivateDa
 }
 
 #ifdef INLINE_IS_PRAGMA
-#pragma inline(OSPerProcessSetHandleOptions)
+#pragma inline(OSConnectionSetHandleOptions)
 #endif
 static INLINE PVRSRV_ERROR OSConnectionSetHandleOptions(PVRSRV_HANDLE_BASE *psHandleBase)
 {

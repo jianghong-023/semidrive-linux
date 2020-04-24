@@ -43,6 +43,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #ifndef _PVRSRV_CLEANUP_H
 #define _PVRSRV_CLEANUP_H
 
+#include "dllist.h"
 
 /**************************************************************************/ /*!
 @Brief          CLEANUP_THREAD_FN
@@ -102,7 +103,7 @@ typedef PVRSRV_ERROR (*CLEANUP_THREAD_FN)(void *pvParam);
 	do { \
 		(_item)->ui32RetryCount = 0; \
 		(_item)->ui32TimeStart = OSClockms(); \
-		(_item)->ui32RetryCount = (_item)->ui32TimeStart + ((_timeout) > 0 ? \
+		(_item)->ui32TimeEnd = (_item)->ui32TimeStart + ((_timeout) > 0 ? \
 				(_timeout) : CLEANUP_THREAD_RETRY_TIMEOUT_MS_DEFAULT); \
 	} while (0)
 

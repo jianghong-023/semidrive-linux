@@ -1,8 +1,8 @@
 /*************************************************************************/ /*!
 @File
-@Title		Resource Handle Manager
+@Title          Resource Handle Manager
 @Copyright      Copyright (c) Imagination Technologies Ltd. All Rights Reserved
-@Description	Provide resource handle management
+@Description    Provide resource handle management
 @License        Dual MIT/GPLv2
 
 The contents of this file are subject to the MIT license as set out below.
@@ -63,6 +63,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "allocmem.h"
 #include "pvr_debug.h"
 #include "connection_server.h"
+#include "pvrsrv.h"
 
 #define	HANDLE_HASH_TAB_INIT_SIZE		32
 
@@ -113,6 +114,15 @@ typedef struct _HANDLE_DATA_
 	 * reference count hits zero
 	 */
 	IMG_UINT32 ui32RefCount;
+
+#if defined(PVRSRV_DEBUG_HANDLE_LOCK)
+	/* Store the handle base used for this handle, so we
+	 * can later access the handle base lock (or check if
+	 * it has been already acquired)
+	 */
+	PVRSRV_HANDLE_BASE *psBase;
+#endif
+
 } HANDLE_DATA;
 
 struct _HANDLE_BASE_
@@ -126,6 +136,9 @@ struct _HANDLE_BASE_
 	 * pointers to handles.
 	 */
 	HASH_TABLE *psHashTab;
+
+	/* Type specific (connection/global/process) Lock handle */
+	POS_LOCK hLock;
 
 	/* Can be connection, process, global */
 	PVRSRV_HANDLE_BASE_TYPE eType;
@@ -148,24 +161,36 @@ enum eHandKey
 /* HAND_KEY is the type of the hash table key */
 typedef uintptr_t HAND_KEY[HAND_KEY_LEN];
 
+typedef struct FREE_HANDLE_DATA_TAG
+{
+	PVRSRV_HANDLE_BASE *psBase;
+	PVRSRV_HANDLE_TYPE eHandleFreeType;
+	/* timing data (ns) to release bridge lock upon the deadline */
+	IMG_UINT64 ui64TimeStart;
+	IMG_UINT64 ui64MaxBridgeTime;
+} FREE_HANDLE_DATA;
+
+typedef struct FREE_KERNEL_HANDLE_DATA_TAG
+{
+	PVRSRV_HANDLE_BASE *psBase;
+	HANDLE_DATA *psProcessHandleData;
+	IMG_HANDLE hKernelHandle;
+} FREE_KERNEL_HANDLE_DATA;
+
 /* Stores a pointer to the function table of the handle back-end in use */
 static HANDLE_IMPL_FUNCTAB const *gpsHandleFuncs;
 
-/*
- * Global lock added to avoid to call the handling functions
- * only in a single threaded context.
- */
-static POS_LOCK gHandleLock;
+static POS_LOCK gKernelHandleLock;
 static IMG_BOOL gbLockInitialised = IMG_FALSE;
 
-void LockHandle(void)
+void LockHandle(PVRSRV_HANDLE_BASE *psBase)
 {
-	OSLockAcquire(gHandleLock);
+	OSLockAcquire(psBase->hLock);
 }
 
-void UnlockHandle(void)
+void UnlockHandle(PVRSRV_HANDLE_BASE *psBase)
 {
-	OSLockRelease(gHandleLock);
+	OSLockRelease(psBase->hLock);
 }
 
 /*
@@ -180,8 +205,8 @@ PVRSRV_HANDLE_BASE *gpsKernelHandleBase = NULL;
  */
 static inline IMG_UINT32 _HandleRef(HANDLE_DATA *psHandleData)
 {
-#if defined PVRSRV_DEBUG_HANDLE_LOCK
-	if (!OSLockIsLocked(gHandleLock))
+#if defined(PVRSRV_DEBUG_HANDLE_LOCK)
+	if (!OSLockIsLocked(psHandleData->psBase->hLock))
 	{
 		PVR_DPF((PVR_DBG_ERROR, "%s: Handle lock is not locked", __func__));
 		OSDumpStack();
@@ -197,8 +222,8 @@ static inline IMG_UINT32 _HandleRef(HANDLE_DATA *psHandleData)
  */
 static inline IMG_UINT32 _HandleUnref(HANDLE_DATA *psHandleData)
 {
-#if defined PVRSRV_DEBUG_HANDLE_LOCK
-	if (!OSLockIsLocked(gHandleLock))
+#if defined(PVRSRV_DEBUG_HANDLE_LOCK)
+	if (!OSLockIsLocked(psHandleData->psBase->hLock))
 	{
 		PVR_DPF((PVR_DBG_ERROR, "%s: Handle lock is not locked", __func__));
 		OSDumpStack();
@@ -216,7 +241,7 @@ static const IMG_CHAR *HandleTypeToString(PVRSRV_HANDLE_TYPE eType)
 	#define HANDLETYPE(x) \
 			case PVRSRV_HANDLE_TYPE_##x: \
 				return #x;
-	switch(eType)
+	switch (eType)
 	{
 		#include "handle_types.h"
 		#undef HANDLETYPE
@@ -260,7 +285,7 @@ PVRSRV_ERROR GetHandleData(PVRSRV_HANDLE_BASE *psBase,
 	eError = gpsHandleFuncs->pfnGetHandleData(psBase->psImplBase,
 						  hHandle,
 						  (void **)&psHandleData);
-	if (eError != PVRSRV_OK)
+	if (unlikely(eError != PVRSRV_OK))
 	{
 		return eError;
 	}
@@ -269,7 +294,7 @@ PVRSRV_ERROR GetHandleData(PVRSRV_HANDLE_BASE *psBase,
 	 * Unless PVRSRV_HANDLE_TYPE_NONE was passed in to this function,
 	 * check handle is of the correct type.
 	 */
-	if (eType != PVRSRV_HANDLE_TYPE_NONE && eType != psHandleData->eType)
+	if (unlikely(eType != PVRSRV_HANDLE_TYPE_NONE && eType != psHandleData->eType))
 	{
 		PVR_DPF((PVR_DBG_ERROR,
 			 "GetHandleData: Type mismatch. Lookup request: Handle %p, type: %s (%u) but stored handle is type %s (%u)",
@@ -648,7 +673,7 @@ PVRSRV_ERROR HandleListRemove(PVRSRV_HANDLE_BASE *psBase,
 			      size_t uiEntryOffset,
 			      size_t uiParentOffset)
 {
-	if (psBase == NULL || psEntry == NULL)
+	if (unlikely(psBase == NULL || psEntry == NULL))
 	{
 		return PVRSRV_ERROR_INVALID_PARAMS;
 	}
@@ -900,7 +925,7 @@ static PVRSRV_ERROR FreeHandle(PVRSRV_HANDLE_BASE *psBase,
 	PVRSRV_ERROR eError;
 
 	eError = GetHandleData(psBase, &psHandleData, hHandle, eType);
-	if (eError != PVRSRV_OK)
+	if (unlikely(eError != PVRSRV_OK))
 	{
 		return eError;
 	}
@@ -920,8 +945,9 @@ static PVRSRV_ERROR FreeHandle(PVRSRV_HANDLE_BASE *psBase,
 		if (eError == PVRSRV_ERROR_RETRY)
 		{
 			PVR_DPF((PVR_DBG_MESSAGE,
-				 "FreeHandle: "
+				 "%s: "
 				 "Got retry while calling release data callback for %p (type = %d)",
+				 __func__,
 				 hHandle,
 				 (IMG_UINT32)psHandleData->eType));
 
@@ -951,28 +977,30 @@ static PVRSRV_ERROR FreeHandle(PVRSRV_HANDLE_BASE *psBase,
 	}
 
 	eError = UnlinkFromParent(psBase, psHandleData);
-	if (eError != PVRSRV_OK)
+	if (unlikely(eError != PVRSRV_OK))
 	{
 		PVR_DPF((PVR_DBG_ERROR,
-			 "FreeHandle: Error whilst unlinking from parent handle (%s)",
-			 PVRSRVGetErrorStringKM(eError)));
+			 "%s: Error whilst unlinking from parent handle (%s)",
+			 __func__,
+			 PVRSRVGetErrorString(eError)));
 		return eError;
 	}
 
 	/* Free children */
 	eError = IterateOverChildren(psBase, psHandleData, FreeHandleWrapper);
-	if (eError != PVRSRV_OK)
+	if (unlikely(eError != PVRSRV_OK))
 	{
 		PVR_DPF((PVR_DBG_ERROR,
-			 "FreeHandle: Error whilst freeing subhandles (%s)",
-			 PVRSRVGetErrorStringKM(eError)));
+			 "%s: Error whilst freeing subhandles (%s)",
+			 __func__,
+			 PVRSRVGetErrorString(eError)));
 		return eError;
 	}
 
 	eError = gpsHandleFuncs->pfnReleaseHandle(psBase->psImplBase,
 						  psHandleData->hHandle,
 						  (void **)&psReleasedHandleData);
-	if (eError == PVRSRV_OK)
+	if (unlikely(eError == PVRSRV_OK))
 	{
 		PVR_ASSERT(psReleasedHandleData == psHandleData);
 	}
@@ -1069,14 +1097,18 @@ static PVRSRV_ERROR AllocHandle(PVRSRV_HANDLE_BASE *psBase,
 	psNewHandleData = OSAllocZMem(sizeof(*psNewHandleData));
 	if (psNewHandleData == NULL)
 	{
-		PVR_DPF((PVR_DBG_ERROR, "AllocHandle: Couldn't allocate handle data"));
+		PVR_DPF((PVR_DBG_ERROR,
+			 "%s: Couldn't allocate handle data",
+			 __func__));
 		return PVRSRV_ERROR_OUT_OF_MEMORY;
 	}
 
 	eError = gpsHandleFuncs->pfnAcquireHandle(psBase->psImplBase, &hHandle, psNewHandleData);
 	if (eError != PVRSRV_OK)
 	{
-		PVR_DPF((PVR_DBG_ERROR, "AllocHandle: Failed to acquire a handle"));
+		PVR_DPF((PVR_DBG_ERROR,
+			 "%s: Failed to acquire a handle",
+			 __func__));
 		goto ErrorFreeHandleData;
 	}
 
@@ -1095,7 +1127,9 @@ static PVRSRV_ERROR AllocHandle(PVRSRV_HANDLE_BASE *psBase,
 		/* Put the new handle in the hash table */
 		if (!HASH_Insert_Extended(psBase->psHashTab, aKey, (uintptr_t)hHandle))
 		{
-			PVR_DPF((PVR_DBG_ERROR, "AllocHandle: Couldn't add handle to hash table"));
+			PVR_DPF((PVR_DBG_ERROR,
+				 "%s: Couldn't add handle to hash table",
+				 __func__));
 			eError = PVRSRV_ERROR_UNABLE_TO_ADD_HANDLE;
 			goto ErrorReleaseHandle;
 		}
@@ -1118,6 +1152,9 @@ static PVRSRV_ERROR AllocHandle(PVRSRV_HANDLE_BASE *psBase,
 	PVR_ASSERT(NoParent(psNewHandleData));
 #endif
 
+#if defined(PVRSRV_DEBUG_HANDLE_LOCK)
+	psNewHandleData->psBase = psBase;
+#endif
 	/* Return the new handle to the client */
 	*phHandle = psNewHandleData->hHandle;
 
@@ -1159,9 +1196,9 @@ PVRSRV_ERROR PVRSRVAllocHandle(PVRSRV_HANDLE_BASE *psBase,
 {
 	PVRSRV_ERROR eError;
 
-	LockHandle();
+	LockHandle(psBase);
 	eError = PVRSRVAllocHandleUnlocked(psBase, phHandle, pvData, eType, eFlag, pfnReleaseData);
-	UnlockHandle();
+	UnlockHandle(psBase);
 
 	return eError;
 }
@@ -1202,14 +1239,14 @@ PVRSRV_ERROR PVRSRVAllocHandleUnlocked(PVRSRV_HANDLE_BASE *psBase,
 
 	if (psBase == NULL)
 	{
-		PVR_DPF((PVR_DBG_ERROR, "PVRSRVAllocHandle: Missing handle base"));
+		PVR_DPF((PVR_DBG_ERROR, "%s: Missing handle base", __func__));
 		eError = PVRSRV_ERROR_INVALID_PARAMS;
 		goto Exit;
 	}
 
 	if (pfnReleaseData == NULL)
 	{
-		PVR_DPF((PVR_DBG_ERROR, "PVRSRVAllocHandle: Missing release function"));
+		PVR_DPF((PVR_DBG_ERROR, "%s: Missing release function", __func__));
 		eError = PVRSRV_ERROR_INVALID_PARAMS;
 		goto Exit;
 	}
@@ -1246,9 +1283,9 @@ PVRSRV_ERROR PVRSRVAllocSubHandle(PVRSRV_HANDLE_BASE *psBase,
 {
 	PVRSRV_ERROR eError;
 
-	LockHandle();
+	LockHandle(psBase);
 	eError = PVRSRVAllocSubHandleUnlocked(psBase, phHandle, pvData, eType, eFlag, hParent);
-	UnlockHandle();
+	UnlockHandle(psBase);
 
 	return eError;
 }
@@ -1292,7 +1329,7 @@ PVRSRV_ERROR PVRSRVAllocSubHandleUnlocked(PVRSRV_HANDLE_BASE *psBase,
 
 	if (psBase == NULL)
 	{
-		PVR_DPF((PVR_DBG_ERROR, "PVRSRVAllocSubHandle: Missing handle base"));
+		PVR_DPF((PVR_DBG_ERROR, "%s: Missing handle base", __func__));
 		eError = PVRSRV_ERROR_INVALID_PARAMS;
 		goto Exit;
 	}
@@ -1303,7 +1340,9 @@ PVRSRV_ERROR PVRSRVAllocSubHandleUnlocked(PVRSRV_HANDLE_BASE *psBase,
 	eError = GetHandleData(psBase, &psPHandleData, hParent, PVRSRV_HANDLE_TYPE_NONE);
 	if (eError != PVRSRV_OK)
 	{
-		PVR_DPF((PVR_DBG_ERROR, "PVRSRVAllocSubHandle: Failed to get parent handle structure"));
+		PVR_DPF((PVR_DBG_ERROR,
+			 "%s: Failed to get parent handle structure",
+			 __func__));
 		goto Exit;
 	}
 
@@ -1316,7 +1355,9 @@ PVRSRV_ERROR PVRSRVAllocSubHandleUnlocked(PVRSRV_HANDLE_BASE *psBase,
 	eError = GetHandleData(psBase, &psCHandleData, hHandle, PVRSRV_HANDLE_TYPE_NONE);
 	if (eError != PVRSRV_OK)
 	{
-		PVR_DPF((PVR_DBG_ERROR, "PVRSRVAllocSubHandle: Failed to get parent handle structure"));
+		PVR_DPF((PVR_DBG_ERROR,
+		 "%s: Failed to get parent handle structure",
+		 __func__));
 
 		/* If we were able to allocate the handle then there should be no reason why we
 		   can't also get it's handle structure. Otherwise something has gone badly wrong. */
@@ -1333,7 +1374,9 @@ PVRSRV_ERROR PVRSRVAllocSubHandleUnlocked(PVRSRV_HANDLE_BASE *psBase,
 	eError = GetHandleData(psBase, &psPHandleData, hParent, PVRSRV_HANDLE_TYPE_NONE);
 	if (eError != PVRSRV_OK)
 	{
-		PVR_DPF((PVR_DBG_ERROR, "PVRSRVAllocSubHandle: Failed to get parent handle structure"));
+		PVR_DPF((PVR_DBG_ERROR,
+			 "%s: Failed to get parent handle structure",
+			 __func__));
 
 		(void)FreeHandle(psBase, hHandle, eType, NULL);
 		goto Exit;
@@ -1342,7 +1385,9 @@ PVRSRV_ERROR PVRSRVAllocSubHandleUnlocked(PVRSRV_HANDLE_BASE *psBase,
 	eError = AdoptChild(psBase, psPHandleData, psCHandleData);
 	if (eError != PVRSRV_OK)
 	{
-		PVR_DPF((PVR_DBG_ERROR, "PVRSRVAllocSubHandle: Parent handle failed to adopt subhandle"));
+		PVR_DPF((PVR_DBG_ERROR,
+			 "%s: Parent handle failed to adopt subhandle",
+			 __func__));
 
 		(void)FreeHandle(psBase, hHandle, eType, NULL);
 		goto Exit;
@@ -1379,9 +1424,9 @@ PVRSRV_ERROR PVRSRVFindHandle(PVRSRV_HANDLE_BASE *psBase,
 {
 	PVRSRV_ERROR eError;
 
-	LockHandle();
+	LockHandle(psBase);
 	eError = PVRSRVFindHandleUnlocked(psBase, phHandle, pvData, eType);
-	UnlockHandle();
+	UnlockHandle(psBase);
 
 	return eError;
 }
@@ -1418,7 +1463,7 @@ PVRSRV_ERROR PVRSRVFindHandleUnlocked(PVRSRV_HANDLE_BASE *psBase,
 
 	if (psBase == NULL)
 	{
-		PVR_DPF((PVR_DBG_ERROR, "PVRSRVFindHandle: Missing handle base"));
+		PVR_DPF((PVR_DBG_ERROR, "%s: Missing handle base", __func__));
 		eError = PVRSRV_ERROR_INVALID_PARAMS;
 		goto Exit;
 	}
@@ -1428,7 +1473,8 @@ PVRSRV_ERROR PVRSRVFindHandleUnlocked(PVRSRV_HANDLE_BASE *psBase,
 	if (hHandle == NULL)
 	{
 		PVR_DPF((PVR_DBG_ERROR,
-			 "PVRSRVFindHandle: Error finding handle. Type %u",
+			 "%s: Error finding handle. Type %u",
+			 __func__,
 			 eType));
 
 		eError = PVRSRV_ERROR_HANDLE_NOT_FOUND;
@@ -1470,9 +1516,9 @@ PVRSRV_ERROR PVRSRVLookupHandle(PVRSRV_HANDLE_BASE *psBase,
 {
 	PVRSRV_ERROR eError;
 
-	LockHandle();
+	LockHandle(psBase);
 	eError = PVRSRVLookupHandleUnlocked(psBase, ppvData, hHandle, eType, bRef);
-	UnlockHandle();
+	UnlockHandle(psBase);
 
 	return eError;
 }
@@ -1505,24 +1551,22 @@ PVRSRV_ERROR PVRSRVLookupHandleUnlocked(PVRSRV_HANDLE_BASE *psBase,
 {
 	HANDLE_DATA *psHandleData = NULL;
 	PVRSRV_ERROR eError;
-
 	/* PVRSRV_HANDLE_TYPE_NONE is reserved for internal use */
 	PVR_ASSERT(eType != PVRSRV_HANDLE_TYPE_NONE);
 	PVR_ASSERT(gpsHandleFuncs);
-
-	if (psBase == NULL)
+	if (unlikely(psBase == NULL))
 	{
-		PVR_DPF((PVR_DBG_ERROR, "PVRSRVLookupHandle: Missing handle base"));
+		PVR_DPF((PVR_DBG_ERROR, "%s: Missing handle base", __func__));
 		eError = PVRSRV_ERROR_INVALID_PARAMS;
 		goto Exit;
 	}
-
 	eError = GetHandleData(psBase, &psHandleData, hHandle, eType);
-	if (eError != PVRSRV_OK)
+	if (unlikely(eError != PVRSRV_OK))
 	{
 		PVR_DPF((PVR_DBG_ERROR,
-			 "PVRSRVLookupHandle: Error looking up handle (%s). Handle %p, type %u",
-			 PVRSRVGetErrorStringKM(eError),
+			 "%s: Error looking up handle (%s). Handle %p, type %u",
+			 __func__,
+			 PVRSRVGetErrorString(eError),
 			 (void*) hHandle,
 			 eType));
 #if defined(DEBUG) || defined(PVRSRV_NEED_PVR_DPF)
@@ -1530,12 +1574,10 @@ PVRSRV_ERROR PVRSRVLookupHandleUnlocked(PVRSRV_HANDLE_BASE *psBase,
 #endif
 		goto Exit;
 	}
-
 	if (bRef)
 	{
 		_HandleRef(psHandleData);
 	}
-
 	*ppvData = psHandleData->pvData;
 
 	eError = PVRSRV_OK;
@@ -1576,21 +1618,21 @@ PVRSRV_ERROR PVRSRVLookupSubHandle(PVRSRV_HANDLE_BASE *psBase,
 	PVR_ASSERT(eType != PVRSRV_HANDLE_TYPE_NONE);
 	PVR_ASSERT(gpsHandleFuncs);
 
-	LockHandle();
-
 	if (psBase == NULL)
 	{
-		PVR_DPF((PVR_DBG_ERROR, "PVRSRVLookupSubHandle: Missing handle base"));
-		eError = PVRSRV_ERROR_INVALID_PARAMS;
-		goto ExitUnlock;
+		PVR_DPF((PVR_DBG_ERROR, "%s: Missing handle base", __func__));
+		return PVRSRV_ERROR_INVALID_PARAMS;
 	}
+
+	LockHandle(psBase);
 
 	eError = GetHandleData(psBase, &psCHandleData, hHandle, eType);
 	if (eError != PVRSRV_OK)
 	{
 		PVR_DPF((PVR_DBG_ERROR,
-			 "PVRSRVLookupSubHandle: Error looking up subhandle (%s). Handle %p, type %u",
-			 PVRSRVGetErrorStringKM(eError),
+			 "%s: Error looking up subhandle (%s). Handle %p, type %u",
+			 __func__,
+			 PVRSRVGetErrorString(eError),
 			 (void*) hHandle,
 			 eType));
 		OSDumpStack();
@@ -1603,7 +1645,9 @@ PVRSRV_ERROR PVRSRVLookupSubHandle(PVRSRV_HANDLE_BASE *psBase,
 		eError = GetHandleData(psBase, &psPHandleData, ParentHandle(psPHandleData), PVRSRV_HANDLE_TYPE_NONE);
 		if (eError != PVRSRV_OK)
 		{
-			PVR_DPF((PVR_DBG_ERROR,"PVRSRVLookupSubHandle: Subhandle doesn't belong to given ancestor"));
+			PVR_DPF((PVR_DBG_ERROR,
+				 "%s: Subhandle doesn't belong to given ancestor",
+				 __func__));
 			eError = PVRSRV_ERROR_INVALID_SUBHANDLE;
 			goto ExitUnlock;
 		}
@@ -1614,70 +1658,11 @@ PVRSRV_ERROR PVRSRVLookupSubHandle(PVRSRV_HANDLE_BASE *psBase,
 	eError = PVRSRV_OK;
 
 ExitUnlock:
-	UnlockHandle();
+	UnlockHandle(psBase);
 
 	return eError;
 }
 
-/*!
-******************************************************************************
-
- @Function	PVRSRVGetParentHandle
-
- @Description	Lookup the parent of a handle
-
- @Input		phParent - location for returning parent handle
-		hHandle - handle for which the parent handle is required
-		eType - handle type
-		hParent - parent handle
-
- @Output	*phParent - parent handle, or NULL if there is no parent
-
- @Return	Error code or PVRSRV_OK.  Note that not having a parent is
-		not regarded as an error.
-
-******************************************************************************/
-PVRSRV_ERROR PVRSRVGetParentHandle(PVRSRV_HANDLE_BASE *psBase,
-				   IMG_HANDLE *phParent,
-				   IMG_HANDLE hHandle,
-				   PVRSRV_HANDLE_TYPE eType)
-{
-	HANDLE_DATA *psHandleData = NULL;
-	PVRSRV_ERROR eError;
-
-	/* PVRSRV_HANDLE_TYPE_NONE is reserved for internal use */
-	PVR_ASSERT(eType != PVRSRV_HANDLE_TYPE_NONE);
-	PVR_ASSERT(gpsHandleFuncs);
-
-	LockHandle();
-
-	if (psBase == NULL)
-	{
-		PVR_DPF((PVR_DBG_ERROR, "PVRSRVGetParentHandle: Missing handle base"));
-		eError = PVRSRV_ERROR_INVALID_PARAMS;
-		goto ExitUnlock;
-	}
-
-	eError = GetHandleData(psBase, &psHandleData, hHandle, eType);
-	if (eError != PVRSRV_OK)
-	{
-		PVR_DPF((PVR_DBG_ERROR,
-			 "PVRSRVGetParentHandle: Error looking up subhandle (%s). Type %u",
-			 PVRSRVGetErrorStringKM(eError),
-			 eType));
-		OSDumpStack();
-		goto ExitUnlock;
-	}
-
-	*phParent = ParentHandle(psHandleData);
-
-	eError = PVRSRV_OK;
-
-ExitUnlock:
-	UnlockHandle();
-
-	return eError;
-}
 
 /*!
 ******************************************************************************
@@ -1698,9 +1683,9 @@ PVRSRV_ERROR PVRSRVReleaseHandle(PVRSRV_HANDLE_BASE *psBase,
 {
 	PVRSRV_ERROR eError;
 
-	LockHandle();
+	LockHandle(psBase);
 	eError = PVRSRVReleaseHandleUnlocked(psBase, hHandle, eType);
-	UnlockHandle();
+	UnlockHandle(psBase);
 
 	return eError;
 }
@@ -1731,7 +1716,7 @@ PVRSRV_ERROR PVRSRVReleaseHandleUnlocked(PVRSRV_HANDLE_BASE *psBase,
 	PVR_ASSERT(eType != PVRSRV_HANDLE_TYPE_NONE);
 	PVR_ASSERT(gpsHandleFuncs);
 
-	if (psBase == NULL)
+	if (unlikely(psBase == NULL))
 	{
 		PVR_DPF((PVR_DBG_ERROR, "PVRSRVReleaseHandle: Missing handle base"));
 		eError = PVRSRV_ERROR_INVALID_PARAMS;
@@ -1763,19 +1748,17 @@ PVRSRV_ERROR PVRSRVPurgeHandles(PVRSRV_HANDLE_BASE *psBase)
 
 	PVR_ASSERT(gpsHandleFuncs);
 
-	LockHandle();
-
 	if (psBase == NULL)
 	{
 		PVR_DPF((PVR_DBG_ERROR, "PVRSRVPurgeHandles: Missing handle base"));
-		eError = PVRSRV_ERROR_INVALID_PARAMS;
-		goto ExitUnlock;
+		return PVRSRV_ERROR_INVALID_PARAMS;
 	}
+
+	LockHandle(psBase);
 
 	eError = gpsHandleFuncs->pfnPurgeHandles(psBase->psImplBase);
 
-ExitUnlock:
-	UnlockHandle();
+	UnlockHandle(psBase);
 
 	return eError;
 }
@@ -1802,32 +1785,44 @@ PVRSRV_ERROR PVRSRVAllocHandleBase(PVRSRV_HANDLE_BASE **ppsBase,
 
 	if (gpsHandleFuncs == NULL)
 	{
-		PVR_DPF((PVR_DBG_ERROR, "PVRSRVAllocHandleBase: Handle management not initialised"));
+		PVR_DPF((PVR_DBG_ERROR,
+			 "%s: Handle management not initialised",
+			 __func__));
 		return PVRSRV_ERROR_NOT_READY;
 	}
 
-	LockHandle();
-
 	if (ppsBase == NULL)
 	{
-		eError = PVRSRV_ERROR_INVALID_PARAMS;
-		goto ErrorUnlock;
+		return PVRSRV_ERROR_INVALID_PARAMS;
 	}
 
 	psBase = OSAllocZMem(sizeof(*psBase));
 	if (psBase == NULL)
 	{
-		PVR_DPF((PVR_DBG_ERROR, "PVRSRVAllocHandleBase: Couldn't allocate handle base"));
-		eError = PVRSRV_ERROR_OUT_OF_MEMORY;
-		goto ErrorUnlock;
+		PVR_DPF((PVR_DBG_ERROR,
+			 "%s: Couldn't allocate handle base",
+			 __func__));
+		return PVRSRV_ERROR_OUT_OF_MEMORY;
+	}
+
+	eError = OSLockCreate(&psBase->hLock);
+	if (eError != PVRSRV_OK)
+	{
+		PVR_DPF((PVR_DBG_ERROR,
+			 "%s: Creation of base handle lock failed (%s)",
+			 __func__,
+			 PVRSRVGetErrorString(eError)));
+		goto ErrorFreeHandleBase;
 	}
 
 	psBase->eType = eType;
 
+	LockHandle(psBase);
+
 	eError = gpsHandleFuncs->pfnCreateHandleBase(&psBase->psImplBase);
 	if (eError != PVRSRV_OK)
 	{
-		goto ErrorFreeHandleBase;
+		goto ErrorUnlock;
 	}
 
 	psBase->psHashTab = HASH_Create_Extended(HANDLE_HASH_TAB_INIT_SIZE,
@@ -1836,25 +1831,27 @@ PVRSRV_ERROR PVRSRVAllocHandleBase(PVRSRV_HANDLE_BASE **ppsBase,
 						 HASH_Key_Comp_Default);
 	if (psBase->psHashTab == NULL)
 	{
-		PVR_DPF((PVR_DBG_ERROR, "PVRSRVAllocHandleBase: Couldn't create data pointer hash table"));
+		PVR_DPF((PVR_DBG_ERROR,
+			 "%s: Couldn't create data pointer hash table",
+			 __func__));
 		eError = PVRSRV_ERROR_UNABLE_TO_CREATE_HASH_TABLE;
 		goto ErrorDestroyHandleBase;
 	}
 
 	*ppsBase = psBase;
 
-	UnlockHandle();
-
+	UnlockHandle(psBase);
 	return PVRSRV_OK;
 
 ErrorDestroyHandleBase:
 	(void)gpsHandleFuncs->pfnDestroyHandleBase(psBase->psImplBase);
 
+ErrorUnlock:
+	UnlockHandle(psBase);
+	OSLockDestroy(psBase->hLock);
+
 ErrorFreeHandleBase:
 	OSFreeMem(psBase);
-
-ErrorUnlock:
-	UnlockHandle();
 
 	return eError;
 }
@@ -1878,7 +1875,7 @@ static PVRSRV_ERROR CountHandleDataWrapper(IMG_HANDLE hHandle, void *pvData)
 	if (psData == NULL ||
 	    psData->psBase == NULL)
 	{
-		PVR_DPF((PVR_DBG_ERROR, "CountHandleDataWrapper: Missing free data"));
+		PVR_DPF((PVR_DBG_ERROR, "%s: Missing free data", __func__));
 		return PVRSRV_ERROR_INVALID_PARAMS;
 	}
 
@@ -1888,7 +1885,9 @@ static PVRSRV_ERROR CountHandleDataWrapper(IMG_HANDLE hHandle, void *pvData)
 			       PVRSRV_HANDLE_TYPE_NONE);
 	if (eError != PVRSRV_OK)
 	{
-		PVR_DPF((PVR_DBG_ERROR, "CountHandleDataWrapper: Couldn't get handle data for handle"));
+		PVR_DPF((PVR_DBG_ERROR,
+			 "%s: Couldn't get handle data for handle",
+			 __func__));
 		return eError;
 	}
 
@@ -1927,11 +1926,12 @@ static PVRSRV_ERROR ListHandlesInBase(IMG_HANDLE hHandle, void *pvData)
 
 	if (psHandleData != NULL)
 	{
-		PVR_DPF((PVR_DBG_WARNING, "    Handle: %6u, Refs: %3u, Type: %s (%u)",
+		PVR_DPF((PVR_DBG_WARNING, "    Handle: %6u, Refs: %3u, Type: %s (%u), pvData<%p>",
 				(IMG_UINT32) (uintptr_t) psHandleData->hHandle,
 				psHandleData->ui32RefCount,
 				HandleTypeToString(psHandleData->eType),
-				psHandleData->eType));
+				psHandleData->eType,
+				psHandleData->pvData));
 	}
 
 	return PVRSRV_OK;
@@ -1940,22 +1940,6 @@ static PVRSRV_ERROR ListHandlesInBase(IMG_HANDLE hHandle, void *pvData)
 
 
 #endif /* defined(DEBUG) */
-
-typedef struct FREE_HANDLE_DATA_TAG
-{
-	PVRSRV_HANDLE_BASE *psBase;
-	PVRSRV_HANDLE_TYPE eHandleFreeType;
-	/* timing data (ns) to release bridge lock upon the deadline */
-	IMG_UINT64 ui64TimeStart;
-	IMG_UINT64 ui64MaxBridgeTime;
-} FREE_HANDLE_DATA;
-
-typedef struct FREE_KERNEL_HANDLE_DATA_TAG
-{
-	PVRSRV_HANDLE_BASE *psBase;
-	HANDLE_DATA *psProcessHandleData;
-	IMG_HANDLE hKernelHandle;
-} FREE_KERNEL_HANDLE_DATA;
 
 static INLINE IMG_BOOL _CheckIfMaxTimeExpired(IMG_UINT64 ui64TimeStart, IMG_UINT64 ui64MaxBridgeTime)
 {
@@ -2021,9 +2005,9 @@ static PVRSRV_ERROR FreeKernelHandlesWrapperIterProcess(IMG_HANDLE hHandle, void
 		return eError;
 	}
 
-	if ((psData->psProcessHandleData->eFlag == PVRSRV_HANDLE_ALLOC_FLAG_MULTI)
+	if (psData->psProcessHandleData->eFlag == PVRSRV_HANDLE_ALLOC_FLAG_MULTI
 #if defined(SUPPORT_INSECURE_EXPORT)
-		|| (psData->psProcessHandleData->eType == PVRSRV_HANDLE_TYPE_PVRSRV_FENCE_EXPORT)
+		|| psData->psProcessHandleData->eType == PVRSRV_HANDLE_TYPE_PVRSRV_FENCE_EXPORT
 #endif
 		)
 	{
@@ -2068,7 +2052,7 @@ static PVRSRV_ERROR FreeHandleDataWrapper(IMG_HANDLE hHandle, void *pvData)
 	    psData->psBase == NULL ||
 	    psData->eHandleFreeType == PVRSRV_HANDLE_TYPE_NONE)
 	{
-		PVR_DPF((PVR_DBG_ERROR, "FreeHandleDataWrapper: Missing free data"));
+		PVR_DPF((PVR_DBG_ERROR, "%s: Missing free data", __func__));
 		return PVRSRV_ERROR_INVALID_PARAMS;
 	}
 
@@ -2078,7 +2062,9 @@ static PVRSRV_ERROR FreeHandleDataWrapper(IMG_HANDLE hHandle, void *pvData)
 			       PVRSRV_HANDLE_TYPE_NONE);
 	if (eError != PVRSRV_OK)
 	{
-		PVR_DPF((PVR_DBG_ERROR, "FreeHandleDataWrapper: Couldn't get handle data for handle"));
+		PVR_DPF((PVR_DBG_ERROR,
+			 "%s: Couldn't get handle data for handle",
+			 __func__));
 		return eError;
 	}
 
@@ -2097,8 +2083,9 @@ static PVRSRV_ERROR FreeHandleDataWrapper(IMG_HANDLE hHandle, void *pvData)
 			if (eError == PVRSRV_ERROR_RETRY)
 			{
 				PVR_DPF((PVR_DBG_MESSAGE,
-					 "FreeHandleDataWrapper: "
+					 "%s: "
 					 "Got retry while calling release data callback for %p (type = %d)",
+					 __func__,
 					 hHandle,
 					 (IMG_UINT32)psHandleData->eType));
 
@@ -2143,9 +2130,11 @@ static PVRSRV_ERROR FreeHandleDataWrapper(IMG_HANDLE hHandle, void *pvData)
 	 * lock, invoke the scheduler and reacquire the lock */
 	if ((psData->ui64MaxBridgeTime != 0) && _CheckIfMaxTimeExpired(psData->ui64TimeStart, psData->ui64MaxBridgeTime))
 	{
-		PVR_DPF((PVR_DBG_MESSAGE, "FreeResourceByCriteria: Lock timeout (timeout: %" IMG_UINT64_FMTSPEC")",
-								            psData->ui64MaxBridgeTime));
-		UnlockHandle();
+		PVR_DPF((PVR_DBG_MESSAGE,
+			 "%s: Lock timeout (timeout: %" IMG_UINT64_FMTSPEC")",
+			 __func__,
+			 psData->ui64MaxBridgeTime));
+		UnlockHandle(psData->psBase);
 #if defined(PVRSRV_USE_BRIDGE_LOCK)
 		OSReleaseBridgeLock();
 #endif
@@ -2154,10 +2143,10 @@ static PVRSRV_ERROR FreeHandleDataWrapper(IMG_HANDLE hHandle, void *pvData)
 #if defined(PVRSRV_USE_BRIDGE_LOCK)
 		OSAcquireBridgeLock();
 #endif
-		LockHandle();
+		LockHandle(psData->psBase);
 		/* Set again lock timeout and reset the counter */
 		psData->ui64TimeStart = OSClockns64();
-		PVR_DPF((PVR_DBG_MESSAGE, "FreeResourceByCriteria: Lock acquired again"));
+		PVR_DPF((PVR_DBG_MESSAGE, "%s: Lock acquired again", __func__));
 	}
 
 	return PVRSRV_OK;
@@ -2170,8 +2159,6 @@ static PVRSRV_HANDLE_TYPE g_aeOrderedFreeList[] =
 	PVRSRV_HANDLE_TYPE_RGX_FW_MEMDESC,
 	PVRSRV_HANDLE_TYPE_RGX_RTDATA_CLEANUP,
 	PVRSRV_HANDLE_TYPE_RGX_FREELIST,
-	PVRSRV_HANDLE_TYPE_RGX_RPM_FREELIST,
-	PVRSRV_HANDLE_TYPE_RGX_SERVER_RPM_CONTEXT,
 	PVRSRV_HANDLE_TYPE_RGX_MEMORY_BLOCK,
 	PVRSRV_HANDLE_TYPE_RGX_POPULATION,
 	PVRSRV_HANDLE_TYPE_RGX_FWIF_ZSBUFFER,
@@ -2180,7 +2167,6 @@ static PVRSRV_HANDLE_TYPE g_aeOrderedFreeList[] =
 	PVRSRV_HANDLE_TYPE_RGX_SERVER_TQ_CONTEXT,
 	PVRSRV_HANDLE_TYPE_RGX_SERVER_TQ_TDM_CONTEXT,
 	PVRSRV_HANDLE_TYPE_RGX_SERVER_COMPUTE_CONTEXT,
-	PVRSRV_HANDLE_TYPE_RGX_SERVER_RAY_CONTEXT,
 	PVRSRV_HANDLE_TYPE_RGX_SERVER_KICKSYNC_CONTEXT,
 	PVRSRV_HANDLE_TYPE_RI_HANDLE,
 	PVRSRV_HANDLE_TYPE_SYNC_RECORD_HANDLE,
@@ -2230,7 +2216,7 @@ PVRSRV_ERROR PVRSRVFreeKernelHandles(PVRSRV_HANDLE_BASE *psBase)
 
 	PVR_ASSERT(gpsHandleFuncs);
 
-	LockHandle();
+	LockHandle(psBase);
 
 	sHandleData.psBase = psBase;
 	/* Iterate over process handles. */
@@ -2241,16 +2227,69 @@ PVRSRV_ERROR PVRSRVFreeKernelHandles(PVRSRV_HANDLE_BASE *psBase)
 	{
 		PVR_DPF((PVR_DBG_ERROR,
 			 "PVRSRVFreeKernelHandles: Failed to iterate over handles (%s)",
-			 PVRSRVGetErrorStringKM(eError)));
+			 PVRSRVGetErrorString(eError)));
 		goto ExitUnlock;
 	}
 
 	eError = PVRSRV_OK;
 
 ExitUnlock:
-	UnlockHandle();
+	UnlockHandle(psBase);
 
 	return eError;
+}
+
+/*!
+******************************************************************************
+
+ @Function	PVRSRVRetrieveProcessHandleBase
+
+ @Description	Returns a pointer to the process handle base for the current
+                process. If the current process is the cleanup thread, then
+                the process handle base for the process currently being
+                cleaned up is returned
+
+ @Return	Pointer to the process handle base, or NULL if not found.
+
+******************************************************************************/
+PVRSRV_HANDLE_BASE *PVRSRVRetrieveProcessHandleBase(void)
+{
+	PVRSRV_HANDLE_BASE *psHandleBase = NULL;
+	PROCESS_HANDLE_BASE *psProcHandleBase = NULL;
+	PVRSRV_DATA *psPvrData = PVRSRVGetPVRSRVData();
+	IMG_PID ui32PurgePid = PVRSRVGetPurgeConnectionPid();
+
+	OSLockAcquire(psPvrData->hProcessHandleBase_Lock);
+
+	/* Check to see if we're being called from the cleanup thread... */
+	if ((OSGetCurrentClientProcessIDKM() == psPvrData->cleanupThreadPid) &&
+		(ui32PurgePid > 0))
+	{
+		/* Check to see if the cleanup thread has already removed the
+		 * process handle base from the HASH table.
+		 */
+		psHandleBase = psPvrData->psProcessHandleBaseBeingFreed;
+		/* psHandleBase shouldn't be null, as cleanup thread
+		 * should be removing this from the HASH table before
+		 * we get here, so assert if not.
+		 */
+		PVR_ASSERT(psHandleBase);
+	}
+	else
+	{
+		/* Not being called from the cleanup thread, so return the process
+		 * handle base for the current process.
+		 */
+		psProcHandleBase = (PROCESS_HANDLE_BASE*) HASH_Retrieve(psPvrData->psProcessHandleBase_Table,
+																OSGetCurrentClientProcessIDKM());
+	}
+	OSLockRelease(psPvrData->hProcessHandleBase_Lock);
+
+	if (psHandleBase == NULL && psProcHandleBase != NULL)
+	{
+		psHandleBase = psProcHandleBase->psHandleBase;
+	}
+	return psHandleBase;
 }
 
 /*!
@@ -2273,10 +2312,21 @@ PVRSRV_ERROR PVRSRVFreeHandleBase(PVRSRV_HANDLE_BASE *psBase, IMG_UINT64 ui64Max
 	FREE_HANDLE_DATA sHandleData = { };
 	IMG_UINT32 i;
 	PVRSRV_ERROR eError;
+	PVRSRV_DATA *psPVRSRVData = PVRSRVGetPVRSRVData();
+	IMG_PID uiCleanupPid = psPVRSRVData->cleanupThreadPid;
 
 	PVR_ASSERT(gpsHandleFuncs);
 
-	LockHandle();
+	LockHandle(psBase);
+
+	/* If this is a process handle base being freed by the cleanup
+	 * thread, store this in psPVRSRVData->psProcessHandleBaseBeingFreed
+	 */
+	if ((OSGetCurrentClientProcessIDKM() == uiCleanupPid) &&
+	    (psBase->eType == PVRSRV_HANDLE_BASE_TYPE_PROCESS))
+	{
+		psPVRSRVData->psProcessHandleBaseBeingFreed = psBase;
+	}
 
 	sHandleData.psBase = psBase;
 	sHandleData.ui64TimeStart = OSClockns64();
@@ -2293,8 +2343,9 @@ PVRSRV_ERROR PVRSRVFreeHandleBase(PVRSRV_HANDLE_BASE *psBase, IMG_UINT64 ui64Max
 	if (eError != PVRSRV_OK)
 	{
 		PVR_DPF((PVR_DBG_ERROR,
-			 "PVRSRVFreeHandleBase: Failed to perform handle count (%s)",
-			 PVRSRVGetErrorStringKM(eError)));
+			 "%s: Failed to perform handle count (%s)",
+			 __func__,
+			 PVRSRVGetErrorString(eError)));
 		goto ExitUnlock;
 	}
 
@@ -2314,9 +2365,9 @@ PVRSRV_ERROR PVRSRVFreeHandleBase(PVRSRV_HANDLE_BASE *psBase, IMG_UINT64 ui64Max
 		if (bList)
 		{
 			PVR_DPF((PVR_DBG_WARNING, "-------- Listing Handles --------"));
-			eError = gpsHandleFuncs->pfnIterateOverHandles(psBase->psImplBase,
-										   &ListHandlesInBase,
-										   psBase);
+			(void) gpsHandleFuncs->pfnIterateOverHandles(psBase->psImplBase,
+			                                             &ListHandlesInBase,
+			                                             psBase);
 			PVR_DPF((PVR_DBG_WARNING, "-------- Done Listing    --------"));
 		}
 	}
@@ -2354,12 +2405,18 @@ PVRSRV_ERROR PVRSRVFreeHandleBase(PVRSRV_HANDLE_BASE *psBase, IMG_UINT64 ui64Max
 		goto ExitUnlock;
 	}
 
+	UnlockHandle(psBase);
+	OSLockDestroy(psBase->hLock);
 	OSFreeMem(psBase);
 
-	eError = PVRSRV_OK;
+	return eError;
 
 ExitUnlock:
-	UnlockHandle();
+	if (OSGetCurrentClientProcessIDKM() == uiCleanupPid)
+	{
+		psPVRSRVData->psProcessHandleBaseBeingFreed = NULL;
+	}
+	UnlockHandle(psBase);
 
 	return eError;
 }
@@ -2382,12 +2439,13 @@ PVRSRV_ERROR PVRSRVHandleInit(void)
 	PVR_ASSERT(gpsHandleFuncs == NULL);
 	PVR_ASSERT(!gbLockInitialised);
 
-	eError = OSLockCreate(&gHandleLock, LOCK_TYPE_PASSIVE);
+	eError = OSLockCreate(&gKernelHandleLock);
 	if (eError != PVRSRV_OK)
 	{
 		PVR_DPF((PVR_DBG_ERROR,
-			 "PVRSRVHandleInit: Creation of handle global lock failed (%s)",
-			 PVRSRVGetErrorStringKM(eError)));
+			 "%s: Creation of handle global lock failed (%s)",
+			 __func__,
+			 PVRSRVGetErrorString(eError)));
 		return eError;
 	}
 	gbLockInitialised = IMG_TRUE;
@@ -2396,8 +2454,9 @@ PVRSRV_ERROR PVRSRVHandleInit(void)
 	if (eError != PVRSRV_OK)
 	{
 		PVR_DPF((PVR_DBG_ERROR,
-			 "PVRSRVHandleInit: PVRSRVHandleGetFuncTable failed (%s)",
-			 PVRSRVGetErrorStringKM(eError)));
+			 "%s: PVRSRVHandleGetFuncTable failed (%s)",
+			 __func__,
+			 PVRSRVGetErrorString(eError)));
 		goto ErrorHandleDeinit;
 	}
 
@@ -2406,8 +2465,9 @@ PVRSRV_ERROR PVRSRVHandleInit(void)
 	if (eError != PVRSRV_OK)
 	{
 		PVR_DPF((PVR_DBG_ERROR,
-			 "PVRSRVHandleInit: PVRSRVAllocHandleBase failed (%s)",
-			 PVRSRVGetErrorStringKM(eError)));
+			 "%s: PVRSRVAllocHandleBase failed (%s)",
+			 __func__,
+			 PVRSRVGetErrorString(eError)));
 		goto ErrorHandleDeinit;
 	}
 
@@ -2415,8 +2475,9 @@ PVRSRV_ERROR PVRSRVHandleInit(void)
 	if (eError != PVRSRV_OK)
 	{
 		PVR_DPF((PVR_DBG_ERROR,
-			 "PVRSRVHandleInit: PVRSRVEnableHandlePurging failed (%s)",
-			 PVRSRVGetErrorStringKM(eError)));
+			 "%s: PVRSRVEnableHandlePurging failed (%s)",
+			 __func__,
+			 PVRSRVGetErrorString(eError)));
 		goto ErrorHandleDeinit;
 	}
 
@@ -2455,7 +2516,7 @@ PVRSRV_ERROR PVRSRVHandleDeInit(void)
 			{
 				PVR_DPF((PVR_DBG_ERROR,
 					 "PVRSRVHandleDeInit: FreeHandleBase failed (%s)",
-					 PVRSRVGetErrorStringKM(eError)));
+					 PVRSRVGetErrorString(eError)));
 			}
 		}
 
@@ -2472,7 +2533,7 @@ PVRSRV_ERROR PVRSRVHandleDeInit(void)
 
 	if (gbLockInitialised)
 	{
-		OSLockDestroy(gHandleLock);
+		OSLockDestroy(gKernelHandleLock);
 		gbLockInitialised = IMG_FALSE;
 	}
 

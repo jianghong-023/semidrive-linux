@@ -55,7 +55,8 @@ THE SOFTWARE.
 #endif
 
 /*
- * Upstream doesn't have a floating point format yet, so we invent one.
+ * Upstream doesn't have a floating point format yet, so let's make one
+ * up.
  * Note: The kernel's core DRM needs to know about this format,
  * otherwise it won't be supported and should not be exposed by our
  * kernel modules either.
@@ -67,7 +68,7 @@ THE SOFTWARE.
 
 /*
  * Upstream does not have a packed 10 Bits Per Channel YVU format yet,
- * so we invent one.
+ * so let`s make one up.
  * Note: at the moment this format is not intended to be used with
  *       a framebuffer, so the kernels core DRM doesn`t need to know
  *       about this format. This means that the kernel doesn`t need
@@ -75,6 +76,8 @@ THE SOFTWARE.
  */
 #if !defined(__KERNEL__)
 #define DRM_FORMAT_YVU444_PACK10_IMG fourcc_code('I', 'M', 'G', '2')
+#define DRM_FORMAT_YUV422_2PLANE_PACK10_IMG fourcc_code('I', 'M', 'G', '3')
+#define DRM_FORMAT_YUV420_2PLANE_PACK10_IMG fourcc_code('I', 'M', 'G', '4')
 #endif
 
 /*

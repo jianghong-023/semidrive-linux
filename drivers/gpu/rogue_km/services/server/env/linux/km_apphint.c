@@ -58,14 +58,13 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "rgxdevice.h"
 #include "rgxfwutils.h"
 #include "rgxhwperf.h"
-#include "debugmisc_server.h"
 #include "htbserver.h"
 #include "rgxutils.h"
 #include "rgxapi_km.h"
 
 
 /* defines for default values */
-#include "rgx_fwif.h"
+#include "rgx_fwif_km.h"
 #include "htbuffer_types.h"
 
 #include "pvr_notifier.h"
@@ -79,10 +78,9 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #endif
 
 /* Size of temporary buffers used to read and write AppHint data.
- * Must be large enough to contain any strings read/written
- * but no larger than 4096 with is the buffer size for the
- * kernel_param_ops .get function.
- * And less than 1024 to keep the stack frame size within bounds.
+ * Must be large enough to contain any strings read or written but no larger
+ * than 4096: which is the buffer size for the kernel_param_ops .get
+ * function. And less than 1024 to keep the stack frame size within bounds.
  */
 #define APPHINT_BUFFER_SIZE 512
 
@@ -93,7 +91,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  * AppHint mnemonic data type helper tables
 ******************************************************************************/
 struct apphint_lookup {
-	char *name;
+	const char *name;
 	int value;
 };
 
@@ -171,7 +169,7 @@ struct apphint_param {
 struct apphint_init_data {
 	IMG_UINT32 id;			/* index into AppHint Table */
 	APPHINT_CLASS class;
-	IMG_CHAR *name;
+	const IMG_CHAR *name;
 	union apphint_value default_value;
 };
 
@@ -381,7 +379,7 @@ static void apphint_action_worker(struct work_struct *work)
 		if (PVRSRV_OK != result) {
 			PVR_DPF((PVR_DBG_ERROR,
 			         "%s: failed (%s)",
-			         __func__, PVRSRVGetErrorStringKM(result)));
+			         __func__, PVRSRVGetErrorString(result)));
 		}
 	} else {
 		if (a->free) {
@@ -580,6 +578,59 @@ err_exit:
 	return (result < 0) ? result : count;
 }
 
+static PVRSRV_ERROR get_apphint_value_from_action(const struct apphint_action * const action,
+												  union apphint_value * const value)
+{
+	APPHINT_ID id;
+	APPHINT_DATA_TYPE data_type;
+	PVRSRV_ERROR result = PVRSRV_OK;
+
+	get_apphint_id_from_action_addr(action, &id);
+	data_type = param_lookup[id].data_type;
+
+	if (action->query.UINT64) {
+		switch (data_type) {
+		case APPHINT_DATA_TYPE_UINT64:
+			result = action->query.UINT64(action->device,
+										  action->private_data,
+										  &value->UINT64);
+			break;
+
+		case APPHINT_DATA_TYPE_UINT32:
+		case APPHINT_DATA_TYPE_UINT32Bitfield:
+		case APPHINT_DATA_TYPE_UINT32List:
+			result = action->query.UINT32(action->device,
+										  action->private_data,
+										  &value->UINT32);
+			break;
+
+		case APPHINT_DATA_TYPE_BOOL:
+			result = action->query.BOOL(action->device,
+										action->private_data,
+										&value->BOOL);
+			break;
+
+		case APPHINT_DATA_TYPE_STRING:
+			result = action->query.STRING(action->device,
+										  action->private_data,
+										  &value->STRING);
+			break;
+		default:
+			PVR_DPF((PVR_DBG_ERROR,
+			         "%s: unrecognised data type (%d), index (%d)",
+			         __func__, data_type, id));
+		}
+	} else {
+		*value = action->stored;
+	}
+
+	if (PVRSRV_OK != result) {
+		PVR_DPF((PVR_DBG_ERROR, "%s: failed (%d), index (%d)", __func__, result, id));
+	}
+
+	return result;
+}
+
 /**
  * apphint_write - write the current AppHint data to a buffer
  *
@@ -596,46 +647,7 @@ static int apphint_write(char *buffer, const size_t size,
 	get_apphint_id_from_action_addr(a, &id);
 	hint = &param_lookup[id];
 
-	if (a->query.UINT64) {
-		switch (hint->data_type) {
-		case APPHINT_DATA_TYPE_UINT64:
-			result = a->query.UINT64(a->device,
-			                         a->private_data,
-			                         &value.UINT64);
-			break;
-
-		case APPHINT_DATA_TYPE_UINT32:
-		case APPHINT_DATA_TYPE_UINT32Bitfield:
-		case APPHINT_DATA_TYPE_UINT32List:
-			result = a->query.UINT32(a->device,
-			                         a->private_data,
-			                         &value.UINT32);
-			break;
-
-		case APPHINT_DATA_TYPE_BOOL:
-			result = a->query.BOOL(a->device,
-			                       a->private_data,
-			                       &value.BOOL);
-			break;
-
-		case APPHINT_DATA_TYPE_STRING:
-			result = a->query.STRING(a->device,
-									 a->private_data,
-									 &value.STRING);
-			break;
-		default:
-			PVR_DPF((PVR_DBG_ERROR,
-			         "%s: unrecognised data type (%d), index (%d)",
-			         __func__, hint->data_type, id));
-		}
-
-		if (PVRSRV_OK != result) {
-			PVR_DPF((PVR_DBG_ERROR, "%s: failed (%d), index (%d)",
-			         __func__, result, id));
-		}
-	} else {
-		value = a->stored;
-	}
+	result = get_apphint_value_from_action(a, &value);
 
 	switch (hint->data_type) {
 	case APPHINT_DATA_TYPE_UINT64:
@@ -897,7 +909,7 @@ err_exit:
 /**
  * apphint_debugfs_init - Create the specified debugfs entries
  */
-static int apphint_debugfs_init(char *sub_dir,
+static int apphint_debugfs_init(const char *sub_dir,
 		int device_num,
 		unsigned init_data_size,
 		const struct apphint_init_data *init_data,
@@ -927,11 +939,10 @@ static int apphint_debugfs_init(char *sub_dir,
 		if (!class_state[init_data[i].class].enabled)
 			continue;
 
-		result = PVRDebugFSCreateEntry(init_data[i].name,
+		result = PVRDebugFSCreateFile(init_data[i].name,
 				*rootdir,
 				&apphint_seq_fops,
 				apphint_set,
-				NULL,
 				NULL,
 				(void *) &apphint.val[init_data[i].id + device_value_offset],
 				&entry[i]);
@@ -956,8 +967,7 @@ static void apphint_debugfs_deinit(unsigned num_entries,
 
 	for (i = 0; i < num_entries; i++) {
 		if (entry[i]) {
-			PVRDebugFSRemoveEntry(&entry[i]);
-			entry[i] = NULL;
+			PVRDebugFSRemoveFile(&entry[i]);
 		}
 	}
 
@@ -986,21 +996,62 @@ static void apphint_pdump_values(void *flags, const IMG_CHAR *format, ...)
 }
 #endif
 
-static void apphint_dump_values(char *group_name,
+static IMG_BOOL is_apphint_value_equal(const APPHINT_DATA_TYPE data_type,
+									const union apphint_value * const left,
+									const union apphint_value * const right)
+{
+		switch (data_type) {
+		case APPHINT_DATA_TYPE_UINT64:
+			return left->UINT64 == right->UINT64;
+		case APPHINT_DATA_TYPE_UINT32:
+		case APPHINT_DATA_TYPE_UINT32List:
+		case APPHINT_DATA_TYPE_UINT32Bitfield:
+			return left->UINT32 == right->UINT32;
+		case APPHINT_DATA_TYPE_BOOL:
+			return left->BOOL == right->BOOL;
+		case APPHINT_DATA_TYPE_STRING:
+			return (strcmp(left->STRING, right->STRING) == 0 ? IMG_TRUE : IMG_FALSE);
+		default:
+			PVR_DPF((PVR_DBG_WARNING, "%s: unhandled data type (%d)", __func__, data_type));
+			return IMG_FALSE;
+		}
+}
+
+static void apphint_dump_values(const char *group_name,
 			int device_num,
 			const struct apphint_init_data *group_data,
 			int group_size,
 			DUMPDEBUG_PRINTF_FUNC *pfnDumpDebugPrintf,
-			void *pvDumpDebugFile)
+			void *pvDumpDebugFile,
+			bool list_all)
 {
 	int i, result;
 	int device_value_offset = device_num * APPHINT_DEBUGFS_DEVICE_ID_MAX;
 	char km_buffer[APPHINT_BUFFER_SIZE];
+	char count = 0;
 
 	PVR_DUMPDEBUG_LOG("  %s", group_name);
-	for (i = 0; i < group_size; i++) {
-		result = apphint_write(km_buffer, APPHINT_BUFFER_SIZE,
-				&apphint.val[group_data[i].id + device_value_offset]);
+	for (i = 0; i < group_size; i++)
+	{
+		IMG_UINT32 id = group_data[i].id;
+		APPHINT_DATA_TYPE data_type = param_lookup[id].data_type;
+		const struct apphint_action *action = &apphint.val[id + device_value_offset];
+		union apphint_value value;
+
+		result = get_apphint_value_from_action(action, &value);
+
+		if (PVRSRV_OK != result) {
+			continue;
+		}
+
+		/* List only apphints with non-default values */
+		if (!list_all &&
+			is_apphint_value_equal(data_type, &value, &group_data[i].default_value)) {
+			continue;
+		}
+
+		result = apphint_write(km_buffer, APPHINT_BUFFER_SIZE, action);
+		count++;
 
 		if (result <= 0) {
 			PVR_DUMPDEBUG_LOG("    %s: <Error>",
@@ -1009,6 +1060,10 @@ static void apphint_dump_values(char *group_name,
 			PVR_DUMPDEBUG_LOG("    %s: %s",
 				group_data[i].name, km_buffer);
 		}
+	}
+
+	if (count == 0) {
+		PVR_DUMPDEBUG_LOG("    none");
 	}
 }
 
@@ -1024,20 +1079,20 @@ static void apphint_dump_state(PVRSRV_DBGREQ_HANDLE hDebugRequestHandle,
 	char km_buffer[APPHINT_BUFFER_SIZE];
 	PVRSRV_DEVICE_NODE *device = (PVRSRV_DEVICE_NODE *)hDebugRequestHandle;
 
-	if (DEBUG_REQUEST_VERBOSITY_HIGH == ui32VerbLevel) {
+	if (DD_VERB_LVL_ENABLED(ui32VerbLevel, DEBUG_REQUEST_VERBOSITY_HIGH)) {
 		PVR_DUMPDEBUG_LOG("------[ AppHint Settings ]------");
 
 		apphint_dump_values("Build Vars", 0,
 			init_data_buildvar, ARRAY_SIZE(init_data_buildvar),
-			pfnDumpDebugPrintf, pvDumpDebugFile);
+			pfnDumpDebugPrintf, pvDumpDebugFile, true);
 
 		apphint_dump_values("Module Params", 0,
 			init_data_modparam, ARRAY_SIZE(init_data_modparam),
-			pfnDumpDebugPrintf, pvDumpDebugFile);
+			pfnDumpDebugPrintf, pvDumpDebugFile, false);
 
 		apphint_dump_values("Debugfs Params", 0,
 			init_data_debugfs, ARRAY_SIZE(init_data_debugfs),
-			pfnDumpDebugPrintf, pvDumpDebugFile);
+			pfnDumpDebugPrintf, pvDumpDebugFile, false);
 
 		for (i = 0; i < APPHINT_DEVICES_MAX; i++) {
 			if (!apphint.devices[i]
@@ -1055,7 +1110,8 @@ static void apphint_dump_state(PVRSRV_DBGREQ_HANDLE hDebugRequestHandle,
 					    init_data_debugfs_device,
 					    ARRAY_SIZE(init_data_debugfs_device),
 					    pfnDumpDebugPrintf,
-					    pvDumpDebugFile);
+					    pvDumpDebugFile,
+						false);
 		}
 	}
 }
@@ -1427,4 +1483,3 @@ void pvr_apphint_register_handlers_string(APPHINT_ID id,
 }
 
 /* EOF */
-

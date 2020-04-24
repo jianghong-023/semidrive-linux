@@ -91,12 +91,8 @@ typedef struct _BUCKET_
 {
 	struct _BUCKET_ *pNext; /*!< the next bucket on the same chain */
 	uintptr_t v;            /*!< entry value */
-#if defined (WIN32)
-	uintptr_t k[1];         /*<! entry key */
-#else
 	uintptr_t k[];          /* PRQA S 0642 */
 	                        /* override dynamic array declaration warning */
-#endif
 } BUCKET;
 
 struct _HASH_TABLE_
@@ -273,7 +269,7 @@ _Resize (HASH_TABLE *pHash, IMG_UINT32 uNewSize)
 
 #if !defined(__KERNEL__)  && defined(PERF_DBG_RESIZE)
 	gettimeofday(&end, NULL);
-	if( start.tv_usec > end.tv_usec )
+	if ( start.tv_usec > end.tv_usec )
 	{
 		end.tv_usec = 1000000 - start.tv_usec + end.tv_usec;
 	}
@@ -404,18 +400,24 @@ HASH_Delete (HASH_TABLE *pHash)
 		{
 			PVR_ASSERT (pHash->uCount==0);
 		}
-		if(pHash->uCount != 0)
+		if (pHash->uCount != 0)
 		{
-			IMG_UINT32 uiEntriesLeft = pHash->uCount;
 			IMG_UINT32 i;
 			PVR_DPF ((PVR_DBG_ERROR, "%s: Leak detected in hash table!", __func__));
 			PVR_DPF ((PVR_DBG_ERROR, "%s: Likely Cause: client drivers not freeing allocations before destroying devmemcontext", __func__));
-			PVR_DPF ((PVR_DBG_ERROR, "%s: Removing remaining %u hash entries.", __func__, uiEntriesLeft));
+			PVR_DPF ((PVR_DBG_ERROR, "%s: Removing remaining %u hash entries.", __func__, pHash->uCount));
 
-			for (i = 0; i < uiEntriesLeft; i++)
+			for (i = 0; i < pHash->uSize; i++)
 			{
-				_FreeMem(pHash->ppBucketTable[i]);
+				BUCKET *pBucket = pHash->ppBucketTable[i];
+				while (pBucket != NULL)
+				{
+					BUCKET *pNextBucket = pBucket->pNext;
+					_FreeMem(pBucket);
+					pBucket = pNextBucket;
+				}
 			}
+
 		}
 		_FreeMem(pHash->ppBucketTable);
 		pHash->ppBucketTable = NULL;

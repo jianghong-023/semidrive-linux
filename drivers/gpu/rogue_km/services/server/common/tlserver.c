@@ -56,10 +56,10 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "tlserver.h"
 
 #include "pvrsrv_tlstreams.h"
+#define NO_STREAM_WAIT_PERIOD_US 2000000ULL
+#define NO_DATA_WAIT_PERIOD_US    500000ULL
+#define NO_ACQUIRE               0xffffffffU
 
-#define NO_STREAM_WAIT_PERIOD 2000000ULL
-#define NO_DATA_WAIT_PERIOD   1000000ULL
-#define NO_ACQUIRE            0xffffffffU
 
 /*
  * Transport Layer Client API Kernel-Mode bridge implementation
@@ -113,7 +113,7 @@ TLServerOpenStreamKM(const IMG_CHAR*  	   pszName,
 				OSLockRelease (psGD->hTLGDLock);
 
 				/* Will exit OK or with timeout, both cases safe to ignore */
-				eErrorEO = OSEventObjectWaitTimeout(hEvent, NO_STREAM_WAIT_PERIOD);
+				eErrorEO = OSEventObjectWaitTimeout(hEvent, NO_STREAM_WAIT_PERIOD_US);
 
 				/* Acquire lock after waking up */
 				OSLockAcquire (psGD->hTLGDLock);
@@ -309,6 +309,9 @@ TLServerCloseStreamKM(PTL_STREAM_DESC psSD)
 	 * TLUnrefDescAndTryFreeStreamNode(). */
 	if (!bIsWriteOnly)
 	{
+		/* Reset the read position on close if the stream requires it. */
+		TLStreamResetReadPos(psStream);
+
 		/* Close and free the event handle resource used by this descriptor */
 		eError = OSEventObjectClose(psSD->hReadEvent);
 		if (eError != PVRSRV_OK)
@@ -487,7 +490,7 @@ TLServerDiscoverStreamsKM(const IMG_CHAR *pszNamePattern,
 
 	if (*pszNamePattern == '\0')
 		return PVRSRV_ERROR_INVALID_PARAMS;
-	
+
 	if (ui32Size % PRVSRVTL_MAX_STREAM_NAME_SIZE != 0)
 		return PVRSRV_ERROR_INVALID_PARAMS;
 
@@ -556,8 +559,30 @@ TLServerAcquireDataKM(PTL_STREAM_DESC psSD,
 	{
 		uiTmpLen = TLStreamAcquireReadPos(psNode->psStream, psSD->ui32Flags & PVRSRV_STREAM_FLAG_DISABLE_PRODUCER_CALLBACK, &uiTmpOffset);
 
+		/* Check we have not already exceeded read limit with just offset
+		 * regardless of data length to ensure the client sees the RC */
+		if (psSD->ui32Flags & PVRSRV_STREAM_FLAG_READ_LIMIT)
+		{
+			/* Check to see if we are reading beyond the read limit */
+			if (uiTmpOffset >= psSD->ui32ReadLimit)
+			{
+				PVR_DPF_RETURN_RC(PVRSRV_ERROR_STREAM_READLIMIT_REACHED);
+			}
+		}
+
 		if (uiTmpLen > 0)
 		{ /* Data found */
+
+			/* Check we have not already exceeded read limit offset+len */
+			if (psSD->ui32Flags & PVRSRV_STREAM_FLAG_READ_LIMIT)
+			{
+				/* Adjust the read length if it goes beyond the read limit
+				 * limit always guaranteed to be on packet  */
+				if ((uiTmpOffset + uiTmpLen) >= psSD->ui32ReadLimit)
+				{
+					uiTmpLen = psSD->ui32ReadLimit - uiTmpOffset;
+				}
+			}
 
 			*puiReadOffset = uiTmpOffset;
 			*puiReadLen = uiTmpLen;
@@ -567,36 +592,53 @@ TLServerAcquireDataKM(PTL_STREAM_DESC psSD,
 		else if (!(psSD->ui32Flags & PVRSRV_STREAM_FLAG_ACQUIRE_NONBLOCKING))
 		{ /* No data found blocking */
 
+			/* Instead of doing a complete sleep for `NO_DATA_WAIT_PERIOD_US` us, we sleep in chunks
+			 * of 168 ms. In a "deferred" signal scenario from writer, this gives us a chance to
+			 * wake-up (timeout) early and continue reading in-case some data is available */
+			IMG_UINT64 ui64WaitInChunksUs = MIN(NO_DATA_WAIT_PERIOD_US, 168000ULL);
+			IMG_BOOL bDataFound = IMG_FALSE;
+
 			TL_COUNTER_INC(psSD->ui32NoDataSleep);
 
-			eError = OSEventObjectWaitTimeout(psSD->hReadEvent, NO_DATA_WAIT_PERIOD);
-			if (eError == PVRSRV_OK)
-			{ /* Data present */
-
-				TL_COUNTER_INC(psSD->ui32Signalled);
-
-				continue; /* Acquire read position again */
-			}
-			else if (eError == PVRSRV_ERROR_TIMEOUT)
-			{ /* Timeout back to client if still no data, optimisation help reduce bridge calls */
-
-				if (TLStreamOutOfData(psNode->psStream))
+			LOOP_UNTIL_TIMEOUT(NO_DATA_WAIT_PERIOD_US)
+			{
+				eError = OSEventObjectWaitTimeout(psSD->hReadEvent, ui64WaitInChunksUs);
+				if (eError == PVRSRV_OK)
 				{
-					/* Return on timeout if stream empty, else let while exit and return data */
-					TL_COUNTER_INC(psSD->ui32TimeoutEmpty);
-					PVR_DPF_RETURN_RC(eError);
+					bDataFound = IMG_TRUE;
+					TL_COUNTER_INC(psSD->ui32Signalled);
+					break;
+				}
+				else if (eError == PVRSRV_ERROR_TIMEOUT)
+				{
+					if (TLStreamOutOfData(psNode->psStream))
+					{
+						/* Return on timeout if stream empty, else let while exit and return data */
+						continue;
+					}
+					else
+					{
+						bDataFound = IMG_TRUE;
+						TL_COUNTER_INC(psSD->ui32TimeoutData);
+						PVR_DPF((PVR_DBG_MESSAGE, "%s: Data found at timeout. Current BuffUt = %u",
+												 __func__, TLStreamGetUT(psNode->psStream)));
+						break;
+					}
 				}
 				else
-				{
-					/* Data available, loop and repeat read procedure, to honour read limit/error path */
-					TL_COUNTER_INC(psSD->ui32TimeoutData);
-
-					continue; /* Acquire read position again */
+				{ /* Some other system error with event objects */
+					PVR_DPF_RETURN_RC(eError);
 				}
+			} END_LOOP_UNTIL_TIMEOUT();
+
+			if (bDataFound)
+			{
+				continue;
 			}
 			else
-			{ /* Some other system error with event objects */
-				PVR_DPF_RETURN_RC(eError);
+			{
+				TL_COUNTER_INC(psSD->ui32TimeoutEmpty);
+				return PVRSRV_ERROR_TIMEOUT;
 			}
 		}
 		else

@@ -132,7 +132,7 @@ void WorkEstHashLockCreate(POS_LOCK *ppsHashLock)
 {
 	if (*ppsHashLock == NULL)
 	{
-		OSLockCreate(ppsHashLock, LOCK_TYPE_DISPATCH);
+		OSLockCreate(ppsHashLock);
 	}
 }
 

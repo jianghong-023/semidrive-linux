@@ -1,6 +1,9 @@
 /*******************************************************************************
+@File
 @Title          Direct client bridge for sync
 @Copyright      Copyright (c) Imagination Technologies Ltd. All Rights Reserved
+@Description    Implements the client side of the bridge for sync
+                which is used in calls from Server context.
 @License        Dual MIT/GPLv2
 
 The contents of this file are subject to the MIT license as set out below.
@@ -127,6 +130,7 @@ IMG_INTERNAL PVRSRV_ERROR IMG_CALLCONV BridgeServerSyncPrimSet(IMG_HANDLE
 							       IMG_UINT32
 							       ui32Value)
 {
+#if defined(SUPPORT_SERVER_SYNC_IMPL)
 	PVRSRV_ERROR eError;
 	SERVER_SYNC_PRIMITIVE *psSyncHandleInt;
 	PVR_UNREFERENCED_PARAMETER(hBridge);
@@ -136,6 +140,13 @@ IMG_INTERNAL PVRSRV_ERROR IMG_CALLCONV BridgeServerSyncPrimSet(IMG_HANDLE
 	eError = PVRSRVServerSyncPrimSetKM(psSyncHandleInt, ui32Value);
 
 	return eError;
+#else
+	PVR_UNREFERENCED_PARAMETER(hBridge);
+	PVR_UNREFERENCED_PARAMETER(hSyncHandle);
+	PVR_UNREFERENCED_PARAMETER(ui32Value);
+
+	return PVRSRV_ERROR_NOT_IMPLEMENTED;
+#endif
 }
 
 IMG_INTERNAL PVRSRV_ERROR IMG_CALLCONV BridgeServerSyncAlloc(IMG_HANDLE hBridge,
@@ -148,6 +159,7 @@ IMG_INTERNAL PVRSRV_ERROR IMG_CALLCONV BridgeServerSyncAlloc(IMG_HANDLE hBridge,
 							     const IMG_CHAR *
 							     puiClassName)
 {
+#if defined(SUPPORT_SERVER_SYNC_IMPL)
 	PVRSRV_ERROR eError;
 	SERVER_SYNC_PRIMITIVE *psSyncHandleInt = NULL;
 
@@ -159,12 +171,21 @@ IMG_INTERNAL PVRSRV_ERROR IMG_CALLCONV BridgeServerSyncAlloc(IMG_HANDLE hBridge,
 
 	*phSyncHandle = psSyncHandleInt;
 	return eError;
+#else
+	PVR_UNREFERENCED_PARAMETER(phSyncHandle);
+	PVR_UNREFERENCED_PARAMETER(pui32SyncPrimVAddr);
+	PVR_UNREFERENCED_PARAMETER(ui32ClassNameSize);
+	PVR_UNREFERENCED_PARAMETER(puiClassName);
+
+	return PVRSRV_ERROR_NOT_IMPLEMENTED;
+#endif
 }
 
 IMG_INTERNAL PVRSRV_ERROR IMG_CALLCONV BridgeServerSyncFree(IMG_HANDLE hBridge,
 							    IMG_HANDLE
 							    hSyncHandle)
 {
+#if defined(SUPPORT_SERVER_SYNC_IMPL)
 	PVRSRV_ERROR eError;
 	SERVER_SYNC_PRIMITIVE *psSyncHandleInt;
 	PVR_UNREFERENCED_PARAMETER(hBridge);
@@ -174,6 +195,12 @@ IMG_INTERNAL PVRSRV_ERROR IMG_CALLCONV BridgeServerSyncFree(IMG_HANDLE hBridge,
 	eError = PVRSRVServerSyncFreeKM(psSyncHandleInt);
 
 	return eError;
+#else
+	PVR_UNREFERENCED_PARAMETER(hBridge);
+	PVR_UNREFERENCED_PARAMETER(hSyncHandle);
+
+	return PVRSRV_ERROR_NOT_IMPLEMENTED;
+#endif
 }
 
 IMG_INTERNAL PVRSRV_ERROR IMG_CALLCONV BridgeServerSyncQueueHWOp(IMG_HANDLE
@@ -187,6 +214,7 @@ IMG_INTERNAL PVRSRV_ERROR IMG_CALLCONV BridgeServerSyncQueueHWOp(IMG_HANDLE
 								 IMG_UINT32 *
 								 pui32UpdateValue)
 {
+#if defined(SUPPORT_SERVER_SYNC_IMPL)
 	PVRSRV_ERROR eError;
 	SERVER_SYNC_PRIMITIVE *psSyncHandleInt;
 	PVR_UNREFERENCED_PARAMETER(hBridge);
@@ -199,6 +227,15 @@ IMG_INTERNAL PVRSRV_ERROR IMG_CALLCONV BridgeServerSyncQueueHWOp(IMG_HANDLE
 					pui32FenceValue, pui32UpdateValue);
 
 	return eError;
+#else
+	PVR_UNREFERENCED_PARAMETER(hBridge);
+	PVR_UNREFERENCED_PARAMETER(hSyncHandle);
+	PVR_UNREFERENCED_PARAMETER(bbUpdate);
+	PVR_UNREFERENCED_PARAMETER(pui32FenceValue);
+	PVR_UNREFERENCED_PARAMETER(pui32UpdateValue);
+
+	return PVRSRV_ERROR_NOT_IMPLEMENTED;
+#endif
 }
 
 IMG_INTERNAL PVRSRV_ERROR IMG_CALLCONV BridgeServerSyncGetStatus(IMG_HANDLE
@@ -216,6 +253,7 @@ IMG_INTERNAL PVRSRV_ERROR IMG_CALLCONV BridgeServerSyncGetStatus(IMG_HANDLE
 								 IMG_UINT32 *
 								 pui32NextOp)
 {
+#if defined(SUPPORT_SERVER_SYNC_IMPL)
 	PVRSRV_ERROR eError;
 	SERVER_SYNC_PRIMITIVE **psSyncHandleInt;
 	PVR_UNREFERENCED_PARAMETER(hBridge);
@@ -230,6 +268,17 @@ IMG_INTERNAL PVRSRV_ERROR IMG_CALLCONV BridgeServerSyncGetStatus(IMG_HANDLE
 					pui32CurrentOp, pui32NextOp);
 
 	return eError;
+#else
+	PVR_UNREFERENCED_PARAMETER(hBridge);
+	PVR_UNREFERENCED_PARAMETER(ui32SyncCount);
+	PVR_UNREFERENCED_PARAMETER(phSyncHandle);
+	PVR_UNREFERENCED_PARAMETER(pui32UID);
+	PVR_UNREFERENCED_PARAMETER(pui32FWAddr);
+	PVR_UNREFERENCED_PARAMETER(pui32CurrentOp);
+	PVR_UNREFERENCED_PARAMETER(pui32NextOp);
+
+	return PVRSRV_ERROR_NOT_IMPLEMENTED;
+#endif
 }
 
 IMG_INTERNAL PVRSRV_ERROR IMG_CALLCONV BridgeSyncPrimOpCreate(IMG_HANDLE
@@ -251,6 +300,7 @@ IMG_INTERNAL PVRSRV_ERROR IMG_CALLCONV BridgeSyncPrimOpCreate(IMG_HANDLE
 							      IMG_HANDLE *
 							      phServerCookie)
 {
+#if defined(SUPPORT_SERVER_SYNC_IMPL)
 	PVRSRV_ERROR eError;
 	SYNC_PRIMITIVE_BLOCK **psBlockListInt;
 	SERVER_SYNC_PRIMITIVE **psServerSyncInt;
@@ -271,6 +321,19 @@ IMG_INTERNAL PVRSRV_ERROR IMG_CALLCONV BridgeSyncPrimOpCreate(IMG_HANDLE
 
 	*phServerCookie = psServerCookieInt;
 	return eError;
+#else
+	PVR_UNREFERENCED_PARAMETER(hBridge);
+	PVR_UNREFERENCED_PARAMETER(ui32SyncBlockCount);
+	PVR_UNREFERENCED_PARAMETER(phBlockList);
+	PVR_UNREFERENCED_PARAMETER(ui32ClientSyncCount);
+	PVR_UNREFERENCED_PARAMETER(pui32SyncBlockIndex);
+	PVR_UNREFERENCED_PARAMETER(pui32Index);
+	PVR_UNREFERENCED_PARAMETER(ui32ServerSyncCount);
+	PVR_UNREFERENCED_PARAMETER(phServerSync);
+	PVR_UNREFERENCED_PARAMETER(phServerCookie);
+
+	return PVRSRV_ERROR_NOT_IMPLEMENTED;
+#endif
 }
 
 IMG_INTERNAL PVRSRV_ERROR IMG_CALLCONV BridgeSyncPrimOpTake(IMG_HANDLE hBridge,
@@ -289,6 +352,7 @@ IMG_INTERNAL PVRSRV_ERROR IMG_CALLCONV BridgeSyncPrimOpTake(IMG_HANDLE hBridge,
 							    IMG_UINT32 *
 							    pui32ServerFlags)
 {
+#if defined(SUPPORT_SERVER_SYNC_IMPL)
 	PVRSRV_ERROR eError;
 	SERVER_OP_COOKIE *psServerCookieInt;
 	PVR_UNREFERENCED_PARAMETER(hBridge);
@@ -304,6 +368,18 @@ IMG_INTERNAL PVRSRV_ERROR IMG_CALLCONV BridgeSyncPrimOpTake(IMG_HANDLE hBridge,
 				   ui32ServerSyncCount, pui32ServerFlags);
 
 	return eError;
+#else
+	PVR_UNREFERENCED_PARAMETER(hBridge);
+	PVR_UNREFERENCED_PARAMETER(hServerCookie);
+	PVR_UNREFERENCED_PARAMETER(ui32ClientSyncCount);
+	PVR_UNREFERENCED_PARAMETER(pui32Flags);
+	PVR_UNREFERENCED_PARAMETER(pui32FenceValue);
+	PVR_UNREFERENCED_PARAMETER(pui32UpdateValue);
+	PVR_UNREFERENCED_PARAMETER(ui32ServerSyncCount);
+	PVR_UNREFERENCED_PARAMETER(pui32ServerFlags);
+
+	return PVRSRV_ERROR_NOT_IMPLEMENTED;
+#endif
 }
 
 IMG_INTERNAL PVRSRV_ERROR IMG_CALLCONV BridgeSyncPrimOpReady(IMG_HANDLE hBridge,
@@ -311,6 +387,7 @@ IMG_INTERNAL PVRSRV_ERROR IMG_CALLCONV BridgeSyncPrimOpReady(IMG_HANDLE hBridge,
 							     hServerCookie,
 							     IMG_BOOL * pbReady)
 {
+#if defined(SUPPORT_SERVER_SYNC_IMPL)
 	PVRSRV_ERROR eError;
 	SERVER_OP_COOKIE *psServerCookieInt;
 	PVR_UNREFERENCED_PARAMETER(hBridge);
@@ -320,6 +397,13 @@ IMG_INTERNAL PVRSRV_ERROR IMG_CALLCONV BridgeSyncPrimOpReady(IMG_HANDLE hBridge,
 	eError = PVRSRVSyncPrimOpReadyKM(psServerCookieInt, pbReady);
 
 	return eError;
+#else
+	PVR_UNREFERENCED_PARAMETER(hBridge);
+	PVR_UNREFERENCED_PARAMETER(hServerCookie);
+	PVR_UNREFERENCED_PARAMETER(pbReady);
+
+	return PVRSRV_ERROR_NOT_IMPLEMENTED;
+#endif
 }
 
 IMG_INTERNAL PVRSRV_ERROR IMG_CALLCONV BridgeSyncPrimOpComplete(IMG_HANDLE
@@ -327,6 +411,7 @@ IMG_INTERNAL PVRSRV_ERROR IMG_CALLCONV BridgeSyncPrimOpComplete(IMG_HANDLE
 								IMG_HANDLE
 								hServerCookie)
 {
+#if defined(SUPPORT_SERVER_SYNC_IMPL)
 	PVRSRV_ERROR eError;
 	SERVER_OP_COOKIE *psServerCookieInt;
 	PVR_UNREFERENCED_PARAMETER(hBridge);
@@ -336,6 +421,12 @@ IMG_INTERNAL PVRSRV_ERROR IMG_CALLCONV BridgeSyncPrimOpComplete(IMG_HANDLE
 	eError = PVRSRVSyncPrimOpCompleteKM(psServerCookieInt);
 
 	return eError;
+#else
+	PVR_UNREFERENCED_PARAMETER(hBridge);
+	PVR_UNREFERENCED_PARAMETER(hServerCookie);
+
+	return PVRSRV_ERROR_NOT_IMPLEMENTED;
+#endif
 }
 
 IMG_INTERNAL PVRSRV_ERROR IMG_CALLCONV BridgeSyncPrimOpDestroy(IMG_HANDLE
@@ -343,6 +434,7 @@ IMG_INTERNAL PVRSRV_ERROR IMG_CALLCONV BridgeSyncPrimOpDestroy(IMG_HANDLE
 							       IMG_HANDLE
 							       hServerCookie)
 {
+#if defined(SUPPORT_SERVER_SYNC_IMPL)
 	PVRSRV_ERROR eError;
 	SERVER_OP_COOKIE *psServerCookieInt;
 	PVR_UNREFERENCED_PARAMETER(hBridge);
@@ -352,6 +444,12 @@ IMG_INTERNAL PVRSRV_ERROR IMG_CALLCONV BridgeSyncPrimOpDestroy(IMG_HANDLE
 	eError = PVRSRVSyncPrimOpDestroyKM(psServerCookieInt);
 
 	return eError;
+#else
+	PVR_UNREFERENCED_PARAMETER(hBridge);
+	PVR_UNREFERENCED_PARAMETER(hServerCookie);
+
+	return PVRSRV_ERROR_NOT_IMPLEMENTED;
+#endif
 }
 
 IMG_INTERNAL PVRSRV_ERROR IMG_CALLCONV BridgeSyncPrimPDump(IMG_HANDLE hBridge,
@@ -460,7 +558,7 @@ IMG_INTERNAL PVRSRV_ERROR IMG_CALLCONV BridgeSyncPrimOpPDumpPol(IMG_HANDLE
 								PDUMP_FLAGS_T
 								uiPDumpFlags)
 {
-#if defined(PDUMP)
+#if defined(SUPPORT_SERVER_SYNC_IMPL_PDUMP)
 	PVRSRV_ERROR eError;
 	SERVER_OP_COOKIE *psServerCookieInt;
 	PVR_UNREFERENCED_PARAMETER(hBridge);

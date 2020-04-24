@@ -208,7 +208,7 @@ void DC_OSUnmapPhysAddr(IMG_CPU_VIRTADDR pvCpuVAddr, IMG_UINT32 ui32Size)
 }
 
 IMG_UINT32 DC_OSReadReg32(IMG_CPU_VIRTADDR pvRegCpuVBase, IMG_UINT32 ui32Offset)
-{    
+{
 	return ioread32(pvRegCpuVBase + ui32Offset);
 }
 
@@ -229,7 +229,7 @@ void DC_OSFloatingPointBegin(void)
 #if defined(CONFIG_X86)
 	kernel_fpu_begin();
 #else
-	DC_OSDebugPrintf(DBGLVL_WARNING, " - %s: Unsupported architecture\n", __FUNCTION__);
+	DC_OSDebugPrintf(DBGLVL_WARNING, " - %s: Unsupported architecture\n", __func__);
 #endif
 }
 
@@ -238,7 +238,7 @@ void DC_OSFloatingPointEnd(void)
 #if defined(CONFIG_X86)
 	kernel_fpu_end();
 #else
-	DC_OSDebugPrintf(DBGLVL_WARNING, " - %s: Unsupported architecture\n", __FUNCTION__);
+	DC_OSDebugPrintf(DBGLVL_WARNING, " - %s: Unsupported architecture\n", __func__);
 #endif
 }
 
@@ -318,7 +318,7 @@ PVRSRV_ERROR DC_OSPVRServicesSetupFuncs(IMG_HANDLE hPVRServicesConnection, DC_SE
 	psServicesFuncs->pfnSysUninstallDeviceLISR = PVRSRVSystemUninstallDeviceLISR;
 
 	psServicesFuncs->pfnCheckStatus = PVRSRVCheckStatus;
-	psServicesFuncs->pfnGetErrorString = PVRSRVGetErrorStringKM;
+	psServicesFuncs->pfnGetErrorString = PVRSRVGetErrorString;
 
 	return PVRSRV_OK;
 }
@@ -431,7 +431,7 @@ PVRSRV_ERROR DC_OSWorkQueueAddWorkItem(IMG_HANDLE hQueue, IMG_HANDLE hWorkItem)
 	if (!queue_work(psQueue, &psWorkItem->sWork))
 	{
 		printk(KERN_WARNING " %s - %s: Cannot queue work that's already queued\n",
-		       g_szDrvName, __FUNCTION__);
+		       g_szDrvName, __func__);
 		return PVRSRV_ERROR_UNABLE_TO_SCHEDULE_TASK;
 	}
 

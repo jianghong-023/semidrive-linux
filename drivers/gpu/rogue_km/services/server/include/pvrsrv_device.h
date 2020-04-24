@@ -124,27 +124,45 @@ typedef void (*PFN_SYS_DEV_FEAT_DEP_INIT)(PVRSRV_DEVICE_CONFIG *, IMG_UINT64);
 
 typedef PVRSRV_DRIVER_MODE (*PFN_SYS_DRIVER_MODE)(void);
 
+typedef enum _PVRSRV_TD_FW_MEM_REGION_
+{
+	PVRSRV_DEVICE_FW_CODE_REGION         = 0,
+	PVRSRV_DEVICE_FW_PRIVATE_DATA_REGION = 1,
+	PVRSRV_DEVICE_FW_COREMEM_CODE_REGION = 2,
+	PVRSRV_DEVICE_FW_COREMEM_DATA_REGION = 3
+} PVRSRV_TD_FW_MEM_REGION;
+
 #if defined(SUPPORT_TRUSTED_DEVICE)
-
-#define PVRSRV_DEVICE_FW_CODE_REGION          (0)
-#define PVRSRV_DEVICE_FW_COREMEM_CODE_REGION  (1)
-
-typedef PVRSRV_ERROR
-(*PFN_TD_GET_FW_CODE_PARAMS)(IMG_HANDLE hSysData,
-                             IMG_CPU_PHYADDR **pasCpuPAddr,
-                             IMG_DEV_PHYADDR **pasDevPAddr,
-                             IMG_UINT32 *pui32Log2Align,
-                             IMG_UINT32 *pui32NumPages,
-                             IMG_UINT64 *pui64FWSize);
 
 typedef struct _PVRSRV_TD_FW_PARAMS_
 {
 	const void *pvFirmware;
 	IMG_UINT32 ui32FirmwareSize;
-	IMG_DEV_VIRTADDR sFWCodeDevVAddrBase;
-	IMG_DEV_VIRTADDR sFWDataDevVAddrBase;
-	RGXFWIF_DEV_VIRTADDR sFWCorememCodeFWAddr;
-	RGXFWIF_DEV_VIRTADDR sFWInitFWAddr;
+
+	union
+	{
+		struct
+		{
+			/* META-only parameters */
+			IMG_DEV_VIRTADDR sFWCodeDevVAddr;
+			IMG_DEV_VIRTADDR sFWDataDevVAddr;
+			IMG_DEV_VIRTADDR sFWCorememCodeDevVAddr;
+			RGXFWIF_DEV_VIRTADDR sFWCorememCodeFWAddr;
+			IMG_DEVMEM_SIZE_T uiFWCorememCodeSize;
+			IMG_DEV_VIRTADDR sFWCorememDataDevVAddr;
+			RGXFWIF_DEV_VIRTADDR sFWCorememDataFWAddr;
+			IMG_UINT32 ui32NumThreads;
+			IMG_UINT32 ui32MainThreadID;
+		} sMeta;
+
+		struct
+		{
+			/* MIPS-only parameters */
+			IMG_DEV_PHYADDR sGPURegAddr;
+			IMG_DEV_PHYADDR sFWPageTableAddr;
+			IMG_DEV_PHYADDR sFWStackAddr;
+		} sMips;
+	} uFWP;
 } PVRSRV_TD_FW_PARAMS;
 
 typedef PVRSRV_ERROR
@@ -224,6 +242,9 @@ struct _PVRSRV_DEVICE_CONFIG_
 
 	IMG_BOOL bHasNonMappableLocalMemory;
 
+	/*! Indicates if system supports FBCDC v3.1 */
+	IMG_BOOL bHasFBCDCVersion31;
+
 	PHYS_HEAP_CONFIG *pasPhysHeaps;
 	IMG_UINT32 ui32PhysHeapCount;
 
@@ -280,12 +301,6 @@ struct _PVRSRV_DEVICE_CONFIG_
 
 #if defined(SUPPORT_TRUSTED_DEVICE)
 	/*!
-	 *! Callback to get FW code parameters (physical address, size) from
-	 *! the trusted device.
-	 */
-	PFN_TD_GET_FW_CODE_PARAMS pfnTDGetFWCodeParams;
-
-	/*!
 	 *! Callback to send FW image and FW boot time parameters to the trusted
 	 *! device.
 	 */
@@ -317,7 +332,7 @@ struct _PVRSRV_DEVICE_CONFIG_
 #endif
 
 #if defined(SUPPORT_ALT_REGBASE)
-	IMG_CPU_PHYADDR sAltRegsCpuPBase;
+	IMG_DEV_PHYADDR sAltRegsGpuPBase;
 #endif
 
 #if defined(SUPPORT_DEVICE_PA0_AS_VALID)

@@ -41,6 +41,7 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */ /***************************************************************************/
 #include "img_types.h"
+#include "img_defs.h"
 #include "pvrsrv_error.h"
 #include "pvrsrv_memallocflags.h"
 #include "device.h"
@@ -189,7 +190,7 @@ PVRSRV_ERROR DevPhysMemAlloc(PVRSRV_DEVICE_NODE	*psDevNode,
 		 *    for this allocation
 		 */
 		/*Write the buffer contents to the prm file */
-		eError = PDumpWriteBuffer(pvCpuVAddr,
+		eError = PDumpWriteParameterBlob(pvCpuVAddr,
 		                          ui32PDumpMemSize,
 		                          PDUMP_FLAGS_CONTINUOUS,
 		                          szFilenameOut,
@@ -210,8 +211,7 @@ PVRSRV_ERROR DevPhysMemAlloc(PVRSRV_DEVICE_NODE	*psDevNode,
 				PDUMP_ERROR(eError, "Failed to write LDB statement to script file");
 				PVR_DPF((PVR_DBG_ERROR, "Failed to write LDB statement to script file, error %d", eError));
 			}
-
-		}
+ 		}
 		else if (eError != PVRSRV_ERROR_PDUMP_NOT_ALLOWED)
 		{
 			PDUMP_ERROR(eError, "Failed to write device allocation to parameter file");
@@ -221,6 +221,7 @@ PVRSRV_ERROR DevPhysMemAlloc(PVRSRV_DEVICE_NODE	*psDevNode,
 		{
 			/* else Write to parameter file prevented under the flags and
 			 * current state of the driver so skip write to script and error IF.
+             * This is normal e..g. no in capture range for example
 			 */
 			eError = PVRSRV_OK;
 		}
@@ -332,11 +333,9 @@ static inline PVRSRV_ERROR _ValidateParams(IMG_UINT32 ui32NumPhysChunks,
 		if ( uiChunkSize != (1 << uiLog2AllocPageSize) )
 		{
 			PVR_DPF((PVR_DBG_ERROR,
-					"%s: Invalid chunk size for sparse allocation. "
-					"Requested %#llx, must be same as page size %#x.",
-					__func__,
-					(long long unsigned) uiChunkSize,
-					1 << uiLog2AllocPageSize ));
+					 "%s: Invalid chunk size for sparse allocation. Requested "
+					 "%#" IMG_UINT64_FMTSPECx ", must be same as page size %#x.",
+					__func__, uiChunkSize, 1 << uiLog2AllocPageSize));
 
 			return PVRSRV_ERROR_PMR_NOT_PAGE_MULTIPLE;
 		}
@@ -344,11 +343,10 @@ static inline PVRSRV_ERROR _ValidateParams(IMG_UINT32 ui32NumPhysChunks,
 		if (ui32NumVirtChunks * uiChunkSize != uiSize)
 		{
 			PVR_DPF((PVR_DBG_ERROR,
-					"%s: Total alloc size (%#llx) is not qual "
-					"to virtual chunks * chunk size (%#llx)",
-					__func__,
-					(long long unsigned) uiSize,
-					(long long unsigned) (ui32NumVirtChunks * uiChunkSize) ));
+					 "%s: Total alloc size (%#" IMG_UINT64_FMTSPECx ") "
+					 "is not equal to virtual chunks * chunk size "
+					 "(%#" IMG_UINT64_FMTSPECx ")",
+					__func__, uiSize, ui32NumVirtChunks * uiChunkSize));
 
 			return PVRSRV_ERROR_PMR_NOT_PAGE_MULTIPLE;
 		}
@@ -383,11 +381,9 @@ static inline PVRSRV_ERROR _ValidateParams(IMG_UINT32 ui32NumPhysChunks,
 	if ((uiSize & ((1ULL << uiLog2AllocPageSize) - 1)) != 0)
 	{
 		PVR_DPF((PVR_DBG_ERROR,
-							"%s: Total size (%#llx) must be a multiple "
-							"of the requested contiguity (%u)",
-							__func__,
-							(long long unsigned) uiSize,
-							(1 << uiLog2AllocPageSize)));
+				 "%s: Total size (%#" IMG_UINT64_FMTSPECx ") "
+				 "must be a multiple of the requested contiguity (%u)",
+				 __func__, uiSize, 1 << uiLog2AllocPageSize));
 		return PVRSRV_ERROR_PMR_NOT_PAGE_MULTIPLE;
 	}
 
@@ -462,7 +458,7 @@ PhysmemNewRamBackedPMR(CONNECTION_DATA * psConnection,
 		/* In case a heap hasn't been acquired for this type, return invalid heap error */
 		PVR_DPF((PVR_DBG_ERROR, "%s: Requested allocation on device node (%p) from "
 		        "an invalid heap (HeapIndex=%d)",
-		        __FUNCTION__, psDevNode, ePhysHeapIdx));
+		        __func__, psDevNode, ePhysHeapIdx));
 		return PVRSRV_ERROR_INVALID_HEAP;
 	}
 
@@ -627,7 +623,7 @@ PhysmemImportPMR(CONNECTION_DATA *psConnection,
 
 	if (PMRGetExportDeviceNode(psPMRExport) != psDevNode)
 	{
-		PVR_DPF((PVR_DBG_ERROR, "%s: PMR invalid for this device\n", __func__));
+		PVR_DPF((PVR_DBG_ERROR, "%s: PMR invalid for this device", __func__));
 		return PVRSRV_ERROR_PMR_NOT_PERMITTED;
 	}
 

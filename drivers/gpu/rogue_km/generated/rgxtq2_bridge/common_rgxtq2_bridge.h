@@ -60,10 +60,11 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #define PVRSRV_BRIDGE_RGXTQ2_RGXTDMSUBMITTRANSFER			PVRSRV_BRIDGE_RGXTQ2_CMD_FIRST+2
 #define PVRSRV_BRIDGE_RGXTQ2_RGXTDMSETTRANSFERCONTEXTPRIORITY			PVRSRV_BRIDGE_RGXTQ2_CMD_FIRST+3
 #define PVRSRV_BRIDGE_RGXTQ2_RGXTDMNOTIFYWRITEOFFSETUPDATE			PVRSRV_BRIDGE_RGXTQ2_CMD_FIRST+4
-#define PVRSRV_BRIDGE_RGXTQ2_CMD_LAST			(PVRSRV_BRIDGE_RGXTQ2_CMD_FIRST+4)
+#define PVRSRV_BRIDGE_RGXTQ2_RGXTDMSUBMITTRANSFER2			PVRSRV_BRIDGE_RGXTQ2_CMD_FIRST+5
+#define PVRSRV_BRIDGE_RGXTQ2_CMD_LAST			(PVRSRV_BRIDGE_RGXTQ2_CMD_FIRST+5)
 
 /*******************************************
-            RGXTDMCreateTransferContext          
+            RGXTDMCreateTransferContext
  *******************************************/
 
 /* Bridge in structure for RGXTDMCreateTransferContext */
@@ -73,6 +74,7 @@ typedef struct PVRSRV_BRIDGE_IN_RGXTDMCREATETRANSFERCONTEXT_TAG
 	IMG_UINT32 ui32FrameworkCmdize;
 	IMG_BYTE *psFrameworkCmd;
 	IMG_HANDLE hPrivData;
+	IMG_UINT32 ui32PackedCCBSizeU88;
 } __attribute__ ((packed)) PVRSRV_BRIDGE_IN_RGXTDMCREATETRANSFERCONTEXT;
 
 /* Bridge out structure for RGXTDMCreateTransferContext */
@@ -83,7 +85,7 @@ typedef struct PVRSRV_BRIDGE_OUT_RGXTDMCREATETRANSFERCONTEXT_TAG
 } __attribute__ ((packed)) PVRSRV_BRIDGE_OUT_RGXTDMCREATETRANSFERCONTEXT;
 
 /*******************************************
-            RGXTDMDestroyTransferContext          
+            RGXTDMDestroyTransferContext
  *******************************************/
 
 /* Bridge in structure for RGXTDMDestroyTransferContext */
@@ -99,7 +101,7 @@ typedef struct PVRSRV_BRIDGE_OUT_RGXTDMDESTROYTRANSFERCONTEXT_TAG
 } __attribute__ ((packed)) PVRSRV_BRIDGE_OUT_RGXTDMDESTROYTRANSFERCONTEXT;
 
 /*******************************************
-            RGXTDMSubmitTransfer          
+            RGXTDMSubmitTransfer
  *******************************************/
 
 /* Bridge in structure for RGXTDMSubmitTransfer */
@@ -138,7 +140,7 @@ typedef struct PVRSRV_BRIDGE_OUT_RGXTDMSUBMITTRANSFER_TAG
 } __attribute__ ((packed)) PVRSRV_BRIDGE_OUT_RGXTDMSUBMITTRANSFER;
 
 /*******************************************
-            RGXTDMSetTransferContextPriority          
+            RGXTDMSetTransferContextPriority
  *******************************************/
 
 /* Bridge in structure for RGXTDMSetTransferContextPriority */
@@ -155,7 +157,7 @@ typedef struct PVRSRV_BRIDGE_OUT_RGXTDMSETTRANSFERCONTEXTPRIORITY_TAG
 } __attribute__ ((packed)) PVRSRV_BRIDGE_OUT_RGXTDMSETTRANSFERCONTEXTPRIORITY;
 
 /*******************************************
-            RGXTDMNotifyWriteOffsetUpdate          
+            RGXTDMNotifyWriteOffsetUpdate
  *******************************************/
 
 /* Bridge in structure for RGXTDMNotifyWriteOffsetUpdate */
@@ -170,5 +172,41 @@ typedef struct PVRSRV_BRIDGE_OUT_RGXTDMNOTIFYWRITEOFFSETUPDATE_TAG
 {
 	PVRSRV_ERROR eError;
 } __attribute__ ((packed)) PVRSRV_BRIDGE_OUT_RGXTDMNOTIFYWRITEOFFSETUPDATE;
+
+/*******************************************
+            RGXTDMSubmitTransfer2
+ *******************************************/
+
+/* Bridge in structure for RGXTDMSubmitTransfer2 */
+typedef struct PVRSRV_BRIDGE_IN_RGXTDMSUBMITTRANSFER2_TAG
+{
+	IMG_HANDLE hTransferContext;
+	IMG_UINT32 ui32PDumpFlags;
+	IMG_UINT32 ui32ClientCacheOpSeqNum;
+	IMG_UINT32 ui32ClientFenceCount;
+	IMG_HANDLE *phFenceUFOSyncPrimBlock;
+	IMG_UINT32 *pui32FenceSyncOffset;
+	IMG_UINT32 *pui32FenceValue;
+	IMG_UINT32 ui32ClientUpdateCount;
+	IMG_HANDLE *phUpdateUFOSyncPrimBlock;
+	IMG_UINT32 *pui32UpdateSyncOffset;
+	IMG_UINT32 *pui32UpdateValue;
+	PVRSRV_FENCE hCheckFenceFD;
+	PVRSRV_TIMELINE hUpdateTimeline;
+	IMG_CHAR *puiUpdateFenceName;
+	IMG_UINT32 ui32CommandSize;
+	IMG_UINT8 *pui8FWCommand;
+	IMG_UINT32 ui32ExternalJobReference;
+	IMG_UINT32 ui32SyncPMRCount;
+	IMG_UINT32 *pui32SyncPMRFlags;
+	IMG_HANDLE *phSyncPMRs;
+} __attribute__ ((packed)) PVRSRV_BRIDGE_IN_RGXTDMSUBMITTRANSFER2;
+
+/* Bridge out structure for RGXTDMSubmitTransfer2 */
+typedef struct PVRSRV_BRIDGE_OUT_RGXTDMSUBMITTRANSFER2_TAG
+{
+	PVRSRV_FENCE hUpdateFence;
+	PVRSRV_ERROR eError;
+} __attribute__ ((packed)) PVRSRV_BRIDGE_OUT_RGXTDMSUBMITTRANSFER2;
 
 #endif /* COMMON_RGXTQ2_BRIDGE_H */

@@ -39,7 +39,7 @@ PURPOSE AND NONINFRINGEMENT; AND (B) IN NO EVENT SHALL THE AUTHORS OR
 COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
 IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-********************************************************************************/
+*******************************************************************************/
 
 #include <linux/uaccess.h>
 
@@ -62,8 +62,6 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include <linux/slab.h>
 
 #include "lock.h"
-
-#if defined(SUPPORT_DEVICEMEMHISTORY_BRIDGE)
 
 /* ***************************************************************************
  * Server-side bridge entry points
@@ -144,10 +142,13 @@ PVRSRVBridgeDevicememHistoryMap(IMG_UINT32 ui32DispatchTableEntry,
 
 			goto DevicememHistoryMap_exit;
 		}
+		((IMG_CHAR *)
+		 uiTextInt)[(DEVMEM_ANNOTATION_MAX_LEN * sizeof(IMG_CHAR)) -
+			    1] = '\0';
 	}
 
 	/* Lock over handle lookup. */
-	LockHandle();
+	LockHandle(psConnection->psHandleBase);
 
 	/* Look up the address from the handle */
 	psDevicememHistoryMapOUT->eError =
@@ -156,13 +157,13 @@ PVRSRVBridgeDevicememHistoryMap(IMG_UINT32 ui32DispatchTableEntry,
 				       hPMR,
 				       PVRSRV_HANDLE_TYPE_PHYSMEM_PMR,
 				       IMG_TRUE);
-	if (psDevicememHistoryMapOUT->eError != PVRSRV_OK)
+	if (unlikely(psDevicememHistoryMapOUT->eError != PVRSRV_OK))
 	{
-		UnlockHandle();
+		UnlockHandle(psConnection->psHandleBase);
 		goto DevicememHistoryMap_exit;
 	}
 	/* Release now we have looked up handles. */
-	UnlockHandle();
+	UnlockHandle(psConnection->psHandleBase);
 
 	psDevicememHistoryMapOUT->eError =
 	    DevicememHistoryMapKM(psPMRInt,
@@ -178,7 +179,7 @@ PVRSRVBridgeDevicememHistoryMap(IMG_UINT32 ui32DispatchTableEntry,
  DevicememHistoryMap_exit:
 
 	/* Lock over handle lookup cleanup. */
-	LockHandle();
+	LockHandle(psConnection->psHandleBase);
 
 	/* Unreference the previously looked up handle */
 	if (psPMRInt)
@@ -188,7 +189,7 @@ PVRSRVBridgeDevicememHistoryMap(IMG_UINT32 ui32DispatchTableEntry,
 					    PVRSRV_HANDLE_TYPE_PHYSMEM_PMR);
 	}
 	/* Release now we have cleaned up look up handles. */
-	UnlockHandle();
+	UnlockHandle(psConnection->psHandleBase);
 
 	/* Allocated space should be equal to the last updated offset */
 	PVR_ASSERT(ui32BufferSize == ui32NextOffset);
@@ -278,10 +279,13 @@ PVRSRVBridgeDevicememHistoryUnmap(IMG_UINT32 ui32DispatchTableEntry,
 
 			goto DevicememHistoryUnmap_exit;
 		}
+		((IMG_CHAR *)
+		 uiTextInt)[(DEVMEM_ANNOTATION_MAX_LEN * sizeof(IMG_CHAR)) -
+			    1] = '\0';
 	}
 
 	/* Lock over handle lookup. */
-	LockHandle();
+	LockHandle(psConnection->psHandleBase);
 
 	/* Look up the address from the handle */
 	psDevicememHistoryUnmapOUT->eError =
@@ -290,13 +294,13 @@ PVRSRVBridgeDevicememHistoryUnmap(IMG_UINT32 ui32DispatchTableEntry,
 				       hPMR,
 				       PVRSRV_HANDLE_TYPE_PHYSMEM_PMR,
 				       IMG_TRUE);
-	if (psDevicememHistoryUnmapOUT->eError != PVRSRV_OK)
+	if (unlikely(psDevicememHistoryUnmapOUT->eError != PVRSRV_OK))
 	{
-		UnlockHandle();
+		UnlockHandle(psConnection->psHandleBase);
 		goto DevicememHistoryUnmap_exit;
 	}
 	/* Release now we have looked up handles. */
-	UnlockHandle();
+	UnlockHandle(psConnection->psHandleBase);
 
 	psDevicememHistoryUnmapOUT->eError =
 	    DevicememHistoryUnmapKM(psPMRInt,
@@ -313,7 +317,7 @@ PVRSRVBridgeDevicememHistoryUnmap(IMG_UINT32 ui32DispatchTableEntry,
  DevicememHistoryUnmap_exit:
 
 	/* Lock over handle lookup cleanup. */
-	LockHandle();
+	LockHandle(psConnection->psHandleBase);
 
 	/* Unreference the previously looked up handle */
 	if (psPMRInt)
@@ -323,7 +327,7 @@ PVRSRVBridgeDevicememHistoryUnmap(IMG_UINT32 ui32DispatchTableEntry,
 					    PVRSRV_HANDLE_TYPE_PHYSMEM_PMR);
 	}
 	/* Release now we have cleaned up look up handles. */
-	UnlockHandle();
+	UnlockHandle(psConnection->psHandleBase);
 
 	/* Allocated space should be equal to the last updated offset */
 	PVR_ASSERT(ui32BufferSize == ui32NextOffset);
@@ -414,6 +418,9 @@ PVRSRVBridgeDevicememHistoryMapVRange(IMG_UINT32 ui32DispatchTableEntry,
 
 			goto DevicememHistoryMapVRange_exit;
 		}
+		((IMG_CHAR *)
+		 uiTextInt)[(DEVMEM_ANNOTATION_MAX_LEN * sizeof(IMG_CHAR)) -
+			    1] = '\0';
 	}
 
 	psDevicememHistoryMapVRangeOUT->eError =
@@ -523,6 +530,9 @@ PVRSRVBridgeDevicememHistoryUnmapVRange(IMG_UINT32 ui32DispatchTableEntry,
 
 			goto DevicememHistoryUnmapVRange_exit;
 		}
+		((IMG_CHAR *)
+		 uiTextInt)[(DEVMEM_ANNOTATION_MAX_LEN * sizeof(IMG_CHAR)) -
+			    1] = '\0';
 	}
 
 	psDevicememHistoryUnmapVRangeOUT->eError =
@@ -638,6 +648,9 @@ PVRSRVBridgeDevicememHistorySparseChange(IMG_UINT32 ui32DispatchTableEntry,
 
 			goto DevicememHistorySparseChange_exit;
 		}
+		((IMG_CHAR *)
+		 uiTextInt)[(DEVMEM_ANNOTATION_MAX_LEN * sizeof(IMG_CHAR)) -
+			    1] = '\0';
 	}
 	if (psDevicememHistorySparseChangeIN->ui32AllocPageCount != 0)
 	{
@@ -695,7 +708,7 @@ PVRSRVBridgeDevicememHistorySparseChange(IMG_UINT32 ui32DispatchTableEntry,
 	}
 
 	/* Lock over handle lookup. */
-	LockHandle();
+	LockHandle(psConnection->psHandleBase);
 
 	/* Look up the address from the handle */
 	psDevicememHistorySparseChangeOUT->eError =
@@ -704,13 +717,13 @@ PVRSRVBridgeDevicememHistorySparseChange(IMG_UINT32 ui32DispatchTableEntry,
 				       hPMR,
 				       PVRSRV_HANDLE_TYPE_PHYSMEM_PMR,
 				       IMG_TRUE);
-	if (psDevicememHistorySparseChangeOUT->eError != PVRSRV_OK)
+	if (unlikely(psDevicememHistorySparseChangeOUT->eError != PVRSRV_OK))
 	{
-		UnlockHandle();
+		UnlockHandle(psConnection->psHandleBase);
 		goto DevicememHistorySparseChange_exit;
 	}
 	/* Release now we have looked up handles. */
-	UnlockHandle();
+	UnlockHandle(psConnection->psHandleBase);
 
 	psDevicememHistorySparseChangeOUT->eError =
 	    DevicememHistorySparseChangeKM(psPMRInt,
@@ -736,7 +749,7 @@ PVRSRVBridgeDevicememHistorySparseChange(IMG_UINT32 ui32DispatchTableEntry,
  DevicememHistorySparseChange_exit:
 
 	/* Lock over handle lookup cleanup. */
-	LockHandle();
+	LockHandle(psConnection->psHandleBase);
 
 	/* Unreference the previously looked up handle */
 	if (psPMRInt)
@@ -746,7 +759,7 @@ PVRSRVBridgeDevicememHistorySparseChange(IMG_UINT32 ui32DispatchTableEntry,
 					    PVRSRV_HANDLE_TYPE_PHYSMEM_PMR);
 	}
 	/* Release now we have cleaned up look up handles. */
-	UnlockHandle();
+	UnlockHandle(psConnection->psHandleBase);
 
 	/* Allocated space should be equal to the last updated offset */
 	PVR_ASSERT(ui32BufferSize == ui32NextOffset);
@@ -761,15 +774,13 @@ PVRSRVBridgeDevicememHistorySparseChange(IMG_UINT32 ui32DispatchTableEntry,
 	return 0;
 }
 
-/* *************************************************************************** 
- * Server bridge dispatch related glue 
+/* ***************************************************************************
+ * Server bridge dispatch related glue
  */
 
 static POS_LOCK pDEVICEMEMHISTORYBridgeLock;
 static IMG_BOOL bUseLock = IMG_TRUE;
-#endif /* SUPPORT_DEVICEMEMHISTORY_BRIDGE */
 
-#if defined(SUPPORT_DEVICEMEMHISTORY_BRIDGE)
 PVRSRV_ERROR InitDEVICEMEMHISTORYBridge(void);
 PVRSRV_ERROR DeinitDEVICEMEMHISTORYBridge(void);
 
@@ -778,8 +789,7 @@ PVRSRV_ERROR DeinitDEVICEMEMHISTORYBridge(void);
  */
 PVRSRV_ERROR InitDEVICEMEMHISTORYBridge(void)
 {
-	PVR_LOGR_IF_ERROR(OSLockCreate
-			  (&pDEVICEMEMHISTORYBridgeLock, LOCK_TYPE_PASSIVE),
+	PVR_LOGR_IF_ERROR(OSLockCreate(&pDEVICEMEMHISTORYBridgeLock),
 			  "OSLockCreate");
 
 	SetDispatchTableEntry(PVRSRV_BRIDGE_DEVICEMEMHISTORY,
@@ -835,14 +845,3 @@ PVRSRV_ERROR DeinitDEVICEMEMHISTORYBridge(void)
 
 	return PVRSRV_OK;
 }
-#else /* SUPPORT_DEVICEMEMHISTORY_BRIDGE */
-/* This bridge is conditional on SUPPORT_DEVICEMEMHISTORY_BRIDGE - when not defined,
- * do not populate the dispatch table with its functions
- */
-#define InitDEVICEMEMHISTORYBridge() \
-	PVRSRV_OK
-
-#define DeinitDEVICEMEMHISTORYBridge() \
-	PVRSRV_OK
-
-#endif /* SUPPORT_DEVICEMEMHISTORY_BRIDGE */

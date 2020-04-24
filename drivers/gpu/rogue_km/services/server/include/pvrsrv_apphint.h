@@ -43,6 +43,12 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #if !defined(__PVRSRV_APPHINT_H__)
 #define __PVRSRV_APPHINT_H__
 
+/* Supplied to PVRSRVAppHintRegisterHandlers*() functions when the apphint
+ * is a global driver apphint, i.e. apphints not present in
+ * APPHINT_DEBUGFS_DEVICE_ID, i.e. not per device.
+ */
+#define APPHINT_OF_DRIVER_NO_DEVICE ((void*)-1U)
+
 #if defined(LINUX)
 
 #include "km_apphint.h"

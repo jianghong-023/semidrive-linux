@@ -62,9 +62,12 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 // Sometimes will want to always output info or error even in release mode.
 // In that case use dev_info, dev_err directly.
 #if defined(PLATO_DRM_DEBUG)
-	#define plato_dev_info(dev, fmt, ...)   dev_info(dev, fmt, ##__VA_ARGS__)
-	#define plato_dev_warn(dev, fmt, ...)   dev_warn(dev, fmt, ##__VA_ARGS__)
-	#define plato_dev_error(dev, fmt, ...)  dev_err(dev, fmt, ##__VA_ARGS__)
+	#define plato_dev_info(dev, fmt, ...) \
+		dev_info(dev, fmt, ##__VA_ARGS__)
+	#define plato_dev_warn(dev, fmt, ...) \
+		dev_warn(dev, fmt, ##__VA_ARGS__)
+	#define plato_dev_error(dev, fmt, ...) \
+		dev_err(dev, fmt, ##__VA_ARGS__)
 	#define PLATO_DRM_CHECKPOINT            pr_info("line %d\n", __LINE__)
 #else
 	#define plato_dev_info(dev, fmt, ...)
@@ -136,7 +139,7 @@ struct plato_hdmi_platform_data {
 #define PLATO_DEVICE_NAME_ROGUE			"plato_rogue"
 #define PLATO_ROGUE_RESOURCE_REGS		"rogue-regs"
 
-typedef struct plato_rogue_platform_data_ {
+struct plato_rogue_platform_data {
 
 	/* The base address of the plato memory (CPU physical address) -
 	 * used to convert from CPU-Physical to device-physical addresses
@@ -151,7 +154,7 @@ typedef struct plato_rogue_platform_data_ {
 #if defined(SUPPORT_PLATO_DISPLAY)
 	struct plato_region pdp_heap;
 #endif
-} plato_rogue_platform_data;
+};
 
 struct plato_interrupt_handler {
 	bool enabled;
@@ -287,10 +290,12 @@ struct plato_device {
 #define SYS_PLATO_REG_PDP_OFFSET			(0x200000)
 #define SYS_PLATO_REG_PDP_SIZE				(0x1000)
 
-#define SYS_PLATO_REG_PDP_BIF_OFFSET        (SYS_PLATO_REG_PDP_OFFSET + SYS_PLATO_REG_PDP_SIZE)
+#define SYS_PLATO_REG_PDP_BIF_OFFSET \
+	(SYS_PLATO_REG_PDP_OFFSET + SYS_PLATO_REG_PDP_SIZE)
 #define SYS_PLATO_REG_PDP_BIF_SIZE          (0x200)
 
-#define SYS_PLATO_REG_HDMI_OFFSET           (SYS_PLATO_REG_PDP_OFFSET + 0x20000)
+#define SYS_PLATO_REG_HDMI_OFFSET \
+	(SYS_PLATO_REG_PDP_OFFSET + 0x20000)
 #define SYS_PLATO_REG_HDMI_SIZE             (128 * 1024)
 
 /* Device memory (including HP mapping) on base register 4 */
@@ -298,7 +303,8 @@ struct plato_device {
 
 /* Device memory size */
 #define ONE_GB_IN_BYTES					(0x40000000ULL)
-#define SYS_DEV_MEM_REGION_SIZE			(PLATO_MEMORY_SIZE_GIGABYTES * ONE_GB_IN_BYTES)
+#define SYS_DEV_MEM_REGION_SIZE \
+	(PLATO_MEMORY_SIZE_GIGABYTES * ONE_GB_IN_BYTES)
 
 /* Plato DDR offset in device memory map at 32GB */
 #define PLATO_DDR_DEV_PHYSICAL_BASE		(0x800000000)
@@ -352,11 +358,11 @@ struct plato_device {
 #define PLATO_LMA_HEAP_REGION_MAPPABLE			0
 #define PLATO_LMA_HEAP_REGION_NONMAPPABLE		1
 
-typedef struct {
+struct plato_debug_register {
 	char *description;
 	unsigned int offset;
 	unsigned int value;
-} PLATO_DBG_REG;
+};
 
 #if defined(ENABLE_PLATO_HDMI)
 
@@ -373,52 +379,33 @@ typedef struct {
 int plato_enable(struct device *dev);
 void plato_disable(struct device *dev);
 
-int plato_enable_interrupt(struct device *dev, enum PLATO_INTERRUPT interrupt_id);
-int plato_disable_interrupt(struct device *dev, enum PLATO_INTERRUPT interrupt_id);
+int plato_enable_interrupt(struct device *dev,
+			   enum PLATO_INTERRUPT interrupt_id);
+int plato_disable_interrupt(struct device *dev,
+			   enum PLATO_INTERRUPT interrupt_id);
 
 int plato_set_interrupt_handler(struct device *dev,
-	enum PLATO_INTERRUPT interrupt_id,
-	void (*handler_function)(void *),
-	void *handler_data);
+				enum PLATO_INTERRUPT interrupt_id,
+				void (*handler_function)(void *),
+				void *handler_data);
 unsigned int plato_core_clock_speed(struct device *dev);
 unsigned int plato_mem_clock_speed(struct device *dev);
 unsigned int plato_pll_clock_speed(struct device *dev,
-	unsigned int clock_speed);
+				   unsigned int clock_speed);
 void plato_enable_pdp_clock(struct device *dev);
 void plato_enable_pixel_clock(struct device *dev, u32 pixel_clock);
 
 int plato_debug_info(struct device *dev,
-	PLATO_DBG_REG *noc_dbg_regs,
-	PLATO_DBG_REG *aon_dbg_regs);
+		     struct plato_debug_register *noc_dbg_regs,
+		     struct plato_debug_register *aon_dbg_regs);
 
 /* Internal */
 int plato_memory_init(struct plato_device *plato);
 void plato_memory_deinit(struct plato_device *plato);
 int plato_cfg_init(struct plato_device *plato);
 int request_pci_io_addr(struct pci_dev *pdev, u32 index,
-	resource_size_t offset, resource_size_t length);
+			resource_size_t offset, resource_size_t length);
 void release_pci_io_addr(struct pci_dev *pdev, u32 index,
-	resource_size_t start, resource_size_t length);
-
-#if defined(PLATO_SYSTEM_PDUMP)
-#include "plato_pdump.h"
-
-static void plato_write_reg32_pdump(void *base, u32 offset, u32 value)
-{
-	plato_write_reg32(base, offset, value);
-	plato_pdump_reg32(base, offset, value, PLATO_SYSTEM_NAME);
-}
-
-static void plato_sleep_ms_pdump(u32 intrvl)
-{
-	msleep(intrvl);
-	plato_pdump_idl(intrvl);
-}
-#undef plato_write_reg32
-#undef plato_sleep_ms
-
-#define plato_write_reg32 plato_write_reg32_pdump
-#define plato_sleep_ms plato_sleep_ms_pdump
-#endif
+			resource_size_t start, resource_size_t length);
 
 #endif /* _PLATO_DRV_H */

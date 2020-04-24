@@ -39,7 +39,7 @@ PURPOSE AND NONINFRINGEMENT; AND (B) IN NO EVENT SHALL THE AUTHORS OR
 COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
 IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-********************************************************************************/
+*******************************************************************************/
 
 #include <linux/uaccess.h>
 
@@ -91,6 +91,13 @@ PVRSRVBridgeCacheOpQueue(IMG_UINT32 ui32DispatchTableEntry,
 	    (psCacheOpQueueIN->ui32NumCacheOps * sizeof(IMG_DEVMEM_OFFSET_T)) +
 	    (psCacheOpQueueIN->ui32NumCacheOps * sizeof(IMG_DEVMEM_SIZE_T)) +
 	    (psCacheOpQueueIN->ui32NumCacheOps * sizeof(PVRSRV_CACHE_OP)) + 0;
+
+	if (unlikely(psCacheOpQueueIN->ui32NumCacheOps > CACHE_BATCH_MAX))
+	{
+		psCacheOpQueueOUT->eError =
+		    PVRSRV_ERROR_BRIDGE_ARRAY_SIZE_TOO_BIG;
+		goto CacheOpQueue_exit;
+	}
 
 	if (ui32BufferSize != 0)
 	{
@@ -248,7 +255,7 @@ PVRSRVBridgeCacheOpQueue(IMG_UINT32 ui32DispatchTableEntry,
 	}
 
 	/* Lock over handle lookup. */
-	LockHandle();
+	LockHandle(psConnection->psHandleBase);
 
 	{
 		IMG_UINT32 i;
@@ -263,18 +270,19 @@ PVRSRVBridgeCacheOpQueue(IMG_UINT32 ui32DispatchTableEntry,
 						       hPMRInt2[i],
 						       PVRSRV_HANDLE_TYPE_PHYSMEM_PMR,
 						       IMG_TRUE);
-			if (psCacheOpQueueOUT->eError != PVRSRV_OK)
+			if (unlikely(psCacheOpQueueOUT->eError != PVRSRV_OK))
 			{
-				UnlockHandle();
+				UnlockHandle(psConnection->psHandleBase);
 				goto CacheOpQueue_exit;
 			}
 		}
 	}
 	/* Release now we have looked up handles. */
-	UnlockHandle();
+	UnlockHandle(psConnection->psHandleBase);
 
 	psCacheOpQueueOUT->eError =
-	    CacheOpQueue(psCacheOpQueueIN->ui32NumCacheOps,
+	    CacheOpQueue(psConnection, OSGetDevData(psConnection),
+			 psCacheOpQueueIN->ui32NumCacheOps,
 			 psPMRInt,
 			 ui64AddressInt,
 			 uiOffsetInt,
@@ -288,7 +296,7 @@ PVRSRVBridgeCacheOpQueue(IMG_UINT32 ui32DispatchTableEntry,
  CacheOpQueue_exit:
 
 	/* Lock over handle lookup cleanup. */
-	LockHandle();
+	LockHandle(psConnection->psHandleBase);
 
 	if (hPMRInt2)
 	{
@@ -308,7 +316,7 @@ PVRSRVBridgeCacheOpQueue(IMG_UINT32 ui32DispatchTableEntry,
 		}
 	}
 	/* Release now we have cleaned up look up handles. */
-	UnlockHandle();
+	UnlockHandle(psConnection->psHandleBase);
 
 	/* Allocated space should be equal to the last updated offset */
 	PVR_ASSERT(ui32BufferSize == ui32NextOffset);
@@ -333,7 +341,7 @@ PVRSRVBridgeCacheOpExec(IMG_UINT32 ui32DispatchTableEntry,
 	PMR *psPMRInt = NULL;
 
 	/* Lock over handle lookup. */
-	LockHandle();
+	LockHandle(psConnection->psHandleBase);
 
 	/* Look up the address from the handle */
 	psCacheOpExecOUT->eError =
@@ -342,13 +350,13 @@ PVRSRVBridgeCacheOpExec(IMG_UINT32 ui32DispatchTableEntry,
 				       hPMR,
 				       PVRSRV_HANDLE_TYPE_PHYSMEM_PMR,
 				       IMG_TRUE);
-	if (psCacheOpExecOUT->eError != PVRSRV_OK)
+	if (unlikely(psCacheOpExecOUT->eError != PVRSRV_OK))
 	{
-		UnlockHandle();
+		UnlockHandle(psConnection->psHandleBase);
 		goto CacheOpExec_exit;
 	}
 	/* Release now we have looked up handles. */
-	UnlockHandle();
+	UnlockHandle(psConnection->psHandleBase);
 
 	psCacheOpExecOUT->eError =
 	    CacheOpValExec(psPMRInt,
@@ -359,7 +367,7 @@ PVRSRVBridgeCacheOpExec(IMG_UINT32 ui32DispatchTableEntry,
  CacheOpExec_exit:
 
 	/* Lock over handle lookup cleanup. */
-	LockHandle();
+	LockHandle(psConnection->psHandleBase);
 
 	/* Unreference the previously looked up handle */
 	if (psPMRInt)
@@ -369,7 +377,7 @@ PVRSRVBridgeCacheOpExec(IMG_UINT32 ui32DispatchTableEntry,
 					    PVRSRV_HANDLE_TYPE_PHYSMEM_PMR);
 	}
 	/* Release now we have cleaned up look up handles. */
-	UnlockHandle();
+	UnlockHandle(psConnection->psHandleBase);
 
 	return 0;
 }
@@ -384,7 +392,7 @@ PVRSRVBridgeCacheOpLog(IMG_UINT32 ui32DispatchTableEntry,
 	PMR *psPMRInt = NULL;
 
 	/* Lock over handle lookup. */
-	LockHandle();
+	LockHandle(psConnection->psHandleBase);
 
 	/* Look up the address from the handle */
 	psCacheOpLogOUT->eError =
@@ -393,13 +401,13 @@ PVRSRVBridgeCacheOpLog(IMG_UINT32 ui32DispatchTableEntry,
 				       hPMR,
 				       PVRSRV_HANDLE_TYPE_PHYSMEM_PMR,
 				       IMG_TRUE);
-	if (psCacheOpLogOUT->eError != PVRSRV_OK)
+	if (unlikely(psCacheOpLogOUT->eError != PVRSRV_OK))
 	{
-		UnlockHandle();
+		UnlockHandle(psConnection->psHandleBase);
 		goto CacheOpLog_exit;
 	}
 	/* Release now we have looked up handles. */
-	UnlockHandle();
+	UnlockHandle(psConnection->psHandleBase);
 
 	psCacheOpLogOUT->eError =
 	    CacheOpLog(psPMRInt,
@@ -414,7 +422,7 @@ PVRSRVBridgeCacheOpLog(IMG_UINT32 ui32DispatchTableEntry,
  CacheOpLog_exit:
 
 	/* Lock over handle lookup cleanup. */
-	LockHandle();
+	LockHandle(psConnection->psHandleBase);
 
 	/* Unreference the previously looked up handle */
 	if (psPMRInt)
@@ -424,13 +432,13 @@ PVRSRVBridgeCacheOpLog(IMG_UINT32 ui32DispatchTableEntry,
 					    PVRSRV_HANDLE_TYPE_PHYSMEM_PMR);
 	}
 	/* Release now we have cleaned up look up handles. */
-	UnlockHandle();
+	UnlockHandle(psConnection->psHandleBase);
 
 	return 0;
 }
 
-/* *************************************************************************** 
- * Server bridge dispatch related glue 
+/* ***************************************************************************
+ * Server bridge dispatch related glue
  */
 
 static IMG_BOOL bUseLock = IMG_TRUE;

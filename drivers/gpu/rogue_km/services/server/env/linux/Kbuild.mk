@@ -2,23 +2,23 @@
 #@File
 #@Copyright     Copyright (c) Imagination Technologies Ltd. All Rights Reserved
 #@License       Dual MIT/GPLv2
-# 
+#
 # The contents of this file are subject to the MIT license as set out below.
-# 
+#
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
 # in the Software without restriction, including without limitation the rights
 # to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
 # copies of the Software, and to permit persons to whom the Software is
 # furnished to do so, subject to the following conditions:
-# 
+#
 # The above copyright notice and this permission notice shall be included in
 # all copies or substantial portions of the Software.
-# 
+#
 # Alternatively, the contents of this file may be used under the terms of
 # the GNU General Public License Version 2 ("GPL") in which case the provisions
 # of GPL are applicable instead of those above.
-# 
+#
 # If you wish to allow use of your version of this file only under the terms of
 # GPL, and not to allow others to use your version of this file under the terms
 # of the MIT license, indicate your decision by deleting the provisions above
@@ -26,10 +26,10 @@
 # out in the file called "GPL-COPYING" included in this distribution. If you do
 # not delete the provisions above, a recipient may use your version of this file
 # under the terms of either the MIT license or GPL.
-# 
+#
 # This License is also included in this distribution in the file called
 # "MIT-COPYING".
-# 
+#
 # EXCEPT AS OTHERWISE STATED IN A NEGOTIATED AGREEMENT: (A) THE SOFTWARE IS
 # PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING
 # BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR
@@ -47,6 +47,7 @@ ccflags-y += -I$(TOP)/hwdefs
 
 # Linux-specific headers
 ccflags-y += \
+ -I$(TOP)/include/drm \
  -I$(TOP)/services/include/env/linux \
  -I$(TOP)/kernel/drivers/staging/imgtec
 
@@ -58,7 +59,6 @@ $(PVRSRV_MODNAME)-y += \
  services/server/env/linux/osfunc.o \
  services/server/env/linux/allocmem.o \
  services/server/env/linux/osconnection_server.o \
- services/server/env/linux/pdump.o \
  services/server/env/linux/physmem_osmem_linux.o \
  services/server/env/linux/pmr_os.o \
  services/server/env/linux/pvr_debugfs.o \
@@ -101,13 +101,19 @@ $(PVRSRV_MODNAME)-y += \
  services/shared/common/uniq_key_splay_tree.o \
  services/server/common/pvrsrv_pool.o \
  services/server/common/pvrsrv_bridge_init.o \
- services/server/common/info_page_km.o
+ services/server/common/info_page_km.o \
+ services/shared/common/pvrsrv_error.o
 
 # Wrap ExtMem support
 ifeq ($(SUPPORT_WRAP_EXTMEM),1)
  $(PVRSRV_MODNAME)-y += \
  services/server/env/linux/physmem_extmem_linux.o \
- services/server/common/physmem_extmem.o 
+ services/server/common/physmem_extmem.o
+endif
+
+ifeq ($(SUPPORT_LINUX_WRAP_EXTMEM_PAGE_TABLE_WALK),1)
+ $(PVRSRV_MODNAME)-y += \
+ services/server/env/linux/pg_walk_through.o
 endif
 
 ifeq ($(SUPPORT_TRUSTED_DEVICE),1)
@@ -125,30 +131,29 @@ ifeq ($(SUPPORT_PHYSMEM_TEST),1)
  services/server/env/linux/physmem_test.o
 endif
 
-ifeq ($(SUPPORT_DRM_EXT),)
- ifneq ($(PVR_LOADER),)
-  ifeq ($(KERNEL_DRIVER_DIR),)
-   $(PVRSRV_MODNAME)-y += kernel/drivers/staging/imgtec/$(PVR_LOADER).o
+ifneq ($(PVR_LOADER),)
+ ifeq ($(KERNEL_DRIVER_DIR),)
+  $(PVRSRV_MODNAME)-y += kernel/drivers/staging/imgtec/$(PVR_LOADER).o
+ else
+  ifneq ($(wildcard $(KERNELDIR)/$(KERNEL_DRIVER_DIR)/$(PVR_SYSTEM)/$(PVR_LOADER).c),)
+    $(PVRSRV_MODNAME)-y += external/$(KERNEL_DRIVER_DIR)/$(PVR_SYSTEM)/$(PVR_LOADER).o
   else
-   ifneq ($(wildcard $(KERNELDIR)/$(KERNEL_DRIVER_DIR)/$(PVR_SYSTEM)/$(PVR_LOADER).c),)
-     $(PVRSRV_MODNAME)-y += external/$(KERNEL_DRIVER_DIR)/$(PVR_SYSTEM)/$(PVR_LOADER).o
+   ifneq ($(wildcard $(KERNELDIR)/$(KERNEL_DRIVER_DIR)/$(PVR_LOADER).c),)
+     $(PVRSRV_MODNAME)-y += external/$(KERNEL_DRIVER_DIR)/$(PVR_LOADER).o
    else
-    ifneq ($(wildcard $(KERNELDIR)/$(KERNEL_DRIVER_DIR)/$(PVR_LOADER).c),)
-      $(PVRSRV_MODNAME)-y += external/$(KERNEL_DRIVER_DIR)/$(PVR_LOADER).o
-    else
-      $(PVRSRV_MODNAME)-y += kernel/drivers/staging/imgtec/$(PVR_LOADER).o
-    endif
+     $(PVRSRV_MODNAME)-y += kernel/drivers/staging/imgtec/$(PVR_LOADER).o
    endif
   endif
- else
-  $(PVRSRV_MODNAME)-y += kernel/drivers/staging/imgtec/pvr_platform_drv.o
  endif
+else
+ $(PVRSRV_MODNAME)-y += kernel/drivers/staging/imgtec/pvr_platform_drv.o
 endif
-
 
 ifeq ($(SUPPORT_RGX),1)
 $(PVRSRV_MODNAME)-y += \
- services/server/devices/rgx/debugmisc_server.o \
+ kernel/drivers/staging/imgtec/pvr_drm.o \
+ services/server/env/linux/pvr_gputrace.o \
+ services/server/devices/rgx/rgxfwdbg.o \
  services/server/devices/rgx/rgxbreakpoint.o \
  services/server/devices/rgx/rgxccb.o \
  services/server/devices/rgx/rgxdebug.o \
@@ -162,20 +167,17 @@ $(PVRSRV_MODNAME)-y += \
  services/server/devices/rgx/rgxregconfig.o \
  services/server/devices/rgx/rgxta3d.o \
  services/server/devices/rgx/rgxsyncutils.o \
- services/server/devices/rgx/rgxtimerquery.o \
  services/server/devices/rgx/rgxtransfer.o \
  services/server/devices/rgx/rgxtdmtransfer.o \
  services/server/devices/rgx/rgxutils.o \
- services/shared/devices/rgx/rgx_compat_bvnc.o \
  services/server/devices/rgx/rgxmipsmmuinit.o \
  services/server/devices/rgx/rgxhwperf.o \
  services/server/devices/rgx/rgxpower.o \
  services/server/devices/rgx/rgxstartstop.o \
  services/server/devices/rgx/rgxtimecorr.o \
  services/server/devices/rgx/rgxcompute.o \
- services/server/devices/rgx/rgxray.o \
  services/server/devices/rgx/rgxsignals.o
- 
+
 ifeq ($(SUPPORT_PDVFS),1)
  $(PVRSRV_MODNAME)-y += \
  services/server/devices/rgx/rgxpdvfs.o
@@ -185,7 +187,7 @@ ifeq ($(SUPPORT_PDVFS),1)
   services/server/devices/rgx/rgxworkest.o
  endif
 endif
- 
+
 endif
 
 ifeq ($(SUPPORT_DISPLAY_CLASS),1)
@@ -200,12 +202,12 @@ endif
 
 ifeq ($(PDUMP),1)
 $(PVRSRV_MODNAME)-y += \
- services/server/common/pdump_common.o \
+ services/server/common/pdump_server.o \
  services/server/common/pdump_mmu.o \
  services/server/common/pdump_physmem.o \
  services/shared/common/devicemem_pdump.o \
  services/shared/common/devicememx_pdump.o
- 
+
 ifeq ($(SUPPORT_RGX),1)
 $(PVRSRV_MODNAME)-y += \
  services/server/devices/rgx/rgxpdump.o
@@ -215,7 +217,7 @@ endif
 
 
 
-ifeq ($(PVR_RI_DEBUG),1)
+ifeq ($(PVRSRV_ENABLE_GPU_MEMORY_INFO),1)
 $(PVRSRV_MODNAME)-y += services/server/common/ri_server.o
 endif
 
@@ -223,9 +225,7 @@ ifeq ($(PVR_TESTING_UTILS),1)
 $(PVRSRV_MODNAME)-y += services/server/common/tutils.o
 endif
 
-ifeq ($(SUPPORT_PAGE_FAULT_DEBUG),1)
 $(PVRSRV_MODNAME)-y += services/server/common/devicemem_history_server.o
-endif
 
 ifeq ($(PVR_HANDLE_BACKEND),generic)
 $(PVRSRV_MODNAME)-y += services/server/common/handle_generic.o
@@ -233,10 +233,6 @@ else
 ifeq ($(PVR_HANDLE_BACKEND),idr)
 $(PVRSRV_MODNAME)-y += services/server/env/linux/handle_idr.o
 endif
-endif
-
-ifeq ($(SUPPORT_GPUTRACE_EVENTS),1)
-$(PVRSRV_MODNAME)-y += services/server/env/linux/pvr_gputrace.o
 endif
 
 ifeq ($(PVRSRV_ENABLE_LINUX_MMAP_STATS),1)
@@ -255,10 +251,8 @@ $(PVRSRV_MODNAME)-y += \
  kernel/drivers/staging/imgtec/pvr_sync_file.o \
  kernel/drivers/staging/imgtec/pvr_counting_timeline.o \
  kernel/drivers/staging/imgtec/pvr_sw_fence.o \
- kernel/drivers/staging/imgtec/pvr_fence.o \
- services/server/env/linux/dma_fence_sync_native_server.o
+ kernel/drivers/staging/imgtec/pvr_fence.o
 else
-$(PVRSRV_MODNAME)-y += services/server/env/linux/sync_native_server.o
 $(PVRSRV_MODNAME)-y += kernel/drivers/staging/imgtec/pvr_sync2.o
 endif
 else
@@ -282,16 +276,6 @@ $(PVRSRV_MODNAME)-$(CONFIG_MIPS) += services/server/env/linux/osfunc_mips.o
 
 $(PVRSRV_MODNAME)-$(CONFIG_EVENT_TRACING) += services/server/env/linux/trace_events.o
 
-ifneq ($(SUPPORT_DRM_EXT),1)
-ccflags-y += \
- -Iinclude/drm \
- -I$(TOP)/include/drm \
- -I$(TOP)/services/include/env/linux
-
-$(PVRSRV_MODNAME)-y += \
- kernel/drivers/staging/imgtec/pvr_drm.o
-endif # SUPPORT_DRM_EXT
-
 ccflags-y += -I$(OUT)/target_neutral/intermediates/firmware
 
 ifeq ($(SUPPORT_RGX),1)
@@ -300,13 +284,13 @@ ifeq ($(SUPPORT_RGX),1)
 $(PVRSRV_MODNAME)-y += \
  services/server/devices/rgx/rgxsrvinit.o \
  services/server/devices/rgx/rgxfwimageutils.o \
- services/shared/devices/rgx/rgx_compat_bvnc.o \
  services/shared/devices/rgx/rgx_hwperf_table.o \
  services/server/devices/rgx/env/linux/km/rgxfwload.o
 endif
 
 ccflags-y += \
  -Iinclude \
+ -Iinclude/drm \
  -Ihwdefs \
  -Ihwdefs/km \
  -Iservices/include \
@@ -341,11 +325,9 @@ ccflags-y += \
  -I$(bridge_base)/rgxhwperf_bridge \
  -I$(bridge_base)/rgxkicksync_bridge \
  -I$(bridge_base)/rgxcmp_bridge \
- -I$(bridge_base)/rgxray_bridge \
- -I$(bridge_base)/breakpoint_bridge \
- -I$(bridge_base)/regconfig_bridge \
- -I$(bridge_base)/timerquery_bridge \
- -I$(bridge_base)/debugmisc_bridge \
+ -I$(bridge_base)/rgxbreakpoint_bridge \
+ -I$(bridge_base)/rgxregconfig_bridge \
+ -I$(bridge_base)/rgxfwdbg_bridge \
  -I$(bridge_base)/rgxsignals_bridge
 endif
 
@@ -367,17 +349,15 @@ $(PVRSRV_MODNAME)-y += \
  generated/rgxhwperf_bridge/server_rgxhwperf_bridge.o \
  generated/rgxkicksync_bridge/server_rgxkicksync_bridge.o \
  generated/rgxcmp_bridge/server_rgxcmp_bridge.o \
- generated/rgxray_bridge/server_rgxray_bridge.o \
- generated/breakpoint_bridge/server_breakpoint_bridge.o \
- generated/regconfig_bridge/server_regconfig_bridge.o \
- generated/timerquery_bridge/server_timerquery_bridge.o \
- generated/debugmisc_bridge/server_debugmisc_bridge.o \
+ generated/rgxbreakpoint_bridge/server_rgxbreakpoint_bridge.o \
+ generated/rgxregconfig_bridge/server_rgxregconfig_bridge.o \
+ generated/rgxfwdbg_bridge/server_rgxfwdbg_bridge.o \
  generated/rgxsignals_bridge/server_rgxsignals_bridge.o
 endif
-  
+
 ifeq ($(SUPPORT_WRAP_EXTMEM),1)
 ccflags-y += -I$(bridge_base)/mmextmem_bridge
-$(PVRSRV_MODNAME)-y += generated/mmextmem_bridge/server_mmextmem_bridge.o 
+$(PVRSRV_MODNAME)-y += generated/mmextmem_bridge/server_mmextmem_bridge.o
 endif
 
 ifeq ($(SUPPORT_DISPLAY_CLASS),1)
@@ -410,19 +390,19 @@ ccflags-y += \
 
 ifeq ($(SUPPORT_RGX),1)
 ccflags-y += \
- -I$(bridge_base)/rgxpdump_bridge 
+ -I$(bridge_base)/rgxpdump_bridge
 
 $(PVRSRV_MODNAME)-y += \
  generated/rgxpdump_bridge/server_rgxpdump_bridge.o
 endif
- 
+
 $(PVRSRV_MODNAME)-y += \
  generated/pdump_bridge/server_pdump_bridge.o \
  generated/pdumpctrl_bridge/server_pdumpctrl_bridge.o \
  generated/pdumpmm_bridge/server_pdumpmm_bridge.o
 endif
 
-ifeq ($(PVR_RI_DEBUG),1)
+ifeq ($(PVRSRV_ENABLE_GPU_MEMORY_INFO),1)
 ccflags-y += -I$(bridge_base)/ri_bridge
 $(PVRSRV_MODNAME)-y += generated/ri_bridge/server_ri_bridge.o
 endif
@@ -438,17 +418,13 @@ ccflags-y += -I$(bridge_base)/tutils_bridge
 $(PVRSRV_MODNAME)-y += generated/tutils_bridge/server_tutils_bridge.o
 endif
 
-ifeq ($(SUPPORT_PAGE_FAULT_DEBUG),1)
 ccflags-y += -I$(bridge_base)/devicememhistory_bridge
 $(PVRSRV_MODNAME)-y += \
  generated/devicememhistory_bridge/server_devicememhistory_bridge.o
-endif
 
-ifeq ($(SUPPORT_SYNCTRACKING_BRIDGE),1)
 ccflags-y += -I$(bridge_base)/synctracking_bridge
 $(PVRSRV_MODNAME)-y += \
  generated/synctracking_bridge/server_synctracking_bridge.o
-endif
 
 ifeq ($(SUPPORT_FALLBACK_FENCE_SYNC),1)
 ccflags-y += \
@@ -472,15 +448,15 @@ ifeq ($(PDUMP),1)
 $(PVRSRV_MODNAME)-y += generated/pdumpmm_bridge/client_pdumpmm_direct_bridge.o
 endif
 
-ifeq ($(PVR_RI_DEBUG),1)
+ifeq ($(PVRSRV_ENABLE_GPU_MEMORY_INFO),1)
 $(PVRSRV_MODNAME)-y += generated/ri_bridge/client_ri_direct_bridge.o
 endif
 
 ifeq ($(PDUMP),1)
  $(PVRSRV_MODNAME)-y += \
   generated/pdump_bridge/client_pdump_direct_bridge.o \
-  generated/pdumpctrl_bridge/client_pdumpctrl_direct_bridge.o 
-  
+  generated/pdumpctrl_bridge/client_pdumpctrl_direct_bridge.o
+
 ifeq ($(SUPPORT_RGX),1)
  $(PVRSRV_MODNAME)-y += \
   generated/rgxpdump_bridge/client_rgxpdump_direct_bridge.o
@@ -488,15 +464,11 @@ endif
 
 endif
 
-ifeq ($(SUPPORT_PAGE_FAULT_DEBUG),1)
 $(PVRSRV_MODNAME)-y += \
  generated/devicememhistory_bridge/client_devicememhistory_direct_bridge.o
-endif
 
-ifeq ($(SUPPORT_SYNCTRACKING_BRIDGE),1)
 $(PVRSRV_MODNAME)-y += \
  generated/synctracking_bridge/client_synctracking_direct_bridge.o
-endif
 
 # Enable -Werror for all built object files (suppress for Fiasco.OC/L4Linux)
 ifeq ($(CONFIG_L4),)
@@ -505,7 +477,7 @@ $(foreach _o,$(addprefix CFLAGS_,$(notdir $($(PVRSRV_MODNAME)-y))),$(eval $(_o) 
 endif
 endif
 
-# With certain build configurations, e.g., ARM, Werror, we get a build 
+# With certain build configurations, e.g., ARM, Werror, we get a build
 # failure in the ftrace Linux kernel header.  So disable the relevant check.
 CFLAGS_trace_events.o := -Wno-missing-prototypes
 
@@ -515,5 +487,8 @@ CFLAGS_mem_utils.o := -ffreestanding
 
 # Chrome OS kernel adds some issues
 ccflags-y += -Wno-ignored-qualifiers
+
+# Treat #warning as a warning
+ccflags-y += -Wno-error=cpp
 
 include $(TOP)/services/system/$(PVR_SYSTEM)/Kbuild.mk

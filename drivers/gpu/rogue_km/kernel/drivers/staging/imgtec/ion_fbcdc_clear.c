@@ -76,19 +76,18 @@ long ion_custom_fbcdc_alloc(struct ion_client *client, unsigned long arg)
 #endif /* defined(SUPPORT_FAKE_SECURE_ION_HEAP) */
 	{
 		void *paddr = ion_map_kernel(client, handle);
-		if (IS_ERR(handle))
-		{
+
+		if (IS_ERR(handle)) {
 			err = PTR_ERR(paddr);
 			goto err_free;
 		}
 
-#if defined(SUPPORT_RGX) && defined(RGX_FEATURE_FBCDC_ARCHITECTURE) 
-		if (data.tiles > 0)
-		{
+#if defined(SUPPORT_RGX) && defined(RGX_FEATURE_FBCDC_ARCHITECTURE)
+		if (data.tiles > 0) {
 #if (RGX_FEATURE_FBCDC_ARCHITECTURE == 1)
 			/* Note: This only works in direct mode (32 bit header) */
 			int j;
-			u32 *pu32addr = paddr; 
+			u32 *pu32addr = paddr;
 			size_t tiles = (data.tiles + 31) & ~31;
 			/* Write the header first */
 			for (j = 0; j < tiles; j++)
@@ -97,7 +96,7 @@ long ion_custom_fbcdc_alloc(struct ion_client *client, unsigned long arg)
 			memset(&pu32addr[tiles], 0, data.len - tiles * sizeof(*pu32addr));
 #elif (RGX_FEATURE_FBCDC_ARCHITECTURE == 2)
 			/* Note: This only works in direct mode (8 bit header) */
-			u8 *pu8addr = paddr; 
+			u8 *pu8addr = paddr;
 			size_t tiles = (data.tiles + 127) & ~127;
 			/* Write the header first */
 			memset(pu8addr, 0xc7, tiles * sizeof(*pu8addr));
@@ -117,15 +116,12 @@ long ion_custom_fbcdc_alloc(struct ion_client *client, unsigned long arg)
 	/* We don't have access to the id member of handle, so return a shared
 	 * dma_buf which gets reimported to ion by userspace. */
 	data.handle = ion_share_dma_buf_fd(client, handle);
-	if (data.handle < 0)
-	{
+	if (data.handle < 0) {
 		err = data.handle;
 		goto err_free;
 	}
 
-	if (copy_to_user((void __user *)arg, &data,
-					 sizeof(data)))
-	{
+	if (copy_to_user((void __user *)arg, &data, sizeof(data))) {
 		err = -EFAULT;
 		goto err_free;
 	}

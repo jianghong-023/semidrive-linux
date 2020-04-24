@@ -42,7 +42,9 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */ /**************************************************************************/
 #include "osfunc.h"
 #include "pvrsrv.h"
+#include "img_defs.h"
 #include "img_types.h"
+#include "img_defs.h"
 #include "pvrsrv.h"
 #include "pvrsrv_error.h"
 #include "vz_vm.h"
@@ -57,7 +59,7 @@ SysVzIsVmOnline(IMG_UINT32 ui32OSID)
 	{
 		PVR_DPF((PVR_DBG_ERROR,
 				 "%s: invalid OSID (%d)",
-				 __FUNCTION__, ui32OSID));
+				 __func__, ui32OSID));
 
 		return PVRSRV_ERROR_INVALID_PVZ_OSID;
 	}
@@ -66,7 +68,7 @@ SysVzIsVmOnline(IMG_UINT32 ui32OSID)
 	{
 		PVR_DPF((PVR_DBG_ERROR,
 				 "%s: OSID %d is already disabled.",
-				 __FUNCTION__, ui32OSID));
+				 __func__, ui32OSID));
 
 		return PVRSRV_ERROR_PVZ_OSID_IS_OFFLINE;
 	}
@@ -86,17 +88,17 @@ SysVzPvzOnVmOnline(IMG_UINT32 ui32OSid, IMG_UINT32 ui32Priority)
 	{
 		PVR_DPF((PVR_DBG_ERROR,
 				 "%s: invalid OSID (%d)",
-				 __FUNCTION__, ui32OSid));
+				 __func__, ui32OSid));
 
-		return PVRSRV_ERROR_INVALID_PVZ_OSID;
+		return PVRSRV_ERROR_INVALID_PARAMS;
 	}
 
 	if (psPVRSRVData->abVmOnline[ui32OSid])
 	{
 		PVR_DPF((PVR_DBG_ERROR,
 				 "%s: OSID %d is already enabled.",
-				 __FUNCTION__, ui32OSid));
-		return PVRSRV_ERROR_PVZ_OSID_IS_ONLINE;
+				 __func__, ui32OSid));
+		return PVRSRV_ERROR_INVALID_PARAMS;
 	}
 
 	/* For now, limit support to single device setups */
@@ -115,7 +117,7 @@ SysVzPvzOnVmOnline(IMG_UINT32 ui32OSid, IMG_UINT32 ui32Priority)
 		{
 			PVR_DPF((PVR_DBG_ERROR,
 					 "%s: failed to initialize firmware (%s)",
-					 __FUNCTION__, PVRSRVGetErrorStringKM(eError)));
+					 __func__, PVRSRVGetErrorString(eError)));
 			goto e0;
 		}
 #if defined(PVRSRV_USE_BRIDGE_LOCK)
@@ -123,17 +125,14 @@ SysVzPvzOnVmOnline(IMG_UINT32 ui32OSid, IMG_UINT32 ui32Priority)
 #endif
 	}
 
-	/* request new priority and enable OS */
-
-	eError = RGXFWSetVMOnlineState(psDevInfo, ui32OSid, RGXFWIF_OS_ONLINE);
+	/* request new priority */
+	eError = RGXFWChangeOSidPriority(psDevInfo, ui32OSid, ui32Priority);
 	if (eError != PVRSRV_OK)
 	{
 		goto e0;
 	}
 
 	psPVRSRVData->abVmOnline[ui32OSid] = IMG_TRUE;
-
-	eError = RGXFWChangeOSidPriority(psDevInfo, ui32OSid, ui32Priority);
 
 e0:
 	return eError;
@@ -151,24 +150,24 @@ SysVzPvzOnVmOffline(IMG_UINT32 ui32OSid)
 	{
 		PVR_DPF((PVR_DBG_ERROR,
 				 "%s: invalid OSID (%d)",
-				 __FUNCTION__, ui32OSid));
+				 __func__, ui32OSid));
 
-		return PVRSRV_ERROR_INVALID_PVZ_OSID;
+		return PVRSRV_ERROR_INVALID_PARAMS;
 	}
 
 	if (!psPVRSRVData->abVmOnline[ui32OSid])
 	{
 		PVR_DPF((PVR_DBG_ERROR,
 				 "%s: OSID %d is already disabled.",
-				 __FUNCTION__, ui32OSid));
-		return PVRSRV_ERROR_PVZ_OSID_IS_OFFLINE;
+				 __func__, ui32OSid));
+		return PVRSRV_ERROR_INVALID_PARAMS;
 	}
 
 	/* For now, limit support to single device setups */
 	psDevNode = psPVRSRVData->psDeviceNodeList;
 	psDevInfo = psDevNode->pvDevice;
 
-	eError = RGXFWSetVMOnlineState(psDevInfo, ui32OSid, RGXFWIF_OS_OFFLINE);
+	eError = RGXFWSetFwOsState(psDevInfo, ui32OSid, RGXFWIF_OS_OFFLINE);
 	if (eError == PVRSRV_OK)
 	{
 		psPVRSRVData->abVmOnline[ui32OSid] = IMG_FALSE;
@@ -189,7 +188,7 @@ SysVzPvzVMMConfigure(VMM_CONF_PARAM eVMMParamType, IMG_UINT32 ui32ParamValue)
 	psDeviceNode = psPVRSRVData->psDeviceNodeList;
 	psDevInfo = psDeviceNode->pvDevice;
 
-	switch(eVMMParamType)
+	switch (eVMMParamType)
 	{
 #if defined(SUPPORT_RGX)
 		case VMM_CONF_PRIO_OSID0:
@@ -210,7 +209,7 @@ SysVzPvzVMMConfigure(VMM_CONF_PARAM eVMMParamType, IMG_UINT32 ui32ParamValue)
 			}
 			else
 			{
-				eError = PVRSRV_ERROR_INVALID_PVZ_OSID;
+				eError = PVRSRV_ERROR_INVALID_PARAMS;
 			}
 			break;
 		}

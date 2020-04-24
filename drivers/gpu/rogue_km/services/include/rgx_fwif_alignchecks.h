@@ -2,7 +2,7 @@
 @File
 @Title          RGX fw interface alignment checks
 @Copyright      Copyright (c) Imagination Technologies Ltd. All Rights Reserved
-@Description    Checks to avoid disalignment in RGX fw data structures 
+@Description    Checks to avoid disalignment in RGX fw data structures
                 shared with the host
 @License        Dual MIT/GPLv2
 
@@ -42,8 +42,8 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */ /**************************************************************************/
 
-#if !defined (__RGX_FWIF_ALIGNCHECKS_H__)
-#define __RGX_FWIF_ALIGNCHECKS_H__
+#if !defined (RGX_FWIF_ALIGNCHECKS_H)
+#define RGX_FWIF_ALIGNCHECKS_H
 
 /* for the offsetof macro */
 #if defined(__KERNEL__) && defined(LINUX)
@@ -57,7 +57,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  * Alignment UM/FW checks array
  *****************************************************************************/
 
-#define RGXFW_ALIGN_CHECKS_UM_MAX 128
+#define RGXFW_ALIGN_CHECKS_UM_MAX 128U
 
 #define RGXFW_ALIGN_CHECKS_INIT0						\
 		sizeof(RGXFWIF_TRACEBUF),						\
@@ -104,50 +104,29 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 							\
 		sizeof(RGXFWIF_HWPERF_CTL_BLK), \
 		offsetof(RGXFWIF_HWPERF_CTL_BLK, aui64CounterCfg), \
-							\
-		sizeof(RGXFWIF_REGISTER_GUESTOS_OFFSETS), \
-		offsetof(RGXFWIF_REGISTER_GUESTOS_OFFSETS, ui32OSid), \
-		offsetof(RGXFWIF_REGISTER_GUESTOS_OFFSETS, sKCCBCtl), \
-		offsetof(RGXFWIF_REGISTER_GUESTOS_OFFSETS, sKCCB), \
-		offsetof(RGXFWIF_REGISTER_GUESTOS_OFFSETS, sFirmwareCCBCtl), \
-		offsetof(RGXFWIF_REGISTER_GUESTOS_OFFSETS, sFirmwareCCB), \
 \
 		sizeof(RGXFWIF_HWPERF_CTL), \
 		offsetof(RGXFWIF_HWPERF_CTL, SelCntr)
 
-
-#if defined(RGX_FEATURE_RAY_TRACING)
-#define RGXFW_ALIGN_CHECKS_INIT1                           \
-		RGXFW_ALIGN_CHECKS_INIT0,                          \
-		sizeof(RGXFWIF_RPM_FREELIST),                      \
-		offsetof(RGXFWIF_RPM_FREELIST, sFreeListDevVAddr), \
-		offsetof(RGXFWIF_RPM_FREELIST, ui32MaxPages),      \
-		offsetof(RGXFWIF_RPM_FREELIST, ui32CurrentPages),  \
-		offsetof(RGXFWIF_RPM_FREELIST, ui32GrowPages)
-#else
-#define RGXFW_ALIGN_CHECKS_INIT1		RGXFW_ALIGN_CHECKS_INIT0
-#endif /* RGX_FEATURE_RAY_TRACING */
-
-
 #if defined(RGX_FEATURE_TLA)
-#define RGXFW_ALIGN_CHECKS_INIT2                   \
-		RGXFW_ALIGN_CHECKS_INIT1,                  \
+#define RGXFW_ALIGN_CHECKS_INIT1                   \
+		RGXFW_ALIGN_CHECKS_INIT0,                  \
 		/* RGXFWIF_CMD2D checks */                 \
 		sizeof(RGXFWIF_CMD2D),                     \
 		offsetof(RGXFWIF_CMD2D, s2DRegs)
 #else
-#define RGXFW_ALIGN_CHECKS_INIT2		RGXFW_ALIGN_CHECKS_INIT1
+#define RGXFW_ALIGN_CHECKS_INIT1		RGXFW_ALIGN_CHECKS_INIT0
 #endif	/* RGX_FEATURE_TLA */
 
 
 #if defined(RGX_FEATURE_FASTRENDER_DM)
 #define RGXFW_ALIGN_CHECKS_INIT                    \
-		RGXFW_ALIGN_CHECKS_INIT2,                  \
+		RGXFW_ALIGN_CHECKS_INIT1,                  \
 		/* RGXFWIF_CMDTDM checks */                \
 		sizeof(RGXFWIF_CMDTDM),                    \
 		offsetof(RGXFWIF_CMDTDM, sTDMRegs)
 #else
-#define RGXFW_ALIGN_CHECKS_INIT		RGXFW_ALIGN_CHECKS_INIT2
+#define RGXFW_ALIGN_CHECKS_INIT		RGXFW_ALIGN_CHECKS_INIT1
 #endif /* ! RGX_FEATURE_FASTRENDER_DM */
 
 
@@ -187,7 +166,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 		offsetof(RGXFWIF_MMUCACHEDATA,ui16MMUCacheSyncUpdateValue)
 
 
-#endif /*  __RGX_FWIF_ALIGNCHECKS_H__ */
+#endif /*  RGX_FWIF_ALIGNCHECKS_H */
 
 /******************************************************************************
  End of file (rgx_fwif_alignchecks.h)

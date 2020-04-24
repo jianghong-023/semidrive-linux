@@ -106,8 +106,10 @@ int pvr_drm_load(struct drm_device *ddev, unsigned long flags)
 	dev_set_drvdata(ddev->dev, ddev);
 
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(3, 12, 0))
-	/* older kernels do not have render drm_minor member in drm_device,
-	 * so we fallback to primary node for device identification */
+	/*
+	 * Older kernels do not have render drm_minor member in drm_device,
+	 * so we fallback to primary node for device identification
+	 */
 	deviceId = ddev->primary->index;
 #else
 	if (ddev->render)
@@ -135,7 +137,7 @@ int pvr_drm_load(struct drm_device *ddev, unsigned long flags)
 	srv_err = PVRSRVDeviceCreate(ddev->dev, deviceId, &priv->dev_node);
 	if (srv_err != PVRSRV_OK) {
 		DRM_ERROR("failed to create device node for device %p (%s)\n",
-			  ddev->dev, PVRSRVGetErrorStringKM(srv_err));
+			  ddev->dev, PVRSRVGetErrorString(srv_err));
 		if (srv_err == PVRSRV_ERROR_PROBE_DEFER)
 			err = -EPROBE_DEFER;
 		else
@@ -230,19 +232,10 @@ static void pvr_drm_release(struct drm_device *ddev, struct drm_file *dfile)
  * taken.
  */
 static struct drm_ioctl_desc pvr_drm_ioctls[] = {
-	DRM_IOCTL_DEF_DRV(PVR_SRVKM_CMD, PVRSRV_BridgeDispatchKM, DRM_RENDER_ALLOW | DRM_UNLOCKED),
-#if defined(PDUMP)
-	DRM_IOCTL_DEF_DRV(PVR_DBGDRV_CMD, dbgdrv_ioctl, DRM_RENDER_ALLOW | DRM_AUTH | DRM_UNLOCKED),
-#endif
+	DRM_IOCTL_DEF_DRV(PVR_SRVKM_CMD, PVRSRV_BridgeDispatchKM, DRM_RENDER_ALLOW | DRM_UNLOCKED)
 };
 
 #if defined(CONFIG_COMPAT)
-#if defined(PDUMP)
-static drm_ioctl_compat_t *pvr_drm_compat_ioctls[] = {
-	[DRM_PVR_DBGDRV_CMD] = dbgdrv_ioctl_compat,
-};
-#endif
-
 static long pvr_compat_ioctl(struct file *file, unsigned int cmd,
 			     unsigned long arg)
 {
@@ -250,16 +243,6 @@ static long pvr_compat_ioctl(struct file *file, unsigned int cmd,
 
 	if (nr < DRM_COMMAND_BASE)
 		return drm_compat_ioctl(file, cmd, arg);
-
-#if defined(PDUMP)
-	if (nr < DRM_COMMAND_BASE + ARRAY_SIZE(pvr_drm_compat_ioctls)) {
-		drm_ioctl_compat_t *pfnBridge;
-
-		pfnBridge = pvr_drm_compat_ioctls[nr - DRM_COMMAND_BASE];
-		if (pfnBridge)
-			return pfnBridge(file, cmd, arg);
-	}
-#endif
 
 	return drm_ioctl(file, cmd, arg);
 }

@@ -50,7 +50,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "physheap.h"
 #include "rgxdevice.h"
 
-#if defined(PVR_RI_DEBUG)
+#if defined(PVRSRV_ENABLE_GPU_MEMORY_INFO)
 #include "ri_server.h"
 #endif
 
@@ -239,7 +239,7 @@ PVRSRV_ERROR PhysmemNewTDSecureBufPMR(CONNECTION_DATA *psConnection,
 	/* Check that the secure buffer is aligned to a Rogue cache line */
 	{
 		PVR_DPF((PVR_DBG_ERROR,
-				 "Trusted Device physical heap has the wrong alignment!"
+				 "Trusted Device physical heap has the wrong alignment! "
 				 "Physical address 0x%llx, alignment mask 0x%llx",
 				 (unsigned long long) psPrivData->sCpuPAddr.uiAddr,
 				 ((1ULL << uiLog2Align) - 1)));
@@ -269,13 +269,13 @@ PVRSRV_ERROR PhysmemNewTDSecureBufPMR(CONNECTION_DATA *psConnection,
 		goto errorOnCreatePMR;
 	}
 
-#if defined(PVR_RI_DEBUG)
+#if defined(PVRSRV_ENABLE_GPU_MEMORY_INFO)
 	eError = RIWritePMREntryKM(psPMR);
 	if (eError != PVRSRV_OK)
 	{
 		PVR_DPF((PVR_DBG_WARNING,
 		         "%s: Failed to write PMR entry (%s)",
-		         __func__, PVRSRVGetErrorStringKM(eError)));
+		         __func__, PVRSRVGetErrorString(eError)));
 	}
 #endif
 
@@ -468,12 +468,13 @@ PVRSRV_ERROR PhysmemNewTDSecureBufPMR(CONNECTION_DATA *psConnection,
 	                         &psPrivData->psTDSecBufPhysHeap);
 	if (eError != PVRSRV_OK) goto errorOnAcquireHeap;
 
-	psPrivData->ui32Log2PageSize = uiLog2Align;
-
-	/* Note that this PMR is only used to copy the FW blob to memory and
-	 * to dump this memory to pdump, it doesn't need to have the alignment
-	 * requested by the caller
+	/*
+	 * The alignment requested by the caller is only used to generate the
+	 * secure FW allocation pdump command with the correct alignment.
+	 * Internally we use another PMR with OS page alignment.
 	 */
+	psPrivData->ui32Log2PageSize = OSGetPageShift();
+
 	eError = PhysmemNewOSRamBackedPMR(psDevNode,
 	                                  uiSize,
 	                                  uiSize,
@@ -511,13 +512,13 @@ PVRSRV_ERROR PhysmemNewTDSecureBufPMR(CONNECTION_DATA *psConnection,
 		goto errorOnCreateTDPMR;
 	}
 
-#if defined(PVR_RI_DEBUG)
+#if defined(PVRSRV_ENABLE_GPU_MEMORY_INFO)
 	eError = RIWritePMREntryKM(psPMR);
 	if (eError != PVRSRV_OK)
 	{
 		PVR_DPF((PVR_DBG_WARNING,
 		         "%s: Failed to write PMR entry (%s)",
-		         __func__, PVRSRVGetErrorStringKM(eError)));
+		         __func__, PVRSRVGetErrorString(eError)));
 	}
 #endif
 
