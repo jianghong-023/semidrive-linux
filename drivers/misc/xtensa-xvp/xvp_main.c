@@ -130,6 +130,10 @@ static int loopback = 0;
 module_param(loopback, int, 0644);
 MODULE_PARM_DESC(loopback, "Don't use actual DSP, perform everything locally.");
 
+static char firmware_name[30];
+module_param_string(firmware_name, firmware_name, sizeof(firmware_name), 0644);
+MODULE_PARM_DESC(firmware_name, "Firmware file name. Overriding default firmware.");
+
 static DEFINE_HASHTABLE(xrp_known_files, 10);
 static DEFINE_SPINLOCK(xrp_known_files_lock);
 
@@ -1798,11 +1802,17 @@ static int xvp_open(struct inode *inode, struct file *filp)
 static int xvp_close(struct inode *inode, struct file *filp)
 {
 	struct xvp_file *xvp_file = filp->private_data;
+	int rc;
 
 	pr_debug("%s\n", __func__);
 
 	xrp_remove_known_file(filp);
-	pm_runtime_put_sync(xvp_file->xvp->dev);
+
+	rc = pm_runtime_put_sync(xvp_file->xvp->dev);
+	if (rc < 0) {
+		pr_debug("%s device still active, ret=%d\n", __func__, rc);
+	}
+
 	devm_kfree(xvp_file->xvp->dev, xvp_file);
 	return 0;
 }
@@ -1854,7 +1864,9 @@ static int xrp_boot_firmware(struct xvp *xvp)
 
 	if (xvp->firmware_name) {
 		if (loopback < LOOPBACK_NOFIRMWARE) {
-			ret = xrp_request_firmware(xvp);
+			/* request custom firmware if set */
+			const char *fname = firmware_name;
+			ret = xrp_request_firmware(xvp, fname);
 			if (ret < 0)
 				return ret;
 		}
@@ -2181,19 +2193,22 @@ int xrp_deinit(struct platform_device *pdev)
 {
 	struct xvp *xvp = platform_get_drvdata(pdev);
 
-	pm_runtime_disable(xvp->dev);
-	if (!pm_runtime_status_suspended(xvp->dev))
-		xrp_runtime_suspend(xvp->dev);
+	if (xvp) {
+		pm_runtime_disable(xvp->dev);
+		if (!pm_runtime_status_suspended(xvp->dev))
+			xrp_runtime_suspend(xvp->dev);
 
-	misc_deregister(&xvp->miscdev);
-	release_firmware(xvp->firmware);
-	xrp_free_pool(xvp->pool);
-	if (xvp->comm_phys && !xvp->pmem) {
-		dma_free_attrs(xvp->dev, PAGE_SIZE, xvp->comm,
-			       phys_to_dma(xvp->dev, xvp->comm_phys), 0);
+
+		misc_deregister(&xvp->miscdev);
+		release_firmware(xvp->firmware);
+		xrp_free_pool(xvp->pool);
+		if (xvp->comm_phys && !xvp->pmem) {
+			dma_free_attrs(xvp->dev, PAGE_SIZE, xvp->comm,
+				       phys_to_dma(xvp->dev, xvp->comm_phys), 0);
+		}
+		xrp_free_address_map(&xvp->address_map);
+		ida_simple_remove(&xvp_nodeid, xvp->nodeid);
 	}
-	xrp_free_address_map(&xvp->address_map);
-	ida_simple_remove(&xvp_nodeid, xvp->nodeid);
 	return 0;
 }
 EXPORT_SYMBOL(xrp_deinit);

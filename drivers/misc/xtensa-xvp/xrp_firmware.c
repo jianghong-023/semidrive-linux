@@ -377,11 +377,16 @@ static int xrp_load_firmware(struct xvp *xvp)
 	return 0;
 }
 
-int xrp_request_firmware(struct xvp *xvp)
+int xrp_request_firmware(struct xvp *xvp, const char *fname)
 {
-	int ret = request_firmware(&xvp->firmware, xvp->firmware_name,
-				   xvp->dev);
+	int ret;
 
+	if (fname[0] == '\0') {
+		ret = request_firmware(&xvp->firmware, xvp->firmware_name, xvp->dev);
+	} else {
+		dev_dbg(xvp->dev, "load custom firmware\n");
+		ret = request_firmware(&xvp->firmware, fname, xvp->dev);
+	}
 	if (ret < 0)
 		return ret;
 

@@ -520,6 +520,7 @@ static int xrp_hw_semidrive_probe(struct platform_device *pdev)
 	init = match->data;
 	ret = init(pdev, hw);
 	if (IS_ERR_VALUE(ret)) {
+		pr_err("xrp probe failed, ret=%d\n", ret);
 		xrp_deinit(pdev);
 		return ret;
 	} else {
