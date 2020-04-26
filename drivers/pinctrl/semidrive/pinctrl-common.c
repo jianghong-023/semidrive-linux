@@ -566,7 +566,7 @@ int sd_pinctrl_probe(struct platform_device *pdev,
 	if (of_property_read_bool(dev_np, "kunlun,input-sel")) {
 		np = of_parse_phandle(dev_np, "kunlun,input-sel", 0);
 		if (!np) {
-			dev_err(&pdev->dev, "iomuxc kunlun,input-sel property not found\n");
+			dev_err(&pdev->dev, "pinctrl kunlun,input-sel property not found\n");
 			return -EINVAL;
 		}
 
@@ -574,7 +574,7 @@ int sd_pinctrl_probe(struct platform_device *pdev,
 		of_node_put(np);
 		if (!ipctl->input_sel_base) {
 			dev_err(&pdev->dev,
-				"iomuxc input select base address not found\n");
+				"pinctrl input select base address not found\n");
 			return -ENOMEM;
 		}
 	}
