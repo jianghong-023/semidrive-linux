@@ -379,7 +379,7 @@ static void axi_chan_block_xfer_start(struct axi_dma_chan *chan,
 			reg = (chan->dma_sconfig.slave_id << DMAC_MUX_WR_HDSK_SHIFT);
 			axi_chan_mux_iowrite32(chan, DMAC_CHAN_MUX, reg);
 			axi_dma_mux_iowrite32(chan->chip, DMAC_MUX_EN, 1 << DMAC_MUX_EN_POS);
-			dev_vdbg(chan2dev(chan), "%s: WR_HDSK(0x%x) vaddr(0x%llx) vaddr(0x%llx) \n", __func__, reg, chan->chip->mux_regs + DMAC_MUX_EN, chan->chan_mux_regs + DMAC_CHAN_MUX);
+			dev_vdbg(chan2dev(chan), "%s: WR_HDSK(0x%x) vaddr(0x%p) vaddr(0x%p) \n", __func__, reg, chan->chip->mux_regs + DMAC_MUX_EN, chan->chan_mux_regs + DMAC_CHAN_MUX);
 		}
 		break;
 
@@ -1068,10 +1068,9 @@ dma_chan_prep_slave_sg(struct dma_chan *dchan, struct scatterlist *sgl,
 	struct axi_dma_chan *chan = dchan_to_axi_dma_chan(dchan);
 	/* Get slave config from axi_dma_chan */
 	struct dma_slave_config *sconfig = &chan->dma_sconfig;
-	size_t block_ts, max_block_ts, xfer_len;
-	u32 xfer_width, reg;
+	size_t max_block_ts;
+	u32 reg;
 	u32 burst_items;
-
 	u32 reg_width;
 	u32 mem_width;
 	dma_addr_t reg_addr;
@@ -1275,16 +1274,14 @@ static struct dma_async_tx_descriptor *dma_chan_prep_cyclic(
 	struct axi_dma_chan *chan = dchan_to_axi_dma_chan(dchan);
 	//Get slave config from axi_dma_chan
 	struct dma_slave_config *sconfig = &chan->dma_sconfig;
-	size_t block_ts, max_block_ts, xfer_len, offset;
-	u32 xfer_width, reg;
+	size_t max_block_ts, offset;
+	u32 reg;
 	u32 burst_items;
 	u32 reg_width;
 	u32 mem_width;
 	dma_addr_t reg_addr;
-	dma_addr_t mem_addr;
 
-	struct scatterlist *sg;
-	u32 i, data_width, periods;
+	u32 data_width;
 	size_t total_len = 0;
 
 	u8 lms = 0; /* Select AXI0 master for LLI fetching */
@@ -1294,8 +1291,11 @@ static struct dma_async_tx_descriptor *dma_chan_prep_cyclic(
 	/* TODO: set channel need add test case for multi transfer */
 	chan->direction = direction;
 
-	unlikely(buf_len % period_len);
-	periods = buf_len / period_len;
+	if(unlikely(buf_len % period_len)){
+		dev_err(chan2dev(chan), "Period length should be multiple of buffer length!\n");
+		return NULL;
+	}
+	/* u32 periods = buf_len / period_len; */
 
 	if (unlikely(!is_slave_direction(direction) || !period_len))
 		return NULL;
@@ -1318,7 +1318,8 @@ static struct dma_async_tx_descriptor *dma_chan_prep_cyclic(
 			reg_width = __ffs(sconfig->dst_addr_width);
 			reg_addr = sconfig->dst_addr;
 			burst_items = sconfig->dst_maxburst;
-			unlikely((period_len >> sconfig->dst_addr_width) > max_block_ts);
+			if(unlikely((period_len >> sconfig->dst_addr_width) > max_block_ts))
+				goto err_desc_get;
 			/* Memory address. */
 			write_desc_sar(desc, buf_addr + offset);
 			/* Device address */
@@ -1362,7 +1363,8 @@ static struct dma_async_tx_descriptor *dma_chan_prep_cyclic(
 			reg_width = __ffs(sconfig->src_addr_width);
 			reg_addr = sconfig->src_addr;
 			burst_items = sconfig->src_maxburst;
-			unlikely((period_len >> sconfig->src_addr_width) > max_block_ts);
+			if(unlikely((period_len >> sconfig->src_addr_width) > max_block_ts))
+				goto err_desc_get;
 			/* Device address. */
 			write_desc_sar(desc, reg_addr);
 			/* Memory  address */
@@ -1560,20 +1562,21 @@ static int dw_probe(struct platform_device *pdev)
 	chip->regs = devm_ioremap_resource(chip->dev, mem);
 	if (IS_ERR(chip->regs))
 		return PTR_ERR(chip->regs);
+
 	if (pdev->num_resources == 3)
 	{
 		mux_mem = platform_get_resource(pdev, IORESOURCE_MEM, 1);
 		chip->mux_regs = devm_ioremap_resource(chip->dev, mux_mem);
 		chip->dw->hdata->dma_mux_enable = true;
 		printk(KERN_DEBUG "DW AXI DMAC"
-						  ": enable mux irq(%d) num(%d) vaddr(0x%llx) paddr(0x%llx) vaddr(0x%llx) paddr(0x%llx)\n",
+						  ": enable mux irq(%d) num(%d) vaddr(0x%p) paddr(0x%llx) vaddr(0x%p) paddr(0x%llx)\n",
 			   chip->irq, pdev->num_resources, chip->regs, mem->start, chip->mux_regs, mux_mem->start);
 	}
 	else if (pdev->num_resources == 2)
 	{
 		chip->dw->hdata->dma_mux_enable = false;
 		printk(KERN_DEBUG "DW AXI DMAC"
-						  ": without mux irq(%d) num(%d) vaddr(0x%llx) paddr(0x%llx) \n",
+						  ": without mux irq(%d) num(%d) vaddr(0x%p) paddr(0x%llx) \n",
 			   chip->irq, pdev->num_resources, chip->regs, mem->start);
 	}
 	else
