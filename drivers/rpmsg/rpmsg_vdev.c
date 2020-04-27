@@ -177,7 +177,7 @@ static int sd_rpmsg_callback(struct notifier_block *this,
 
 	vq_id -= virdev->base_vq_id;
 
-	pr_info("%s vqid: %d rproc: %d nvqs: %d\n", __func__, msg->vq_id,
+	pr_debug("%s vqid: %d rproc: %d nvqs: %d\n", __func__, msg->vq_id,
 				msg->msghead.rproc, virdev->num_of_vqs);
 
 	/*
@@ -546,13 +546,13 @@ static int __init sd_rpmsg_init(void)
 	if (ret)
 		pr_err("Unable to initialize rpmsg driver\n");
 	else
-		pr_info("Semidrive rpmsg driver is registered.\n");
+		pr_info("Semidrive rpmsg virtio is registered.\n");
 
 	return ret;
 }
 
 subsys_initcall(sd_rpmsg_init);
 
-MODULE_AUTHOR("Semidrive Semiconductor, Inc.");
-MODULE_DESCRIPTION("X9 rpmsg virtio device");
+MODULE_AUTHOR("Semidrive Semiconductor");
+MODULE_DESCRIPTION("Semidrive rpmsg virtio device");
 MODULE_LICENSE("GPL v2");

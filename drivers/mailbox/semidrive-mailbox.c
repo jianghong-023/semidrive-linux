@@ -199,7 +199,7 @@ static u32 sd_mu_write_msg(struct sd_mbox_chan *mlink, void *data)
 	struct sd_mbox_tx_msg *msg = mlink->msg;
 
 	if (msg) {
-		memcpy((void *)msg->tx_buf, data, mlink->actual_size);
+		memcpy_toio((void *)msg->tx_buf, data, mlink->actual_size);
 #if CONFIG_MBOX_DUMP_HEX
 		print_hex_dump_bytes("mu: txb: ", DUMP_PREFIX_ADDRESS,
 				 msg->tx_buf, mlink->actual_size);
@@ -219,7 +219,7 @@ void* sd_mu_get_read_ptr(struct sd_mbox_device *mbox, int remote_proc, int msg_i
 u32 sd_mu_read_msg(struct sd_mbox_device *mbox, int remote_proc,
 						int msg_id, u8* data, int len)
 {
-	memcpy(data, (void *) mbox->rxb_base + MU_RX_BUF_OFF(remote_proc) +
+	memcpy_fromio(data, (void *) mbox->rxb_base + MU_RX_BUF_OFF(remote_proc) +
 			msg_id * MB_BANK_LEN, len);
 #if CONFIG_MBOX_DUMP_HEX
 	print_hex_dump_bytes("mu : rxb: ", DUMP_PREFIX_ADDRESS,

@@ -6,4 +6,4 @@ obj-$(CONFIG_RPMSG_QCOM_GLINK_NATIVE) += qcom_glink_native.o
 obj-$(CONFIG_RPMSG_QCOM_GLINK_SMEM) += qcom_glink_smem.o
 obj-$(CONFIG_RPMSG_QCOM_SMD)	+= qcom_smd.o
 obj-$(CONFIG_RPMSG_VIRTIO)	+= virtio_rpmsg_bus.o
-obj-$(CONFIG_RPMSG_SEMIDRIVE)	+= rpmsg_vdev.o
+obj-$(CONFIG_RPMSG_SEMIDRIVE)	+= rpmsg_vdev.o semidrive_ipcc.o
