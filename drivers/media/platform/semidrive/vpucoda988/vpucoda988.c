@@ -38,7 +38,7 @@
 #include <linux/of.h>
 #include <linux/of_address.h>
 
-#include "vpuconfig.h"
+#include "coda_config.h"
 #include "vpu.h"
 
 #define ENABLE_DEBUG_MSG
@@ -62,9 +62,6 @@
 #define VPU_PLATFORM_DEVICE_NAME "vpu-coda988"
 #define VPU_CLK_NAME "vpucodecclock"
 #define VPU_DEV_NAME "vpucoda"
-
-#define RSTGEN_VPU_CODA_BASE_ADDR     0x32320000
-
 
 /* x9 plat ignored following */
 #define VPU_REG_BASE_ADDR 0x306200000
@@ -199,63 +196,6 @@ static vpu_bit_firmware_info_t s_bit_firmware_info[MAX_NUM_VPU_CORE];
 #define BIT_RUN_INDEX               (BIT_BASE + 0x168)
 #define BIT_RUN_COD_STD             (BIT_BASE + 0x16C)
 
-/* WAVE4 registers */
-#define W4_REG_BASE                  0x0000
-#define W4_VPU_BUSY_STATUS           (W4_REG_BASE + 0x0070)
-#define W4_VPU_INT_REASON_CLEAR      (W4_REG_BASE + 0x0034)
-#define W4_VPU_VINT_CLEAR            (W4_REG_BASE + 0x003C)
-#define W4_VPU_VPU_INT_STS           (W4_REG_BASE + 0x0044)
-#define W4_VPU_INT_REASON            (W4_REG_BASE + 0x004c)
-
-#define W4_RET_SUCCESS               (W4_REG_BASE + 0x0110)
-#define W4_RET_FAIL_REASON           (W4_REG_BASE + 0x0114)
-
-/* WAVE4 INIT, WAKEUP */
-#define W4_PO_CONF                   (W4_REG_BASE + 0x0000)
-#define W4_VCPU_CUR_PC               (W4_REG_BASE + 0x0004)
-
-#define W4_VPU_VINT_ENABLE           (W4_REG_BASE + 0x0048)
-
-#define W4_VPU_RESET_REQ             (W4_REG_BASE + 0x0050)
-#define W4_VPU_RESET_STATUS          (W4_REG_BASE + 0x0054)
-
-#define W4_VPU_REMAP_CTRL            (W4_REG_BASE + 0x0060)
-#define W4_VPU_REMAP_VADDR           (W4_REG_BASE + 0x0064)
-#define W4_VPU_REMAP_PADDR           (W4_REG_BASE + 0x0068)
-#define W4_VPU_REMAP_CORE_START      (W4_REG_BASE + 0x006C)
-#define W4_VPU_BUSY_STATUS           (W4_REG_BASE + 0x0070)
-
-#define W4_REMAP_CODE_INDEX          0
-enum {
-    W4_INT_INIT_VPU          = 0,
-    W4_INT_DEC_PIC_HDR       = 1,
-    W4_INT_FINI_SEQ          = 2,
-    W4_INT_DEC_PIC           = 3,
-    W4_INT_SET_FRAMEBUF      = 4,
-    W4_INT_FLUSH_DEC         = 5,
-    W4_INT_GET_FW_VERSION    = 9,
-    W4_INT_QUERY_DEC         = 10,
-    W4_INT_SLEEP_VPU         = 11,
-    W4_INT_WAKEUP_VPU        = 12,
-    W4_INT_CHANGE_INT        = 13,
-    W4_INT_CREATE_INSTANCE   = 14,
-    W4_INT_BSBUF_EMPTY       = 15,   /*!<< Bitstream buffer empty */
-    W4_INT_ENC_SLICE_INT     = 15,
-};
-
-#define W4_HW_OPTION                    (W4_REG_BASE + 0x0124)
-#define W4_CODE_SIZE                    (W4_REG_BASE + 0x011C)
-/* Note: W4_INIT_CODE_BASE_ADDR should be aligned to 4KB */
-#define W4_ADDR_CODE_BASE               (W4_REG_BASE + 0x0118)
-#define W4_CODE_PARAM                   (W4_REG_BASE + 0x0120)
-#define W4_INIT_VPU_TIME_OUT_CNT        (W4_REG_BASE + 0x0134)
-
-/* WAVE4 Wave4BitIssueCommand */
-#define W4_CORE_INDEX           (W4_REG_BASE + 0x0104)
-#define W4_INST_INDEX           (W4_REG_BASE + 0x0108)
-#define W4_COMMAND              (W4_REG_BASE + 0x0100)
-#define W4_VPU_HOST_INT_REQ     (W4_REG_BASE + 0x0038)
-
 /* Product register */
 #define VPU_PRODUCT_CODE_REGISTER   (BIT_BASE + 0x1044)
 
@@ -289,7 +229,7 @@ static int vpu_alloc_common_buffer(vpudrv_buffer_t *vb)
     vb->phys_addr = vb->dma_addr;
 
     if ((void *)(vb->base) == NULL) {
-        DPRINTK("[VPUDRV] Physical memory allocation error size=%d\n",
+        pr_err("[VPUDRV-ERR] Physical memory allocation error size=%d\n",
                 vb->size);
         return -1;
     }
@@ -322,7 +262,7 @@ static int vpu_alloc_dma_buffer(vpudrv_buffer_t *vb)
     vb->phys_addr = (unsigned long) vmem_alloc(&s_vmem, vb->size, 0);
 
     if ((unsigned long) vb->phys_addr  == (unsigned long) -1) {
-        DPRINTK("[VPUDRV] Physical memory allocation error size=%d\n",
+        pr_err("[VPUDRV-ERR] Physical memory allocation error size=%d\n",
                 vb->size);
         return -1;
     }
@@ -335,7 +275,7 @@ static int vpu_alloc_dma_buffer(vpudrv_buffer_t *vb)
                GFP_DMA | GFP_KERNEL | GFP_USER);
 
     if ((void *)(vb->base) == NULL)  {
-        DPRINTK("[VPUDRV] Physical memory allocation error size=%d\n",
+        pr_err("[VPUDRV-ERR] Physical memory allocation error size=%d\n",
                 vb->size);
         return -1;
     }
@@ -455,21 +395,14 @@ static irqreturn_t vpu_irq_handler(int irq, void *dev_id)
 
         product_code = ReadVpuRegister(VPU_PRODUCT_CODE_REGISTER);
 
-        if (PRODUCT_CODE_W_SERIES(product_code)) {
-            if (ReadVpuRegister(W4_VPU_VPU_INT_STS)) {
-                dev->interrupt_reason = ReadVpuRegister(W4_VPU_INT_REASON);
-                WriteVpuRegister(W4_VPU_INT_REASON_CLEAR, dev->interrupt_reason);
-                WriteVpuRegister(W4_VPU_VINT_CLEAR, 0x1);
-            }
-        }
-        else if (PRODUCT_CODE_NOT_W_SERIES(product_code)) {
+        if (PRODUCT_CODE_CODA988(product_code)) {
             if (ReadVpuRegister(BIT_INT_STS)) {
                 dev->interrupt_reason = ReadVpuRegister(BIT_INT_REASON);
                 WriteVpuRegister(BIT_INT_CLEAR, 0x1);
             }
         }
         else {
-            DPRINTK("[VPUDRV] Unknown product id : %08x\n", product_code);
+            pr_err("[VPUDRV-ERR] Unknown product id : %08x\n", product_code);
             continue;
         }
 
@@ -494,16 +427,13 @@ static int vpu_open(struct inode *inode, struct file *filp)
     spin_lock(&s_vpu_lock);
 
     s_vpu_drv_context.open_count++;
-
     filp->private_data = (void *)(&s_vpu_drv_context);
     spin_unlock(&s_vpu_lock);
-
     DPRINTK("[VPUDRV][-] %s\n", __func__);
 
     return 0;
 }
 
-/*static int vpu_ioctl(struct inode *inode, struct file *filp, u_int cmd, u_long arg) // for kernel 2.6.9 of C&M*/
 static long vpu_ioctl(struct file *filp, u_int cmd, u_long arg)
 {
     int ret = 0;
@@ -636,9 +566,9 @@ static long vpu_ioctl(struct file *filp, u_int cmd, u_long arg)
                 break;
             }
 
-
             if (signal_pending(current)) {
                 ret = -ERESTARTSYS;
+                pr_err("[VPUDRV-ERR]  Signal is received now \n");
                 break;
             }
 
@@ -695,10 +625,8 @@ static long vpu_ioctl(struct file *filp, u_int cmd, u_long arg)
 
                         if (s_instance_pool.base != 0)
 #else
-
                         if (vpu_alloc_dma_buffer(&s_instance_pool) != -1)
 #endif
-
                         {
                             memset((void *) s_instance_pool.base, 0x0,
                                    s_instance_pool.size);   /*clearing memory*/
@@ -713,10 +641,8 @@ static long vpu_ioctl(struct file *filp, u_int cmd, u_long arg)
                         }
 
                     }
-
                     ret = -EFAULT;
                 }
-
                 up(&s_vpu_sem);
             }
 
@@ -730,26 +656,22 @@ static long vpu_ioctl(struct file *filp, u_int cmd, u_long arg)
             if (s_common_memory.base != 0) {
                 ret = copy_to_user((void __user *) arg, &s_common_memory,
                                    sizeof(vpudrv_buffer_t));
-
                 if (ret != 0)
                     ret = -EFAULT;
             }
             else {
                 ret = copy_from_user(&s_common_memory, (vpudrv_buffer_t *) arg,
                                      sizeof(vpudrv_buffer_t));
-
                 if (ret == 0) {
                     if (vpu_alloc_common_buffer(&s_common_memory) != -1) {
                         ret = copy_to_user((void __user *) arg, &s_common_memory,
                                            sizeof(vpudrv_buffer_t));
-
                         if (ret == 0) {
                             /* success to get memory for common memory */
                             break;
                         }
                     }
                 }
-
                 ret = -EFAULT;
             }
 
@@ -760,7 +682,6 @@ static long vpu_ioctl(struct file *filp, u_int cmd, u_long arg)
         case VDI_IOCTL_OPEN_INSTANCE: {
             vpudrv_inst_info_t inst_info;
             vpudrv_instanace_list_t *vil, *n;
-
             vil = kzalloc(sizeof(*vil), GFP_KERNEL);
 
             if (!vil)
@@ -777,8 +698,7 @@ static long vpu_ioctl(struct file *filp, u_int cmd, u_long arg)
             spin_lock(&s_vpu_lock);
             list_add(&vil->list, &s_inst_list_head);
 
-            inst_info.inst_open_count =
-                0; /* counting the current open instance number */
+            inst_info.inst_open_count = 0; /* counting the current open instance number */
             list_for_each_entry_safe(vil, n, &s_inst_list_head, list) {
                 if (vil->core_idx == inst_info.core_idx)
                     inst_info.inst_open_count++;
@@ -803,7 +723,6 @@ static long vpu_ioctl(struct file *filp, u_int cmd, u_long arg)
         case VDI_IOCTL_CLOSE_INSTANCE: {
             vpudrv_inst_info_t inst_info;
             vpudrv_instanace_list_t *vil, *n;
-
             DPRINTK("[VPUDRV][+]VDI_IOCTL_CLOSE_INSTANCE\n");
 
             if (copy_from_user(&inst_info, (vpudrv_inst_info_t *) arg,
@@ -820,8 +739,7 @@ static long vpu_ioctl(struct file *filp, u_int cmd, u_long arg)
                 }
             }
 
-            inst_info.inst_open_count =
-                0; /* counting the current open instance number */
+            inst_info.inst_open_count = 0; /* counting the current open instance number */
             list_for_each_entry_safe(vil, n, &s_inst_list_head, list) {
                 if (vil->core_idx == inst_info.core_idx)
                     inst_info.inst_open_count++;
@@ -853,7 +771,6 @@ static long vpu_ioctl(struct file *filp, u_int cmd, u_long arg)
                 break;
 
             inst_info.inst_open_count = 0;
-
             spin_lock(&s_vpu_lock);
             list_for_each_entry_safe(vil, n, &s_inst_list_head, list) {
                 if (vil->core_idx == inst_info.core_idx)
@@ -867,12 +784,11 @@ static long vpu_ioctl(struct file *filp, u_int cmd, u_long arg)
             DPRINTK("[VPUDRV] VDI_IOCTL_GET_INSTANCE_NUM core_idx=%d, inst_idx=%d, open_count=%d\n",
                     (int) inst_info.core_idx, (int) inst_info.inst_idx,
                     inst_info.inst_open_count);
-
         }
         break;
 
         case VDI_IOCTL_RESET: {
-            vpu_hw_reset();
+            ret = vpu_hw_reset();
         }
         break;
 
@@ -900,25 +816,25 @@ static long vpu_ioctl(struct file *filp, u_int cmd, u_long arg)
                 return -1;
 
             if (NULL == (temp = dma_buf_get(buf.buf_handle))) {
-                DPRINTK("[VPUDRV-ERR] get dma buf error \n");
+                pr_err("[VPUDRV-ERR] get dma buf error \n");
                 return -1;
             }
 
             if (NULL == (void *)(buf.attachment = (uint64_t)dma_buf_attach(temp,
                                                   vpucoda_device))) {
-                DPRINTK("[VPUDRV-ERR] get dma buf attach error \n");
+                pr_err("[VPUDRV-ERR] get dma buf attach error \n");
                 return -1;
             }
 
             if (NULL ==  (void *)(buf.sgt = (uint64_t) dma_buf_map_attachment((
                                                 struct dma_buf_attachment *)buf.attachment, 0))) {
-                DPRINTK("[VPUDRV-ERR] dma_buf_map_attachment error \n");
+                pr_err("[VPUDRV-ERR] dma_buf_map_attachment error \n");
                 return -1;
             }
 
             if (NULL == (void *)( buf.dma_addr  = sg_dma_address(((
                     struct sg_table *)(buf.sgt))->sgl))) {
-                DPRINTK("[VPUDRV-ERR] sg_dma_address error \n");
+                pr_err("[VPUDRV-ERR] sg_dma_address error \n");
                 return -1;
             }
 
@@ -945,14 +861,14 @@ static long vpu_ioctl(struct file *filp, u_int cmd, u_long arg)
                 return -1;
 
             if (NULL == (temp = dma_buf_get(buf.buf_handle))) {
-                DPRINTK("[VPUDRV-ERR] unmap get dma buf error buf.buf_handle %d \n",
+                pr_err("[VPUDRV-ERR] unmap get dma buf error buf.buf_handle %d \n",
                         buf.buf_handle);
                 return -1;
             }
 
             if ((NULL == (struct dma_buf_attachment *)(buf.attachment))
                     || ((NULL == (struct sg_table *)buf.sgt))) {
-                DPRINTK("[VPUDRV-ERR] dma_buf_unmap_attachment param null  \n");
+                pr_err("[VPUDRV-ERR] dma_buf_unmap_attachment param null  \n");
                 return -1;
             }
 
@@ -990,7 +906,7 @@ static long vpu_ioctl(struct file *filp, u_int cmd, u_long arg)
             volatile void __iomem *io_adress = NULL;
 
             if (get_user(mode, (u32 __user *) arg)) {
-                DPRINTK("[VPUDRV]  sram cfg error get_user\n");
+                pr_err("[VPUDRV-ERR]  sram cfg error get_user\n");
                 return -EFAULT;
             }
 
@@ -1050,12 +966,12 @@ static ssize_t vpu_write(struct file *filp, const char __user *buf,
                                     GFP_KERNEL);
 
         if (!bit_firmware_info) {
-            DPRINTK("[VPUDRV] vpu_write  bit_firmware_info allocation error \n");
+            pr_err("[VPUDRV-ERR] vpu_write  bit_firmware_info allocation error \n");
             return -EFAULT;
         }
 
         if (copy_from_user(bit_firmware_info, buf, len)) {
-            DPRINTK("[VPUDRV] vpu_write copy_from_user error for bit_firmware_info\n");
+            pr_err("[VPUDRV-ERR] vpu_write copy_from_user error for bit_firmware_info\n");
             return -EFAULT;
         }
 
@@ -1065,7 +981,7 @@ static ssize_t vpu_write(struct file *filp, const char __user *buf,
                     bit_firmware_info->size, bit_firmware_info->bit_code[0]);
 
             if (bit_firmware_info->core_idx > MAX_NUM_VPU_CORE) {
-                DPRINTK("[VPUDRV] vpu_write coreIdx[%d] is exceeded than MAX_NUM_VPU_CORE[%d]\n",
+                pr_err("[VPUDRV-ERR] vpu_write coreIdx[%d] is exceeded than MAX_NUM_VPU_CORE[%d]\n",
                         bit_firmware_info->core_idx, MAX_NUM_VPU_CORE);
                 return -ENODEV;
             }
@@ -1086,7 +1002,6 @@ static ssize_t vpu_write(struct file *filp, const char __user *buf,
 static int vpu_release(struct inode *inode, struct file *filp)
 {
     int ret = 0;
-
     DPRINTK("[VPUDRV] vpu_release\n");
 
     if ((ret = down_interruptible(&s_vpu_sem)) == 0) {
@@ -1154,7 +1069,6 @@ static int vpu_map_to_physical_memory(struct file *fp,
     /* normal memory with no cache */
 //  v_m->vm_page_prot = pgprot_noncached(vm->vm_page_prot);
     vm->vm_page_prot = pgprot_writecombine(vm->vm_page_prot);
-    DPRINTK("VM-VM_PAGE_PROT\n");
     return remap_pfn_range(vm, vm->vm_start, vm->vm_pgoff,
                            vm->vm_end - vm->vm_start, vm->vm_page_prot) ? -EAGAIN : 0;
 }
@@ -1170,7 +1084,6 @@ static int vpu_map_to_instance_pool_memory(struct file *fp,
     unsigned long pfn;
 
     vm->vm_flags |= VM_RESERVED;
-
     /* loop over all pages, map it page individually */
     while (length > 0) {
         pfn = vmalloc_to_pfn(vmalloc_area_ptr);
@@ -1310,7 +1223,6 @@ static int vpu_probe(struct platform_device *pdev)
     int err = 0;
     struct resource *res = NULL;
     memset(&drive_data, 0 , sizeof(struct coda_drive));
-
     DPRINTK("[VPUDRV] vpu_probe\n");
 
     if (pdev) {
@@ -1357,7 +1269,7 @@ static int vpu_probe(struct platform_device *pdev)
     /* get the major number of the character device */
     if ((alloc_chrdev_region(&s_vpu_major, 0, 1, VPU_DEV_NAME)) < 0) {
         err = -EBUSY;
-        DPRINTK("could not allocate major number\n");
+        pr_err("[VPUDRV-ERR] could not allocate major number\n");
         goto ERROR_PROVE_DEVICE;
     }
 
@@ -1368,12 +1280,12 @@ static int vpu_probe(struct platform_device *pdev)
 
     if ((cdev_add(&s_vpu_cdev, s_vpu_major, 1)) < 0) {
         err = -EBUSY;
-        DPRINTK("could not allocate chrdev\n");
+        pr_err("[VPUDRV-ERR] could not allocate chrdev\n");
         goto ERROR_PROVE_DEVICE;
     }
 
     if(NULL == (drive_data.coda_class = class_create(THIS_MODULE, "vpu_coda"))) {
-        DPRINTK("ERR could not allocate class\n");
+        pr_err("[VPUDRV-ERR] could not allocate class\n");
         err = -EBUSY;
         goto ERROR_PROVE_DEVICE;
     }
@@ -1382,7 +1294,7 @@ static int vpu_probe(struct platform_device *pdev)
         class_destroy(drive_data.coda_class);
         err = -EBUSY;
         drive_data.coda_class = NULL;
-        DPRINTK("ERR could not allocate device\n");
+        pr_err("[VPUDRV-ERR] could not allocate device\n");
         goto ERROR_PROVE_DEVICE;
     }
 
@@ -1397,9 +1309,7 @@ static int vpu_probe(struct platform_device *pdev)
     else
         DPRINTK("[VPUDRV] : get clock controller s_vpu_clk=%p\n", s_vpu_clk);
 
-
 //    vpu_clk_enable(s_vpu_clk);
-
 
 #ifdef VPU_SUPPORT_ISR
 #ifdef VPU_SUPPORT_PLATFORM_DRIVER_REGISTER
@@ -1426,7 +1336,7 @@ static int vpu_probe(struct platform_device *pdev)
                       (void *)(&s_vpu_drv_context));
 
     if (err) {
-        DPRINTK("[VPUDRV] :  fail to register interrupt handler\n");
+        pr_err("[VPUDRV-ERR] :  fail to register interrupt handler\n");
         goto ERROR_PROVE_DEVICE;
     }
 
@@ -1439,7 +1349,7 @@ static int vpu_probe(struct platform_device *pdev)
                               s_video_memory.phys_addr, PAGE_ALIGN(s_video_memory.size));
 
     if (!s_video_memory.base) {
-        DPRINTK("[VPUDRV] :  fail to remap video memory physical phys_addr=0x%lx, base=0x%lx, size=%d\n",
+        pr_err("[VPUDRV-ERR] :  fail to remap video memory physical phys_addr=0x%lx, base=0x%lx, size=%d\n",
                 s_video_memory.phys_addr, s_video_memory.base,
                 (int) s_video_memory.size);
         goto ERROR_PROVE_DEVICE;
@@ -1447,7 +1357,7 @@ static int vpu_probe(struct platform_device *pdev)
 
     if (vmem_init(&s_vmem, s_video_memory.phys_addr,
                   s_video_memory.size) < 0) {
-        DPRINTK("[VPUDRV] :  fail to init vmem system\n");
+        pr_err("[VPUDRV-ERR] :  fail to init vmem system\n");
         goto ERROR_PROVE_DEVICE;
     }
 
@@ -1543,18 +1453,6 @@ static int vpu_remove(struct platform_device *pdev)
 #define W4_CMD_SLEEP_VPU         (0x0400)
 #define W4_CMD_WAKEUP_VPU       (0x0800)
 
-static void Wave4BitIssueCommand(int core, u32 cmd)
-{
-    WriteVpuRegister(W4_VPU_BUSY_STATUS, 1);
-    WriteVpuRegister(W4_CORE_INDEX,  0);
-    /*  coreIdx = ReadVpuRegister(W4_VPU_BUSY_STATUS);*/
-    /*  coreIdx = 0;*/
-    /*  WriteVpuRegister(W4_INST_INDEX,  (instanceIndex&0xffff)|(codecMode<<16));*/
-    WriteVpuRegister(W4_COMMAND, cmd);
-    WriteVpuRegister(W4_VPU_HOST_INT_REQ, 1);
-
-    return;
-}
 
 static int vpu_suspend(struct platform_device *pdev,
                        pm_message_t state)
@@ -1575,30 +1473,7 @@ static int vpu_suspend(struct platform_device *pdev,
 
             product_code = ReadVpuRegister(VPU_PRODUCT_CODE_REGISTER);
 
-            if (PRODUCT_CODE_W_SERIES(product_code)) {
-                while (ReadVpuRegister(W4_VPU_BUSY_STATUS)) {
-                    if (time_after(jiffies, timeout)) {
-                        DPRINTK("SLEEP_VPU BUSY timeout");
-                        goto DONE_SUSPEND;
-                    }
-                }
-
-                Wave4BitIssueCommand(core, W4_CMD_SLEEP_VPU);
-
-                while (ReadVpuRegister(W4_VPU_BUSY_STATUS)) {
-                    if (time_after(jiffies, timeout)) {
-                        DPRINTK("SLEEP_VPU BUSY timeout");
-                        goto DONE_SUSPEND;
-                    }
-                }
-
-                if (ReadVpuRegister(W4_RET_SUCCESS) == 0) {
-                    DPRINTK("SLEEP_VPU failed [0x%x]",
-                            ReadVpuRegister(W4_RET_FAIL_REASON));
-                    goto DONE_SUSPEND;
-                }
-            }
-            else if (PRODUCT_CODE_NOT_W_SERIES(product_code)) {
+            if (PRODUCT_CODE_CODA988(product_code)) {
                 while (ReadVpuRegister(BIT_BUSY_FLAG)) {
                     if (time_after(jiffies, timeout))
                         goto DONE_SUSPEND;
@@ -1609,7 +1484,7 @@ static int vpu_suspend(struct platform_device *pdev,
                                                (i * 4)));
             }
             else {
-                DPRINTK("[VPUDRV] Unknown product id : %08x\n", product_code);
+                pr_err("[VPUDRV] Unknown product id : %08x\n", product_code);
                 goto DONE_SUSPEND;
             }
         }
@@ -1633,12 +1508,6 @@ static int vpu_resume(struct platform_device *pdev)
     unsigned long timeout = jiffies + HZ;   /* vpu wait timeout to 1sec */
     int product_code;
 
-    unsigned long   code_base;
-    u32         code_size;
-    u32         remap_size;
-    int          regVal;
-    u32         hwOption  = 0;
-
     DPRINTK("[VPUDRV] vpu_resume\n");
 
     vpu_clk_enable(s_vpu_clk);
@@ -1651,72 +1520,8 @@ static int vpu_resume(struct platform_device *pdev)
 
         product_code = ReadVpuRegister(VPU_PRODUCT_CODE_REGISTER);
 
-        if (PRODUCT_CODE_W_SERIES(product_code)) {
-            code_base = s_common_memory.phys_addr;
-            /* ALIGN TO 4KB */
-            code_size = (W4_MAX_CODE_BUF_SIZE & ~0xfff);
-
-            if (code_size < s_bit_firmware_info[core].size * 2) {
-                goto DONE_WAKEUP;
-            }
-
-            regVal = 0;
-            WriteVpuRegister(W4_PO_CONF, regVal);
-
-            /* Reset All blocks */
-            regVal = 0x7ffffff;
-            WriteVpuRegister(W4_VPU_RESET_REQ, regVal); /*Reset All blocks*/
-
-            /* Waiting reset done */
-            while (ReadVpuRegister(W4_VPU_RESET_STATUS)) {
-                if (time_after(jiffies, timeout))
-                    goto DONE_WAKEUP;
-            }
-
-            WriteVpuRegister(W4_VPU_RESET_REQ, 0);
-
-            /* remap page size */
-            remap_size = (code_size >> 12) & 0x1ff;
-            regVal = 0x80000000 | (W4_REMAP_CODE_INDEX << 12) | (0 << 16) |
-                     (1 << 11) | remap_size;
-            WriteVpuRegister(W4_VPU_REMAP_CTRL,  regVal);
-            WriteVpuRegister(W4_VPU_REMAP_VADDR,
-                             0x00000000);    /* DO NOT CHANGE! */
-            WriteVpuRegister(W4_VPU_REMAP_PADDR,    code_base);
-            WriteVpuRegister(W4_ADDR_CODE_BASE,  code_base);
-            WriteVpuRegister(W4_CODE_SIZE,        code_size);
-            WriteVpuRegister(W4_CODE_PARAM,      0);
-            WriteVpuRegister(W4_INIT_VPU_TIME_OUT_CNT,   timeout);
-
-            WriteVpuRegister(W4_HW_OPTION, hwOption);
-
-            /* Interrupt */
-            regVal  = (1 << W4_INT_DEC_PIC_HDR);
-            regVal |= (1 << W4_INT_DEC_PIC);
-            regVal |= (1 << W4_INT_QUERY_DEC);
-            regVal |= (1 << W4_INT_SLEEP_VPU);
-            regVal |= (1 << W4_INT_BSBUF_EMPTY);
-
-            WriteVpuRegister(W4_VPU_VINT_ENABLE,  regVal);
-
-            Wave4BitIssueCommand(core, W4_CMD_INIT_VPU);
-            WriteVpuRegister(W4_VPU_REMAP_CORE_START, 1);
-
-            while (ReadVpuRegister(W4_VPU_BUSY_STATUS)) {
-                if (time_after(jiffies, timeout))
-                    goto DONE_WAKEUP;
-            }
-
-            if (ReadVpuRegister(W4_RET_SUCCESS) == 0) {
-                DPRINTK("WAKEUP_VPU failed [0x%x]",
-                        ReadVpuRegister(W4_RET_FAIL_REASON));
-                goto DONE_WAKEUP;
-            }
-        }
-        else if (PRODUCT_CODE_NOT_W_SERIES(product_code)) {
-
+        if (PRODUCT_CODE_CODA988(product_code)) {
             WriteVpuRegister(BIT_CODE_RUN, 0);
-
             /*---- LOAD BOOT CODE*/
             for (i = 0; i < 512; i++) {
                 val = s_bit_firmware_info[core].bit_code[i];
@@ -1738,7 +1543,7 @@ static int vpu_resume(struct platform_device *pdev)
 
         }
         else {
-            DPRINTK("[VPUDRV] Unknown product id : %08x\n", product_code);
+            pr_err("[VPUDRV-ERR] Unknown product id : %08x\n", product_code);
             goto DONE_WAKEUP;
         }
 
@@ -1892,15 +1697,6 @@ module_exit(vpu_exit);
 static int vpu_hw_reset(void)
 {
     struct reset_control *vpu_rst = NULL;
-    uint32_t core = 0;
-    unsigned long timeout = jiffies + HZ;   /* vpu wait timeout to 1sec */
-
-    while (ReadVpuRegister(BIT_BUSY_FLAG)) {
-        if (time_after(jiffies, timeout)) {
-            pr_err("[VPUDRV], Coda988 can not reset now ...\n");
-            return -1;
-        }
-    }
 
     if (vpucoda_device)
     {
@@ -1918,7 +1714,7 @@ static int vpu_hw_reset(void)
 
         reset_control_put(vpu_rst);
     } else {
-        pr_err("[VPUDRV] No vpucoda_device\n");
+        pr_err("[VPUDRV-ERR] No vpucoda_device\n");
         return -1;
     }
 
@@ -1960,7 +1756,7 @@ static void vpu_clk_put(struct clk *clk)
             || IS_ERR(clk))) {
 
         clk_put(clk);
-        DPRINTK("[DRV] colk and pclk put is success \n");
+        DPRINTK("[VPUDRV] colk and pclk put is success \n");
     }
     clk = NULL;
 
@@ -1985,11 +1781,11 @@ static int vpu_clk_enable(struct clk *clk)
             || IS_ERR(clk))) {
 
         if(0 != (err_code = clk_prepare(clk))) {
-            DPRINTK("[DRV] ckl prepare error code %d \n", err_code);
+            pr_err("[VPUDRV-ERR] ckl prepare error code %d \n", err_code);
             return err_code;
         }
         clk_enable(clk);
-        DPRINTK("[DRV] colk enable success clk_reference %d  \n", ++clk_reference);
+        DPRINTK("[VPUDRV] colk enable success clk_reference %d  \n", ++clk_reference);
     }
 
     return 0;
@@ -2015,7 +1811,7 @@ static void vpu_clk_disable(struct clk *clk)
             clk_disable(clk);
             clk_unprepare(clk);
 
-            DPRINTK("[DRV] colk and pclk disable is success clk_reference %d \n", --clk_reference);
+            DPRINTK("[VPUDRV] colk and pclk disable is success clk_reference %d \n", --clk_reference);
         }
 
 #else
