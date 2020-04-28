@@ -311,7 +311,7 @@ static void TCLocalDevPAddrToCpuPAddr(IMG_HANDLE hPrivData,
 				      IMG_DEV_PHYADDR *psDevPAddr)
 {
 	PVRSRV_DEVICE_CONFIG *psDevConfig = (PVRSRV_DEVICE_CONFIG *)hPrivData;
-	
+
 	/* Optimise common case */
 	psCpuPAddr[0].uiAddr = psDevPAddr[0].uiAddr + psDevConfig->pasPhysHeaps[0].pasRegions[0].sStartAddr.uiAddr;
 	if (ui32NumOfAddr > 1)
@@ -338,9 +338,9 @@ static void TCIonCpuPAddrToDevPAddr(IMG_HANDLE hPrivData,
 {
 	PVRSRV_DEVICE_CONFIG *psDevConfig = (PVRSRV_DEVICE_CONFIG *)hPrivData;
 	SYS_DATA *psSysData = psDevConfig->hSysData;
-	
+
 	/* Optimise common case */
-	psDevPAddr[0].uiAddr = psCpuPAddr[0].uiAddr - psSysData->pdata->tc_memory_base;	
+	psDevPAddr[0].uiAddr = psCpuPAddr[0].uiAddr - psSysData->pdata->tc_memory_base;
 	if (ui32NumOfAddr > 1)
 	{
 		IMG_UINT32 ui32Idx;
@@ -622,7 +622,7 @@ PVRSRV_ERROR SysDevInit(void *pvOSDevice, PVRSRV_DEVICE_CONFIG **ppsDevConfig)
 	{
 		PVR_DPF((PVR_DBG_ERROR,
 				 "%s: Rogue register region isn't big enough (was %pa, required 0x%08x)",
-				 __FUNCTION__, &uiRegistersSize, SYS_RGX_REG_REGION_SIZE));
+				 __func__, &uiRegistersSize, SYS_RGX_REG_REGION_SIZE));
 
 		eError = PVRSRV_ERROR_PCI_REGION_TOO_SMALL;
 		goto ErrorDevDisable;
@@ -633,7 +633,9 @@ PVRSRV_ERROR SysDevInit(void *pvOSDevice, PVRSRV_DEVICE_CONFIG **ppsDevConfig)
 							resource_size(psSysData->registers),
 							SYS_RGX_DEV_NAME))
 	{
-		PVR_DPF((PVR_DBG_ERROR, "%s: Rogue register memory region not available", __FUNCTION__));
+		PVR_DPF((PVR_DBG_ERROR,
+				 "%s: Rogue register memory region not available",
+				 __func__));
 		eError = PVRSRV_ERROR_PCI_CALL_FAILED;
 
 		goto ErrorDevDisable;

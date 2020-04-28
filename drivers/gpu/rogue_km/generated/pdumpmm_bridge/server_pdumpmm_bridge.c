@@ -39,7 +39,7 @@ PURPOSE AND NONINFRINGEMENT; AND (B) IN NO EVENT SHALL THE AUTHORS OR
 COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
 IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-********************************************************************************/
+*******************************************************************************/
 
 #include <linux/uaccess.h>
 
@@ -48,6 +48,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "devicemem_server.h"
 #include "pmr.h"
 #include "physmem.h"
+#include "pdump_physmem.h"
 
 #include "common_pdumpmm_bridge.h"
 
@@ -79,7 +80,7 @@ PVRSRVBridgePMRPDumpLoadMem(IMG_UINT32 ui32DispatchTableEntry,
 	PMR *psPMRInt = NULL;
 
 	/* Lock over handle lookup. */
-	LockHandle();
+	LockHandle(psConnection->psHandleBase);
 
 	/* Look up the address from the handle */
 	psPMRPDumpLoadMemOUT->eError =
@@ -88,13 +89,13 @@ PVRSRVBridgePMRPDumpLoadMem(IMG_UINT32 ui32DispatchTableEntry,
 				       hPMR,
 				       PVRSRV_HANDLE_TYPE_PHYSMEM_PMR,
 				       IMG_TRUE);
-	if (psPMRPDumpLoadMemOUT->eError != PVRSRV_OK)
+	if (unlikely(psPMRPDumpLoadMemOUT->eError != PVRSRV_OK))
 	{
-		UnlockHandle();
+		UnlockHandle(psConnection->psHandleBase);
 		goto PMRPDumpLoadMem_exit;
 	}
 	/* Release now we have looked up handles. */
-	UnlockHandle();
+	UnlockHandle(psConnection->psHandleBase);
 
 	psPMRPDumpLoadMemOUT->eError =
 	    PMRPDumpLoadMem(psPMRInt,
@@ -106,7 +107,7 @@ PVRSRVBridgePMRPDumpLoadMem(IMG_UINT32 ui32DispatchTableEntry,
  PMRPDumpLoadMem_exit:
 
 	/* Lock over handle lookup cleanup. */
-	LockHandle();
+	LockHandle(psConnection->psHandleBase);
 
 	/* Unreference the previously looked up handle */
 	if (psPMRInt)
@@ -116,7 +117,7 @@ PVRSRVBridgePMRPDumpLoadMem(IMG_UINT32 ui32DispatchTableEntry,
 					    PVRSRV_HANDLE_TYPE_PHYSMEM_PMR);
 	}
 	/* Release now we have cleaned up look up handles. */
-	UnlockHandle();
+	UnlockHandle(psConnection->psHandleBase);
 
 	return 0;
 }
@@ -133,7 +134,7 @@ PVRSRVBridgePMRPDumpLoadMemValue32(IMG_UINT32 ui32DispatchTableEntry,
 	PMR *psPMRInt = NULL;
 
 	/* Lock over handle lookup. */
-	LockHandle();
+	LockHandle(psConnection->psHandleBase);
 
 	/* Look up the address from the handle */
 	psPMRPDumpLoadMemValue32OUT->eError =
@@ -142,13 +143,13 @@ PVRSRVBridgePMRPDumpLoadMemValue32(IMG_UINT32 ui32DispatchTableEntry,
 				       hPMR,
 				       PVRSRV_HANDLE_TYPE_PHYSMEM_PMR,
 				       IMG_TRUE);
-	if (psPMRPDumpLoadMemValue32OUT->eError != PVRSRV_OK)
+	if (unlikely(psPMRPDumpLoadMemValue32OUT->eError != PVRSRV_OK))
 	{
-		UnlockHandle();
+		UnlockHandle(psConnection->psHandleBase);
 		goto PMRPDumpLoadMemValue32_exit;
 	}
 	/* Release now we have looked up handles. */
-	UnlockHandle();
+	UnlockHandle(psConnection->psHandleBase);
 
 	psPMRPDumpLoadMemValue32OUT->eError =
 	    PMRPDumpLoadMemValue32(psPMRInt,
@@ -159,7 +160,7 @@ PVRSRVBridgePMRPDumpLoadMemValue32(IMG_UINT32 ui32DispatchTableEntry,
  PMRPDumpLoadMemValue32_exit:
 
 	/* Lock over handle lookup cleanup. */
-	LockHandle();
+	LockHandle(psConnection->psHandleBase);
 
 	/* Unreference the previously looked up handle */
 	if (psPMRInt)
@@ -169,7 +170,7 @@ PVRSRVBridgePMRPDumpLoadMemValue32(IMG_UINT32 ui32DispatchTableEntry,
 					    PVRSRV_HANDLE_TYPE_PHYSMEM_PMR);
 	}
 	/* Release now we have cleaned up look up handles. */
-	UnlockHandle();
+	UnlockHandle(psConnection->psHandleBase);
 
 	return 0;
 }
@@ -186,7 +187,7 @@ PVRSRVBridgePMRPDumpLoadMemValue64(IMG_UINT32 ui32DispatchTableEntry,
 	PMR *psPMRInt = NULL;
 
 	/* Lock over handle lookup. */
-	LockHandle();
+	LockHandle(psConnection->psHandleBase);
 
 	/* Look up the address from the handle */
 	psPMRPDumpLoadMemValue64OUT->eError =
@@ -195,13 +196,13 @@ PVRSRVBridgePMRPDumpLoadMemValue64(IMG_UINT32 ui32DispatchTableEntry,
 				       hPMR,
 				       PVRSRV_HANDLE_TYPE_PHYSMEM_PMR,
 				       IMG_TRUE);
-	if (psPMRPDumpLoadMemValue64OUT->eError != PVRSRV_OK)
+	if (unlikely(psPMRPDumpLoadMemValue64OUT->eError != PVRSRV_OK))
 	{
-		UnlockHandle();
+		UnlockHandle(psConnection->psHandleBase);
 		goto PMRPDumpLoadMemValue64_exit;
 	}
 	/* Release now we have looked up handles. */
-	UnlockHandle();
+	UnlockHandle(psConnection->psHandleBase);
 
 	psPMRPDumpLoadMemValue64OUT->eError =
 	    PMRPDumpLoadMemValue64(psPMRInt,
@@ -212,7 +213,7 @@ PVRSRVBridgePMRPDumpLoadMemValue64(IMG_UINT32 ui32DispatchTableEntry,
  PMRPDumpLoadMemValue64_exit:
 
 	/* Lock over handle lookup cleanup. */
-	LockHandle();
+	LockHandle(psConnection->psHandleBase);
 
 	/* Unreference the previously looked up handle */
 	if (psPMRInt)
@@ -222,7 +223,7 @@ PVRSRVBridgePMRPDumpLoadMemValue64(IMG_UINT32 ui32DispatchTableEntry,
 					    PVRSRV_HANDLE_TYPE_PHYSMEM_PMR);
 	}
 	/* Release now we have cleaned up look up handles. */
-	UnlockHandle();
+	UnlockHandle(psConnection->psHandleBase);
 
 	return 0;
 }
@@ -247,6 +248,15 @@ PVRSRVBridgePMRPDumpSaveToFile(IMG_UINT32 ui32DispatchTableEntry,
 
 	IMG_UINT32 ui32BufferSize =
 	    (psPMRPDumpSaveToFileIN->ui32ArraySize * sizeof(IMG_CHAR)) + 0;
+
+	if (unlikely
+	    (psPMRPDumpSaveToFileIN->ui32ArraySize >
+	     PVRSRV_PDUMP_MAX_FILENAME_SIZE))
+	{
+		psPMRPDumpSaveToFileOUT->eError =
+		    PVRSRV_ERROR_BRIDGE_ARRAY_SIZE_TOO_BIG;
+		goto PMRPDumpSaveToFile_exit;
+	}
 
 	if (ui32BufferSize != 0)
 	{
@@ -305,10 +315,13 @@ PVRSRVBridgePMRPDumpSaveToFile(IMG_UINT32 ui32DispatchTableEntry,
 
 			goto PMRPDumpSaveToFile_exit;
 		}
+		((IMG_CHAR *)
+		 uiFileNameInt)[(psPMRPDumpSaveToFileIN->ui32ArraySize *
+				 sizeof(IMG_CHAR)) - 1] = '\0';
 	}
 
 	/* Lock over handle lookup. */
-	LockHandle();
+	LockHandle(psConnection->psHandleBase);
 
 	/* Look up the address from the handle */
 	psPMRPDumpSaveToFileOUT->eError =
@@ -317,13 +330,13 @@ PVRSRVBridgePMRPDumpSaveToFile(IMG_UINT32 ui32DispatchTableEntry,
 				       hPMR,
 				       PVRSRV_HANDLE_TYPE_PHYSMEM_PMR,
 				       IMG_TRUE);
-	if (psPMRPDumpSaveToFileOUT->eError != PVRSRV_OK)
+	if (unlikely(psPMRPDumpSaveToFileOUT->eError != PVRSRV_OK))
 	{
-		UnlockHandle();
+		UnlockHandle(psConnection->psHandleBase);
 		goto PMRPDumpSaveToFile_exit;
 	}
 	/* Release now we have looked up handles. */
-	UnlockHandle();
+	UnlockHandle(psConnection->psHandleBase);
 
 	psPMRPDumpSaveToFileOUT->eError =
 	    PMRPDumpSaveToFile(psPMRInt,
@@ -336,7 +349,7 @@ PVRSRVBridgePMRPDumpSaveToFile(IMG_UINT32 ui32DispatchTableEntry,
  PMRPDumpSaveToFile_exit:
 
 	/* Lock over handle lookup cleanup. */
-	LockHandle();
+	LockHandle(psConnection->psHandleBase);
 
 	/* Unreference the previously looked up handle */
 	if (psPMRInt)
@@ -346,7 +359,7 @@ PVRSRVBridgePMRPDumpSaveToFile(IMG_UINT32 ui32DispatchTableEntry,
 					    PVRSRV_HANDLE_TYPE_PHYSMEM_PMR);
 	}
 	/* Release now we have cleaned up look up handles. */
-	UnlockHandle();
+	UnlockHandle(psConnection->psHandleBase);
 
 	/* Allocated space should be equal to the last updated offset */
 	PVR_ASSERT(ui32BufferSize == ui32NextOffset);
@@ -384,6 +397,22 @@ PVRSRVBridgePMRPDumpSymbolicAddr(IMG_UINT32 ui32DispatchTableEntry,
 	    (psPMRPDumpSymbolicAddrIN->ui32MemspaceNameLen * sizeof(IMG_CHAR)) +
 	    (psPMRPDumpSymbolicAddrIN->ui32SymbolicAddrLen * sizeof(IMG_CHAR)) +
 	    0;
+
+	if (psPMRPDumpSymbolicAddrIN->ui32MemspaceNameLen >
+	    PHYSMEM_PDUMP_MEMSPACE_MAX_LENGTH)
+	{
+		psPMRPDumpSymbolicAddrOUT->eError =
+		    PVRSRV_ERROR_BRIDGE_ARRAY_SIZE_TOO_BIG;
+		goto PMRPDumpSymbolicAddr_exit;
+	}
+
+	if (psPMRPDumpSymbolicAddrIN->ui32SymbolicAddrLen >
+	    PHYSMEM_PDUMP_SYMNAME_MAX_LENGTH)
+	{
+		psPMRPDumpSymbolicAddrOUT->eError =
+		    PVRSRV_ERROR_BRIDGE_ARRAY_SIZE_TOO_BIG;
+		goto PMRPDumpSymbolicAddr_exit;
+	}
 
 	psPMRPDumpSymbolicAddrOUT->puiMemspaceName =
 	    psPMRPDumpSymbolicAddrIN->puiMemspaceName;
@@ -445,7 +474,7 @@ PVRSRVBridgePMRPDumpSymbolicAddr(IMG_UINT32 ui32DispatchTableEntry,
 	}
 
 	/* Lock over handle lookup. */
-	LockHandle();
+	LockHandle(psConnection->psHandleBase);
 
 	/* Look up the address from the handle */
 	psPMRPDumpSymbolicAddrOUT->eError =
@@ -454,13 +483,13 @@ PVRSRVBridgePMRPDumpSymbolicAddr(IMG_UINT32 ui32DispatchTableEntry,
 				       hPMR,
 				       PVRSRV_HANDLE_TYPE_PHYSMEM_PMR,
 				       IMG_TRUE);
-	if (psPMRPDumpSymbolicAddrOUT->eError != PVRSRV_OK)
+	if (unlikely(psPMRPDumpSymbolicAddrOUT->eError != PVRSRV_OK))
 	{
-		UnlockHandle();
+		UnlockHandle(psConnection->psHandleBase);
 		goto PMRPDumpSymbolicAddr_exit;
 	}
 	/* Release now we have looked up handles. */
-	UnlockHandle();
+	UnlockHandle(psConnection->psHandleBase);
 
 	psPMRPDumpSymbolicAddrOUT->eError =
 	    PMR_PDumpSymbolicAddr(psPMRInt,
@@ -475,12 +504,13 @@ PVRSRVBridgePMRPDumpSymbolicAddr(IMG_UINT32 ui32DispatchTableEntry,
 	if ((psPMRPDumpSymbolicAddrIN->ui32MemspaceNameLen * sizeof(IMG_CHAR)) >
 	    0)
 	{
-		if (OSCopyToUser
-		    (NULL,
-		     (void __user *)psPMRPDumpSymbolicAddrOUT->puiMemspaceName,
-		     puiMemspaceNameInt,
-		     (psPMRPDumpSymbolicAddrIN->ui32MemspaceNameLen *
-		      sizeof(IMG_CHAR))) != PVRSRV_OK)
+		if (unlikely
+		    (OSCopyToUser
+		     (NULL,
+		      (void __user *)psPMRPDumpSymbolicAddrOUT->puiMemspaceName,
+		      puiMemspaceNameInt,
+		      (psPMRPDumpSymbolicAddrIN->ui32MemspaceNameLen *
+		       sizeof(IMG_CHAR))) != PVRSRV_OK))
 		{
 			psPMRPDumpSymbolicAddrOUT->eError =
 			    PVRSRV_ERROR_INVALID_PARAMS;
@@ -492,12 +522,13 @@ PVRSRVBridgePMRPDumpSymbolicAddr(IMG_UINT32 ui32DispatchTableEntry,
 	if ((psPMRPDumpSymbolicAddrIN->ui32SymbolicAddrLen * sizeof(IMG_CHAR)) >
 	    0)
 	{
-		if (OSCopyToUser
-		    (NULL,
-		     (void __user *)psPMRPDumpSymbolicAddrOUT->puiSymbolicAddr,
-		     puiSymbolicAddrInt,
-		     (psPMRPDumpSymbolicAddrIN->ui32SymbolicAddrLen *
-		      sizeof(IMG_CHAR))) != PVRSRV_OK)
+		if (unlikely
+		    (OSCopyToUser
+		     (NULL,
+		      (void __user *)psPMRPDumpSymbolicAddrOUT->puiSymbolicAddr,
+		      puiSymbolicAddrInt,
+		      (psPMRPDumpSymbolicAddrIN->ui32SymbolicAddrLen *
+		       sizeof(IMG_CHAR))) != PVRSRV_OK))
 		{
 			psPMRPDumpSymbolicAddrOUT->eError =
 			    PVRSRV_ERROR_INVALID_PARAMS;
@@ -509,7 +540,7 @@ PVRSRVBridgePMRPDumpSymbolicAddr(IMG_UINT32 ui32DispatchTableEntry,
  PMRPDumpSymbolicAddr_exit:
 
 	/* Lock over handle lookup cleanup. */
-	LockHandle();
+	LockHandle(psConnection->psHandleBase);
 
 	/* Unreference the previously looked up handle */
 	if (psPMRInt)
@@ -519,7 +550,7 @@ PVRSRVBridgePMRPDumpSymbolicAddr(IMG_UINT32 ui32DispatchTableEntry,
 					    PVRSRV_HANDLE_TYPE_PHYSMEM_PMR);
 	}
 	/* Release now we have cleaned up look up handles. */
-	UnlockHandle();
+	UnlockHandle(psConnection->psHandleBase);
 
 	/* Allocated space should be equal to the last updated offset */
 	PVR_ASSERT(ui32BufferSize == ui32NextOffset);
@@ -544,7 +575,7 @@ PVRSRVBridgePMRPDumpPol32(IMG_UINT32 ui32DispatchTableEntry,
 	PMR *psPMRInt = NULL;
 
 	/* Lock over handle lookup. */
-	LockHandle();
+	LockHandle(psConnection->psHandleBase);
 
 	/* Look up the address from the handle */
 	psPMRPDumpPol32OUT->eError =
@@ -553,13 +584,13 @@ PVRSRVBridgePMRPDumpPol32(IMG_UINT32 ui32DispatchTableEntry,
 				       hPMR,
 				       PVRSRV_HANDLE_TYPE_PHYSMEM_PMR,
 				       IMG_TRUE);
-	if (psPMRPDumpPol32OUT->eError != PVRSRV_OK)
+	if (unlikely(psPMRPDumpPol32OUT->eError != PVRSRV_OK))
 	{
-		UnlockHandle();
+		UnlockHandle(psConnection->psHandleBase);
 		goto PMRPDumpPol32_exit;
 	}
 	/* Release now we have looked up handles. */
-	UnlockHandle();
+	UnlockHandle(psConnection->psHandleBase);
 
 	psPMRPDumpPol32OUT->eError =
 	    PMRPDumpPol32(psPMRInt,
@@ -572,7 +603,7 @@ PVRSRVBridgePMRPDumpPol32(IMG_UINT32 ui32DispatchTableEntry,
  PMRPDumpPol32_exit:
 
 	/* Lock over handle lookup cleanup. */
-	LockHandle();
+	LockHandle(psConnection->psHandleBase);
 
 	/* Unreference the previously looked up handle */
 	if (psPMRInt)
@@ -582,7 +613,7 @@ PVRSRVBridgePMRPDumpPol32(IMG_UINT32 ui32DispatchTableEntry,
 					    PVRSRV_HANDLE_TYPE_PHYSMEM_PMR);
 	}
 	/* Release now we have cleaned up look up handles. */
-	UnlockHandle();
+	UnlockHandle(psConnection->psHandleBase);
 
 	return 0;
 }
@@ -597,7 +628,7 @@ PVRSRVBridgePMRPDumpCBP(IMG_UINT32 ui32DispatchTableEntry,
 	PMR *psPMRInt = NULL;
 
 	/* Lock over handle lookup. */
-	LockHandle();
+	LockHandle(psConnection->psHandleBase);
 
 	/* Look up the address from the handle */
 	psPMRPDumpCBPOUT->eError =
@@ -606,13 +637,13 @@ PVRSRVBridgePMRPDumpCBP(IMG_UINT32 ui32DispatchTableEntry,
 				       hPMR,
 				       PVRSRV_HANDLE_TYPE_PHYSMEM_PMR,
 				       IMG_TRUE);
-	if (psPMRPDumpCBPOUT->eError != PVRSRV_OK)
+	if (unlikely(psPMRPDumpCBPOUT->eError != PVRSRV_OK))
 	{
-		UnlockHandle();
+		UnlockHandle(psConnection->psHandleBase);
 		goto PMRPDumpCBP_exit;
 	}
 	/* Release now we have looked up handles. */
-	UnlockHandle();
+	UnlockHandle(psConnection->psHandleBase);
 
 	psPMRPDumpCBPOUT->eError =
 	    PMRPDumpCBP(psPMRInt,
@@ -624,7 +655,7 @@ PVRSRVBridgePMRPDumpCBP(IMG_UINT32 ui32DispatchTableEntry,
  PMRPDumpCBP_exit:
 
 	/* Lock over handle lookup cleanup. */
-	LockHandle();
+	LockHandle(psConnection->psHandleBase);
 
 	/* Unreference the previously looked up handle */
 	if (psPMRInt)
@@ -634,7 +665,7 @@ PVRSRVBridgePMRPDumpCBP(IMG_UINT32 ui32DispatchTableEntry,
 					    PVRSRV_HANDLE_TYPE_PHYSMEM_PMR);
 	}
 	/* Release now we have cleaned up look up handles. */
-	UnlockHandle();
+	UnlockHandle(psConnection->psHandleBase);
 
 	return 0;
 }
@@ -663,6 +694,15 @@ PVRSRVBridgeDevmemIntPDumpSaveToFileVirtual(IMG_UINT32 ui32DispatchTableEntry,
 	IMG_UINT32 ui32BufferSize =
 	    (psDevmemIntPDumpSaveToFileVirtualIN->ui32ArraySize *
 	     sizeof(IMG_CHAR)) + 0;
+
+	if (unlikely
+	    (psDevmemIntPDumpSaveToFileVirtualIN->ui32ArraySize >
+	     PVRSRV_PDUMP_MAX_FILENAME_SIZE))
+	{
+		psDevmemIntPDumpSaveToFileVirtualOUT->eError =
+		    PVRSRV_ERROR_BRIDGE_ARRAY_SIZE_TOO_BIG;
+		goto DevmemIntPDumpSaveToFileVirtual_exit;
+	}
 
 	if (ui32BufferSize != 0)
 	{
@@ -724,10 +764,13 @@ PVRSRVBridgeDevmemIntPDumpSaveToFileVirtual(IMG_UINT32 ui32DispatchTableEntry,
 
 			goto DevmemIntPDumpSaveToFileVirtual_exit;
 		}
+		((IMG_CHAR *)
+		 uiFileNameInt)[(psDevmemIntPDumpSaveToFileVirtualIN->
+				 ui32ArraySize * sizeof(IMG_CHAR)) - 1] = '\0';
 	}
 
 	/* Lock over handle lookup. */
-	LockHandle();
+	LockHandle(psConnection->psHandleBase);
 
 	/* Look up the address from the handle */
 	psDevmemIntPDumpSaveToFileVirtualOUT->eError =
@@ -736,13 +779,13 @@ PVRSRVBridgeDevmemIntPDumpSaveToFileVirtual(IMG_UINT32 ui32DispatchTableEntry,
 				       hDevmemServerContext,
 				       PVRSRV_HANDLE_TYPE_DEVMEMINT_CTX,
 				       IMG_TRUE);
-	if (psDevmemIntPDumpSaveToFileVirtualOUT->eError != PVRSRV_OK)
+	if (unlikely(psDevmemIntPDumpSaveToFileVirtualOUT->eError != PVRSRV_OK))
 	{
-		UnlockHandle();
+		UnlockHandle(psConnection->psHandleBase);
 		goto DevmemIntPDumpSaveToFileVirtual_exit;
 	}
 	/* Release now we have looked up handles. */
-	UnlockHandle();
+	UnlockHandle(psConnection->psHandleBase);
 
 	psDevmemIntPDumpSaveToFileVirtualOUT->eError =
 	    DevmemIntPDumpSaveToFileVirtual(psDevmemServerContextInt,
@@ -760,7 +803,7 @@ PVRSRVBridgeDevmemIntPDumpSaveToFileVirtual(IMG_UINT32 ui32DispatchTableEntry,
  DevmemIntPDumpSaveToFileVirtual_exit:
 
 	/* Lock over handle lookup cleanup. */
-	LockHandle();
+	LockHandle(psConnection->psHandleBase);
 
 	/* Unreference the previously looked up handle */
 	if (psDevmemServerContextInt)
@@ -770,7 +813,7 @@ PVRSRVBridgeDevmemIntPDumpSaveToFileVirtual(IMG_UINT32 ui32DispatchTableEntry,
 					    PVRSRV_HANDLE_TYPE_DEVMEMINT_CTX);
 	}
 	/* Release now we have cleaned up look up handles. */
-	UnlockHandle();
+	UnlockHandle(psConnection->psHandleBase);
 
 	/* Allocated space should be equal to the last updated offset */
 	PVR_ASSERT(ui32BufferSize == ui32NextOffset);
@@ -785,8 +828,8 @@ PVRSRVBridgeDevmemIntPDumpSaveToFileVirtual(IMG_UINT32 ui32DispatchTableEntry,
 	return 0;
 }
 
-/* *************************************************************************** 
- * Server bridge dispatch related glue 
+/* ***************************************************************************
+ * Server bridge dispatch related glue
  */
 
 static IMG_BOOL bUseLock = IMG_TRUE;

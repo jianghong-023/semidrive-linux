@@ -64,13 +64,7 @@ typedef struct _RGX_SERVER_COMPUTE_CONTEXT_ RGX_SERVER_COMPUTE_CONTEXT;
 
  @Description
 
-
- @Input pvDeviceNode
- @Input psCmpCCBMemDesc -
- @Input psCmpCCBCtlMemDesc -
- @Output ppsFWComputeContextMemDesc -
-
- @Return   PVRSRV_ERROR
+@Return   PVRSRV_ERROR
 ******************************************************************************/
 PVRSRV_ERROR PVRSRVRGXCreateComputeContextKM(CONNECTION_DATA			*psConnection,
 											 PVRSRV_DEVICE_NODE			*psDeviceNode,
@@ -79,6 +73,9 @@ PVRSRV_ERROR PVRSRVRGXCreateComputeContextKM(CONNECTION_DATA			*psConnection,
 											 IMG_PBYTE					pbyFrameworkRegisters,
 											 IMG_HANDLE					hMemCtxPrivData,
 											 IMG_DEV_VIRTADDR			sServicesSignalAddr,
+											 IMG_UINT32					ui32StaticComputecontextStateSize,
+											 IMG_PBYTE					pStaticComputecontextState,
+											 IMG_UINT32					ui32PackedCCBSizeU88,
 											 RGX_SERVER_COMPUTE_CONTEXT	**ppsComputeContext);
 
 /*!
@@ -87,8 +84,6 @@ PVRSRV_ERROR PVRSRVRGXCreateComputeContextKM(CONNECTION_DATA			*psConnection,
 
  @Description
 	Server-side implementation of RGXDestroyComputeContext
-
- @Input psCleanupData -
 
  @Return   PVRSRV_ERROR
 ******************************************************************************/
@@ -102,10 +97,6 @@ PVRSRV_ERROR PVRSRVRGXDestroyComputeContextKM(RGX_SERVER_COMPUTE_CONTEXT *psComp
  @Description
 	Server-side implementation of RGXKickCDM
 
- @Input psDeviceNode - RGX Device node
- @Input psFWComputeContextMemDesc - Mem desc for firmware compute context
- @Input ui32cCCBWoffUpdate - New fw Woff for the client CDM CCB
-
  @Return   PVRSRV_ERROR
 ******************************************************************************/
 PVRSRV_ERROR PVRSRVRGXKickCDMKM(RGX_SERVER_COMPUTE_CONTEXT	*psComputeContext,
@@ -118,18 +109,19 @@ PVRSRV_ERROR PVRSRVRGXKickCDMKM(RGX_SERVER_COMPUTE_CONTEXT	*psComputeContext,
 								SYNC_PRIMITIVE_BLOCK		**pauiClientUpdateUFOSyncPrimBlock,
 								IMG_UINT32					*paui32ClientUpdateSyncOffset,
 								IMG_UINT32					*paui32ClientUpdateValue,
+#if defined(SUPPORT_SERVER_SYNC_IMPL)
 								IMG_UINT32					ui32ServerSyncPrims,
 								IMG_UINT32					*paui32ServerSyncFlags,
 								SERVER_SYNC_PRIMITIVE		**pasServerSyncs,
+#endif
 								PVRSRV_FENCE				iCheckFence,
 								PVRSRV_TIMELINE				iUpdateTimeline,
 								PVRSRV_FENCE				*piUpdateFence,
-								IMG_CHAR					pcszUpdateFenceName[32],
+								IMG_CHAR					pcszUpdateFenceName[PVRSRV_SYNC_NAME_LENGTH],
 								IMG_UINT32					ui32CmdSize,
 								IMG_PBYTE					pui8DMCmd,
 								IMG_UINT32					ui32PDumpFlags,
-								IMG_UINT32					ui32ExtJobRef,
-								IMG_DEV_VIRTADDR			sRobustnessResetReason);
+								IMG_UINT32					ui32ExtJobRef);
 
 /*!
 *******************************************************************************
@@ -150,7 +142,6 @@ PVRSRV_ERROR PVRSRVRGXFlushComputeDataKM(RGX_SERVER_COMPUTE_CONTEXT *psComputeCo
  @Function	    PVRSRVRGXNotifyComputeWriteOffsetUpdateKM
  @Description   Server-side implementation of RGXNotifyComputeWriteOffsetUpdate
 
- @Input         psDeviceNode - RGX Device node
  @Input         psComputeContext - Compute context to flush
 
  @Return   PVRSRV_ERROR
@@ -167,10 +158,11 @@ PVRSRV_ERROR PVRSRVRGXGetLastComputeContextResetReasonKM(RGX_SERVER_COMPUTE_CONT
                                                          IMG_UINT32 *peLastResetReason,
                                                          IMG_UINT32 *pui32LastResetJobRef);
 
-/* Debug - check if compute context is waiting on a fence */
-void CheckForStalledComputeCtxt(PVRSRV_RGXDEV_INFO *psDevInfo,
-					DUMPDEBUG_PRINTF_FUNC *pfnDumpDebugPrintf,
-					void *pvDumpDebugFile);
+/* Debug - Dump debug info of compute contexts on this device */
+void DumpComputeCtxtsInfo(PVRSRV_RGXDEV_INFO *psDevInfo,
+                          DUMPDEBUG_PRINTF_FUNC *pfnDumpDebugPrintf,
+                          void *pvDumpDebugFile,
+                          IMG_UINT32 ui32VerbLevel);
 
 /* Debug/Watchdog - check if client compute contexts are stalled */
 IMG_UINT32 CheckForStalledClientComputeCtxt(PVRSRV_RGXDEV_INFO *psDevInfo);

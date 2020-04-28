@@ -82,11 +82,11 @@ DevmemPDumpLoadZeroMem(DEVMEM_MEMDESC *psMemDesc,
 
 /*
  * DevmemPDumpMemValue()
- * 
+ *
  * As above but dumps the value at a dword-aligned address in plain
  * text to the pdump script2 file. Useful for patching a buffer at
  * pdump playback by simply editing the script output file.
- * 
+ *
  * (The same functionality can be achieved by the above function but
  *  the binary PARAM file must be patched in that case.)
  */
@@ -232,21 +232,6 @@ DevmemPDumpLoadMemValue64(DEVMEM_MEMDESC *psMemDesc,
 	PVR_UNREFERENCED_PARAMETER(psMemDesc);
 	PVR_UNREFERENCED_PARAMETER(uiOffset);
 	PVR_UNREFERENCED_PARAMETER(ui64Value);
-	PVR_UNREFERENCED_PARAMETER(uiPDumpFlags);
-}
-
-#ifdef INLINE_IS_PRAGMA
-#pragma inline(DevmemPDumpLoadMemValue)
-#endif
-static INLINE void
-DevmemPDumpLoadMemValue(DEVMEM_MEMDESC *psMemDesc,
-                        IMG_DEVMEM_OFFSET_T uiOffset,
-                        IMG_UINT32 ui32Value,
-                        PDUMP_FLAGS_T uiPDumpFlags)
-{
-	PVR_UNREFERENCED_PARAMETER(psMemDesc);
-	PVR_UNREFERENCED_PARAMETER(uiOffset);
-	PVR_UNREFERENCED_PARAMETER(ui32Value);
 	PVR_UNREFERENCED_PARAMETER(uiPDumpFlags);
 }
 

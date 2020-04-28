@@ -67,7 +67,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #define PVRSRV_BRIDGE_PDUMPMM_CMD_LAST			(PVRSRV_BRIDGE_PDUMPMM_CMD_FIRST+7)
 
 /*******************************************
-            PMRPDumpLoadMem          
+            PMRPDumpLoadMem
  *******************************************/
 
 /* Bridge in structure for PMRPDumpLoadMem */
@@ -87,7 +87,7 @@ typedef struct PVRSRV_BRIDGE_OUT_PMRPDUMPLOADMEM_TAG
 } __attribute__ ((packed)) PVRSRV_BRIDGE_OUT_PMRPDUMPLOADMEM;
 
 /*******************************************
-            PMRPDumpLoadMemValue32          
+            PMRPDumpLoadMemValue32
  *******************************************/
 
 /* Bridge in structure for PMRPDumpLoadMemValue32 */
@@ -106,7 +106,7 @@ typedef struct PVRSRV_BRIDGE_OUT_PMRPDUMPLOADMEMVALUE32_TAG
 } __attribute__ ((packed)) PVRSRV_BRIDGE_OUT_PMRPDUMPLOADMEMVALUE32;
 
 /*******************************************
-            PMRPDumpLoadMemValue64          
+            PMRPDumpLoadMemValue64
  *******************************************/
 
 /* Bridge in structure for PMRPDumpLoadMemValue64 */
@@ -125,7 +125,7 @@ typedef struct PVRSRV_BRIDGE_OUT_PMRPDUMPLOADMEMVALUE64_TAG
 } __attribute__ ((packed)) PVRSRV_BRIDGE_OUT_PMRPDUMPLOADMEMVALUE64;
 
 /*******************************************
-            PMRPDumpSaveToFile          
+            PMRPDumpSaveToFile
  *******************************************/
 
 /* Bridge in structure for PMRPDumpSaveToFile */
@@ -146,7 +146,7 @@ typedef struct PVRSRV_BRIDGE_OUT_PMRPDUMPSAVETOFILE_TAG
 } __attribute__ ((packed)) PVRSRV_BRIDGE_OUT_PMRPDUMPSAVETOFILE;
 
 /*******************************************
-            PMRPDumpSymbolicAddr          
+            PMRPDumpSymbolicAddr
  *******************************************/
 
 /* Bridge in structure for PMRPDumpSymbolicAddr */
@@ -173,7 +173,7 @@ typedef struct PVRSRV_BRIDGE_OUT_PMRPDUMPSYMBOLICADDR_TAG
 } __attribute__ ((packed)) PVRSRV_BRIDGE_OUT_PMRPDUMPSYMBOLICADDR;
 
 /*******************************************
-            PMRPDumpPol32          
+            PMRPDumpPol32
  *******************************************/
 
 /* Bridge in structure for PMRPDumpPol32 */
@@ -194,7 +194,7 @@ typedef struct PVRSRV_BRIDGE_OUT_PMRPDUMPPOL32_TAG
 } __attribute__ ((packed)) PVRSRV_BRIDGE_OUT_PMRPDUMPPOL32;
 
 /*******************************************
-            PMRPDumpCBP          
+            PMRPDumpCBP
  *******************************************/
 
 /* Bridge in structure for PMRPDumpCBP */
@@ -214,7 +214,7 @@ typedef struct PVRSRV_BRIDGE_OUT_PMRPDUMPCBP_TAG
 } __attribute__ ((packed)) PVRSRV_BRIDGE_OUT_PMRPDUMPCBP;
 
 /*******************************************
-            DevmemIntPDumpSaveToFileVirtual          
+            DevmemIntPDumpSaveToFileVirtual
  *******************************************/
 
 /* Bridge in structure for DevmemIntPDumpSaveToFileVirtual */

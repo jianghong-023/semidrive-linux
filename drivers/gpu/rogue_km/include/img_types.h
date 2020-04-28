@@ -41,9 +41,9 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */ /**************************************************************************/
 
-#ifndef __IMG_TYPES_H__
-#define __IMG_TYPES_H__
-#if defined (__cplusplus)
+#ifndef IMG_TYPES_H
+#define IMG_TYPES_H
+#if defined(__cplusplus)
 extern "C" {
 #endif
 
@@ -62,6 +62,7 @@ extern "C" {
  * firmware code), we can include the standard headers.
  */
 #if defined(_MSC_VER)
+	#include <stdbool.h>		/* bool */
 	#include "msvc_types.h"
 #elif defined(LINUX) && defined(__KERNEL__)
 	#include <linux/types.h>
@@ -71,28 +72,45 @@ extern "C" {
 	#include <stdint.h>
 	#include <inttypes.h>		/* intX_t/uintX_t, format specifiers */
 	#include <limits.h>			/* INT_MIN, etc */
+	#include <stdbool.h>		/* bool */
 #elif defined(__mips)
 	#include <stddef.h>			/* NULL */
 	#include <inttypes.h>		/* intX_t/uintX_t, format specifiers */
+	#include <stdbool.h>		/* bool */
 #else
 	#error C99 support not set up for this build
 #endif
 
-typedef unsigned int	IMG_UINT,	*IMG_PUINT;
-typedef int				IMG_INT,	*IMG_PINT;
+/*
+ * Due to a Klocwork bug, 'true'/'false' constants are not recognized to be of
+ * boolean type. This results in large number of false-positives being reported
+ * (MISRA.ETYPE.ASSIGN.2012: "An expression value of essential type 'signed char'
+ * is assigned to an object of essential type 'bool'"). Work around this by
+ * redefining those constants with cast to bool added.
+ */
+#if defined(__KLOCWORK__) && !defined(__cplusplus)
+#undef true
+#undef false
+#define true ((bool) 1)
+#define false ((bool) 0)
+#endif
+
+typedef unsigned int	IMG_UINT;
+typedef int				IMG_INT;
 
 typedef uint8_t			IMG_UINT8,	*IMG_PUINT8;
 typedef uint8_t			IMG_BYTE,	*IMG_PBYTE;
-typedef int8_t			IMG_INT8,	*IMG_PINT8;
+typedef int8_t			IMG_INT8;
 typedef char			IMG_CHAR,	*IMG_PCHAR;
 
 typedef uint16_t		IMG_UINT16,	*IMG_PUINT16;
-typedef int16_t			IMG_INT16,	*IMG_PINT16;
+typedef int16_t			IMG_INT16;
 typedef uint32_t		IMG_UINT32,	*IMG_PUINT32;
 typedef int32_t			IMG_INT32,	*IMG_PINT32;
+#define IMG_UINT32_C(c) ((IMG_UINT32)UINT32_C(c))
 
 typedef uint64_t		IMG_UINT64,	*IMG_PUINT64;
-typedef int64_t			IMG_INT64,	*IMG_PINT64;
+typedef int64_t			IMG_INT64;
 #define IMG_INT64_C(c)	INT64_C(c)
 #define IMG_UINT64_C(c)	UINT64_C(c)
 #define IMG_UINT64_FMTSPEC PRIu64
@@ -111,9 +129,9 @@ typedef int64_t			IMG_INT64,	*IMG_PINT64;
 
 /* Linux kernel mode does not use floating point */
 typedef float			IMG_FLOAT,	*IMG_PFLOAT;
-typedef double			IMG_DOUBLE, *IMG_PDOUBLE;
+typedef double			IMG_DOUBLE;
 
-typedef union _IMG_UINT32_FLOAT_
+typedef union
 {
 	IMG_UINT32 ui32;
 	IMG_FLOAT f;
@@ -132,7 +150,7 @@ typedef	enum tag_img_bool
 typedef IMG_CHAR const* IMG_PCCHAR;
 #endif
 
-#if defined(_MSC_VER)
+#if defined(_MSC_VER) || defined(__MINGW32__)
 #define IMG_SIZE_FMTSPEC  "%Iu"
 #define IMG_SIZE_FMTSPECX "%Ix"
 #else
@@ -170,7 +188,7 @@ typedef int             IMG_OS_CONNECTION;
  * and a memory block is only mapped by the MMU once.
  *
  * Different devices could have offset views of the physical address space.
- * 
+ *
  */
 
 
@@ -207,7 +225,7 @@ typedef int             IMG_OS_CONNECTION;
 #define IMG_DEVMEM_OFFSET_FMTSPEC "0x%010" IMG_UINT64_FMTSPECX
 
 /* cpu physical address */
-typedef struct _IMG_CPU_PHYADDR
+typedef struct
 {
 #if defined(UNDER_WDDM) || defined(WINDOWS_WDF)
 	uintptr_t uiAddr;
@@ -222,59 +240,40 @@ typedef struct _IMG_CPU_PHYADDR
 } IMG_CPU_PHYADDR;
 
 /* device physical address */
-typedef struct _IMG_DEV_PHYADDR
+typedef struct
 {
 	IMG_UINT64 uiAddr;
 } IMG_DEV_PHYADDR;
 
 /* system physical address */
-typedef struct _IMG_SYS_PHYADDR
+typedef struct
 {
-#if defined(UNDER_WDDM) || defined(WINDOWS_WDF)
-	uintptr_t uiAddr;
-#else
 	IMG_UINT64 uiAddr;
-#endif
 } IMG_SYS_PHYADDR;
-
-/* 32-bit device virtual address (e.g. MSVDX) */
-typedef struct _IMG_DEV_VIRTADDR32
-{
-	IMG_UINT32 uiAddr;
-#define IMG_CAST_TO_DEVVADDR_UINT32(var) (IMG_UINT32)(var)
-} IMG_DEV_VIRTADDR32;
 
 /*
 	rectangle structure
 */
-typedef struct _IMG_RECT_
+typedef struct
 {
 	IMG_INT32	x0;
 	IMG_INT32	y0;
 	IMG_INT32	x1;
 	IMG_INT32	y1;
-}IMG_RECT, *PIMG_RECT;
+} IMG_RECT;
 
-typedef struct _IMG_RECT_16_
+typedef struct
 {
 	IMG_INT16	x0;
 	IMG_INT16	y0;
 	IMG_INT16	x1;
 	IMG_INT16	y1;
-}IMG_RECT_16, *PIMG_RECT_16;
-
-typedef struct _IMG_RECT_32_
-{
-	IMG_FLOAT	x0;
-	IMG_FLOAT	y0;
-	IMG_FLOAT	x1;
-	IMG_FLOAT	y1;
-} IMG_RECT_F32, *PIMG_RECT_F32;
+} IMG_RECT_16;
 
 /*
  * box structure
  */
-typedef struct _IMG_BOX_
+typedef struct
 {
 	IMG_INT32	x0;
 	IMG_INT32	y0;
@@ -282,17 +281,13 @@ typedef struct _IMG_BOX_
 	IMG_INT32	x1;
 	IMG_INT32	y1;
 	IMG_INT32	z1;
-} IMG_BOX, *PIMG_BOX;
+} IMG_BOX;
 
-
-#if defined (__cplusplus)
+#if defined(__cplusplus)
 }
 #endif
 
-#include "img_defs.h"
-
-#endif	/* __IMG_TYPES_H__ */
+#endif	/* IMG_TYPES_H */
 /******************************************************************************
  End of file (img_types.h)
 ******************************************************************************/
-

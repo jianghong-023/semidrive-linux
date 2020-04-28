@@ -75,4 +75,29 @@ PVRSRV_ERROR LinuxBridgeUnblockClientsAccess(void);
 void LinuxBridgeNumActiveKernelThreadsIncrement(void);
 void LinuxBridgeNumActiveKernelThreadsDecrement(void);
 
+/*!
+******************************************************************************
+ @Function      PVRSRVDriverThreadEnter
+ @Description   Increments number of client threads currently operating
+                in the driver's context.
+                If the driver is currently being suspended this function
+                will call try_to_freeze() on behalf of the client thread.
+                When the driver is resumed the function will exit and allow
+                the thread into the driver.
+ @Return        PVRSRV_ERROR
+******************************************************************************/
+PVRSRV_ERROR PVRSRVDriverThreadEnter(void);
+
+/*!
+******************************************************************************
+ @Function      PVRSRVDriverThreadExit
+ @Description   Decrements the number of client threads currently operating
+                in the driver's context to match the call to
+                PVRSRVDriverThreadEnter().
+                The function also signals the driver that a thread left the
+                driver context so if it's waiting to suspend it knows that
+                the number of threads decreased.
+******************************************************************************/
+void PVRSRVDriverThreadExit(void);
+
 #endif /* _PVR_BRIDGE_K_H_ */

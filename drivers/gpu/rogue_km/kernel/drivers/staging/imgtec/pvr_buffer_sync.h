@@ -43,42 +43,42 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */ /**************************************************************************/
 
-#if !defined(__PVR_BUFFER_SYNC_H__)
-#define __PVR_BUFFER_SYNC_H__
+#ifndef PVR_BUFFER_SYNC_H
+#define PVR_BUFFER_SYNC_H
 
 #include <linux/device.h>
 #include <linux/err.h>
 #include <linux/types.h>
 
-struct _RGXFWIF_DEV_VIRTADDR_;
 struct _PMR_;
 struct pvr_buffer_sync_context;
 struct pvr_buffer_sync_append_data;
 
 /**
  * pvr_buffer_sync_context_create - creates a buffer sync context
- * @dev: linux device
+ * @dev: Linux device
  * @name: context name (used for debugging)
  *
- * This function returns a buffer sync context, or NULL if it fails for any
- * reason.
+ * pvr_buffer_sync_context_destroy() should be used to clean up the buffer
+ * sync context.
  *
- * @pvr_buffer_sync_context_destroy should be used to clean up the buffer sync
- * context.
+ * Return: A buffer sync context or NULL if it fails for any reason.
  */
 struct pvr_buffer_sync_context *
 pvr_buffer_sync_context_create(struct device *dev, const char *name);
 
 /**
- * pvr_buffer_sync_context_destroy - frees a buffer sync context
+ * pvr_buffer_sync_context_destroy() - frees a buffer sync context
  * @ctx: buffer sync context
  */
 void
 pvr_buffer_sync_context_destroy(struct pvr_buffer_sync_context *ctx);
 
 /**
- * pvr_buffer_sync_resolve_and_create_fences - create checkpoints from buffers
+ * pvr_buffer_sync_resolve_and_create_fences() - create checkpoints from
+ *                                               buffers
  * @ctx: buffer sync context
+ * @sync_checkpoint_ctx: context in which to create sync checkpoints
  * @nr_pmrs: number of buffer objects (PMRs)
  * @pmrs: buffer array
  * @pmr_flags: internal flags
@@ -87,13 +87,14 @@ pvr_buffer_sync_context_destroy(struct pvr_buffer_sync_context *ctx);
  * @update_checkpoint_out: returned update sync checkpoint
  * @data_out: returned buffer sync data
  *
- * This function returns 0 on success, or an error code otherwise.
+ * After this call, either pvr_buffer_sync_kick_succeeded() or
+ * pvr_buffer_sync_kick_failed() must be called.
  *
- * After this call, either @pvr_buffer_sync_kick_succeeded or
- * @pvr_buffer_sync_kick_failed must be called.
+ * Return: 0 on success or an error code otherwise.
  */
 int
 pvr_buffer_sync_resolve_and_create_fences(struct pvr_buffer_sync_context *ctx,
+					  PSYNC_CHECKPOINT_CONTEXT sync_checkpoint_ctx,
 					  u32 nr_pmrs,
 					  struct _PMR_ **pmrs,
 					  u32 *pmr_flags,
@@ -103,21 +104,40 @@ pvr_buffer_sync_resolve_and_create_fences(struct pvr_buffer_sync_context *ctx,
 					  struct pvr_buffer_sync_append_data **data_out);
 
 /**
- * pvr_buffer_sync_kick_succeeded - cleans up after a successful kick operation
- * @data: buffer sync data returned by @pvr_buffer_sync_resolve_and_create_fences
+ * pvr_buffer_sync_kick_succeeded() - cleans up after a successful kick
+ *                                    operation
+ * @data: buffer sync data returned by
+ *        pvr_buffer_sync_resolve_and_create_fences()
  *
- * Should only be called following @pvr_buffer_sync_resolve_and_create_fences.
+ * Should only be called following pvr_buffer_sync_resolve_and_create_fences().
  */
 void
 pvr_buffer_sync_kick_succeeded(struct pvr_buffer_sync_append_data *data);
 
 /**
- * pvr_buffer_sync_kick_succeeded - cleans up after a failed kick operation
- * @data: buffer sync data returned by @pvr_buffer_sync_resolve_and_create_fences
+ * pvr_buffer_sync_kick_failed() - cleans up after a failed kick operation
+ * @data: buffer sync data returned by
+ *        pvr_buffer_sync_resolve_and_create_fences()
  *
- * Should only be called following @pvr_buffer_sync_resolve_and_create_fences.
+ * Should only be called following pvr_buffer_sync_resolve_and_create_fences().
  */
 void
 pvr_buffer_sync_kick_failed(struct pvr_buffer_sync_append_data *data);
 
-#endif /* !defined(__PVR_BUFFER_SYNC_H__) */
+#if defined(PVRSRV_SYNC_CHECKPOINT_CCB)
+/**
+ * pvr_buffer_sync_checkpoint_ufo_has_signalled() - signals that a checkpoint's
+ *                                                  state has been updated
+ * @fwaddr: firmware address of the updated checkpoint
+ * @value: the new value of the checkpoint
+ */
+enum tag_img_bool
+pvr_buffer_sync_checkpoint_ufo_has_signalled(u32 fwaddr, u32 value);
+
+/**
+ * pvr_buffer_sync_check_state() - performs a full sync state check
+ */
+void
+pvr_buffer_sync_check_state(void);
+#endif /* defined(PVRSRV_SYNC_CHECKPOINT_CCB)*/
+#endif /* PVR_BUFFER_SYNC_H */

@@ -1,6 +1,6 @@
 /*************************************************************************/ /*!
 @File
-@Title         PVR synchronization interface
+@Title         PVR synchronisation interface
 @Copyright     Copyright (c) Imagination Technologies Ltd. All Rights Reserved
 @Description   Types for server side code
 @License        Dual MIT/GPLv2
@@ -45,9 +45,13 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #include <powervr/pvrsrv_sync_ext.h>
 
-#if defined (__cplusplus)
+#if defined(__cplusplus)
 extern "C" {
 #endif
+
+#define SYNC_FB_FILE_STRING_MAX			256
+#define SYNC_FB_MODULE_STRING_LEN_MAX	(32)
+#define	SYNC_FB_DESC_STRING_LEN_MAX		(32)
 
 /* By default, fence-sync module emits into HWPerf (of course, if enabled) and
  * considers a process (sleepable) context */
@@ -55,20 +59,7 @@ extern "C" {
 #define PVRSRV_FENCE_FLAG_SUPPRESS_HWP_PKT (1U << 0)
 #define PVRSRV_FENCE_FLAG_CTX_ATOMIC       (1U << 1)
 
-/*! Possible states for a PVRSRV_FENCE */
-typedef enum
-{
-    PVRSRV_FENCE_NOT_SIGNALLED,             /*!< fence has not yet signalled (not all components have signalled) */
-    PVRSRV_FENCE_SIGNALLED                  /*!< fence has signalled (all components have signalled/errored) */
-} PVRSRV_FENCE_STATE;
-
-/* Typedefs for opaque pointers to implementation-specific structures
- */
-typedef void *SYNC_TIMELINE_OBJ;
-typedef void *SYNC_FENCE_OBJ;
-
-#if defined (__cplusplus)
+#if defined(__cplusplus)
 }
 #endif
 #endif	/* PVRSRV_SYNC_KM_H */
-

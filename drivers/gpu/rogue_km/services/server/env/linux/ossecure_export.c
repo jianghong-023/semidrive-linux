@@ -49,6 +49,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include <linux/cred.h>
 
 #include "img_types.h"
+#include "img_defs.h"
 #include "ossecure_export.h"
 #include "private_data.h"
 #include "pvr_debug.h"

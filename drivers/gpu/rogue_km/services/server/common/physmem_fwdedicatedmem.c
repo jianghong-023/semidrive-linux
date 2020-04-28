@@ -52,7 +52,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "rgx_bvnc_defs_km.h"
 #include "devicemem_server_utils.h"
 
-#if defined(PVR_RI_DEBUG)
+#if defined(PVRSRV_ENABLE_GPU_MEMORY_INFO)
 #include "ri_server.h"
 #endif
 
@@ -278,13 +278,13 @@ PVRSRV_ERROR PhysmemNewFWDedicatedMemPMR(PVRSRV_DEVICE_NODE *psDevNode,
 		goto errorOnCreatePMR;
 	}
 
-#if defined(PVR_RI_DEBUG)
+#if defined(PVRSRV_ENABLE_GPU_MEMORY_INFO)
 	eError = RIWritePMREntryKM(psPMR);
 	if (eError != PVRSRV_OK)
 	{
 		PVR_DPF((PVR_DBG_WARNING,
 		         "%s: Failed to write PMR entry (%s)",
-		         __func__, PVRSRVGetErrorStringKM(eError)));
+		         __func__, PVRSRVGetErrorString(eError)));
 	}
 #endif
 
@@ -588,13 +588,13 @@ PVRSRV_ERROR PhysmemNewFWDedicatedMemPMR(PVRSRV_DEVICE_NODE *psDevNode,
 		goto errorOnCreatePMR;
 	}
 
-#if defined(PVR_RI_DEBUG)
+#if defined(PVRSRV_ENABLE_GPU_MEMORY_INFO)
 	eError = RIWritePMREntryKM(psPMR);
 	if (eError != PVRSRV_OK)
 	{
 		PVR_DPF((PVR_DBG_WARNING,
 		         "%s: Failed to write PMR entry (%s)",
-		         __func__, PVRSRVGetErrorStringKM(eError)));
+		         __func__, PVRSRVGetErrorString(eError)));
 	}
 #endif
 

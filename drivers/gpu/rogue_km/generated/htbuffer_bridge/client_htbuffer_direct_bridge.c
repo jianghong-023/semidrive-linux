@@ -1,6 +1,9 @@
 /*******************************************************************************
+@File
 @Title          Direct client bridge for htbuffer
 @Copyright      Copyright (c) Imagination Technologies Ltd. All Rights Reserved
+@Description    Implements the client side of the bridge for htbuffer
+                which is used in calls from Server context.
 @License        Dual MIT/GPLv2
 
 The contents of this file are subject to the MIT license as set out below.
@@ -45,33 +48,9 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 /* Module specific includes */
 #include "devicemem_typedefs.h"
+#include "htbuffer_types.h"
 
 #include "htbserver.h"
-
-IMG_INTERNAL PVRSRV_ERROR IMG_CALLCONV BridgeHTBConfigure(IMG_HANDLE hBridge,
-							  IMG_UINT32
-							  ui32NameSize,
-							  const IMG_CHAR *
-							  puiName,
-							  IMG_UINT32
-							  ui32BufferSize)
-{
-#if defined(PVR_NEVER_USED)
-	PVRSRV_ERROR eError;
-	PVR_UNREFERENCED_PARAMETER(hBridge);
-
-	eError = PVRSRVHTBConfigureKM(ui32NameSize, puiName, ui32BufferSize);
-
-	return eError;
-#else
-	PVR_UNREFERENCED_PARAMETER(hBridge);
-	PVR_UNREFERENCED_PARAMETER(ui32NameSize);
-	PVR_UNREFERENCED_PARAMETER(puiName);
-	PVR_UNREFERENCED_PARAMETER(ui32BufferSize);
-
-	return PVRSRV_ERROR_NOT_IMPLEMENTED;
-#endif
-}
 
 IMG_INTERNAL PVRSRV_ERROR IMG_CALLCONV BridgeHTBControl(IMG_HANDLE hBridge,
 							IMG_UINT32
@@ -97,7 +76,7 @@ IMG_INTERNAL PVRSRV_ERROR IMG_CALLCONV BridgeHTBControl(IMG_HANDLE hBridge,
 
 IMG_INTERNAL PVRSRV_ERROR IMG_CALLCONV BridgeHTBLog(IMG_HANDLE hBridge,
 						    IMG_UINT32 ui32PID,
-						    IMG_UINT32 ui32TimeStamp,
+						    IMG_UINT64 ui64TimeStamp,
 						    IMG_UINT32 ui32SF,
 						    IMG_UINT32 ui32NumArgs,
 						    IMG_UINT32 * pui32Args)
@@ -106,7 +85,7 @@ IMG_INTERNAL PVRSRV_ERROR IMG_CALLCONV BridgeHTBLog(IMG_HANDLE hBridge,
 	PVR_UNREFERENCED_PARAMETER(hBridge);
 
 	eError =
-	    HTBLogKM(ui32PID, ui32TimeStamp, ui32SF, ui32NumArgs, pui32Args);
+	    HTBLogKM(ui32PID, ui64TimeStamp, ui32SF, ui32NumArgs, pui32Args);
 
 	return eError;
 }

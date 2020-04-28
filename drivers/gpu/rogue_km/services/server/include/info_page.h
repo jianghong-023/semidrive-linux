@@ -73,7 +73,7 @@ void InfoPageDestroy(PVRSRV_DATA *psData);
  *              The use of this information page outside of services is _not_
  *              recommended.
  * @Output ppsPMR handle to exported PMR
- * @Return 
+ * @Return
  */
 PVRSRV_ERROR PVRSRVAcquireInfoPageKM(PMR **ppsPMR);
 
@@ -84,5 +84,15 @@ PVRSRV_ERROR PVRSRVAcquireInfoPageKM(PMR **ppsPMR);
  * @Return PVRSRV_OK on success and other PVRSRV_ERROR code on error.
  */
 PVRSRV_ERROR PVRSRVReleaseInfoPageKM(PMR *psPMR);
+
+/**
+ * @Function GetInfoPageDebugFlagsKM()
+ * @Description Return info page debug flags
+ * @Return info page debug flags
+ */
+static INLINE IMG_UINT32 GetInfoPageDebugFlagsKM(void)
+{
+	return (PVRSRVGetPVRSRVData())->pui32InfoPage[DEBUG_FEATURE_FLAGS];
+}
 
 #endif /* _INFO_PAGE_KM_H_ */

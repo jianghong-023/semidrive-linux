@@ -51,7 +51,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "rgxdevice.h"
 #include "rgx_bvnc_defs_km.h"
 
-#if defined(PVR_RI_DEBUG)
+#if defined(PVRSRV_ENABLE_GPU_MEMORY_INFO)
 #include "ri_server.h"
 #endif
 
@@ -60,9 +60,8 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 typedef struct _PMR_TDFWCODE_DATA_ {
 	PHYS_HEAP       *psTDFWCodePhysHeap;
-	IMG_CPU_PHYADDR *pasCpuPAddr;
-	IMG_DEV_PHYADDR *pasDevPAddr;
-	IMG_UINT32      ui32NumPages;
+	IMG_CPU_PHYADDR sCpuPAddr;
+	IMG_DEV_PHYADDR sDevPAddr;
 	PMR_LOG2ALIGN_T uiLog2Align;
 	IMG_UINT64      ui64Size;
 } PMR_TDFWCODE_DATA;
@@ -84,20 +83,16 @@ static PVRSRV_ERROR PMRSysPhysAddrTDFWCodeMem(PMR_IMPL_PRIVDATA pvPriv,
 
 	if (psPrivData->uiLog2Align != ui32Log2PageSize)
 	{
+		PVR_DPF((PVR_DBG_ERROR, "%s: Incompatible contiguity (requested %u, got %u)",
+				 __func__, ui32Log2PageSize, psPrivData->uiLog2Align));
 		return PVRSRV_ERROR_PMR_INCOMPATIBLE_CONTIGUITY;
-	}
-
-	if (psPrivData->ui32NumPages < ui32NumOfPages)
-	{
-		return PVRSRV_ERROR_PMR_BAD_MAPPINGTABLE_SIZE;
 	}
 
 	for (i = 0; i < ui32NumOfPages; i++)
 	{
 		if (pbValid[i])
 		{
-			IMG_UINT32 ui32Offset = puiOffset[i] >> ui32Log2PageSize;
-			psDevPAddr[i].uiAddr = psPrivData->pasDevPAddr[ui32Offset].uiAddr;
+			psDevPAddr[i].uiAddr = psPrivData->sDevPAddr.uiAddr + puiOffset[i];
 		}
 	}
 
@@ -110,19 +105,6 @@ static PVRSRV_ERROR PMRFinalizeTDFWCodeMem(PMR_IMPL_PRIVDATA pvPriv)
 
 	psPrivData = pvPriv;
 	PhysHeapRelease(psPrivData->psTDFWCodePhysHeap);
-
-	if (psPrivData->pasCpuPAddr != NULL)
-	{
-		OSFreeMem(psPrivData->pasCpuPAddr);
-		psPrivData->pasCpuPAddr = NULL;
-	}
-
-	if (psPrivData->pasDevPAddr != NULL)
-	{
-		OSFreeMem(psPrivData->pasDevPAddr);
-		psPrivData->pasDevPAddr = NULL;
-	}
-
 	OSFreeMem(psPrivData);
 
 	return PVRSRV_OK;
@@ -141,7 +123,7 @@ PVRSRV_ERROR PhysmemNewTDFWCodePMR(PVRSRV_DEVICE_NODE *psDevNode,
                                    IMG_DEVMEM_SIZE_T uiSize,
                                    PMR_LOG2ALIGN_T uiLog2Align,
                                    PVRSRV_MEMALLOCFLAGS_T uiFlags,
-                                   IMG_BOOL bFWCorememCode,
+                                   PVRSRV_TD_FW_MEM_REGION eRegion,
                                    PMR **ppsPMRPtr)
 {
 	PVRSRV_DEVICE_CONFIG *psDevConfig = psDevNode->psDevConfig;
@@ -192,54 +174,44 @@ PVRSRV_ERROR PhysmemNewTDFWCodePMR(PVRSRV_DEVICE_NODE *psDevNode,
 		goto errorOnAcquireHeap;
 	}
 
-	ui32FWCodeRegionId = bFWCorememCode ?
-		PVRSRV_DEVICE_FW_COREMEM_CODE_REGION : PVRSRV_DEVICE_FW_CODE_REGION;
+	ui32FWCodeRegionId = eRegion;
 
 	eError = PhysHeapAcquire(psRGXData->uiTDFWCodePhysHeapID,
 	                         &psPrivData->psTDFWCodePhysHeap);
-	if(eError != PVRSRV_OK) goto errorOnAcquireHeap;
-
-	if (psDevConfig->pfnTDGetFWCodeParams == NULL)
+	if (eError != PVRSRV_OK)
 	{
-		PVR_DPF((PVR_DBG_ERROR, "%s: TDGetFWCodeParams not implemented!", __func__));
-		eError = PVRSRV_ERROR_NOT_IMPLEMENTED;
+		PVR_DPF((PVR_DBG_ERROR, "%s: Could not acquire secure physical heap %u",
+				 __func__, psRGXData->uiTDFWCodePhysHeapID));
 		goto errorOnAcquireHeap;
 	}
 
-	/* The following call will allocate memory for psPrivData->pas[Cpu|Dev]PAddr */
-	eError = psDevConfig->pfnTDGetFWCodeParams(psDevConfig->hSysData,
-	                                           &psPrivData->pasCpuPAddr,
-	                                           &psPrivData->pasDevPAddr,
-	                                           &psPrivData->uiLog2Align,
-	                                           &psPrivData->ui32NumPages,
-	                                           &psPrivData->ui64Size);
-
+	eError = PhysHeapRegionGetCpuPAddr(psPrivData->psTDFWCodePhysHeap,
+	                                   ui32FWCodeRegionId,
+	                                   &psPrivData->sCpuPAddr);
 	if (eError != PVRSRV_OK)
 	{
-		PVR_DPF((PVR_DBG_ERROR, "%s: TDGetFWCodeParams failed with error %x", __func__, eError));
-		goto errorOnGetFWCodeParams;
+		PVR_DPF((PVR_DBG_ERROR, "%s: Could not acquire secure region CPU address", __func__));
+		goto errorOnValidateParams;
 	}
 
-	if ((((1ULL << psPrivData->uiLog2Align) - 1) & psPrivData->pasCpuPAddr[0].uiAddr) != 0)
+	if ((((1ULL << uiLog2Align) - 1) & psPrivData->sCpuPAddr.uiAddr) != 0)
 	{
 		PVR_DPF((PVR_DBG_ERROR,
-				 "Trusted Device physical heap has the wrong alignment!"
+				 "Trusted Device physical heap has the wrong alignment! "
 				 "Physical address 0x%llx, alignment mask 0x%llx",
-				 (unsigned long long) psPrivData->pasCpuPAddr[0].uiAddr,
-				 ((1ULL << psPrivData->uiLog2Align) - 1)));
+				 (unsigned long long) psPrivData->sCpuPAddr.uiAddr,
+				 ((1ULL << uiLog2Align) - 1)));
 		eError = PVRSRV_ERROR_REQUEST_TDFWCODE_PAGES_FAIL;
-		goto errorOnGetFWCodeParams;
+		goto errorOnValidateParams;
 	}
 
-	if (uiLog2Align != psPrivData->uiLog2Align)
+	eError = PhysHeapRegionGetSize(psPrivData->psTDFWCodePhysHeap,
+	                               ui32FWCodeRegionId,
+	                               &psPrivData->ui64Size);
+	if (eError != PVRSRV_OK)
 	{
-		PVR_DPF((PVR_DBG_ERROR,
-				 "Trusted Device physical heap has incompatible alignment!"
-				 "Required alignment %u, heap alignment %u",
-				 uiLog2Align,
-				 psPrivData->uiLog2Align));
-		eError = PVRSRV_ERROR_REQUEST_TDFWCODE_PAGES_FAIL;
-		goto errorOnGetFWCodeParams;
+		PVR_DPF((PVR_DBG_ERROR, "%s: Could not acquire secure region size", __func__));
+		goto errorOnValidateParams;
 	}
 
 	if (uiSize > psPrivData->ui64Size)
@@ -247,22 +219,29 @@ PVRSRV_ERROR PhysmemNewTDFWCodePMR(PVRSRV_DEVICE_NODE *psDevNode,
 		PVR_DPF((PVR_DBG_ERROR, "Trusted Device physical heap not big enough! Required %llu, available %llu",
 				 uiSize, psPrivData->ui64Size));
 		eError = PVRSRV_ERROR_REQUEST_TDFWCODE_PAGES_FAIL;
-		goto errorOnGetFWCodeParams;
+		goto errorOnValidateParams;
 	}
 
 	PhysHeapCpuPAddrToDevPAddr(psPrivData->psTDFWCodePhysHeap,
-	                           psPrivData->ui32NumPages,
-	                           psPrivData->pasDevPAddr,
-	                           psPrivData->pasCpuPAddr);
+	                           1,
+	                           &psPrivData->sDevPAddr,
+	                           &psPrivData->sCpuPAddr);
 
 	/* Check that the FW code is aligned to a Rogue cache line */
 	if (ui32CacheLineSize > 0 &&
-		(psPrivData->pasDevPAddr[0].uiAddr & (ui32CacheLineSize - 1)) != 0)
+		(psPrivData->sDevPAddr.uiAddr & (ui32CacheLineSize - 1)) != 0)
 	{
 		PVR_DPF((PVR_DBG_ERROR, "Trusted Device physical heap not aligned to a Rogue cache line!"));
 		eError = PVRSRV_ERROR_REQUEST_TDFWCODE_PAGES_FAIL;
-		goto errorOnGetFWCodeParams;
+		goto errorOnValidateParams;
 	}
+
+	/*
+	 * uiLog2Align is only used to check the alignment of the secure memory
+	 * region. The page size is still determined by the OS, and we expect the
+	 * number of pages from TDGetTDFWCodeParams to have the same granularity.
+	 */
+	psPrivData->uiLog2Align = OSGetPageShift();
 
 	eError = PMRCreatePMR(psDevNode,
 	                      psPrivData->psTDFWCodePhysHeap,
@@ -273,7 +252,8 @@ PVRSRV_ERROR PhysmemNewTDFWCodePMR(PVRSRV_DEVICE_NODE *psDevNode,
 	                      &uiMappingTable,   /* pui32MappingTable (not used) */
 	                      uiLog2Align,       /* uiLog2ContiguityGuarantee */
 	                      uiPMRFlags,
-	                      "TDFWCODE_PMR",
+	                      eRegion == PVRSRV_DEVICE_FW_PRIVATE_DATA_REGION ?
+	                      "TDFWDATA_PMR" : "TDFWCODE_PMR",
 	                      &_sPMRTDFWCodeFuncTab,
 	                      psPrivData,
 	                      PMR_TYPE_TDFWCODE,
@@ -284,13 +264,13 @@ PVRSRV_ERROR PhysmemNewTDFWCodePMR(PVRSRV_DEVICE_NODE *psDevNode,
 		goto errorOnCreatePMR;
 	}
 
-#if defined(PVR_RI_DEBUG)
+#if defined(PVRSRV_ENABLE_GPU_MEMORY_INFO)
 	eError = RIWritePMREntryKM(psPMR);
 	if (eError != PVRSRV_OK)
 	{
 		PVR_DPF((PVR_DBG_WARNING,
 		         "%s: Failed to write PMR entry (%s)",
-		         __func__, PVRSRVGetErrorStringKM(eError)));
+		         __func__, PVRSRVGetErrorString(eError)));
 	}
 #endif
 
@@ -298,18 +278,8 @@ PVRSRV_ERROR PhysmemNewTDFWCodePMR(PVRSRV_DEVICE_NODE *psDevNode,
 	return PVRSRV_OK;
 
 errorOnCreatePMR:
-errorOnGetFWCodeParams:
-	if (psPrivData->pasDevPAddr)
-	{
-		OSFreeMem(psPrivData->pasDevPAddr);
-		psPrivData->pasDevPAddr = NULL;
-	}
-
-	if (psPrivData->pasCpuPAddr)
-	{
-		OSFreeMem(psPrivData->pasCpuPAddr);
-		psPrivData->pasCpuPAddr = NULL;
-	}
+errorOnValidateParams:
+	PhysHeapRelease(psPrivData->psTDFWCodePhysHeap);
 
 errorOnAcquireHeap:
 	OSFreeMem(psPrivData);
@@ -436,7 +406,7 @@ PVRSRV_ERROR PhysmemNewTDFWCodePMR(PVRSRV_DEVICE_NODE *psDevNode,
                                    IMG_DEVMEM_SIZE_T uiSize,
                                    PMR_LOG2ALIGN_T uiLog2Align,
                                    PVRSRV_MEMALLOCFLAGS_T uiFlags,
-                                   IMG_BOOL bFWCorememCode,
+                                   PVRSRV_TD_FW_MEM_REGION eRegion,
                                    PMR **ppsPMRPtr)
 {
 	RGX_DATA *psRGXData = (RGX_DATA *)(psDevNode->psDevConfig->hDevData);
@@ -446,8 +416,6 @@ PVRSRV_ERROR PhysmemNewTDFWCodePMR(PVRSRV_DEVICE_NODE *psDevNode,
 	IMG_UINT32 uiMappingTable = 0;
 	PMR_FLAGS_T uiPMRFlags;
 	PVRSRV_ERROR eError;
-
-	PVR_UNREFERENCED_PARAMETER(bFWCorememCode);
 
 	/* In this instance, we simply pass flags straight through.
 	 * Generically, uiFlags can include things that control the PMR
@@ -476,18 +444,15 @@ PVRSRV_ERROR PhysmemNewTDFWCodePMR(PVRSRV_DEVICE_NODE *psDevNode,
 	}
 	eError = PhysHeapAcquire(psRGXData->uiTDFWCodePhysHeapID,
 	                         &psPrivData->psTDFWCodePhysHeap);
-	if(eError != PVRSRV_OK) goto errorOnAcquireHeap;
+	if (eError != PVRSRV_OK) goto errorOnAcquireHeap;
 
-	/* The alignment requested by the caller is only used to generate the
+	/*
+	 * The alignment requested by the caller is only used to generate the
 	 * secure FW allocation pdump command with the correct alignment.
 	 * Internally we use another PMR with OS page alignment.
 	 */
 	psPrivData->ui32Log2PageSize = OSGetPageShift();
 
-	/* Note that this PMR is only used to copy the FW blob to memory and
-	 * to dump this memory to pdump, it doesn't need to have the alignment
-	 * requested by the caller.
-	 */
 	eError = PhysmemNewOSRamBackedPMR(psDevNode,
 	                                  uiSize,
 	                                  uiSize,
@@ -496,7 +461,8 @@ PVRSRV_ERROR PhysmemNewTDFWCodePMR(PVRSRV_DEVICE_NODE *psDevNode,
 	                                  &uiMappingTable,
 	                                  psPrivData->ui32Log2PageSize,
 	                                  uiFlags,
-	                                  "TDFWCODE_OSMEM",
+	                                  eRegion == PVRSRV_DEVICE_FW_PRIVATE_DATA_REGION ?
+	                                  "TDFWDATA_OSMEM" : "TDFWCODE_OSMEM",
 	                                  OSGetCurrentClientProcessIDKM(),
 	                                  &psOSPMR);
 	if (eError != PVRSRV_OK)
@@ -514,7 +480,8 @@ PVRSRV_ERROR PhysmemNewTDFWCodePMR(PVRSRV_DEVICE_NODE *psDevNode,
 	                      &uiMappingTable,   /* pui32MappingTable (not used) */
 	                      uiLog2Align,       /* uiLog2ContiguityGuarantee */
 	                      uiPMRFlags,
-	                      "TDFWCODE_PMR",
+	                      eRegion == PVRSRV_DEVICE_FW_PRIVATE_DATA_REGION ?
+	                      "TDFWDATA_PMR" : "TDFWCODE_PMR",
 	                      &_sPMRTDFWCodeFuncTab,
 	                      psPrivData,
 	                      PMR_TYPE_TDFWCODE,
@@ -525,13 +492,13 @@ PVRSRV_ERROR PhysmemNewTDFWCodePMR(PVRSRV_DEVICE_NODE *psDevNode,
 		goto errorOnCreateTDPMR;
 	}
 
-#if defined(PVR_RI_DEBUG)
+#if defined(PVRSRV_ENABLE_GPU_MEMORY_INFO)
 	eError = RIWritePMREntryKM(psPMR);
 	if (eError != PVRSRV_OK)
 	{
 		PVR_DPF((PVR_DBG_WARNING,
 		         "%s: Failed to write PMR entry (%s)",
-		         __func__, PVRSRVGetErrorStringKM(eError)));
+		         __func__, PVRSRVGetErrorString(eError)));
 	}
 #endif
 

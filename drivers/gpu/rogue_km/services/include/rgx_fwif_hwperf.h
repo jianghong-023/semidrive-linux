@@ -52,7 +52,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 /* Structure to hold a block's parameters for passing between the BG context
  * and the IRQ context when applying a configuration request. */
-typedef struct _RGXFWIF_HWPERF_CTL_BLK_
+typedef struct
 {
 	IMG_BOOL                bValid;
 	IMG_BOOL                bEnabled;
@@ -62,7 +62,7 @@ typedef struct _RGXFWIF_HWPERF_CTL_BLK_
 }  RGXFWIF_HWPERF_CTL_BLK;
 
 /* Structure used to hold the configuration of the non-mux counters blocks */
-typedef struct _RGXFW_HWPERF_SELECT_
+typedef struct
 {
 	IMG_UINT32            ui32NumSelectedCounters;
 	IMG_UINT32            aui32SelectedCountersIDs[RGX_HWPERF_MAX_CUSTOM_CNTRS];
@@ -70,9 +70,9 @@ typedef struct _RGXFW_HWPERF_SELECT_
 
 /* Structure to hold the whole configuration request details for all blocks
  * The block masks and counts are used to optimise reading of this data. */
-typedef struct _RGXFWIF_HWPERF_CTL_
+typedef struct
 {
-	IMG_BOOL                           bResetOrdinal;
+	IMG_UINT32                         ui32HWPerfCtlFlags;
 
 	IMG_UINT32                         ui32SelectedCountersBlockMask;
 	RGXFW_HWPERF_SELECT RGXFW_ALIGN    SelCntr[RGX_HWPERF_MAX_CUSTOM_BLKS];
@@ -93,10 +93,10 @@ typedef struct _RGXFWIF_HWPERF_CTL_
 static INLINE RGXFWIF_HWPERF_CTL_BLK* rgxfw_hwperf_get_block_ctl(
 		RGX_HWPERF_CNTBLK_ID eBlockID, RGXFWIF_HWPERF_CTL *psHWPerfInitData)
 {
-	IMG_INT32 i32Idx = -1;
+	IMG_UINT32 ui32Idx;
 
 	/* Hash the block ID into a control configuration array index */
-	switch(eBlockID)
+	switch (eBlockID)
 	{
 		case RGX_CNTBLK_ID_TA:
 		case RGX_CNTBLK_ID_RASTER:
@@ -108,7 +108,7 @@ static INLINE RGXFWIF_HWPERF_CTL_BLK* rgxfw_hwperf_get_block_ctl(
 		case RGX_CNTBLK_ID_RT:
 		case RGX_CNTBLK_ID_SH:
 		{
-			i32Idx = eBlockID;
+			ui32Idx = eBlockID;
 			break;
 		}
 		case RGX_CNTBLK_ID_TPU_MCU0:
@@ -120,7 +120,7 @@ static INLINE RGXFWIF_HWPERF_CTL_BLK* rgxfw_hwperf_get_block_ctl(
 		case RGX_CNTBLK_ID_TPU_MCU6:
 		case RGX_CNTBLK_ID_TPU_MCU7:
 		{
-			i32Idx = RGX_CNTBLK_ID_DIRECT_LAST +
+			ui32Idx = RGX_CNTBLK_ID_DIRECT_LAST +
 						(eBlockID & RGX_CNTBLK_ID_UNIT_MASK);
 			break;
 		}
@@ -141,7 +141,7 @@ static INLINE RGXFWIF_HWPERF_CTL_BLK* rgxfw_hwperf_get_block_ctl(
 		case RGX_CNTBLK_ID_USC14:
 		case RGX_CNTBLK_ID_USC15:
 		{
-			i32Idx = RGX_CNTBLK_ID_DIRECT_LAST +
+			ui32Idx = RGX_CNTBLK_ID_DIRECT_LAST +
 						RGX_CNTBLK_INDIRECT_COUNT(TPU_MCU, 7) +
 						(eBlockID & RGX_CNTBLK_ID_UNIT_MASK);
 			break;
@@ -155,7 +155,7 @@ static INLINE RGXFWIF_HWPERF_CTL_BLK* rgxfw_hwperf_get_block_ctl(
 		case RGX_CNTBLK_ID_TEXAS6:
 		case RGX_CNTBLK_ID_TEXAS7:
 		{
-			i32Idx = RGX_CNTBLK_ID_DIRECT_LAST +
+			ui32Idx = RGX_CNTBLK_ID_DIRECT_LAST +
 						RGX_CNTBLK_INDIRECT_COUNT(TPU_MCU, 7) +
 						RGX_CNTBLK_INDIRECT_COUNT(USC, 15) +
 						(eBlockID & RGX_CNTBLK_ID_UNIT_MASK);
@@ -166,7 +166,7 @@ static INLINE RGXFWIF_HWPERF_CTL_BLK* rgxfw_hwperf_get_block_ctl(
 		case RGX_CNTBLK_ID_RASTER2:
 		case RGX_CNTBLK_ID_RASTER3:
 		{
-			i32Idx = RGX_CNTBLK_ID_DIRECT_LAST +
+			ui32Idx = RGX_CNTBLK_ID_DIRECT_LAST +
 						RGX_CNTBLK_INDIRECT_COUNT(TPU_MCU, 7) +
 						RGX_CNTBLK_INDIRECT_COUNT(USC, 15) +
 						RGX_CNTBLK_INDIRECT_COUNT(TEXAS, 7) +
@@ -178,7 +178,7 @@ static INLINE RGXFWIF_HWPERF_CTL_BLK* rgxfw_hwperf_get_block_ctl(
 		case RGX_CNTBLK_ID_BLACKPEARL2:
 		case RGX_CNTBLK_ID_BLACKPEARL3:
 		{
-			i32Idx = RGX_CNTBLK_ID_DIRECT_LAST +
+			ui32Idx = RGX_CNTBLK_ID_DIRECT_LAST +
 						RGX_CNTBLK_INDIRECT_COUNT(TPU_MCU, 7) +
 						RGX_CNTBLK_INDIRECT_COUNT(USC, 15) +
 						RGX_CNTBLK_INDIRECT_COUNT(TEXAS, 7) +
@@ -203,7 +203,7 @@ static INLINE RGXFWIF_HWPERF_CTL_BLK* rgxfw_hwperf_get_block_ctl(
 		case RGX_CNTBLK_ID_PBE14:
 		case RGX_CNTBLK_ID_PBE15:
 		{
-			i32Idx = RGX_CNTBLK_ID_DIRECT_LAST +
+			ui32Idx = RGX_CNTBLK_ID_DIRECT_LAST +
 						RGX_CNTBLK_INDIRECT_COUNT(TPU_MCU, 7) +
 						RGX_CNTBLK_INDIRECT_COUNT(USC, 15) +
 						RGX_CNTBLK_INDIRECT_COUNT(TEXAS, 7) +
@@ -217,7 +217,7 @@ static INLINE RGXFWIF_HWPERF_CTL_BLK* rgxfw_hwperf_get_block_ctl(
 		case RGX_CNTBLK_ID_BX_TU2:
 		case RGX_CNTBLK_ID_BX_TU3:
 		{
-			i32Idx = RGX_CNTBLK_ID_DIRECT_LAST +
+			ui32Idx = RGX_CNTBLK_ID_DIRECT_LAST +
 						RGX_CNTBLK_INDIRECT_COUNT(TPU_MCU, 7) +
 						RGX_CNTBLK_INDIRECT_COUNT(USC, 15) +
 						RGX_CNTBLK_INDIRECT_COUNT(TEXAS, 7) +
@@ -229,14 +229,15 @@ static INLINE RGXFWIF_HWPERF_CTL_BLK* rgxfw_hwperf_get_block_ctl(
 		}
 		default:
 		{
-			return NULL;
+			ui32Idx = RGX_HWPERF_MAX_DEFINED_BLKS;
+			break;
 		}
 	}
-	if ((i32Idx < 0) || (i32Idx >= RGX_HWPERF_MAX_DEFINED_BLKS))
+	if (ui32Idx >= RGX_HWPERF_MAX_DEFINED_BLKS)
 	{
 		return NULL;
 	}
-	return &psHWPerfInitData->sBlkCfg[i32Idx];
+	return &psHWPerfInitData->sBlkCfg[ui32Idx];
 }
 
 #endif

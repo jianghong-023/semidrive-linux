@@ -45,7 +45,6 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "allocmem.h"
 #include "osfunc.h"
 
-#include "lists.h"
 #include "pvrsrv.h"
 #include "pvr_debug.h"
 #include "process_stats.h"
@@ -67,6 +66,13 @@ struct _PVRSRV_POWER_DEV_TAG_
 	PVRSRV_DEV_POWER_STATE 			eDefaultPowerState;
 	PVRSRV_DEV_POWER_STATE 			eCurrentPowerState;
 };
+
+/*!
+  Typedef for a pointer to a function that will be called for re-acquiring
+  device powerlock after releasing it temporarily for some timeout period
+  in function PVRSRVDeviceIdleRequestKM
+ */
+typedef PVRSRV_ERROR (*PFN_POWER_LOCK_ACQUIRE) (PCPVRSRV_DEVICE_NODE psDevNode);
 
 static inline IMG_UINT64 PVRSRVProcessStatsGetTimeNs(void)
 {
@@ -111,7 +117,7 @@ static IMG_BOOL _IsSystemStatePowered(PVRSRV_SYS_POWER_STATE eSystemPowerState)
  @Description	Obtain the mutex for power transitions. Only allowed when
                 system power is on.
 
- @Return	PVRSRV_ERROR_RETRY or PVRSRV_OK
+ @Return	PVRSRV_ERROR_SYSTEM_STATE_POWERED_OFF or PVRSRV_OK
 
 ******************************************************************************/
 PVRSRV_ERROR PVRSRVPowerLock(PCPVRSRV_DEVICE_NODE psDeviceNode)
@@ -126,23 +132,58 @@ PVRSRV_ERROR PVRSRVPowerLock(PCPVRSRV_DEVICE_NODE psDeviceNode)
 
 	OSLockRelease(psDeviceNode->hPowerLock);
 
-	return PVRSRV_ERROR_RETRY;
+	return PVRSRV_ERROR_SYSTEM_STATE_POWERED_OFF;
 }
 
 /*!
 ******************************************************************************
 
- @Function	PVRSRVForcedPowerLock
+ @Function	PVRSRVPowerTryLock
 
- @Description	Obtain the mutex for power transitions regardless of
-                system power state
+ @Description	Try to obtain the mutex for power transitions. Only allowed when
+		system power is on.
 
- @Return	PVRSRV_ERROR_RETRY or PVRSRV_OK
+ @Return	PVRSRV_ERROR_RETRY or PVRSRV_ERROR_SYSTEM_STATE_POWERED_OFF or
+		PVRSRV_OK
 
 ******************************************************************************/
-void PVRSRVForcedPowerLock(PPVRSRV_DEVICE_NODE psDeviceNode)
+PVRSRV_ERROR PVRSRVPowerTryLock(PCPVRSRV_DEVICE_NODE psDeviceNode)
+{
+	if (!(OSTryLockAcquire(psDeviceNode->hPowerLock)))
+	{
+		return PVRSRV_ERROR_RETRY;
+	}
+
+	/* Only allow to take powerlock when the system power is on */
+	if (_IsSystemStatePowered(psDeviceNode->eCurrentSysPowerState))
+	{
+		/* System is powered ON, return OK */
+		return PVRSRV_OK;
+	}
+	else
+	{
+		/* System is powered OFF, release the lock and return error */
+		OSLockRelease(psDeviceNode->hPowerLock);
+		return PVRSRV_ERROR_SYSTEM_STATE_POWERED_OFF;
+	}
+}
+
+/*!
+******************************************************************************
+
+ @Function     _PVRSRVForcedPowerLock
+
+ @Description  Obtain the mutex for power transitions regardless of system
+               power state
+
+ @Return       Always returns PVRSRV_OK. Function prototype required same as
+               PFN_POWER_LOCK_ACQUIRE
+
+******************************************************************************/
+static PVRSRV_ERROR _PVRSRVForcedPowerLock(PCPVRSRV_DEVICE_NODE psDeviceNode)
 {
 	OSLockAcquire(psDeviceNode->hPowerLock);
+	return PVRSRV_OK;
 }
 
 /*!
@@ -197,36 +238,110 @@ PVRSRV_ERROR PVRSRVSetDeviceDefaultPowerState(PCPVRSRV_DEVICE_NODE psDeviceNode,
 /*!
 ******************************************************************************
 
- @Function	PVRSRVDeviceIdleRequestKM
+ @Function    _PVRSRVDeviceIdleRequestKM
 
- @Description
+ @Description Perform device-specific processing required to force the device
+              idle. The device power-lock might be temporarily released (and
+              again re-acquired) during the course of this call, hence to
+              maintain lock-ordering power-lock should be the last acquired
+              lock before calling this function
 
- Perform device-specific processing required to force the device idle.
+ @Input       psDeviceNode         : Device node
 
- @Input		psDeviceNode : Device node
- @Input		pfnCheckIdleReq : Filter function used to determine whether a forced idle is required for the device
- @Input		bDeviceOffPermitted :	IMG_TRUE if the transition should not fail if device off
-					IMG_FALSE if the transition should fail if device off
+ @Input       pfnIsDefaultStateOff : When specified, the idle request is only
+                                     processed if this function passes.
 
- @Return	PVRSRV_ERROR
+ @Input       bDeviceOffPermitted  : IMG_TRUE if the transition should not fail
+                                       if device off
+                                     IMG_FALSE if the transition should fail if
+                                       device off
+
+ @Input       pfnPowerLockAcquire  : Function to re-acquire power-lock in-case
+                                     it was necessary to release it.
+
+ @Return      PVRSRV_ERROR_PWLOCK_RELEASED_REACQ_FAILED
+                                     When re-acquisition of power-lock failed.
+                                     This error NEEDS EXPLICIT HANDLING at call
+                                     site as it signifies the caller needs to
+                                     AVOID calling PVRSRVPowerUnlock, since
+                                     power-lock is no longer "possessed" by
+                                     this context.
+
+              PVRSRV_OK              When idle request succeeded.
+              PVRSRV_ERROR           Other system errors.
 
 ******************************************************************************/
-PVRSRV_ERROR PVRSRVDeviceIdleRequestKM(PPVRSRV_DEVICE_NODE psDeviceNode,
-					PFN_SYS_DEV_IS_DEFAULT_STATE_OFF	pfnIsDefaultStateOff,
-					IMG_BOOL				bDeviceOffPermitted)
+static PVRSRV_ERROR _PVRSRVDeviceIdleRequestKM(PPVRSRV_DEVICE_NODE psDeviceNode,
+					PFN_SYS_DEV_IS_DEFAULT_STATE_OFF    pfnIsDefaultStateOff,
+					IMG_BOOL                            bDeviceOffPermitted,
+					PFN_POWER_LOCK_ACQUIRE              pfnPowerLockAcquire)
 {
 	PVRSRV_POWER_DEV *psPowerDev = psDeviceNode->psPowerDev;
+	PVRSRV_ERROR eError;
 
-	if (psPowerDev && psPowerDev->pfnForcedIdleRequest)
+	if ((psPowerDev && psPowerDev->pfnForcedIdleRequest) &&
+	    (!pfnIsDefaultStateOff || pfnIsDefaultStateOff(psPowerDev)))
 	{
-		if (!pfnIsDefaultStateOff || pfnIsDefaultStateOff(psPowerDev))
+		LOOP_UNTIL_TIMEOUT(MAX_HW_TIME_US)
 		{
-			return psPowerDev->pfnForcedIdleRequest(psPowerDev->hDevCookie,
-													bDeviceOffPermitted);
-		}
+			eError = psPowerDev->pfnForcedIdleRequest(psPowerDev->hDevCookie,
+			                                          bDeviceOffPermitted);
+			if (eError == PVRSRV_OK)
+			{
+				/* Idle request was successful */
+				break;
+			}
+			else if (eError == PVRSRV_ERROR_DEVICE_IDLE_REQUEST_DENIED)
+			{
+				PVRSRV_ERROR eErrPwrLockAcq;
+				/* FW denied idle request */
+				PVRSRVPowerUnlock(psDeviceNode);
+
+				OSWaitus(MAX_HW_TIME_US/WAIT_TRY_COUNT);
+
+				eErrPwrLockAcq = pfnPowerLockAcquire(psDeviceNode);
+				if (eErrPwrLockAcq != PVRSRV_OK)
+				{
+					/* We only understand PVRSRV_ERROR_RETRY, so assert on others.
+					 * Moreover, we've ended-up releasing the power-lock which was
+					 * originally "held" by caller before calling this function -
+					 * since this needs vigilant handling at call-site, we pass
+					 * back an explicit error, for caller(s) to "avoid" calling
+					 * PVRSRVPowerUnlock */
+					PVR_ASSERT(eErrPwrLockAcq == PVRSRV_ERROR_RETRY);
+					PVR_DPF((PVR_DBG_ERROR, "%s: Failed to re-acquire power-lock "
+					         "(%s) after releasing it for a time-out",
+							 __func__, PVRSRVGetErrorString(eErrPwrLockAcq)));
+					return PVRSRV_ERROR_PWLOCK_RELEASED_REACQ_FAILED;
+				}
+			}
+			else
+			{
+				/* some other error occurred, return failure */
+				break;
+			}
+		} END_LOOP_UNTIL_TIMEOUT();
+	}
+	else
+	{
+		return PVRSRV_OK;
 	}
 
-	return PVRSRV_OK;
+	return eError;
+}
+
+/*
+ * Wrapper function helps limiting calling complexity of supplying additional
+ * PFN_POWER_LOCK_ACQUIRE argument (required by _PVRSRVDeviceIdleRequestKM)
+ */
+inline PVRSRV_ERROR PVRSRVDeviceIdleRequestKM(PPVRSRV_DEVICE_NODE psDeviceNode,
+					PFN_SYS_DEV_IS_DEFAULT_STATE_OFF      pfnIsDefaultStateOff,
+					IMG_BOOL                              bDeviceOffPermitted)
+{
+	return _PVRSRVDeviceIdleRequestKM(psDeviceNode,
+	                                  pfnIsDefaultStateOff,
+									  bDeviceOffPermitted,
+									  PVRSRVPowerLock);
 }
 
 /*!
@@ -489,13 +604,13 @@ ErrorExit:
 				 "%s: Transition to %d was denied, Forced=%d",
 				 __func__, eNewPowerState, bForced));
 	}
-	else if(eError != PVRSRV_OK)
+	else if (eError != PVRSRV_OK)
 	{
 		PVR_DPF((PVR_DBG_WARNING,
 				 "%s: Transition to %d FAILED (%s)",
-				 __func__, eNewPowerState, PVRSRVGetErrorStringKM(eError)));
+				 __func__, eNewPowerState, PVRSRVGetErrorString(eError)));
 	}
-	
+
 	return eError;
 }
 
@@ -513,7 +628,7 @@ PVRSRV_ERROR PVRSRVSetDeviceSystemPowerState(PPVRSRV_DEVICE_NODE psDeviceNode,
 	PVRSRV_ERROR	eError;
 	IMG_UINT        uiStage = 0;
 
-	PVRSRV_DEV_POWER_STATE eNewDevicePowerState = 
+	PVRSRV_DEV_POWER_STATE eNewDevicePowerState =
 	  _IsSystemStatePowered(eNewSysPowerState)? PVRSRV_DEV_POWER_STATE_DEFAULT : PVRSRV_DEV_POWER_STATE_OFF;
 
 	/* If setting devices to default state, force idle all devices whose default state is off */
@@ -527,7 +642,7 @@ PVRSRV_ERROR PVRSRVSetDeviceSystemPowerState(PPVRSRV_DEVICE_NODE psDeviceNode,
 	}
 
 	/* Prevent simultaneous SetPowerStateKM calls */
-	PVRSRVForcedPowerLock(psDeviceNode);
+	_PVRSRVForcedPowerLock(psDeviceNode);
 
 	/* no power transition requested, so do nothing */
 	if (eNewSysPowerState == psDeviceNode->eCurrentSysPowerState)
@@ -536,31 +651,12 @@ PVRSRV_ERROR PVRSRVSetDeviceSystemPowerState(PPVRSRV_DEVICE_NODE psDeviceNode,
 		return PVRSRV_OK;
 	}
 
-	LOOP_UNTIL_TIMEOUT(MAX_HW_TIME_US)
+	eError = _PVRSRVDeviceIdleRequestKM(psDeviceNode, pfnIsDefaultStateOff,
+	                                    IMG_TRUE, _PVRSRVForcedPowerLock);
+	if (eError != PVRSRV_OK)
 	{
-		eError = PVRSRVDeviceIdleRequestKM(psDeviceNode,
-										   pfnIsDefaultStateOff, IMG_TRUE);
-
-		if (eError == PVRSRV_OK)
-		{
-			break;
-		}
-		else if (eError == PVRSRV_ERROR_DEVICE_IDLE_REQUEST_DENIED)
-		{
-			PVRSRVPowerUnlock(psDeviceNode);
-			OSWaitus(MAX_HW_TIME_US/WAIT_TRY_COUNT);
-			PVRSRVForcedPowerLock(psDeviceNode);
-		}
-		else
-		{
-			uiStage++;
-			goto ErrorExit;
-		}
-	} END_LOOP_UNTIL_TIMEOUT();
-
-	if (eError == PVRSRV_ERROR_DEVICE_IDLE_REQUEST_DENIED)
-	{
-		PVR_DPF((PVR_DBG_ERROR, "%s: Forced idle DENIED", __func__));
+		PVR_DPF((PVR_DBG_ERROR, "%s: Forced idle request failure (%s)",
+		                        __func__, PVRSRVGetErrorString(eError)));
 		uiStage++;
 		goto ErrorExit;
 	}
@@ -585,7 +681,7 @@ ErrorExit:
 	PVR_DPF((PVR_DBG_ERROR,
 			 "%s: Transition from %d to %d FAILED (%s) at stage %u. Dumping debug info.",
 			 __func__, psDeviceNode->eCurrentSysPowerState, eNewSysPowerState,
-			 PVRSRVGetErrorStringKM(eError), uiStage));
+			 PVRSRVGetErrorString(eError), uiStage));
 
 	PVRSRVDebugRequest(psDeviceNode, DEBUG_REQUEST_VERBOSITY_MAX, NULL, NULL);
 
@@ -639,7 +735,7 @@ PVRSRV_ERROR PVRSRVRegisterPowerDevice(PPVRSRV_DEVICE_NODE psDeviceNode,
 
 	psDeviceNode->psPowerDev = psPowerDevice;
 
-	return (PVRSRV_OK);
+	return PVRSRV_OK;
 }
 
 /*!
@@ -664,7 +760,7 @@ PVRSRV_ERROR PVRSRVRemovePowerDevice(PPVRSRV_DEVICE_NODE psDeviceNode)
 		psDeviceNode->psPowerDev = NULL;
 	}
 
-	return (PVRSRV_OK);
+	return PVRSRV_OK;
 }
 
 /*!
@@ -677,7 +773,7 @@ PVRSRV_ERROR PVRSRVRemovePowerDevice(PPVRSRV_DEVICE_NODE psDeviceNode)
 	Return the device power state
 
  @Input		psDeviceNode : Device node
- @Output	psPowerState : Current power state 
+ @Output	psPowerState : Current power state
 
  @Return	PVRSRV_ERROR_UNKNOWN_POWER_STATE if device could not be found. PVRSRV_OK otherwise.
 
@@ -774,7 +870,7 @@ PVRSRVDevicePreClockSpeedChange(PPVRSRV_DEVICE_NODE psDeviceNode,
 	{
 		PVR_DPF((PVR_DBG_ERROR,
 				 "%s: failed to acquire lock (%s)",
-				 __func__, PVRSRVGetErrorStringKM(eError)));
+				 __func__, PVRSRVGetErrorString(eError)));
 		return eError;
 	}
 
@@ -783,41 +879,17 @@ PVRSRVDevicePreClockSpeedChange(PPVRSRV_DEVICE_NODE psDeviceNode,
 	{
 		if ((psPowerDevice->eCurrentPowerState == PVRSRV_DEV_POWER_STATE_ON) && bIdleDevice)
 		{
-			LOOP_UNTIL_TIMEOUT(MAX_HW_TIME_US)
+			/* We can change the clock speed if the device is either IDLE or OFF */
+			eError = PVRSRVDeviceIdleRequestKM(psDeviceNode, NULL, IMG_TRUE);
+
+			if (eError != PVRSRV_OK)
 			{
-				/* We can change the clock speed if the device is either IDLE or OFF */
-				eError = PVRSRVDeviceIdleRequestKM(psDeviceNode, NULL, IMG_TRUE);
-				if (eError == PVRSRV_OK)
-				{
-					break;
-				}
-				else if (eError == PVRSRV_ERROR_DEVICE_IDLE_REQUEST_DENIED)
-				{
-					PVRSRV_ERROR	eError2;
-
-					PVRSRVPowerUnlock(psDeviceNode);
-					OSWaitus(MAX_HW_TIME_US/WAIT_TRY_COUNT);
-					eError2 = PVRSRVPowerLock(psDeviceNode);
-
-					if (eError2 != PVRSRV_OK)
-					{
-						PVR_DPF((PVR_DBG_ERROR,
-								 "%s: failed to acquire lock (%s)",
-								 __func__, PVRSRVGetErrorStringKM(eError)));
-						return eError2;
-					}
-				}
-				else
+				PVR_DPF((PVR_DBG_ERROR, "%s: Forced idle request failed (%s)",
+				                        __func__, PVRSRVGetErrorString(eError)));
+				if (eError != PVRSRV_ERROR_PWLOCK_RELEASED_REACQ_FAILED)
 				{
 					PVRSRVPowerUnlock(psDeviceNode);
-					return eError;
 				}
-			} END_LOOP_UNTIL_TIMEOUT();
-
-			if (eError == PVRSRV_ERROR_DEVICE_IDLE_REQUEST_DENIED)
-			{
-				PVR_DPF((PVR_DBG_ERROR, "%s: Forced idle DENIED", __func__));
-				PVRSRVPowerUnlock(psDeviceNode);
 				return eError;
 			}
 		}
@@ -884,7 +956,7 @@ PVRSRVDevicePostClockSpeedChange(PPVRSRV_DEVICE_NODE psDeviceNode,
 		if (eError != PVRSRV_OK)
 		{
 			PVR_DPF((PVR_DBG_ERROR, "%s: Device %p failed (%s)",
-					 __func__, psDeviceNode, PVRSRVGetErrorStringKM(eError)));
+					 __func__, psDeviceNode, PVRSRVGetErrorString(eError)));
 		}
 
 		if ((psPowerDevice->eCurrentPowerState == PVRSRV_DEV_POWER_STATE_ON) && bIdleDevice)
@@ -940,7 +1012,7 @@ PVRSRV_ERROR PVRSRVDeviceDustCountChange(PPVRSRV_DEVICE_NODE psDeviceNode,
 		if (eError != PVRSRV_OK)
 		{
 			PVR_DPF((PVR_DBG_ERROR, "%s: failed to acquire lock (%s)",
-					 __func__, PVRSRVGetErrorStringKM(eError)));
+					 __func__, PVRSRVGetErrorString(eError)));
 			return eError;
 		}
 
@@ -948,41 +1020,17 @@ PVRSRV_ERROR PVRSRVDeviceDustCountChange(PPVRSRV_DEVICE_NODE psDeviceNode,
 		if (eDevicePowerState == PVRSRV_DEV_POWER_STATE_ON)
 		{
 			/* Device must be idle to change dust count */
-			LOOP_UNTIL_TIMEOUT(MAX_HW_TIME_US)
+			eError = PVRSRVDeviceIdleRequestKM(psDeviceNode, NULL, IMG_FALSE);
+
+			if (eError != PVRSRV_OK)
 			{
-				eError = PVRSRVDeviceIdleRequestKM(psDeviceNode, NULL, IMG_FALSE);
-				if (eError == PVRSRV_OK)
+				PVR_DPF((PVR_DBG_ERROR, "%s: Forced idle request failure (%s)",
+				                        __func__, PVRSRVGetErrorString(eError)));
+				if (eError == PVRSRV_ERROR_PWLOCK_RELEASED_REACQ_FAILED)
 				{
-					break;
-				}
-				else if (eError == PVRSRV_ERROR_DEVICE_IDLE_REQUEST_DENIED)
-				{
-					PVRSRV_ERROR	eError2;
-
-					PVRSRVPowerUnlock(psDeviceNode);
-					OSWaitus(MAX_HW_TIME_US/WAIT_TRY_COUNT);
-					eError2 = PVRSRVPowerLock(psDeviceNode);
-
-					if (eError2 != PVRSRV_OK)
-					{
-						PVR_DPF((PVR_DBG_ERROR, "%s: failed to acquire lock (%s)",
-								 __func__, PVRSRVGetErrorStringKM(eError)));
-						return eError2;
-					}
-				}
-				else
-				{
-					PVR_DPF((PVR_DBG_ERROR,
-							 "%s: error occurred whilst forcing idle (%s)",
-							 __func__, PVRSRVGetErrorStringKM(eError)));
 					goto ErrorExit;
 				}
-			} END_LOOP_UNTIL_TIMEOUT();
-
-			if (eError == PVRSRV_ERROR_DEVICE_IDLE_REQUEST_DENIED)
-			{
-				PVR_DPF((PVR_DBG_ERROR, "%s: Forced idle DENIED", __func__));
-				goto ErrorExit;
+				goto ErrorUnlockAndExit;
 			}
 		}
 
@@ -994,7 +1042,7 @@ PVRSRV_ERROR PVRSRVDeviceDustCountChange(PPVRSRV_DEVICE_NODE psDeviceNode,
 			{
 				PVR_DPF((PVR_DBG_ERROR, "%s: Device %p failed (%s)",
 						 __func__, psDeviceNode,
-						 PVRSRVGetErrorStringKM(eError)));
+						 PVRSRVGetErrorString(eError)));
 			}
 		}
 
@@ -1005,7 +1053,7 @@ PVRSRV_ERROR PVRSRVDeviceDustCountChange(PPVRSRV_DEVICE_NODE psDeviceNode,
 			{
 				PVR_DPF((PVR_DBG_ERROR,
 						 "%s: Failed to cancel forced IDLE.", __func__));
-				goto ErrorExit;
+				goto ErrorUnlockAndExit;
 			}
 		}
 
@@ -1014,8 +1062,9 @@ PVRSRV_ERROR PVRSRVDeviceDustCountChange(PPVRSRV_DEVICE_NODE psDeviceNode,
 
 	return eError;
 
-ErrorExit:
+ErrorUnlockAndExit:
 	PVRSRVPowerUnlock(psDeviceNode);
+ErrorExit:
 	return eError;
 }
 

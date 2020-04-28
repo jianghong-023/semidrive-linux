@@ -354,7 +354,7 @@ static void adf_sunxi_set_hotplug_state(struct sunxi_interface *intf,
 static void
 adf_sunxi_release(struct adf_obj *obj, struct inode *inode, struct file *file)
 {
-#if (LINUX_VERSION_CODE <= KERNEL_VERSION(4,5,0))
+#if (LINUX_VERSION_CODE <= KERNEL_VERSION(4, 5, 0))
 	struct sync_fence *release_fence;
 #else
 	struct fence *release_fence;
@@ -382,7 +382,7 @@ adf_sunxi_release(struct adf_obj *obj, struct inode *inode, struct file *file)
 				false);
 	}
 
-#if (LINUX_VERSION_CODE <= KERNEL_VERSION(4,5,0))
+#if (LINUX_VERSION_CODE <= KERNEL_VERSION(4, 5, 0))
 	sync_fence_put(release_fence);
 #else
 	fence_put(release_fence);
@@ -864,9 +864,9 @@ static int sunxi_disp_hotplug_callback(void *user_data,
 		unsigned int supported_idx = 0;
 
 		intf->num_supported_modes = mode_count;
-		intf->supported_modes = kzalloc(
-			mode_count * sizeof(*intf->supported_modes),
-			GFP_KERNEL);
+		intf->supported_modes = kcalloc(mode_count,
+						sizeof(*intf->supported_modes),
+						GFP_KERNEL);
 		if (!intf->supported_modes) {
 			dev_err(sunxi.dev, "%s: Failed to allocate mode list\n",
 				__func__);

@@ -66,7 +66,7 @@ typedef struct _RGX_SERVER_TQ_CONTEXT_ RGX_SERVER_TQ_CONTEXT;
 	Server-side implementation of RGXCreateTransferContext
 
  @Input pvDeviceNode - device node
- 
+
 FIXME fill this in
 
  @Return   PVRSRV_ERROR
@@ -78,6 +78,7 @@ PVRSRV_ERROR PVRSRVRGXCreateTransferContextKM(CONNECTION_DATA		*psConnection,
 										   IMG_UINT32				ui32FrameworkCommandSize,
 										   IMG_PBYTE				pabyFrameworkCommand,
 										   IMG_HANDLE				hMemCtxPrivData,
+										   IMG_UINT32				ui32PackedCCBSizeU8888,
 										   RGX_SERVER_TQ_CONTEXT	**ppsTransferContext);
 
 
@@ -119,9 +120,11 @@ PVRSRV_ERROR PVRSRVRGXSubmitTransferKM(RGX_SERVER_TQ_CONTEXT	*psTransferContext,
 									SYNC_PRIMITIVE_BLOCK		***papauiClientUpdateUFOSyncPrimBlock,
 									IMG_UINT32				**papaui32ClientUpdateSyncOffset,
 									IMG_UINT32				**papaui32ClientUpdateValue,
+#if defined(SUPPORT_SERVER_SYNC_IMPL)
 									IMG_UINT32				*paui32ServerSyncCount,
 									IMG_UINT32				**papaui32ServerSyncFlags,
 									SERVER_SYNC_PRIMITIVE	***papapsServerSyncs,
+#endif
 									PVRSRV_FENCE			iCheckFence,
 									PVRSRV_TIMELINE			i2DUpdateTimeline,
 									PVRSRV_FENCE			*pi2DUpdateFence,
@@ -141,10 +144,11 @@ PVRSRV_ERROR PVRSRVRGXSetTransferContextPriorityKM(CONNECTION_DATA *psConnection
 												   RGX_SERVER_TQ_CONTEXT *psTransferContext,
 												   IMG_UINT32 ui32Priority);
 
-/* Debug - check if transfer context is waiting on a fence */
-void CheckForStalledTransferCtxt(PVRSRV_RGXDEV_INFO *psDevInfo,
-					DUMPDEBUG_PRINTF_FUNC *pfnDumpDebugPrintf,
-					void *pvDumpDebugFile);
+/* Debug - Dump debug info of transfer contexts on this device */
+void DumpTransferCtxtsInfo(PVRSRV_RGXDEV_INFO *psDevInfo,
+                           DUMPDEBUG_PRINTF_FUNC *pfnDumpDebugPrintf,
+                           void *pvDumpDebugFile,
+                           IMG_UINT32 ui32VerbLevel);
 
 /* Debug/Watchdog - check if client transfer contexts are stalled */
 IMG_UINT32 CheckForStalledClientTransferCtxt(PVRSRV_RGXDEV_INFO *psDevInfo);

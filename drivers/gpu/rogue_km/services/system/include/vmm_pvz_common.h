@@ -2,7 +2,8 @@
 @File           vmm_pvz_common.h
 @Title          Common VM manager function IDs
 @Copyright      Copyright (c) Imagination Technologies Ltd. All Rights Reserved
-@Description    Header provides VM manager para-virtualization function IDs
+@Description    Header provides VM manager para-virtualization function IDs and
+                definitions of their payload structures, if appropriate.
 @License        Dual MIT/GPLv2
 
 The contents of this file are subject to the MIT license as set out below.
@@ -41,8 +42,10 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */ /**************************************************************************/
 
-#ifndef _VMM_PVZ_COMMON_H_
-#define _VMM_PVZ_COMMON_H_
+#ifndef VMM_PVZ_COMMON_H
+#define VMM_PVZ_COMMON_H
+
+#include "img_types.h"
 
 #define PVZ_BRIDGE_DEFAULT					0UL
 #define PVZ_BRIDGE_CREATEDEVICECONFIG		(PVZ_BRIDGE_DEFAULT + 1)
@@ -53,7 +56,13 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #define PVZ_BRIDGE_UNMAPDEVICEPHYSHEAP		(PVZ_BRIDGE_MAPDEVICEPHYSHEAP   + 1)
 #define PVZ_BRIDGE_LAST						(PVZ_BRIDGE_UNMAPDEVICEPHYSHEAP + 1)
 
-#endif /* _VMM_PVZ_COMMON_H_ */
+typedef struct _PVZ_BRIDGEPARA_MAPDEVICEPHYSHEAP
+{
+	IMG_UINT64	ui64MemBase;
+	IMG_UINT32	ui32OSID;
+}PVZ_BRIDGEPARA_MAPDEVICEPHYSHEAP;
+
+#endif /* VMM_PVZ_COMMON_H */
 
 /*****************************************************************************
  End of file (vmm_pvz_common.h)

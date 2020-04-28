@@ -46,6 +46,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #include "device.h" /* For device node */
 #include "img_types.h"
+#include "img_defs.h"
 #include "pvr_debug.h"
 #include "pvrsrv_error.h"
 
@@ -432,7 +433,7 @@ DevmemIntPDumpBitmap(CONNECTION_DATA * psConnection,
                      IMG_UINT32 ui32PDumpFlags);
 
 extern PVRSRV_ERROR
-DevmemIntPdumpImageDescriptor(CONNECTION_DATA * psConnection,
+DevmemIntPDumpImageDescriptor(CONNECTION_DATA * psConnection,
                               PVRSRV_DEVICE_NODE *psDeviceNode,
                               DEVMEMINT_CTX *psDevMemContext,
                               IMG_UINT32 ui32Size,
@@ -447,13 +448,26 @@ DevmemIntPdumpImageDescriptor(CONNECTION_DATA * psConnection,
                               IMG_MEMLAYOUT eMemLayout,
                               IMG_FB_COMPRESSION eFBCompression,
                               const IMG_UINT32 *paui32FBCClearColour,
+                              PDUMP_FBC_SWIZZLE eFBCSwizzle,
                               IMG_DEV_VIRTADDR sHeader,
                               IMG_UINT32 ui32HeaderSize,
+                              IMG_UINT32 ui32PDumpFlags);
+
+extern PVRSRV_ERROR
+DevmemIntPDumpDataDescriptor(CONNECTION_DATA * psConnection,
+                              PVRSRV_DEVICE_NODE *psDeviceNode,
+                              DEVMEMINT_CTX *psDevMemContext,
+                              IMG_UINT32 ui32Size,
+                              const IMG_CHAR *pszFileName,
+                              IMG_DEV_VIRTADDR sData,
+                              IMG_UINT32 ui32DataSize,
+                              IMG_UINT32 ui32ElementType,
+                              IMG_UINT32 ui32ElementCount,
                               IMG_UINT32 ui32PDumpFlags);
 #else	/* PDUMP */
 
 #ifdef INLINE_IS_PRAGMA
-#pragma inline(PVRSRVSyncPrimPDumpPolKM)
+#pragma inline(DevmemIntPDumpSaveToFileVirtual)
 #endif
 static INLINE PVRSRV_ERROR
 DevmemIntPDumpSaveToFileVirtual(DEVMEMINT_CTX *psDevmemCtx,
@@ -475,7 +489,7 @@ DevmemIntPDumpSaveToFileVirtual(DEVMEMINT_CTX *psDevmemCtx,
 }
 
 #ifdef INLINE_IS_PRAGMA
-#pragma inline(PVRSRVSyncPrimPDumpPolKM)
+#pragma inline(DevmemIntPDumpBitmap)
 #endif
 static INLINE PVRSRV_ERROR
 DevmemIntPDumpBitmap(CONNECTION_DATA * psConnection,
@@ -509,10 +523,10 @@ DevmemIntPDumpBitmap(CONNECTION_DATA * psConnection,
 }
 
 #ifdef INLINE_IS_PRAGMA
-#pragma inline(DevmemIntPdumpImageDescriptor)
+#pragma inline(DevmemIntPDumpImageDescriptor)
 #endif
 static INLINE PVRSRV_ERROR
-DevmemIntPdumpImageDescriptor(CONNECTION_DATA * psConnection,
+DevmemIntPDumpImageDescriptor(CONNECTION_DATA * psConnection,
                               PVRSRV_DEVICE_NODE *psDeviceNode,
                               DEVMEMINT_CTX *psDevMemContext,
                               IMG_UINT32 ui32Size,
@@ -527,11 +541,15 @@ DevmemIntPdumpImageDescriptor(CONNECTION_DATA * psConnection,
                               IMG_MEMLAYOUT eMemLayout,
                               IMG_FB_COMPRESSION eFBCompression,
                               const IMG_UINT32 *paui32FBCClearColour,
+                              PDUMP_FBC_SWIZZLE eFBCSwizzle,
                               IMG_DEV_VIRTADDR sHeader,
                               IMG_UINT32 ui32HeaderSize,
                               IMG_UINT32 ui32PDumpFlags)
 {
+	PVR_UNREFERENCED_PARAMETER(psConnection);
 	PVR_UNREFERENCED_PARAMETER(psDeviceNode);
+	PVR_UNREFERENCED_PARAMETER(psDevMemContext);
+	PVR_UNREFERENCED_PARAMETER(ui32Size);
 	PVR_UNREFERENCED_PARAMETER(pszFileName);
 	PVR_UNREFERENCED_PARAMETER(sData);
 	PVR_UNREFERENCED_PARAMETER(ui32DataSize);
@@ -543,8 +561,37 @@ DevmemIntPdumpImageDescriptor(CONNECTION_DATA * psConnection,
 	PVR_UNREFERENCED_PARAMETER(eMemLayout);
 	PVR_UNREFERENCED_PARAMETER(eFBCompression);
 	PVR_UNREFERENCED_PARAMETER(paui32FBCClearColour);
+	PVR_UNREFERENCED_PARAMETER(eFBCSwizzle);
 	PVR_UNREFERENCED_PARAMETER(sHeader);
 	PVR_UNREFERENCED_PARAMETER(ui32HeaderSize);
+	PVR_UNREFERENCED_PARAMETER(ui32PDumpFlags);
+	return PVRSRV_OK;
+}
+
+#ifdef INLINE_IS_PRAGMA
+#pragma inline(DevmemIntPDumpDataDescriptor)
+#endif
+static INLINE PVRSRV_ERROR
+DevmemIntPDumpDataDescriptor(CONNECTION_DATA * psConnection,
+                              PVRSRV_DEVICE_NODE *psDeviceNode,
+                              DEVMEMINT_CTX *psDevMemContext,
+                              IMG_UINT32 ui32Size,
+                              const IMG_CHAR *pszFileName,
+                              IMG_DEV_VIRTADDR sData,
+                              IMG_UINT32 ui32DataSize,
+                              IMG_UINT32 ui32ElementType,
+                              IMG_UINT32 ui32ElementCount,
+                              IMG_UINT32 ui32PDumpFlags)
+{
+	PVR_UNREFERENCED_PARAMETER(psConnection);
+	PVR_UNREFERENCED_PARAMETER(psDeviceNode);
+	PVR_UNREFERENCED_PARAMETER(psDevMemContext);
+	PVR_UNREFERENCED_PARAMETER(ui32Size);
+	PVR_UNREFERENCED_PARAMETER(pszFileName);
+	PVR_UNREFERENCED_PARAMETER(sData);
+	PVR_UNREFERENCED_PARAMETER(ui32DataSize);
+	PVR_UNREFERENCED_PARAMETER(ui32ElementType);
+	PVR_UNREFERENCED_PARAMETER(ui32ElementCount);
 	PVR_UNREFERENCED_PARAMETER(ui32PDumpFlags);
 	return PVRSRV_OK;
 }

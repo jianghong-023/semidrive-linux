@@ -39,7 +39,7 @@ PURPOSE AND NONINFRINGEMENT; AND (B) IN NO EVENT SHALL THE AUTHORS OR
 COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
 IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-********************************************************************************/
+*******************************************************************************/
 
 #include <linux/uaccess.h>
 
@@ -100,6 +100,15 @@ PVRSRVBridgeRGXConfigEnableHWPerfCounters(IMG_UINT32 ui32DispatchTableEntry,
 	IMG_UINT32 ui32BufferSize =
 	    (psRGXConfigEnableHWPerfCountersIN->ui32ArrayLen *
 	     sizeof(RGX_HWPERF_CONFIG_CNTBLK)) + 0;
+
+	if (unlikely
+	    (psRGXConfigEnableHWPerfCountersIN->ui32ArrayLen >
+	     RGX_HWPERF_MAX_DEFINED_BLKS))
+	{
+		psRGXConfigEnableHWPerfCountersOUT->eError =
+		    PVRSRV_ERROR_BRIDGE_ARRAY_SIZE_TOO_BIG;
+		goto RGXConfigEnableHWPerfCounters_exit;
+	}
 
 	if (ui32BufferSize != 0)
 	{
@@ -204,6 +213,15 @@ PVRSRVBridgeRGXCtrlHWPerfCounters(IMG_UINT32 ui32DispatchTableEntry,
 	IMG_UINT32 ui32BufferSize =
 	    (psRGXCtrlHWPerfCountersIN->ui32ArrayLen * sizeof(IMG_UINT16)) + 0;
 
+	if (unlikely
+	    (psRGXCtrlHWPerfCountersIN->ui32ArrayLen >
+	     RGX_HWPERF_MAX_DEFINED_BLKS))
+	{
+		psRGXCtrlHWPerfCountersOUT->eError =
+		    PVRSRV_ERROR_BRIDGE_ARRAY_SIZE_TOO_BIG;
+		goto RGXCtrlHWPerfCounters_exit;
+	}
+
 	if (ui32BufferSize != 0)
 	{
 #if !defined(INTEGRITY_OS)
@@ -307,6 +325,15 @@ PVRSRVBridgeRGXConfigCustomCounters(IMG_UINT32 ui32DispatchTableEntry,
 	    (psRGXConfigCustomCountersIN->ui16NumCustomCounters *
 	     sizeof(IMG_UINT32)) + 0;
 
+	if (unlikely
+	    (psRGXConfigCustomCountersIN->ui16NumCustomCounters >
+	     RGX_HWPERF_MAX_CUSTOM_CNTRS))
+	{
+		psRGXConfigCustomCountersOUT->eError =
+		    PVRSRV_ERROR_BRIDGE_ARRAY_SIZE_TOO_BIG;
+		goto RGXConfigCustomCounters_exit;
+	}
+
 	if (ui32BufferSize != 0)
 	{
 #if !defined(INTEGRITY_OS)
@@ -408,13 +435,13 @@ PVRSRVBridgeRGXGetHWPerfBvncFeatureFlags(IMG_UINT32 ui32DispatchTableEntry,
 	    PVRSRVRGXGetHWPerfBvncFeatureFlagsKM(psConnection,
 						 OSGetDevData(psConnection),
 						 &psRGXGetHWPerfBvncFeatureFlagsOUT->
-						 ui32FeatureFlags);
+						 sBVNC);
 
 	return 0;
 }
 
-/* *************************************************************************** 
- * Server bridge dispatch related glue 
+/* ***************************************************************************
+ * Server bridge dispatch related glue
  */
 
 static IMG_BOOL bUseLock = IMG_TRUE;

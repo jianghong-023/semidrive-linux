@@ -83,6 +83,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
 #include "img_types.h"
+#include "img_defs.h"
 #include "pvr_debug.h"
 #include "pvrsrv_error.h"
 #include "uniq_key_splay_tree.h"
@@ -243,7 +244,7 @@ _RequestAllocFail (RA_PERARENA_HANDLE _h,
 	   the bHasEltsMapping is used to quickly determine the smallest bucket containing elements.
 	   therefore it must have at least as many bits has the buckets array have buckets. The RA
 	   implementation actually uses one more bit. */
-	static_assert((sizeof(((IMG_PSPLAY_TREE) 0)->buckets) / sizeof(((IMG_PSPLAY_TREE) 0)->buckets[0]))
+	static_assert(ARRAY_SIZE(((IMG_PSPLAY_TREE)0)->buckets)
 				  < 8 * sizeof(((IMG_PSPLAY_TREE) 0)->bHasEltsMapping),
 				  "Too many buckets for bHasEltsMapping bitmap");
 #endif
@@ -886,7 +887,7 @@ _AttemptAllocAligned (RA_ARENA *pArena,
 	PVR_ASSERT(index_low <= index_high);
 
 #if defined(PVR_CTZLL)
-	i = PVR_CTZLL((IMG_ELTS_MAPPINGS) (~((1 << (index_high + 1)) - 1)) & pArena->per_flags_buckets->bHasEltsMapping);
+	i = PVR_CTZLL((~(((IMG_ELTS_MAPPINGS)1 << (index_high + 1)) - 1)) & pArena->per_flags_buckets->bHasEltsMapping);
 #else
 	for (i = index_high + 1; (i < FREE_TABLE_LIMIT) && (pArena->per_flags_buckets->buckets[i] == NULL); ++i)
 	{
@@ -903,7 +904,7 @@ _AttemptAllocAligned (RA_ARENA *pArena,
 	{
 		for (i = index_high; (i != index_low - 1) && (pBT == NULL); --i)
 		{
-			pBT = find_chunk_in_bucket(pArena->per_flags_buckets->buckets[i], uSize, uAlignment, (unsigned int) ~0);			
+			pBT = find_chunk_in_bucket(pArena->per_flags_buckets->buckets[i], uSize, uAlignment, (unsigned int) ~0);
 		}
 	}
 
@@ -916,7 +917,7 @@ _AttemptAllocAligned (RA_ARENA *pArena,
 
 	_FreeListRemove (pArena, pBT);
 
-	if(pArena->bNoSplit)
+	if (pArena->bNoSplit)
 	{
 		goto nosplit;
 	}
@@ -929,7 +930,7 @@ _AttemptAllocAligned (RA_ARENA *pArena,
 		/* partition the buffer, create a new boundary tag */
 		if (pNeighbour == NULL)
 		{
-			PVR_DPF ((PVR_DBG_ERROR, "%s: Front split failed", __FUNCTION__));
+			PVR_DPF ((PVR_DBG_ERROR, "%s: Front split failed", __func__));
 			/* Put pBT back in the list */
 			_FreeListInsert (pArena, pBT);
 			return IMG_FALSE;
@@ -947,7 +948,7 @@ _AttemptAllocAligned (RA_ARENA *pArena,
 		/* partition the buffer, create a new boundary tag */
 		if (pNeighbour == NULL)
 		{
-			PVR_DPF ((PVR_DBG_ERROR, "%s: Back split failed", __FUNCTION__));
+			PVR_DPF ((PVR_DBG_ERROR, "%s: Back split failed", __func__));
 			/* Put pBT back in the list */
 			_FreeListInsert (pArena, pBT);
 			return IMG_FALSE;
@@ -958,7 +959,7 @@ _AttemptAllocAligned (RA_ARENA *pArena,
 nosplit:
 	pBT->type = btt_live;
 
-	if (!HASH_Insert_Extended (pArena->pSegmentHash, &pBT->base, (uintptr_t)pBT))
+	if (!HASH_Insert_Extended (pArena->pSegmentHash, &aligned_base, (uintptr_t)pBT))
 	{
 		_FreeBT (pArena, pBT);
 		return IMG_FALSE;
@@ -967,7 +968,7 @@ nosplit:
 	if (phPriv != NULL)
 		*phPriv = pBT->hPriv;
 
-	*base = pBT->base;
+	*base = aligned_base;
 
 	return IMG_TRUE;
 }
@@ -1023,7 +1024,7 @@ RA_Create (IMG_CHAR *name,
 		goto arena_fail;
 	}
 
-	eError = OSLockCreate(&pArena->hLock, LOCK_TYPE_PASSIVE);
+	eError = OSLockCreate(&pArena->hLock);
 	if (eError != PVRSRV_OK)
 	{
 		goto lock_fail;
@@ -1154,7 +1155,7 @@ RA_Add (RA_ARENA *pArena,
 		return IMG_FALSE;
 	}
 
-	if(uSize == 0)
+	if (uSize == 0)
 	{
 		PVR_DPF((PVR_DBG_ERROR, "RA_Add: invalid size 0 added to arena %s", pArena->name));
 		return IMG_FALSE;

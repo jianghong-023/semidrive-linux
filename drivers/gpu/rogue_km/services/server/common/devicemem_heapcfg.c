@@ -46,6 +46,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #include "device.h"
 #include "img_types.h"
+#include "img_defs.h"
 #include "pvr_debug.h"
 #include "pvrsrv_error.h"
 #include "osfunc.h"

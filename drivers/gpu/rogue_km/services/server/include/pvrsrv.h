@@ -1,4 +1,4 @@
-/**************************************************************************/ /*!
+/*************************************************************************/ /*!
 @File
 @Title          PowerVR services server header file
 @Copyright      Copyright (c) Imagination Technologies Ltd. All Rights Reserved
@@ -38,11 +38,10 @@ PURPOSE AND NONINFRINGEMENT; AND (B) IN NO EVENT SHALL THE AUTHORS OR
 COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
 IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/ /***************************************************************************/
+*/ /**************************************************************************/
 
 #ifndef PVRSRV_H
 #define PVRSRV_H
-
 
 #include "connection_server.h"
 #include "device.h"
@@ -100,7 +99,7 @@ typedef struct _BUILD_INFO_
 	IMG_UINT32	ui32BuildType;
 #define BUILD_TYPE_DEBUG	0
 #define BUILD_TYPE_RELEASE	1
-	/*The above fields are self explanatory */
+	/* The above fields are self explanatory */
 	/* B.V.N.C can be added later if required */
 } BUILD_INFO;
 
@@ -130,6 +129,7 @@ typedef struct PVRSRV_DATA_TAG
 
 	HASH_TABLE					*psProcessHandleBase_Table; /*!< Hash table with process handle bases */
 	POS_LOCK					hProcessHandleBase_Lock;	/*!< Lock for the process handle base table */
+	PVRSRV_HANDLE_BASE			*psProcessHandleBaseBeingFreed; /*!< Pointer to process handle base currently being freed */
 
 	IMG_HANDLE					hGlobalEventObject;			/*!< OS Global Event Object */
 	IMG_UINT32					ui32GEOConsecutiveTimeouts;	/*!< OS Global Event Object Timeouts */
@@ -139,7 +139,7 @@ typedef struct PVRSRV_DATA_TAG
 	POS_LOCK					hCleanupThreadWorkListLock;	/*!< Lock protecting the cleanup thread work list */
 	DLLIST_NODE					sCleanupThreadWorkList;		/*!< List of work for the cleanup thread */
 	IMG_PID						cleanupThreadPid;			/*!< Cleanup thread process id */
-	ATOMIC_T					i32NumCleanupItems;		/*!< Number of items in cleanup thread work list */
+	ATOMIC_T					i32NumCleanupItems;			/*!< Number of items in cleanup thread work list */
 
 	IMG_HANDLE					hDevicesWatchdogThread;		/*!< Devices watchdog thread */
 	IMG_HANDLE					hDevicesWatchdogEvObj;		/*! Event object to drive devices watchdog thread */
@@ -151,6 +151,12 @@ typedef struct PVRSRV_DATA_TAG
 	volatile IMG_UINT32			ui32DevicesWdWakeupCounter;	/* Need this for the unit tests. */
 #endif
 
+	POS_LOCK					hHWPerfHostPeriodicThread_Lock;	/*!< Lock for the HWPerf Host periodic thread */
+	IMG_HANDLE					hHWPerfHostPeriodicThread;		/*!< HWPerf Host periodic thread */
+	IMG_HANDLE					hHWPerfHostPeriodicEvObj;		/*! Event object to drive HWPerf thread */
+	volatile IMG_BOOL			bHWPerfHostThreadStop;
+	IMG_UINT32					ui32HWPerfHostThreadTimeout;
+
 	IMG_HANDLE					hPvzConnection;				/*!< PVZ connection used for cross-VM hyper-calls */
 	POS_LOCK					hPvzConnectionLock;			/*!< Lock protecting PVZ connection */
 	IMG_BOOL					abVmOnline[RGXFW_NUM_OS];
@@ -159,10 +165,9 @@ typedef struct PVRSRV_DATA_TAG
 
 	IMG_HANDLE					hTLCtrlStream;				/*! Control plane for TL streams */
 
-	PVRSRV_POOL					*psBridgeBufferPool;			/*! Pool of bridge buffers */
-	IMG_HANDLE					hDriverThreadEventObject;		/*! Event object relating to multi-threading in the Server */
+	IMG_HANDLE					hDriverThreadEventObject;	/*! Event object relating to multi-threading in the Server */
 	IMG_BOOL					bDriverSuspended;			/*! if TRUE, the driver is suspended and new threads should not enter */
-	ATOMIC_T					iNumActiveDriverThreads;			/*! Number of threads active in the Server */
+	ATOMIC_T					iNumActiveDriverThreads;	/*! Number of threads active in the Server */
 
 	PMR							*psInfoPagePMR;				/*! Handle to exportable PMR of the information page. */
 	IMG_UINT32					*pui32InfoPage;				/*! CPU memory mapping for information page. */
@@ -176,25 +181,24 @@ typedef struct PVRSRV_DATA_TAG
 
 /*!
 ******************************************************************************
-
  @Function	PVRSRVGetPVRSRVData
 
  @Description	Get a pointer to the global data
 
  @Return   PVRSRV_DATA *
-
 ******************************************************************************/
 PVRSRV_DATA *PVRSRVGetPVRSRVData(void);
 
 /*!
-******************************************************************************************
-@Note   Kernel code must always query the driver mode using the PVRSRV_VZ_MODE_IS() macro
-		_only_ and PVRSRV_DATA->eDriverMode should not be read directly as the field also
-		overloads as driver OSID (i.e. not to be confused with hardware kick register OSID)
-		when running on non-VZ capable BVNC as the driver has to simulate OSID propagation
-		to the firmware in the absence of the hardware kick register propagating this OSID
-		on any non-VZ BVNC.
-******************************************************************************************/
+******************************************************************************
+@Note	Kernel code must always query the driver mode using the
+		PVRSRV_VZ_MODE_IS() macro _only_ and PVRSRV_DATA->eDriverMode should
+		not be read directly as the field also overloads as driver OSID (i.e.
+		not to be confused with hardware kick register OSID) when running on
+		non-VZ capable BVNC as the driver has to simulate OSID propagation to
+		the firmware in the absence of the hardware kick register propagating
+		this OSID on any non-VZ BVNC.
+******************************************************************************/
 #define PVRSRV_VZ_MODE_IS(_expr)              (((((IMG_INT)_expr)>0)&&((IMG_INT)PVRSRVGetPVRSRVData()->eDriverMode>0)) ? \
                                                    (IMG_TRUE) : ((_expr) == (PVRSRVGetPVRSRVData()->eDriverMode)))
 #define PVRSRV_VZ_RETN_IF_MODE(_expr)         do { if (  PVRSRV_VZ_MODE_IS(_expr)) { return; } } while(0)
@@ -205,12 +209,14 @@ PVRSRV_DATA *PVRSRVGetPVRSRVData(void);
 												   ((IMG_UINT32)(PVRSRVGetPVRSRVData()->eDriverMode)) : (0))
 
 /*!
-************************************************************************************************
-@Note	The driver execution mode AppHint (i.e. PVRSRV_APPHINT_DRIVERMODE) can be an override or
-		non-override 32-bit value. An override value has the MSB bit set & a non-override value
-		has this MSB bit cleared. Excluding this MSB bit & interpreting the remaining 31-bit as
-		a signed 31-bit integer, the mode values are [-1 native <default>: 0 host : +1 guest ].
-************************************************************************************************/
+******************************************************************************
+@Note	The driver execution mode AppHint (i.e. PVRSRV_APPHINT_DRIVERMODE)
+		can be an override or non-override 32-bit value. An override value
+		has the MSB bit set & a non-override value has this MSB bit cleared.
+		Excluding this MSB bit & interpreting the remaining 31-bit as a
+		signed 31-bit integer, the mode values are:
+		  [-1 native <default>: 0 host : +1 guest ].
+******************************************************************************/
 #define PVRSRV_VZ_APPHINT_MODE_IS_OVERRIDE(_expr)   ((IMG_UINT32)(_expr)&(IMG_UINT32)(1<<31))
 #define PVRSRV_VZ_APPHINT_MODE(_expr)				\
 	((((IMG_UINT32)(_expr)&(IMG_UINT32)0x7FFFFFFF) == (IMG_UINT32)0x7FFFFFFF) ? DRIVER_MODE_NATIVE : \
@@ -241,6 +247,7 @@ PVRSRV_ERROR LMA_PhyContigPagesClean(PVRSRV_DEVICE_NODE *psDevNode,
                                      IMG_UINT32 uiOffset,
                                      IMG_UINT32 uiLength);
 
+IMG_BOOL IsPhysmemNewRamBackedByLMA(PVRSRV_DEVICE_NODE *psDeviceNode, PVRSRV_DEVICE_PHYS_HEAP ePhysHeapIdx);
 
 /*!
 ******************************************************************************
@@ -298,62 +305,61 @@ PVRSRV_ERROR IMG_CALLCONV PVRSRVWaitForValueKMAndHoldBridgeLockKM(
 		IMG_UINT32                   ui32Mask);
 
 /*!
-*****************************************************************************
+******************************************************************************
  @Function	: PVRSRVSystemHasCacheSnooping
 
  @Description	: Returns whether the system has cache snooping
 
  @Return : IMG_TRUE if the system has cache snooping
-*****************************************************************************/
+******************************************************************************/
 IMG_BOOL PVRSRVSystemHasCacheSnooping(PVRSRV_DEVICE_CONFIG *psDevConfig);
 
 /*!
-*****************************************************************************
+******************************************************************************
  @Function	: PVRSRVSystemSnoopingIsEmulated
 
  @Description : Returns whether system cache snooping support is emulated
 
  @Return : IMG_TRUE if the system cache snooping is emulated in software
-*****************************************************************************/
+******************************************************************************/
 IMG_BOOL PVRSRVSystemSnoopingIsEmulated(PVRSRV_DEVICE_CONFIG *psDevConfig);
 
 /*!
-*****************************************************************************
+******************************************************************************
  @Function	: PVRSRVSystemSnoopingOfCPUCache
 
  @Description	: Returns whether the system supports snooping of the CPU cache
 
  @Return : IMG_TRUE if the system has CPU cache snooping
-*****************************************************************************/
+******************************************************************************/
 IMG_BOOL PVRSRVSystemSnoopingOfCPUCache(PVRSRV_DEVICE_CONFIG *psDevConfig);
 
 /*!
-*****************************************************************************
+******************************************************************************
  @Function	: PVRSRVSystemSnoopingOfDeviceCache
 
  @Description	: Returns whether the system supports snooping of the device cache
 
  @Return : IMG_TRUE if the system has device cache snooping
-*****************************************************************************/
+******************************************************************************/
 IMG_BOOL PVRSRVSystemSnoopingOfDeviceCache(PVRSRV_DEVICE_CONFIG *psDevConfig);
 
 /*!
-*****************************************************************************
+******************************************************************************
  @Function	: PVRSRVSystemHasNonMappableLocalMemory
 
  @Description	: Returns whether the device has non-mappable part of local memory
 
  @Return : IMG_TRUE if the device has non-mappable part of local memory
-*****************************************************************************/
+******************************************************************************/
 IMG_BOOL PVRSRVSystemHasNonMappableLocalMemory(PVRSRV_DEVICE_CONFIG *psDevConfig);
 
 /*!
-*****************************************************************************
+******************************************************************************
  @Function	: PVRSRVSystemWaitCycles
 
  @Description	: Waits for at least ui32Cycles of the Device clk.
-
-*****************************************************************************/
+******************************************************************************/
 void PVRSRVSystemWaitCycles(PVRSRV_DEVICE_CONFIG *psDevConfig, IMG_UINT32 ui32Cycles);
 
 PVRSRV_ERROR PVRSRVSystemInstallDeviceLISR(void *pvOSDevice,
@@ -368,33 +374,38 @@ PVRSRV_ERROR PVRSRVSystemUninstallDeviceLISR(IMG_HANDLE hLISRData);
 int PVRSRVGetDriverStatus(void);
 
 /*!
-*****************************************************************************
+******************************************************************************
  @Function	: PVRSRVIsBridgeEnabled
 
  @Description	: Returns whether the given bridge group is enabled
 
  @Return : IMG_TRUE if the given bridge group is enabled
-*****************************************************************************/
+******************************************************************************/
 static inline IMG_BOOL PVRSRVIsBridgeEnabled(IMG_HANDLE hServices, IMG_UINT32 ui32BridgeGroup)
 {
+	IMG_UINT32 ui32Bridges;
+	IMG_UINT32 ui32Offset;
+
 	PVR_UNREFERENCED_PARAMETER(hServices);
 
 #if defined(SUPPORT_RGX)
-	if(ui32BridgeGroup >= PVRSRV_BRIDGE_RGX_FIRST)
+	if (ui32BridgeGroup >= PVRSRV_BRIDGE_RGX_FIRST)
 	{
-		return ((1U << (ui32BridgeGroup - PVRSRV_BRIDGE_RGX_FIRST)) &
-							gui32RGXBridges) != 0;
+		ui32Bridges = gui32RGXBridges;
+		ui32Offset = PVRSRV_BRIDGE_RGX_FIRST;
 	}
 	else
 #endif /* SUPPORT_RGX */
 	{
-		return ((1U << (ui32BridgeGroup - PVRSRV_BRIDGE_FIRST)) &
-							gui32PVRBridges) != 0;
+		ui32Bridges = gui32PVRBridges;
+		ui32Offset = PVRSRV_BRIDGE_FIRST;
 	}
+
+	return ((1U << (ui32BridgeGroup - ui32Offset)) & ui32Bridges) != 0;
 }
 
 /*!
-*****************************************************************************
+******************************************************************************
  @Function	: PVRSRVSystemBIFTilingHeapGetXStride
 
  @Description	: return the default x-stride configuration for the given
@@ -405,15 +416,14 @@ static inline IMG_BOOL PVRSRVIsBridgeEnabled(IMG_HANDLE hServices, IMG_UINT32 ui
  @Input uiHeapNum: BIF tiling heap number, starting from 1
 
  @Output puiXStride: pointer to x-stride output of the requested heap
-
-*****************************************************************************/
+******************************************************************************/
 PVRSRV_ERROR
 PVRSRVSystemBIFTilingHeapGetXStride(PVRSRV_DEVICE_CONFIG *psDevConfig,
 									IMG_UINT32 uiHeapNum,
 									IMG_UINT32 *puiXStride);
 
 /*!
-*****************************************************************************
+******************************************************************************
  @Function              : PVRSRVSystemBIFTilingGetConfig
 
  @Description           : return the BIF tiling mode and number of BIF
@@ -425,7 +435,7 @@ PVRSRVSystemBIFTilingHeapGetXStride(PVRSRV_DEVICE_CONFIG *psDevConfig,
 
  @Output puiNumHeaps    : pointer to uint to hold number of heaps
 
-*****************************************************************************/
+******************************************************************************/
 PVRSRV_ERROR
 PVRSRVSystemBIFTilingGetConfig(PVRSRV_DEVICE_CONFIG  *psDevConfig,
                                RGXFWIF_BIFTILINGMODE *peBifTilingMode,
@@ -433,22 +443,22 @@ PVRSRVSystemBIFTilingGetConfig(PVRSRV_DEVICE_CONFIG  *psDevConfig,
 
 #if defined(SUPPORT_GPUVIRT_VALIDATION)
 /*!
-***********************************************************************************
+******************************************************************************
  @Function				: PopulateLMASubArenas
 
- @Description			: Uses the Apphints passed by the client at initialization
-						  time to add bases and sizes in the various arenas in the
-						  LMA memory
+ @Description			: Uses the Apphints passed by the client at
+						  initialization time to add bases and sizes in the
+						  various arenas in the LMA memory
 
  @Input psDeviceNode	: Pointer to the device node struct containing all the
 						  arena information
 
- @Input ui32OSidMin		: Single dimensional array containing the minimum values
-						  for each OSid area
+ @Input aui32OSidMin	: Single dimensional array containing the minimum
+						  values for each OSid area
 
- @Input ui32OSidMax		: Single dimensional array containing the maximum values
-						  for each OSid area
-***********************************************************************************/
+ @Input aui32OSidMax	: Single dimensional array containing the maximum
+						  values for each OSid area
+******************************************************************************/
 
 void PopulateLMASubArenas(PVRSRV_DEVICE_NODE *psDeviceNode, IMG_UINT32 aui32OSidMin[GPUVIRT_VALIDATION_NUM_REGIONS][GPUVIRT_VALIDATION_NUM_OS], IMG_UINT32 aui32OSidMax[GPUVIRT_VALIDATION_NUM_REGIONS][GPUVIRT_VALIDATION_NUM_OS]);
 
@@ -461,14 +471,13 @@ void PopulateLMASubArenas(PVRSRV_DEVICE_NODE *psDeviceNode, IMG_UINT32 aui32OSid
 
 /*!
 ******************************************************************************
-
  @Function			PVRSRVVzRegisterFirmwarePhysHeap
 
- @Description 		Request to map a physical heap to kernel FW memory context
+ @Description		Request to map a physical heap to kernel FW memory context
 
  @Return			PVRSRV_ERROR	PVRSRV_OK on success. Otherwise, a PVRSRV_
 									error code
- ******************************************************************************/
+******************************************************************************/
 PVRSRV_ERROR PVRSRVVzRegisterFirmwarePhysHeap(PVRSRV_DEVICE_NODE *psDeviceNode,
 											  IMG_DEV_PHYADDR sDevPAddr,
 											  IMG_UINT64 ui64DevPSize,
@@ -476,15 +485,60 @@ PVRSRV_ERROR PVRSRVVzRegisterFirmwarePhysHeap(PVRSRV_DEVICE_NODE *psDeviceNode,
 
 /*!
 ******************************************************************************
-
  @Function			PVRSRVVzUnregisterFirmwarePhysHeap
 
- @Description 		Request to unmap a physical heap from kernel FW memory context
+ @Description		Request to unmap a physical heap from kernel FW memory context
 
  @Return			PVRSRV_ERROR	PVRSRV_OK on success. Otherwise, a PVRSRV_
 									error code
- ******************************************************************************/
+******************************************************************************/
 PVRSRV_ERROR PVRSRVVzUnregisterFirmwarePhysHeap(PVRSRV_DEVICE_NODE *psDeviceNode,
 												IMG_UINT32 uiOSID);
+
+/*!
+******************************************************************************
+ @Function			: PVRSRVCreateHWPerfHostThread
+
+ @Description		: Creates HWPerf event object and thread unless already created
+
+ @Input ui32Timeout	: Initial timeout (ms) between updates on the HWPerf thread
+
+ @Return			: PVRSRV_ERROR	PVRSRV_OK on success. Otherwise, a PVRSRV_
+									error code
+******************************************************************************/
+PVRSRV_ERROR PVRSRVCreateHWPerfHostThread(IMG_UINT32 ui32Timeout);
+
+/*!
+******************************************************************************
+ @Function			: PVRSRVDestroyHWPerfHostThread
+
+ @Description		: Destroys HWPerf event object and thread if created
+
+ @Return			: PVRSRV_ERROR	PVRSRV_OK on success. Otherwise, a PVRSRV_
+									error code
+******************************************************************************/
+PVRSRV_ERROR PVRSRVDestroyHWPerfHostThread(void);
+
+/*!
+******************************************************************************
+ @Function			: PVRSRVPhysMemHeapsInit
+
+ @Description		: Registers and acquires physical memory heaps
+
+ @Return			: PVRSRV_ERROR	PVRSRV_OK on success. Otherwise, a PVRSRV_
+									error code
+******************************************************************************/
+PVRSRV_ERROR PVRSRVPhysMemHeapsInit(PVRSRV_DEVICE_NODE *psDeviceNode, PVRSRV_DEVICE_CONFIG *psDevConfig);
+
+/*!
+******************************************************************************
+ @Function			: PVRSRVPhysMemHeapsDeinit
+
+ @Description		: Releases and unregisters physical memory heaps
+
+ @Return			: PVRSRV_ERROR	PVRSRV_OK on success. Otherwise, a PVRSRV_
+									error code
+******************************************************************************/
+void PVRSRVPhysMemHeapsDeinit(PVRSRV_DEVICE_NODE *psDeviceNode);
 
 #endif /* PVRSRV_H */

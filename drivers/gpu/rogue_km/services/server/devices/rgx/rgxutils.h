@@ -91,7 +91,7 @@ PVRSRV_ERROR RGXSetAPMState(const PVRSRV_DEVICE_NODE *psDeviceNode,
 /*!
 ******************************************************************************
 
- @Function      RGXQueryPdumpPanicEnable
+ @Function      RGXQueryPdumpPanicDisable
 
  @Description   Get the PDump Panic Enable configuration state.
 
@@ -99,19 +99,19 @@ PVRSRV_ERROR RGXSetAPMState(const PVRSRV_DEVICE_NODE *psDeviceNode,
 
  @Input         pvPrivateData: Unused (required for AppHint callback)
 
- @Input         pbEnabled    : IMG_TRUE if PDump Panic is enabled
+ @Input         pbDisabled    : IMG_TRUE if PDump Panic is disabled
 
  @Return        PVRSRV_ERROR
 
 ******************************************************************************/
-PVRSRV_ERROR RGXQueryPdumpPanicEnable(const PVRSRV_DEVICE_NODE *psDeviceNode,
+PVRSRV_ERROR RGXQueryPdumpPanicDisable(const PVRSRV_DEVICE_NODE *psDeviceNode,
 	const void *pvPrivateData,
-	IMG_BOOL *pbEnabled);
+	IMG_BOOL *pbDisabled);
 
 /*!
 ******************************************************************************
 
- @Function      RGXSetPdumpPanicEnable
+ @Function      RGXSetPdumpPanicDisable
 
  @Description   Set the PDump Panic Enable flag
 
@@ -119,14 +119,14 @@ PVRSRV_ERROR RGXQueryPdumpPanicEnable(const PVRSRV_DEVICE_NODE *psDeviceNode,
 
  @Input         pvPrivateData: Unused (required for AppHint callback)
 
- @Input         bEnable      : The requested configuration state
+ @Input         bDisable      : The requested configuration state
 
  @Return        PVRSRV_ERROR
 
 ******************************************************************************/
-PVRSRV_ERROR RGXSetPdumpPanicEnable(const PVRSRV_DEVICE_NODE *psDeviceNode,
+PVRSRV_ERROR RGXSetPdumpPanicDisable(const PVRSRV_DEVICE_NODE *psDeviceNode,
 	const void *pvPrivateData,
-	IMG_BOOL bEnable);
+	IMG_BOOL bDisable);
 
 /*!
 ******************************************************************************
@@ -178,7 +178,7 @@ PVRSRV_ERROR RGXSetDeviceFlags(PVRSRV_RGXDEV_INFO *psDevInfo,
 
 ******************************************************************************/
 const char* RGXStringifyKickTypeDM(RGX_KICK_TYPE_DM eKickTypeDM);
-                                                                             
+
 #define RGX_STRINGIFY_KICK_TYPE_DM_IF_SET(bitmask, eKickTypeDM) bitmask & eKickTypeDM ? RGXStringifyKickTypeDM(eKickTypeDM) : ""
 /******************************************************************************
  End of file (rgxutils.h)

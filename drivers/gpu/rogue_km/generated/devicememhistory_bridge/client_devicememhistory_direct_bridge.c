@@ -1,6 +1,9 @@
 /*******************************************************************************
+@File
 @Title          Direct client bridge for devicememhistory
 @Copyright      Copyright (c) Imagination Technologies Ltd. All Rights Reserved
+@Description    Implements the client side of the bridge for devicememhistory
+                which is used in calls from Server context.
 @License        Dual MIT/GPLv2
 
 The contents of this file are subject to the MIT license as set out below.
@@ -45,6 +48,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 /* Module specific includes */
 #include "img_types.h"
+#include "img_defs.h"
 #include "devicemem_typedefs.h"
 
 #include "devicemem_history_server.h"

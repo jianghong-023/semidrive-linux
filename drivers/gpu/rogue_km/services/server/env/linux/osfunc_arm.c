@@ -50,6 +50,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #include "pvrsrv_error.h"
 #include "img_types.h"
+#include "img_defs.h"
 #include "osfunc.h"
 #include "pvr_debug.h"
 
@@ -103,9 +104,8 @@ PVRSRV_ERROR OSCPUOperation(PVRSRV_CACHE_OP uiCacheOp)
 {
 	PVRSRV_ERROR eError = PVRSRV_OK;
 
-	switch(uiCacheOp)
+	switch (uiCacheOp)
 	{
-		/* Fall-through */
 		case PVRSRV_CACHE_OP_CLEAN:
 			on_each_cpu(per_cpu_cache_flush, NULL, 1);
 			OUTER_CLEAN_RANGE();
@@ -123,7 +123,7 @@ PVRSRV_ERROR OSCPUOperation(PVRSRV_CACHE_OP uiCacheOp)
 		default:
 			PVR_DPF((PVR_DBG_ERROR,
 					"%s: Global cache operation type %d is invalid",
-					__FUNCTION__, uiCacheOp));
+					__func__, uiCacheOp));
 			eError = PVRSRV_ERROR_INVALID_PARAMS;
 			PVR_ASSERT(0);
 			break;
@@ -187,15 +187,11 @@ void OSCPUCacheInvalidateRangeKM(PVRSRV_DEVICE_NODE *psDevNode,
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,7,0))
 	arm_dma_ops.sync_single_for_cpu(psDevNode->psDevConfig->pvOSDevice, sCPUPhysStart.uiAddr, sCPUPhysEnd.uiAddr - sCPUPhysStart.uiAddr, DMA_FROM_DEVICE);
 #else	/* (LINUX_VERSION_CODE >= KERNEL_VERSION(3,7,0)) */
-#if defined(PVR_LINUX_DONT_USE_RANGE_BASED_INVALIDATE)
-	OSCPUCacheCleanRangeKM(psDevNode, pvVirtStart, pvVirtEnd, sCPUPhysStart, sCPUPhysEnd);
-#else
 	/* Inner cache */
 	dmac_map_area(pvVirtStart, pvr_dmac_range_len(pvVirtStart, pvVirtEnd), DMA_FROM_DEVICE);
 
 	/* Outer cache */
 	outer_inv_range(sCPUPhysStart.uiAddr, sCPUPhysEnd.uiAddr);
-#endif
 #endif	/* (LINUX_VERSION_CODE >= KERNEL_VERSION(3,7,0)) */
 }
 
@@ -223,4 +219,13 @@ static void per_cpu_perf_counter_user_access_en(void *data)
 void OSUserModeAccessToPerfCountersEn(void)
 {
 	on_each_cpu(per_cpu_perf_counter_user_access_en, NULL, 1);
+}
+
+IMG_BOOL OSIsWriteCombineUnalignedSafe(void)
+{
+	/*
+	 * The kernel looks to have always used normal memory under ARM32.
+	 * See osfunc_arm64.c implementation for more details.
+	 */
+	return IMG_TRUE;
 }

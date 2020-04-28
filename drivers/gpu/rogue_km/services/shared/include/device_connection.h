@@ -1,8 +1,8 @@
 /*************************************************************************/ /*!
 @File           device_connection.h
-@Title          
+@Title
 @Copyright      Copyright (c) Imagination Technologies Ltd. All Rights Reserved
-@Description    
+@Description
 @License        Dual MIT/GPLv2
 
 The contents of this file are subject to the MIT license as set out below.
@@ -45,15 +45,37 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #define __DEVICE_CONNECTION_H__
 
 #include "img_types.h"
+#include "img_defs.h"
 
 #if defined(__KERNEL__)
 typedef struct _PVRSRV_DEVICE_NODE_ *SHARED_DEV_CONNECTION;
 #else
-typedef IMG_HANDLE SHARED_DEV_CONNECTION;
+#include "connection.h"
+typedef const struct _PVRSRV_DEV_CONNECTION_ *SHARED_DEV_CONNECTION;
 #endif
 
 /******************************************************************************
  * Device capability flags and masks
+ *
+ * Following bitmask shows allocated ranges and values for our device
+ * capability settings:
+ *
+ * 31 27  23  19  15  11   7   3  0
+ * |...|...|...|...|...|...|...|...
+ *                               ** CACHE_COHERENT                   [0x1..0x2]
+ *                                x  PVRSRV_CACHE_COHERENT_DEVICE_FLAG
+ *                               x.  PVRSRV_CACHE_COHERENT_CPU_FLAG
+ *                             *... NONMAPPABLE_MEMORY                    [0x8]
+ *                             x...  PVRSRV_NONMAPPABLE_MEMORY_PRESENT_FLAG
+ *                            *.... PDUMP_IS_RECORDING                   [0x10]
+ *                            x....  PVRSRV_PDUMP_IS_RECORDING
+ *                      ***........ DEVMEM_SVM_ALLOC             [0x100..0x400]
+ *                        x........  PVRSRV_DEVMEM_SVM_ALLOC_UNSUPPORTED
+ *                       x.........  PVRSRV_DEVMEM_SVM_ALLOC_SUPPORTED
+ *                      x..........  PVRSRV_DEVMEM_SVM_ALLOC_CANFAIL
+ *                     *........... FBCDC_V3_1             [0x800]
+ *                     x...........  FBCDC_V3_1_USED
+ * |...|...|...|...|...|...|...|...
  *****************************************************************************/
 
 /* Flag to be passed over the bridge during connection stating whether CPU cache coherent is available*/
@@ -75,5 +97,19 @@ typedef IMG_HANDLE SHARED_DEV_CONNECTION;
 
 #define PVRSRV_PDUMP_IS_RECORDING_SHIFT (4)
 #define PVRSRV_PDUMP_IS_RECORDING (1U << PVRSRV_PDUMP_IS_RECORDING_SHIFT)
+
+/* Flag to be passed over the bridge during connection stating whether GPU uses FBCDC v3.1 */
+#define PVRSRV_FBCDC_V3_1_USED_SHIFT (11)
+#define PVRSRV_FBCDC_V3_1_USED (1U << PVRSRV_FBCDC_V3_1_USED_SHIFT)
+
+static INLINE IMG_HANDLE GetBridgeHandle(SHARED_DEV_CONNECTION hDevConnection)
+{
+#if defined(__KERNEL__)
+    return hDevConnection;
+#else
+    return hDevConnection->hServices;
+#endif
+}
+
 
 #endif /* !defined(__DEVICE_CONNECTION_H__) */

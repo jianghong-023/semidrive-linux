@@ -47,10 +47,10 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "img_types.h"
 #include "pvrsrv_error.h"
 
-PVRSRV_ERROR CommonBridgeInit(void);
+PVRSRV_ERROR ServerBridgeInit(void);
 PVRSRV_ERROR DeviceDepBridgeInit(IMG_UINT64 ui64Features);
 
-PVRSRV_ERROR CommonBridgeDeInit(void);
+PVRSRV_ERROR ServerBridgeDeInit(void);
 PVRSRV_ERROR DeviceDepBridgeDeInit(IMG_UINT64 ui64Features);
 
 

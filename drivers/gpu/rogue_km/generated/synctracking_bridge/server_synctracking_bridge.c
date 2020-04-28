@@ -39,7 +39,7 @@ PURPOSE AND NONINFRINGEMENT; AND (B) IN NO EVENT SHALL THE AUTHORS OR
 COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
 IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-********************************************************************************/
+*******************************************************************************/
 
 #include <linux/uaccess.h>
 
@@ -76,26 +76,27 @@ PVRSRVBridgeSyncRecordRemoveByHandle(IMG_UINT32 ui32DispatchTableEntry,
 {
 
 	/* Lock over handle destruction. */
-	LockHandle();
+	LockHandle(psConnection->psHandleBase);
 
 	psSyncRecordRemoveByHandleOUT->eError =
 	    PVRSRVReleaseHandleUnlocked(psConnection->psHandleBase,
 					(IMG_HANDLE)
 					psSyncRecordRemoveByHandleIN->hhRecord,
 					PVRSRV_HANDLE_TYPE_SYNC_RECORD_HANDLE);
-	if ((psSyncRecordRemoveByHandleOUT->eError != PVRSRV_OK)
-	    && (psSyncRecordRemoveByHandleOUT->eError != PVRSRV_ERROR_RETRY))
+	if (unlikely
+	    ((psSyncRecordRemoveByHandleOUT->eError != PVRSRV_OK)
+	     && (psSyncRecordRemoveByHandleOUT->eError != PVRSRV_ERROR_RETRY)))
 	{
 		PVR_DPF((PVR_DBG_ERROR,
 			 "PVRSRVBridgeSyncRecordRemoveByHandle: %s",
-			 PVRSRVGetErrorStringKM(psSyncRecordRemoveByHandleOUT->
-						eError)));
-		UnlockHandle();
+			 PVRSRVGetErrorString(psSyncRecordRemoveByHandleOUT->
+					      eError)));
+		UnlockHandle(psConnection->psHandleBase);
 		goto SyncRecordRemoveByHandle_exit;
 	}
 
 	/* Release now we have destroyed handles. */
-	UnlockHandle();
+	UnlockHandle(psConnection->psHandleBase);
 
  SyncRecordRemoveByHandle_exit:
 
@@ -122,6 +123,14 @@ PVRSRVBridgeSyncRecordAdd(IMG_UINT32 ui32DispatchTableEntry,
 
 	IMG_UINT32 ui32BufferSize =
 	    (psSyncRecordAddIN->ui32ClassNameSize * sizeof(IMG_CHAR)) + 0;
+
+	if (unlikely
+	    (psSyncRecordAddIN->ui32ClassNameSize > SYNC_MAX_CLASS_NAME_LEN))
+	{
+		psSyncRecordAddOUT->eError =
+		    PVRSRV_ERROR_BRIDGE_ARRAY_SIZE_TOO_BIG;
+		goto SyncRecordAdd_exit;
+	}
 
 	if (ui32BufferSize != 0)
 	{
@@ -179,10 +188,13 @@ PVRSRVBridgeSyncRecordAdd(IMG_UINT32 ui32DispatchTableEntry,
 
 			goto SyncRecordAdd_exit;
 		}
+		((IMG_CHAR *)
+		 uiClassNameInt)[(psSyncRecordAddIN->ui32ClassNameSize *
+				  sizeof(IMG_CHAR)) - 1] = '\0';
 	}
 
 	/* Lock over handle lookup. */
-	LockHandle();
+	LockHandle(psConnection->psHandleBase);
 
 	/* Look up the address from the handle */
 	psSyncRecordAddOUT->eError =
@@ -191,13 +203,13 @@ PVRSRVBridgeSyncRecordAdd(IMG_UINT32 ui32DispatchTableEntry,
 				       hhServerSyncPrimBlock,
 				       PVRSRV_HANDLE_TYPE_SYNC_PRIMITIVE_BLOCK,
 				       IMG_TRUE);
-	if (psSyncRecordAddOUT->eError != PVRSRV_OK)
+	if (unlikely(psSyncRecordAddOUT->eError != PVRSRV_OK))
 	{
-		UnlockHandle();
+		UnlockHandle(psConnection->psHandleBase);
 		goto SyncRecordAdd_exit;
 	}
 	/* Release now we have looked up handles. */
-	UnlockHandle();
+	UnlockHandle(psConnection->psHandleBase);
 
 	psSyncRecordAddOUT->eError =
 	    PVRSRVSyncRecordAddKM(psConnection, OSGetDevData(psConnection),
@@ -209,13 +221,13 @@ PVRSRVBridgeSyncRecordAdd(IMG_UINT32 ui32DispatchTableEntry,
 				  psSyncRecordAddIN->ui32ClassNameSize,
 				  uiClassNameInt);
 	/* Exit early if bridged call fails */
-	if (psSyncRecordAddOUT->eError != PVRSRV_OK)
+	if (unlikely(psSyncRecordAddOUT->eError != PVRSRV_OK))
 	{
 		goto SyncRecordAdd_exit;
 	}
 
 	/* Lock over handle creation. */
-	LockHandle();
+	LockHandle(psConnection->psHandleBase);
 
 	psSyncRecordAddOUT->eError =
 	    PVRSRVAllocHandleUnlocked(psConnection->psHandleBase,
@@ -225,19 +237,19 @@ PVRSRVBridgeSyncRecordAdd(IMG_UINT32 ui32DispatchTableEntry,
 				      PVRSRV_HANDLE_ALLOC_FLAG_NONE,
 				      (PFN_HANDLE_RELEASE) &
 				      PVRSRVSyncRecordRemoveByHandleKM);
-	if (psSyncRecordAddOUT->eError != PVRSRV_OK)
+	if (unlikely(psSyncRecordAddOUT->eError != PVRSRV_OK))
 	{
-		UnlockHandle();
+		UnlockHandle(psConnection->psHandleBase);
 		goto SyncRecordAdd_exit;
 	}
 
 	/* Release now we have created handles. */
-	UnlockHandle();
+	UnlockHandle(psConnection->psHandleBase);
 
  SyncRecordAdd_exit:
 
 	/* Lock over handle lookup cleanup. */
-	LockHandle();
+	LockHandle(psConnection->psHandleBase);
 
 	/* Unreference the previously looked up handle */
 	if (pshServerSyncPrimBlockInt)
@@ -247,7 +259,7 @@ PVRSRVBridgeSyncRecordAdd(IMG_UINT32 ui32DispatchTableEntry,
 					    PVRSRV_HANDLE_TYPE_SYNC_PRIMITIVE_BLOCK);
 	}
 	/* Release now we have cleaned up look up handles. */
-	UnlockHandle();
+	UnlockHandle(psConnection->psHandleBase);
 
 	if (psSyncRecordAddOUT->eError != PVRSRV_OK)
 	{
@@ -270,8 +282,8 @@ PVRSRVBridgeSyncRecordAdd(IMG_UINT32 ui32DispatchTableEntry,
 	return 0;
 }
 
-/* *************************************************************************** 
- * Server bridge dispatch related glue 
+/* ***************************************************************************
+ * Server bridge dispatch related glue
  */
 
 static IMG_BOOL bUseLock = IMG_TRUE;

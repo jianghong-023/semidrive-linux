@@ -46,6 +46,8 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #include "img_types.h"
 #include "device.h"
+#include "osfunc.h"
+#include "connection_server.h"
 
 typedef enum
 {
@@ -63,6 +65,54 @@ typedef enum
 	RGXTIMECORR_EVENT_PERIODIC,
 	RGXTIMECORR_EVENT_CLOCK_CHANGE
 } RGXTIMECORR_EVENT;
+
+/*
+ * Calibrated GPU frequencies are rounded to the nearest multiple of 1 KHz
+ * before use, to reduce the noise introduced by calculations done with
+ * imperfect operands (correlated timers not sampled at exactly the same
+ * time, GPU CR timer incrementing only once every 256 GPU cycles).
+ * This also helps reducing the variation between consecutive calculations.
+ */
+#define RGXFWIF_CONVERT_TO_KHZ(freq)   (((freq) + 500) / 1000)
+#define RGXFWIF_ROUND_TO_KHZ(freq)    ((((freq) + 500) / 1000) * 1000)
+
+
+/*
+ * Use this macro to get a more realistic GPU core clock speed than the one
+ * given by the upper layers (used when doing GPU frequency calibration)
+ */
+#define RGXFWIF_GET_GPU_CLOCK_FREQUENCY_HZ(deltacr_us, deltaos_us, remainder) \
+    OSDivide64((deltacr_us) * 256000000, (deltaos_us), &(remainder))
+
+
+/*!
+******************************************************************************
+
+ @Function    RGXTimeCorrGetConversionFactor
+
+ @Description Generate constant used to convert a GPU time difference into
+              an OS time difference (for more info see rgx_fwif_km.h).
+
+ @Input       ui32ClockSpeed : GPU clock speed
+
+ @Return      0 on failure, conversion factor otherwise
+
+******************************************************************************/
+static inline IMG_UINT64 RGXTimeCorrGetConversionFactor(IMG_UINT32 ui32ClockSpeed)
+{
+	IMG_UINT32 ui32Remainder;
+
+	if (RGXFWIF_CONVERT_TO_KHZ(ui32ClockSpeed) == 0)
+	{
+		PVR_DPF((PVR_DBG_ERROR, "%s: GPU clock frequency %u is too low",
+				 __func__, ui32ClockSpeed));
+
+		return 0;
+	}
+
+	return OSDivide64r64(256000000ULL << RGXFWIF_CRDELTA_TO_OSDELTA_ACCURACY_SHIFT,
+	                     RGXFWIF_CONVERT_TO_KHZ(ui32ClockSpeed), &ui32Remainder);
+}
 
 /*!
 ******************************************************************************
@@ -200,5 +250,17 @@ void RGXTimeCorrInitAppHintCallbacks(const PVRSRV_DEVICE_NODE *psDeviceNode);
 void RGXGetTimeCorrData(PVRSRV_DEVICE_NODE *psDeviceNode,
 							RGXFWIF_TIME_CORR *psTimeCorrs,
 							IMG_UINT32 ui32NumOut);
+
+/**************************************************************************/ /*!
+@Function       PVRSRVRGXCurrentTime
+@Description    Returns the current state of the device timer
+@Input          psDevData  Device data.
+@Out            pui64Time
+@Return         PVRSRV_OK on success.
+*/ /***************************************************************************/
+PVRSRV_ERROR
+PVRSRVRGXCurrentTime(CONNECTION_DATA    * psConnection,
+                     PVRSRV_DEVICE_NODE * psDeviceNode,
+                     IMG_UINT64         * pui64Time);
 
 #endif /* __RGXTIMECORR_H__ */

@@ -47,6 +47,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #include "pvrsrv_error.h"
 #include "img_types.h"
+#include "img_defs.h"
 #include "osfunc.h"
 #include "pvr_debug.h"
 
@@ -148,54 +149,11 @@ e0:
 	PVR_UNREFERENCED_PARAMETER(arg);
 }
 
-static inline void FlushRange(void *pvRangeAddrStart,
-							  void *pvRangeAddrEnd,
-							  PVRSRV_CACHE_OP eCacheOp)
-{
-	IMG_UINT32 ui32CacheLineSize = OSCPUCacheAttributeSize(PVR_DCACHE_LINE_SIZE);
-	IMG_BYTE *pbStart = pvRangeAddrStart;
-	IMG_BYTE *pbEnd = pvRangeAddrEnd;
-	IMG_BYTE *pbBase;
-
-	/*
-	  On arm64, the TRM states in D5.8.1 (data and unified caches) that if cache
-	  maintenance is performed on a memory location using a VA, the effect of
-	  that cache maintenance is visible to all VA aliases of the physical memory
-	  location. So here it's quicker to issue the machine cache maintenance
-	  instruction directly without going via the Linux kernel DMA framework as
-	  this is sufficient to maintain the CPU d-caches on arm64.
-	 */
-	pbEnd = (IMG_BYTE *) PVR_ALIGN((uintptr_t)pbEnd, (uintptr_t)ui32CacheLineSize);
-	for (pbBase = pbStart; pbBase < pbEnd; pbBase += ui32CacheLineSize)
-	{
-		switch (eCacheOp)
-		{
-			case PVRSRV_CACHE_OP_CLEAN:
-				asm volatile ("dc cvac, %0" :: "r" (pbBase));
-				break;
-
-			case PVRSRV_CACHE_OP_INVALIDATE:
-				asm volatile ("dc ivac, %0" :: "r" (pbBase));
-				break;
-
-			case PVRSRV_CACHE_OP_FLUSH:
-				asm volatile ("dc civac, %0" :: "r" (pbBase));
-				break;
-
-			default:
-				PVR_DPF((PVR_DBG_ERROR,
-						"%s: Cache maintenance operation type %d is invalid",
-						__FUNCTION__, eCacheOp));
-				break;
-		}
-	}
-}
-
 PVRSRV_ERROR OSCPUOperation(PVRSRV_CACHE_OP uiCacheOp)
 {
 	PVRSRV_ERROR eError = PVRSRV_OK;
 
-	switch(uiCacheOp)
+	switch (uiCacheOp)
 	{
 		case PVRSRV_CACHE_OP_CLEAN:
 		case PVRSRV_CACHE_OP_FLUSH:
@@ -209,7 +167,7 @@ PVRSRV_ERROR OSCPUOperation(PVRSRV_CACHE_OP uiCacheOp)
 		default:
 			PVR_DPF((PVR_DBG_ERROR,
 					"%s: Global cache operation type %d is invalid",
-					__FUNCTION__, uiCacheOp));
+					__func__, uiCacheOp));
 			eError = PVRSRV_ERROR_INVALID_PARAMS;
 			PVR_ASSERT(0);
 			break;
@@ -227,11 +185,8 @@ void OSCPUCacheFlushRangeKM(PVRSRV_DEVICE_NODE *psDevNode,
 	struct device *dev;
 	const struct dma_map_ops *dma_ops;
 
-	if (pvVirtStart)
-	{
-		FlushRange(pvVirtStart, pvVirtEnd, PVRSRV_CACHE_OP_FLUSH);
-		return;
-	}
+	PVR_UNREFERENCED_PARAMETER(pvVirtStart);
+	PVR_UNREFERENCED_PARAMETER(pvVirtEnd);
 
 	dev = psDevNode->psDevConfig->pvOSDevice;
 
@@ -249,11 +204,8 @@ void OSCPUCacheCleanRangeKM(PVRSRV_DEVICE_NODE *psDevNode,
 	struct device *dev;
 	const struct dma_map_ops *dma_ops;
 
-	if (pvVirtStart)
-	{
-		FlushRange(pvVirtStart, pvVirtEnd, PVRSRV_CACHE_OP_CLEAN);
-		return;
-	}
+	PVR_UNREFERENCED_PARAMETER(pvVirtStart);
+	PVR_UNREFERENCED_PARAMETER(pvVirtEnd);
 
 	dev = psDevNode->psDevConfig->pvOSDevice;
 
@@ -270,11 +222,8 @@ void OSCPUCacheInvalidateRangeKM(PVRSRV_DEVICE_NODE *psDevNode,
 	struct device *dev;
 	const struct dma_map_ops *dma_ops;
 
-	if (pvVirtStart)
-	{
-		FlushRange(pvVirtStart, pvVirtEnd, PVRSRV_CACHE_OP_INVALIDATE);
-		return;
-	}
+	PVR_UNREFERENCED_PARAMETER(pvVirtStart);
+	PVR_UNREFERENCED_PARAMETER(pvVirtEnd);
 
 	dev = psDevNode->psDevConfig->pvOSDevice;
 
@@ -290,4 +239,30 @@ PVRSRV_CACHE_OP_ADDR_TYPE OSCPUCacheOpAddressType(void)
 void OSUserModeAccessToPerfCountersEn(void)
 {
 	/* FIXME: implement similarly to __arm__ */
+}
+
+IMG_BOOL OSIsWriteCombineUnalignedSafe(void)
+{
+	/*
+	 * Under ARM64 there is the concept of 'device' [0] and 'normal' [1] memory.
+	 * Unaligned access on device memory is explicitly disallowed [2]:
+	 *
+	 * 'Further, unaligned accesses are only allowed to regions marked as Normal
+	 *  memory type.
+	 *  ...
+	 *  Attempts to perform unaligned accesses when not allowed will cause an
+	 *  alignment fault (data abort).'
+	 *
+	 * Write-combine on ARM64 can be implemented as either normal non-cached
+	 * memory (NORMAL_NC) or as device memory with gathering enabled
+	 * (DEVICE_GRE.) Kernel 3.13 changed this from the latter to the former.
+	 *
+	 * [0]:http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.den0024a/CHDBDIDF.html
+	 * [1]:http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.den0024a/ch13s01s01.html
+	 * [2]:http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.faqs/ka15414.html
+	 */
+
+	pgprot_t pgprot = pgprot_writecombine(PAGE_KERNEL);
+
+	return (pgprot_val(pgprot) & PTE_ATTRINDX_MASK) == PTE_ATTRINDX(MT_NORMAL_NC);
 }

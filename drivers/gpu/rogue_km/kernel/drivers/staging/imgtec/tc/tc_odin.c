@@ -109,8 +109,8 @@ static int spi_read(struct tc_device *tc, u32 off, u32 *val)
 
 		if (cnt++ > 10000) {
 			dev_err(&tc->pdev->dev,
-				"spi_read: Time out reading SPI reg (0x%x)\n",
-				off);
+				"%s: Time out reading SPI reg (0x%x)\n",
+				__func__, off);
 			return -1;
 		}
 
@@ -358,26 +358,36 @@ static int odin_mmcm_counter_calc(struct device *dev,
 			pfd = freq_input / d_cur;
 			vco = pfd * m_cur;
 
-			if(pfd < ODN_PFD_MIN) continue;
-			if(pfd > ODN_PFD_MAX) continue;
-			if(vco < ODN_VCO_MIN) continue;
-			if(vco > ODN_VCO_MAX) continue;
+			if (pfd < ODN_PFD_MIN)
+				continue;
+
+			if (pfd > ODN_PFD_MAX)
+				continue;
+
+			if (vco < ODN_VCO_MIN)
+				continue;
+
+			if (vco > ODN_VCO_MAX)
+				continue;
 
 			/* A range of -1/+3 around o_avg gives us 100kHz granularity. It can be extended further. */
 			o_avg = vco / freq_output;
 			o_min = (o_avg >= 2) ? (o_avg - 1) : 1;
 			o_max = o_avg + 3;
-			if(o_max > (u32)ODN_OREG_VALUE_MAX) o_max = (u32)ODN_OREG_VALUE_MAX;
+			if (o_max > (u32)ODN_OREG_VALUE_MAX)
+				o_max = (u32)ODN_OREG_VALUE_MAX;
 
-			for(o_cur = o_min;o_cur <= o_max; o_cur++){
+			for (o_cur = o_min; o_cur <= o_max; o_cur++) {
 				u32 freq_cur, diff_cur;
 
 				freq_cur = vco / o_cur;
 
-				if(freq_cur > freq_output) continue;
+				if (freq_cur > freq_output)
+					continue;
+
 				diff_cur = freq_output - freq_cur;
 
-				if(diff_cur == 0){
+				if (diff_cur == 0) {
 					/* Found an exact match */
 					*d = d_cur;
 					*m = m_cur;
@@ -385,7 +395,7 @@ static int odin_mmcm_counter_calc(struct device *dev,
 					return 0;
 				}
 
-				if(diff_cur < best_diff){
+				if (diff_cur < best_diff) {
 					best_diff = diff_cur;
 					d_best = d_cur;
 					m_best = m_cur;
@@ -395,7 +405,7 @@ static int odin_mmcm_counter_calc(struct device *dev,
 		}
 	}
 
-	if(best_diff != 0xFFFFFFFF){
+	if (best_diff != 0xFFFFFFFF) {
 		dev_warn(dev, "Odin: Found similar freq of %u Hz\n", freq_output - best_diff);
 		*d = d_best;
 		*m = m_best;
@@ -622,8 +632,7 @@ static void odin_fpga_update_dut_clk_freq(struct tc_device *tc,
 #if defined(SUPPORT_FPGA_DUT_CLK_INFO)
 	int dut_clk_info = ioread32(tc->tcf.registers + ODN_CORE_DUT_CLK_INFO);
 
-	if ((dut_clk_info != 0) && (dut_clk_info != 0xbaadface) && (dut_clk_info != 0xffffffff))
-	{
+	if ((dut_clk_info != 0) && (dut_clk_info != 0xbaadface) && (dut_clk_info != 0xffffffff)) {
 		dev_info(dev, "ODN_DUT_CLK_INFO = %08x\n", dut_clk_info);
 		dev_info(dev, "Overriding provided DUT clock values: core %i, mem %i\n",
 			 *core_clock, *mem_clock);
@@ -749,14 +758,13 @@ static void odin_set_mem_latency(struct tc_device *tc,
 {
 	u32 regval = 0;
 
-	if (mem_latency <= 4)
+	if (mem_latency <= 4) {
 		/* The total memory read latency cannot be lower than the
 		 * amount of cycles consumed by the hardware to do a read.
 		 * Set the memory read latency to 0 cycles.
 		 */
 		mem_latency = 0;
-	else
-	{
+	} else {
 		mem_latency -= 4;
 
 		dev_info(&tc->pdev->dev,
@@ -764,14 +772,13 @@ static void odin_set_mem_latency(struct tc_device *tc,
 			 mem_latency);
 	}
 
-	if (mem_wresp_latency <= 2)
+	if (mem_wresp_latency <= 2) {
 		/* The total memory write latency cannot be lower than the
 		 * amount of cycles consumed by the hardware to do a write.
 		 * Set the memory write latency to 0 cycles.
 		 */
 		mem_wresp_latency = 0;
-	else
-	{
+	} else {
 		mem_wresp_latency -= 2;
 
 		dev_info(&tc->pdev->dev,
@@ -945,7 +952,7 @@ static int odin_dev_init(struct tc_device *tc, struct pci_dev *pdev,
 		goto err_out;
 
 	tc->version = odin_detect_daughterboard_version(tc);
-	if(tc->version == TC_INVALID_VERSION) {
+	if (tc->version == TC_INVALID_VERSION) {
 		err = -EIO;
 		goto err_odin_unmap_sys_registers;
 	}
@@ -1040,7 +1047,7 @@ err_out:
 
 err_odin_unmap_sys_registers:
 	dev_info(&pdev->dev,
-		"odin_dev_init failed. unmapping the io regions.\n");
+		 "%s: failed - unmapping the io regions.\n", __func__);
 
 	iounmap(tc->tcf.registers);
 	release_pci_io_addr(pdev, ODN_SYS_BAR,

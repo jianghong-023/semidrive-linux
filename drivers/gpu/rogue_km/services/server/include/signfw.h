@@ -41,11 +41,11 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #ifndef __SIGNFW_H__
 #define __SIGNFW_H__
 
-#include "rgx_fwif_shared.h"
+#include "rgx_fw_info.h"
 
 /*
  * When the firmware is signed, the signature data block is
- * placed before the FW BVNC data block.
+ * placed before the FW info data block.
  */
 #define FW_SIGN_BACKWARDS_OFFSET (2 * FW_BLOCK_SIZE)
 

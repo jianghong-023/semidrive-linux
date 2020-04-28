@@ -51,6 +51,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "pvrsrv_error.h"
 
 #include "img_types.h"
+#include "img_defs.h"
 #include "devicemem_typedefs.h"
 
 #define PVRSRV_BRIDGE_DEVICEMEMHISTORY_CMD_FIRST			0
@@ -62,7 +63,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #define PVRSRV_BRIDGE_DEVICEMEMHISTORY_CMD_LAST			(PVRSRV_BRIDGE_DEVICEMEMHISTORY_CMD_FIRST+4)
 
 /*******************************************
-            DevicememHistoryMap          
+            DevicememHistoryMap
  *******************************************/
 
 /* Bridge in structure for DevicememHistoryMap */
@@ -85,7 +86,7 @@ typedef struct PVRSRV_BRIDGE_OUT_DEVICEMEMHISTORYMAP_TAG
 } __attribute__ ((packed)) PVRSRV_BRIDGE_OUT_DEVICEMEMHISTORYMAP;
 
 /*******************************************
-            DevicememHistoryUnmap          
+            DevicememHistoryUnmap
  *******************************************/
 
 /* Bridge in structure for DevicememHistoryUnmap */
@@ -108,7 +109,7 @@ typedef struct PVRSRV_BRIDGE_OUT_DEVICEMEMHISTORYUNMAP_TAG
 } __attribute__ ((packed)) PVRSRV_BRIDGE_OUT_DEVICEMEMHISTORYUNMAP;
 
 /*******************************************
-            DevicememHistoryMapVRange          
+            DevicememHistoryMapVRange
  *******************************************/
 
 /* Bridge in structure for DevicememHistoryMapVRange */
@@ -131,7 +132,7 @@ typedef struct PVRSRV_BRIDGE_OUT_DEVICEMEMHISTORYMAPVRANGE_TAG
 } __attribute__ ((packed)) PVRSRV_BRIDGE_OUT_DEVICEMEMHISTORYMAPVRANGE;
 
 /*******************************************
-            DevicememHistoryUnmapVRange          
+            DevicememHistoryUnmapVRange
  *******************************************/
 
 /* Bridge in structure for DevicememHistoryUnmapVRange */
@@ -154,7 +155,7 @@ typedef struct PVRSRV_BRIDGE_OUT_DEVICEMEMHISTORYUNMAPVRANGE_TAG
 } __attribute__ ((packed)) PVRSRV_BRIDGE_OUT_DEVICEMEMHISTORYUNMAPVRANGE;
 
 /*******************************************
-            DevicememHistorySparseChange          
+            DevicememHistorySparseChange
  *******************************************/
 
 /* Bridge in structure for DevicememHistorySparseChange */

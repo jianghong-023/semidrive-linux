@@ -87,9 +87,9 @@ int nulldisp_gem_object_get_pages(struct drm_gem_object *obj)
 	WARN_ON(!mutex_is_locked(&dev->struct_mutex));
 
 	if (atomic_inc_return(&nulldisp_obj->pg_refcnt) == 1) {
-		unsigned npages = obj->size >> PAGE_SHIFT;
+		unsigned int npages = obj->size >> PAGE_SHIFT;
 		dma_addr_t *addrs;
-		unsigned i;
+		unsigned int i;
 
 		pages = drm_gem_get_pages(obj);
 		if (IS_ERR(pages)) {
@@ -97,7 +97,7 @@ int nulldisp_gem_object_get_pages(struct drm_gem_object *obj)
 			goto dec_refcnt;
 		}
 
-		addrs = kmalloc(npages * sizeof(*addrs), GFP_KERNEL);
+		addrs = kmalloc_array(npages, sizeof(*addrs), GFP_KERNEL);
 		if (!addrs) {
 			err = -ENOMEM;
 			goto free_pages;
@@ -133,8 +133,8 @@ static void nulldisp_gem_object_put_pages(struct drm_gem_object *obj)
 		return;
 
 	if (atomic_dec_and_test(&nulldisp_obj->pg_refcnt)) {
-		unsigned npages = obj->size >> PAGE_SHIFT;
-		unsigned i;
+		unsigned int npages = obj->size >> PAGE_SHIFT;
+		unsigned int i;
 
 		for (i = 0; i < npages; i++) {
 			dma_unmap_page(dev->dev, nulldisp_obj->addrs[i],
@@ -284,7 +284,7 @@ nulldisp_gem_prime_import_sg_table(struct drm_device *dev,
 	struct drm_gem_object *obj;
 	struct page **pages;
 	dma_addr_t *addrs;
-	unsigned npages;
+	unsigned int npages;
 
 	nulldisp_obj = kzalloc(sizeof(*nulldisp_obj), GFP_KERNEL);
 	if (!nulldisp_obj)
@@ -297,8 +297,8 @@ nulldisp_gem_prime_import_sg_table(struct drm_device *dev,
 
 	npages = obj->size >> PAGE_SHIFT;
 
-	pages = kmalloc(npages * sizeof(*pages), GFP_KERNEL);
-	addrs = kmalloc(npages * sizeof(*addrs), GFP_KERNEL);
+	pages = kmalloc_array(npages, sizeof(*pages), GFP_KERNEL);
+	addrs = kmalloc_array(npages, sizeof(*addrs), GFP_KERNEL);
 	if (!pages || !addrs)
 		goto exit_free_arrays;
 

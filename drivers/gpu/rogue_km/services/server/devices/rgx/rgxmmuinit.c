@@ -45,6 +45,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #include "device.h"
 #include "img_types.h"
+#include "img_defs.h"
 #include "mmu_common.h"
 #include "pdump_mmu.h"
 
@@ -61,7 +62,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 
 /*
- * Bits of PT, PD and PC not involving addresses 
+ * Bits of PT, PD and PC not involving addresses
  */
 
 #define RGX_MMUCTRL_PTE_PROTMASK	(RGX_MMUCTRL_PT_DATA_PM_META_PROTECT_EN | \
@@ -182,25 +183,25 @@ static MMU_DEVICEATTRIBS sRGXMMUDeviceAttributes;
 PVRSRV_ERROR RGXMMUInit_Register(PVRSRV_DEVICE_NODE *psDeviceNode)
 {
 	/* Setup of Px Entries:
-	 * 
-	 * 
+	 *
+	 *
 	 * PAGE TABLE (8 Byte):
-	 * 
+	 *
 	 * | 62              | 61...40         | 39...12 (varies) | 11...6          | 5             | 4      | 3               | 2               | 1         | 0     |
 	 * | PM/Meta protect | VP Page (39:18) | Physical Page    | VP Page (17:12) | Entry Pending | PM src | SLC Bypass Ctrl | Cache Coherency | Read Only | Valid |
-	 * 
-	 * 
+	 *
+	 *
 	 * PAGE DIRECTORY (8 Byte):
-	 * 
+	 *
 	 *  | 40            | 39...5  (varies)        | 4          | 3...1     | 0     |
-	 *  | Entry Pending | Page Table base address | (reserved) | Page Size | Valid | 
-	 * 
-	 * 
+	 *  | Entry Pending | Page Table base address | (reserved) | Page Size | Valid |
+	 *
+	 *
 	 * PAGE CATALOGUE (4 Byte):
-	 * 
-	 *  | 31...4                      | 3...2      | 1             | 0     | 
-	 *  | Page Directory base address | (reserved) | Entry Pending | Valid | 
-	 * 
+	 *
+	 *  | 31...4                      | 3...2      | 1             | 0     |
+	 *  | Page Directory base address | (reserved) | Entry Pending | Valid |
+	 *
 	 */
 
 
@@ -209,7 +210,7 @@ PVRSRV_ERROR RGXMMUInit_Register(PVRSRV_DEVICE_NODE *psDeviceNode)
 	 *
 	 * 1) sRGXMMUPCEConfig.uiAddrMask applied to PC entry with '&':
 	 *  | 31...4   | 3...2      | 1             | 0     |
-	 *  | PD Addr  | 0          | 0             | 0     | 
+	 *  | PD Addr  | 0          | 0             | 0     |
 	 *
 	 * 2) sRGXMMUPCEConfig.uiAddrShift applied with '>>':
 	 *  | 27...0   |
@@ -283,7 +284,7 @@ PVRSRV_ERROR RGXMMUInit_Register(PVRSRV_DEVICE_NODE *psDeviceNode)
 	sRGXMMUPTEConfig_4KBDP.uiBytesPerEntry = 8;
 
 	sRGXMMUPTEConfig_4KBDP.uiAddrMask = IMG_UINT64_C(0xfffffff000);
-	sRGXMMUPTEConfig_4KBDP.uiAddrShift = 12; 
+	sRGXMMUPTEConfig_4KBDP.uiAddrShift = 12;
 	sRGXMMUPTEConfig_4KBDP.uiAddrLog2Align = 12; /* Alignment of the physical addresses of the pages NOT PTs */
 
 	sRGXMMUPTEConfig_4KBDP.uiProtMask = RGX_MMUCTRL_PTE_PROTMASK;
@@ -791,7 +792,7 @@ static IMG_UINT64 RGXDerivePCEProt8(IMG_UINT32 uiProtFlags, IMG_UINT32 uiLog2Dat
 	PVR_UNREFERENCED_PARAMETER(uiLog2DataPageSize);
 
 	PVR_DPF((PVR_DBG_ERROR, "8-byte PCE not supported on this device"));
-	return 0;	
+	return 0;
 }
 
 
@@ -847,7 +848,7 @@ static IMG_UINT64 RGXDerivePDEProt8(IMG_UINT32 uiProtFlags, IMG_UINT32 uiLog2Dat
 		default:
 			PVR_DPF((PVR_DBG_ERROR,
 					"%s:%d: in function<%s>: Invalid parameter log2_page_size. Expected {12, 14, 16, 18, 20, 21}. Got [%u]",
-					__FILE__, __LINE__, __FUNCTION__, uiLog2DataPageSize));
+					__FILE__, __LINE__, __func__, uiLog2DataPageSize));
 		}
 	}
 	return ret_value;
@@ -878,16 +879,16 @@ static IMG_UINT64 RGXDerivePTEProt8(IMG_UINT32 uiProtFlags, IMG_UINT32 uiLog2Dat
 
 	PVR_UNREFERENCED_PARAMETER(uiLog2DataPageSize);
 
-	if(((MMU_PROTFLAGS_READABLE|MMU_PROTFLAGS_WRITEABLE) & uiProtFlags) == (MMU_PROTFLAGS_READABLE|MMU_PROTFLAGS_WRITEABLE))
+	if (((MMU_PROTFLAGS_READABLE|MMU_PROTFLAGS_WRITEABLE) & uiProtFlags) == (MMU_PROTFLAGS_READABLE|MMU_PROTFLAGS_WRITEABLE))
 	{
 		/* read/write */
 	}
-	else if(MMU_PROTFLAGS_READABLE & uiProtFlags)
+	else if (MMU_PROTFLAGS_READABLE & uiProtFlags)
 	{
 		/* read only */
 		ui64MMUFlags |= RGX_MMUCTRL_PT_DATA_READ_ONLY_EN;
 	}
-	else if(MMU_PROTFLAGS_WRITEABLE & uiProtFlags)
+	else if (MMU_PROTFLAGS_WRITEABLE & uiProtFlags)
 	{
 		/* write only */
 		PVR_DPF((PVR_DBG_ERROR, "RGXDerivePTEProt8: write-only is not possible on this device"));
@@ -898,7 +899,7 @@ static IMG_UINT64 RGXDerivePTEProt8(IMG_UINT32 uiProtFlags, IMG_UINT32 uiLog2Dat
 	}
 
 	/* cache coherency */
-	if(MMU_PROTFLAGS_CACHE_COHERENT & uiProtFlags)
+	if (MMU_PROTFLAGS_CACHE_COHERENT & uiProtFlags)
 	{
 		ui64MMUFlags |= RGX_MMUCTRL_PT_DATA_CC_EN;
 	}

@@ -41,8 +41,8 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */ /**************************************************************************/
 
-#ifndef __RGXHEAPCONFIG_H__
-#define __RGXHEAPCONFIG_H__
+#ifndef RGXHEAPCONFIG_H
+#define RGXHEAPCONFIG_H
 
 #include "rgxdefs_km.h"
 
@@ -166,7 +166,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 	#define RGX_MMU_INIB_BRN_65273_HEAP_BASE	IMG_UINT64_C(0xF900000000)
 	#define RGX_MMU_INIB_BRN_65273_HEAP_SIZE	IMG_UINT64_C(0x0040000000)
 
-#endif /* __RGXHEAPCONFIG_H__ */
+#endif /* RGXHEAPCONFIG_H */
 
 /*****************************************************************************
  End of file (rgxheapconfig.h)

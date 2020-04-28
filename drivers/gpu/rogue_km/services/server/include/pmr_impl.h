@@ -2,7 +2,7 @@
 @File
 @Title          Implementation Callbacks for Physmem (PMR) abstraction
 @Copyright      Copyright (c) Imagination Technologies Ltd. All Rights Reserved
-@Description    Part of the memory management.  This file is for definitions
+@Description    Part of the memory management. This file is for definitions
                 that are private to the world of PMRs, but that need to be
                 shared between pmr.c itself and the modules that implement the
                 callbacks for the PMR.
@@ -44,23 +44,43 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */ /***************************************************************************/
 
-#ifndef _SRVSRV_PMR_IMPL_H_
-#define _SRVSRV_PMR_IMPL_H_
+#ifndef SRVSRV_PMR_IMPL_H
+#define SRVSRV_PMR_IMPL_H
 
-/* include/ */
 #include "img_types.h"
+#include "img_defs.h"
 #include "pvrsrv_error.h"
 
+/*! Physical Memory Resource type.
+ */
 typedef struct _PMR_ PMR;
-/* stuff that per-flavour callbacks need to share with pmr.c */
+
+/*! Per-flavour callbacks need to be shared with generic implementation
+ * (pmr.c).
+ */
 typedef void *PMR_IMPL_PRIVDATA;
 
+/*! Type for holding flags passed to the PMR factory.
+ */
 typedef PVRSRV_MEMALLOCFLAGS_T PMR_FLAGS_T;
+
+/*! Mapping table for the allocation.
+ *
+ * PMR's can be sparse in which case not all the logical addresses
+ * in it are valid. The mapping table translates logical offsets into
+ * physical offsets.
+ *
+ * This table is always passed to the PMR factory regardless if the memory
+ * is sparse or not. In case of non-sparse memory all virtual offsets are
+ * mapped to physical offsets.
+ */
 typedef struct _PMR_MAPPING_TABLE_ PMR_MAPPING_TABLE;
+
+/*! Private data passed to the ::PFN_MMAP_FN function.
+ */
 typedef void *PMR_MMAP_DATA;
 
-/**
- *  Which PMR factory has created this PMR?
+/*! PMR factory type.
  */
 typedef enum _PMR_IMPL_TYPE_
 {
@@ -476,13 +496,49 @@ typedef PVRSRV_ERROR (*PFN_MMAP_FN)(PMR_IMPL_PRIVDATA pPriv,
 /*****************************************************************************/
 typedef PVRSRV_ERROR (*PFN_FINALIZE_FN)(PMR_IMPL_PRIVDATA pvPriv);
 
+/*************************************************************************/ /*!
+@Brief          Callback function type PFN_ACQUIRE_PMR_FACTORY_LOCK_FN
+
+@Description    Called to acquire the PMR factory's global lock, if it has one,
+				hence callback optional. Factories which support entry points
+				in addition to the normal bridge calls, for example, from the
+				native OS that manipulate the PMR reference count should
+				create a factory lock and implementations for these call backs.
+
+				Implementation of this callback is optional.
+
+@Return			None
+*/
+/*****************************************************************************/
+typedef void (*PFN_ACQUIRE_PMR_FACTORY_LOCK_FN)(void);
+
+/*************************************************************************/ /*!
+@Brief			Callback function type PFN_RELEASE_PMR_FACTORY_LOCK_FN
+
+@Description	Called to release the PMR factory's global lock acquired by calling
+				pfn_acquire_pmr_factory_lock callback.
+
+				Implementation of this callback is optional.
+
+@Return			None
+*/
+/*****************************************************************************/
+typedef void (*PFN_RELEASE_PMR_FACTORY_LOCK_FN)(void);
+
+/*! PMR factory callback table.
+ */
 struct _PMR_IMPL_FUNCTAB_ {
+    /*! Callback function pointer, see ::PFN_LOCK_PHYS_ADDRESSES_FN */
     PFN_LOCK_PHYS_ADDRESSES_FN pfnLockPhysAddresses;
+    /*! Callback function pointer, see ::PFN_UNLOCK_PHYS_ADDRESSES_FN */
     PFN_UNLOCK_PHYS_ADDRESSES_FN pfnUnlockPhysAddresses;
 
+    /*! Callback function pointer, see ::PFN_DEV_PHYS_ADDR_FN */
     PFN_DEV_PHYS_ADDR_FN pfnDevPhysAddr;
 
+    /*! Callback function pointer, see ::PFN_ACQUIRE_KERNEL_MAPPING_DATA_FN */
     PFN_ACQUIRE_KERNEL_MAPPING_DATA_FN pfnAcquireKernelMappingData;
+    /*! Callback function pointer, see ::PFN_RELEASE_KERNEL_MAPPING_DATA_FN */
     PFN_RELEASE_KERNEL_MAPPING_DATA_FN pfnReleaseKernelMappingData;
 
 #if defined (INTEGRITY_OS)
@@ -503,20 +559,36 @@ struct _PMR_IMPL_FUNCTAB_ {
 #endif
 #endif
 
+    /*! Callback function pointer, see ::PFN_READ_BYTES_FN */
     PFN_READ_BYTES_FN pfnReadBytes;
+    /*! Callback function pointer, see ::PFN_WRITE_BYTES_FN */
     PFN_WRITE_BYTES_FN pfnWriteBytes;
 
+    /*! Callback function pointer, see ::PFN_UNPIN_MEM_FN */
     PFN_UNPIN_MEM_FN pfnUnpinMem;
+    /*! Callback function pointer, see ::PFN_PIN_MEM_FN */
     PFN_PIN_MEM_FN pfnPinMem;
 
+    /*! Callback function pointer, see ::PFN_CHANGE_SPARSE_MEM_FN */
     PFN_CHANGE_SPARSE_MEM_FN pfnChangeSparseMem;
+    /*! Callback function pointer, see ::PFN_CHANGE_SPARSE_MEM_CPU_MAP_FN */
     PFN_CHANGE_SPARSE_MEM_CPU_MAP_FN pfnChangeSparseMemCPUMap;
 
+    /*! Callback function pointer, see ::PFN_MMAP_FN */
     PFN_MMAP_FN pfnMMap;
 
+    /*! Callback function pointer, see ::PFN_FINALIZE_FN */
     PFN_FINALIZE_FN pfnFinalize;
-} ;
+
+    /*! Callback function pointer, see ::PFN_ACQUIRE_PMR_FACTORY_LOCK_FN */
+    PFN_ACQUIRE_PMR_FACTORY_LOCK_FN	pfnGetPMRFactoryLock;
+
+    /*! Callback function pointer, see ::PFN_RELEASE_PMR_FACTORY_LOCK_FN */
+    PFN_RELEASE_PMR_FACTORY_LOCK_FN	pfnReleasePMRFactoryLock;
+};
+
+/*! PMR factory callback table.
+ */
 typedef struct _PMR_IMPL_FUNCTAB_ PMR_IMPL_FUNCTAB;
 
-
-#endif /* of #ifndef _SRVSRV_PMR_IMPL_H_ */
+#endif /* SRVSRV_PMR_IMPL_H */

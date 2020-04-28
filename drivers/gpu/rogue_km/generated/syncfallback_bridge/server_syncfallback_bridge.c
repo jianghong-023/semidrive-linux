@@ -39,7 +39,7 @@ PURPOSE AND NONINFRINGEMENT; AND (B) IN NO EVENT SHALL THE AUTHORS OR
 COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
 IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-********************************************************************************/
+*******************************************************************************/
 
 #include <linux/uaccess.h>
 
@@ -95,6 +95,15 @@ PVRSRVBridgeSyncFbTimelineCreatePVR(IMG_UINT32 ui32DispatchTableEntry,
 	IMG_UINT32 ui32BufferSize =
 	    (psSyncFbTimelineCreatePVRIN->ui32TimelineNameSize *
 	     sizeof(IMG_CHAR)) + 0;
+
+	if (unlikely
+	    (psSyncFbTimelineCreatePVRIN->ui32TimelineNameSize >
+	     SYNC_FB_TIMELINE_MAX_LENGTH))
+	{
+		psSyncFbTimelineCreatePVROUT->eError =
+		    PVRSRV_ERROR_BRIDGE_ARRAY_SIZE_TOO_BIG;
+		goto SyncFbTimelineCreatePVR_exit;
+	}
 
 	if (ui32BufferSize != 0)
 	{
@@ -156,6 +165,10 @@ PVRSRVBridgeSyncFbTimelineCreatePVR(IMG_UINT32 ui32DispatchTableEntry,
 
 			goto SyncFbTimelineCreatePVR_exit;
 		}
+		((IMG_CHAR *)
+		 uiTimelineNameInt)[(psSyncFbTimelineCreatePVRIN->
+				     ui32TimelineNameSize * sizeof(IMG_CHAR)) -
+				    1] = '\0';
 	}
 
 	psSyncFbTimelineCreatePVROUT->eError =
@@ -163,13 +176,13 @@ PVRSRVBridgeSyncFbTimelineCreatePVR(IMG_UINT32 ui32DispatchTableEntry,
 				    ui32TimelineNameSize, uiTimelineNameInt,
 				    &psTimelineInt);
 	/* Exit early if bridged call fails */
-	if (psSyncFbTimelineCreatePVROUT->eError != PVRSRV_OK)
+	if (unlikely(psSyncFbTimelineCreatePVROUT->eError != PVRSRV_OK))
 	{
 		goto SyncFbTimelineCreatePVR_exit;
 	}
 
 	/* Lock over handle creation. */
-	LockHandle();
+	LockHandle(psConnection->psProcessHandleBase->psHandleBase);
 
 	psSyncFbTimelineCreatePVROUT->eError =
 	    PVRSRVAllocHandleUnlocked(psConnection->psProcessHandleBase->
@@ -180,14 +193,14 @@ PVRSRVBridgeSyncFbTimelineCreatePVR(IMG_UINT32 ui32DispatchTableEntry,
 				      PVRSRV_HANDLE_ALLOC_FLAG_NONE,
 				      (PFN_HANDLE_RELEASE) &
 				      SyncFbTimelineRelease);
-	if (psSyncFbTimelineCreatePVROUT->eError != PVRSRV_OK)
+	if (unlikely(psSyncFbTimelineCreatePVROUT->eError != PVRSRV_OK))
 	{
-		UnlockHandle();
+		UnlockHandle(psConnection->psProcessHandleBase->psHandleBase);
 		goto SyncFbTimelineCreatePVR_exit;
 	}
 
 	/* Release now we have created handles. */
-	UnlockHandle();
+	UnlockHandle(psConnection->psProcessHandleBase->psHandleBase);
 
  SyncFbTimelineCreatePVR_exit:
 
@@ -222,7 +235,7 @@ PVRSRVBridgeSyncFbTimelineRelease(IMG_UINT32 ui32DispatchTableEntry,
 {
 
 	/* Lock over handle destruction. */
-	LockHandle();
+	LockHandle(psConnection->psProcessHandleBase->psHandleBase);
 
 	psSyncFbTimelineReleaseOUT->eError =
 	    PVRSRVReleaseHandleUnlocked(psConnection->psProcessHandleBase->
@@ -230,19 +243,20 @@ PVRSRVBridgeSyncFbTimelineRelease(IMG_UINT32 ui32DispatchTableEntry,
 					(IMG_HANDLE) psSyncFbTimelineReleaseIN->
 					hTimeline,
 					PVRSRV_HANDLE_TYPE_PVRSRV_TIMELINE_SERVER);
-	if ((psSyncFbTimelineReleaseOUT->eError != PVRSRV_OK)
-	    && (psSyncFbTimelineReleaseOUT->eError != PVRSRV_ERROR_RETRY))
+	if (unlikely
+	    ((psSyncFbTimelineReleaseOUT->eError != PVRSRV_OK)
+	     && (psSyncFbTimelineReleaseOUT->eError != PVRSRV_ERROR_RETRY)))
 	{
 		PVR_DPF((PVR_DBG_ERROR,
 			 "PVRSRVBridgeSyncFbTimelineRelease: %s",
-			 PVRSRVGetErrorStringKM(psSyncFbTimelineReleaseOUT->
-						eError)));
-		UnlockHandle();
+			 PVRSRVGetErrorString(psSyncFbTimelineReleaseOUT->
+					      eError)));
+		UnlockHandle(psConnection->psProcessHandleBase->psHandleBase);
 		goto SyncFbTimelineRelease_exit;
 	}
 
 	/* Release now we have destroyed handles. */
-	UnlockHandle();
+	UnlockHandle(psConnection->psProcessHandleBase->psHandleBase);
 
  SyncFbTimelineRelease_exit:
 
@@ -260,7 +274,7 @@ PVRSRVBridgeSyncFbFenceDup(IMG_UINT32 ui32DispatchTableEntry,
 	PVRSRV_FENCE_SERVER *psOutFenceInt = NULL;
 
 	/* Lock over handle lookup. */
-	LockHandle();
+	LockHandle(psConnection->psProcessHandleBase->psHandleBase);
 
 	/* Look up the address from the handle */
 	psSyncFbFenceDupOUT->eError =
@@ -269,24 +283,24 @@ PVRSRVBridgeSyncFbFenceDup(IMG_UINT32 ui32DispatchTableEntry,
 				       hInFence,
 				       PVRSRV_HANDLE_TYPE_PVRSRV_FENCE_SERVER,
 				       IMG_TRUE);
-	if (psSyncFbFenceDupOUT->eError != PVRSRV_OK)
+	if (unlikely(psSyncFbFenceDupOUT->eError != PVRSRV_OK))
 	{
-		UnlockHandle();
+		UnlockHandle(psConnection->psProcessHandleBase->psHandleBase);
 		goto SyncFbFenceDup_exit;
 	}
 	/* Release now we have looked up handles. */
-	UnlockHandle();
+	UnlockHandle(psConnection->psProcessHandleBase->psHandleBase);
 
 	psSyncFbFenceDupOUT->eError =
 	    SyncFbFenceDup(psInFenceInt, &psOutFenceInt);
 	/* Exit early if bridged call fails */
-	if (psSyncFbFenceDupOUT->eError != PVRSRV_OK)
+	if (unlikely(psSyncFbFenceDupOUT->eError != PVRSRV_OK))
 	{
 		goto SyncFbFenceDup_exit;
 	}
 
 	/* Lock over handle creation. */
-	LockHandle();
+	LockHandle(psConnection->psProcessHandleBase->psHandleBase);
 
 	psSyncFbFenceDupOUT->eError =
 	    PVRSRVAllocHandleUnlocked(psConnection->psProcessHandleBase->
@@ -297,19 +311,19 @@ PVRSRVBridgeSyncFbFenceDup(IMG_UINT32 ui32DispatchTableEntry,
 				      PVRSRV_HANDLE_ALLOC_FLAG_MULTI,
 				      (PFN_HANDLE_RELEASE) &
 				      SyncFbFenceRelease);
-	if (psSyncFbFenceDupOUT->eError != PVRSRV_OK)
+	if (unlikely(psSyncFbFenceDupOUT->eError != PVRSRV_OK))
 	{
-		UnlockHandle();
+		UnlockHandle(psConnection->psProcessHandleBase->psHandleBase);
 		goto SyncFbFenceDup_exit;
 	}
 
 	/* Release now we have created handles. */
-	UnlockHandle();
+	UnlockHandle(psConnection->psProcessHandleBase->psHandleBase);
 
  SyncFbFenceDup_exit:
 
 	/* Lock over handle lookup cleanup. */
-	LockHandle();
+	LockHandle(psConnection->psProcessHandleBase->psHandleBase);
 
 	/* Unreference the previously looked up handle */
 	if (psInFenceInt)
@@ -319,7 +333,7 @@ PVRSRVBridgeSyncFbFenceDup(IMG_UINT32 ui32DispatchTableEntry,
 					    PVRSRV_HANDLE_TYPE_PVRSRV_FENCE_SERVER);
 	}
 	/* Release now we have cleaned up look up handles. */
-	UnlockHandle();
+	UnlockHandle(psConnection->psProcessHandleBase->psHandleBase);
 
 	if (psSyncFbFenceDupOUT->eError != PVRSRV_OK)
 	{
@@ -355,6 +369,15 @@ PVRSRVBridgeSyncFbFenceMerge(IMG_UINT32 ui32DispatchTableEntry,
 
 	IMG_UINT32 ui32BufferSize =
 	    (psSyncFbFenceMergeIN->ui32FenceNameSize * sizeof(IMG_CHAR)) + 0;
+
+	if (unlikely
+	    (psSyncFbFenceMergeIN->ui32FenceNameSize >
+	     SYNC_FB_FENCE_MAX_LENGTH))
+	{
+		psSyncFbFenceMergeOUT->eError =
+		    PVRSRV_ERROR_BRIDGE_ARRAY_SIZE_TOO_BIG;
+		goto SyncFbFenceMerge_exit;
+	}
 
 	if (ui32BufferSize != 0)
 	{
@@ -413,10 +436,13 @@ PVRSRVBridgeSyncFbFenceMerge(IMG_UINT32 ui32DispatchTableEntry,
 
 			goto SyncFbFenceMerge_exit;
 		}
+		((IMG_CHAR *)
+		 uiFenceNameInt)[(psSyncFbFenceMergeIN->ui32FenceNameSize *
+				  sizeof(IMG_CHAR)) - 1] = '\0';
 	}
 
 	/* Lock over handle lookup. */
-	LockHandle();
+	LockHandle(psConnection->psProcessHandleBase->psHandleBase);
 
 	/* Look up the address from the handle */
 	psSyncFbFenceMergeOUT->eError =
@@ -425,9 +451,9 @@ PVRSRVBridgeSyncFbFenceMerge(IMG_UINT32 ui32DispatchTableEntry,
 				       hInFence1,
 				       PVRSRV_HANDLE_TYPE_PVRSRV_FENCE_SERVER,
 				       IMG_TRUE);
-	if (psSyncFbFenceMergeOUT->eError != PVRSRV_OK)
+	if (unlikely(psSyncFbFenceMergeOUT->eError != PVRSRV_OK))
 	{
-		UnlockHandle();
+		UnlockHandle(psConnection->psProcessHandleBase->psHandleBase);
 		goto SyncFbFenceMerge_exit;
 	}
 
@@ -438,13 +464,13 @@ PVRSRVBridgeSyncFbFenceMerge(IMG_UINT32 ui32DispatchTableEntry,
 				       hInFence2,
 				       PVRSRV_HANDLE_TYPE_PVRSRV_FENCE_SERVER,
 				       IMG_TRUE);
-	if (psSyncFbFenceMergeOUT->eError != PVRSRV_OK)
+	if (unlikely(psSyncFbFenceMergeOUT->eError != PVRSRV_OK))
 	{
-		UnlockHandle();
+		UnlockHandle(psConnection->psProcessHandleBase->psHandleBase);
 		goto SyncFbFenceMerge_exit;
 	}
 	/* Release now we have looked up handles. */
-	UnlockHandle();
+	UnlockHandle(psConnection->psProcessHandleBase->psHandleBase);
 
 	psSyncFbFenceMergeOUT->eError =
 	    SyncFbFenceMerge(psInFence1Int,
@@ -452,13 +478,13 @@ PVRSRVBridgeSyncFbFenceMerge(IMG_UINT32 ui32DispatchTableEntry,
 			     psSyncFbFenceMergeIN->ui32FenceNameSize,
 			     uiFenceNameInt, &psOutFenceInt);
 	/* Exit early if bridged call fails */
-	if (psSyncFbFenceMergeOUT->eError != PVRSRV_OK)
+	if (unlikely(psSyncFbFenceMergeOUT->eError != PVRSRV_OK))
 	{
 		goto SyncFbFenceMerge_exit;
 	}
 
 	/* Lock over handle creation. */
-	LockHandle();
+	LockHandle(psConnection->psProcessHandleBase->psHandleBase);
 
 	psSyncFbFenceMergeOUT->eError =
 	    PVRSRVAllocHandleUnlocked(psConnection->psProcessHandleBase->
@@ -469,19 +495,19 @@ PVRSRVBridgeSyncFbFenceMerge(IMG_UINT32 ui32DispatchTableEntry,
 				      PVRSRV_HANDLE_ALLOC_FLAG_MULTI,
 				      (PFN_HANDLE_RELEASE) &
 				      SyncFbFenceRelease);
-	if (psSyncFbFenceMergeOUT->eError != PVRSRV_OK)
+	if (unlikely(psSyncFbFenceMergeOUT->eError != PVRSRV_OK))
 	{
-		UnlockHandle();
+		UnlockHandle(psConnection->psProcessHandleBase->psHandleBase);
 		goto SyncFbFenceMerge_exit;
 	}
 
 	/* Release now we have created handles. */
-	UnlockHandle();
+	UnlockHandle(psConnection->psProcessHandleBase->psHandleBase);
 
  SyncFbFenceMerge_exit:
 
 	/* Lock over handle lookup cleanup. */
-	LockHandle();
+	LockHandle(psConnection->psProcessHandleBase->psHandleBase);
 
 	/* Unreference the previously looked up handle */
 	if (psInFence1Int)
@@ -499,7 +525,7 @@ PVRSRVBridgeSyncFbFenceMerge(IMG_UINT32 ui32DispatchTableEntry,
 					    PVRSRV_HANDLE_TYPE_PVRSRV_FENCE_SERVER);
 	}
 	/* Release now we have cleaned up look up handles. */
-	UnlockHandle();
+	UnlockHandle(psConnection->psProcessHandleBase->psHandleBase);
 
 	if (psSyncFbFenceMergeOUT->eError != PVRSRV_OK)
 	{
@@ -532,7 +558,7 @@ PVRSRVBridgeSyncFbFenceRelease(IMG_UINT32 ui32DispatchTableEntry,
 {
 
 	/* Lock over handle destruction. */
-	LockHandle();
+	LockHandle(psConnection->psProcessHandleBase->psHandleBase);
 
 	psSyncFbFenceReleaseOUT->eError =
 	    PVRSRVReleaseHandleUnlocked(psConnection->psProcessHandleBase->
@@ -540,19 +566,20 @@ PVRSRVBridgeSyncFbFenceRelease(IMG_UINT32 ui32DispatchTableEntry,
 					(IMG_HANDLE) psSyncFbFenceReleaseIN->
 					hFence,
 					PVRSRV_HANDLE_TYPE_PVRSRV_FENCE_SERVER);
-	if ((psSyncFbFenceReleaseOUT->eError != PVRSRV_OK)
-	    && (psSyncFbFenceReleaseOUT->eError != PVRSRV_ERROR_RETRY))
+	if (unlikely
+	    ((psSyncFbFenceReleaseOUT->eError != PVRSRV_OK)
+	     && (psSyncFbFenceReleaseOUT->eError != PVRSRV_ERROR_RETRY)))
 	{
 		PVR_DPF((PVR_DBG_ERROR,
 			 "PVRSRVBridgeSyncFbFenceRelease: %s",
-			 PVRSRVGetErrorStringKM(psSyncFbFenceReleaseOUT->
-						eError)));
-		UnlockHandle();
+			 PVRSRVGetErrorString(psSyncFbFenceReleaseOUT->
+					      eError)));
+		UnlockHandle(psConnection->psProcessHandleBase->psHandleBase);
 		goto SyncFbFenceRelease_exit;
 	}
 
 	/* Release now we have destroyed handles. */
-	UnlockHandle();
+	UnlockHandle(psConnection->psProcessHandleBase->psHandleBase);
 
  SyncFbFenceRelease_exit:
 
@@ -571,7 +598,7 @@ PVRSRVBridgeSyncFbFenceWait(IMG_UINT32 ui32DispatchTableEntry,
 	PVRSRV_FENCE_SERVER *psFenceInt = NULL;
 
 	/* Lock over handle lookup. */
-	LockHandle();
+	LockHandle(psConnection->psProcessHandleBase->psHandleBase);
 
 	/* Look up the address from the handle */
 	psSyncFbFenceWaitOUT->eError =
@@ -580,13 +607,13 @@ PVRSRVBridgeSyncFbFenceWait(IMG_UINT32 ui32DispatchTableEntry,
 				       hFence,
 				       PVRSRV_HANDLE_TYPE_PVRSRV_FENCE_SERVER,
 				       IMG_TRUE);
-	if (psSyncFbFenceWaitOUT->eError != PVRSRV_OK)
+	if (unlikely(psSyncFbFenceWaitOUT->eError != PVRSRV_OK))
 	{
-		UnlockHandle();
+		UnlockHandle(psConnection->psProcessHandleBase->psHandleBase);
 		goto SyncFbFenceWait_exit;
 	}
 	/* Release now we have looked up handles. */
-	UnlockHandle();
+	UnlockHandle(psConnection->psProcessHandleBase->psHandleBase);
 
 	psSyncFbFenceWaitOUT->eError =
 	    SyncFbFenceWait(psFenceInt, psSyncFbFenceWaitIN->ui32Timeout);
@@ -594,7 +621,7 @@ PVRSRVBridgeSyncFbFenceWait(IMG_UINT32 ui32DispatchTableEntry,
  SyncFbFenceWait_exit:
 
 	/* Lock over handle lookup cleanup. */
-	LockHandle();
+	LockHandle(psConnection->psProcessHandleBase->psHandleBase);
 
 	/* Unreference the previously looked up handle */
 	if (psFenceInt)
@@ -604,7 +631,7 @@ PVRSRVBridgeSyncFbFenceWait(IMG_UINT32 ui32DispatchTableEntry,
 					    PVRSRV_HANDLE_TYPE_PVRSRV_FENCE_SERVER);
 	}
 	/* Release now we have cleaned up look up handles. */
-	UnlockHandle();
+	UnlockHandle(psConnection->psProcessHandleBase->psHandleBase);
 
 	return 0;
 }
@@ -620,6 +647,8 @@ PVRSRVBridgeSyncFbFenceDump(IMG_UINT32 ui32DispatchTableEntry,
 	IMG_HANDLE hFence = psSyncFbFenceDumpIN->hFence;
 	PVRSRV_FENCE_SERVER *psFenceInt = NULL;
 	IMG_CHAR *uiFileStrInt = NULL;
+	IMG_CHAR *uiModuleStrInt = NULL;
+	IMG_CHAR *uiDescStrInt = NULL;
 
 	IMG_UINT32 ui32NextOffset = 0;
 	IMG_BYTE *pArrayArgsBuffer = NULL;
@@ -628,7 +657,36 @@ PVRSRVBridgeSyncFbFenceDump(IMG_UINT32 ui32DispatchTableEntry,
 #endif
 
 	IMG_UINT32 ui32BufferSize =
-	    (psSyncFbFenceDumpIN->ui32FileStrLength * sizeof(IMG_CHAR)) + 0;
+	    (psSyncFbFenceDumpIN->ui32FileStrLength * sizeof(IMG_CHAR)) +
+	    (psSyncFbFenceDumpIN->ui32ModuleStrLength * sizeof(IMG_CHAR)) +
+	    (psSyncFbFenceDumpIN->ui32DescStrLength * sizeof(IMG_CHAR)) + 0;
+
+	if (unlikely
+	    (psSyncFbFenceDumpIN->ui32FileStrLength >
+	     (SYNC_FB_FILE_STRING_MAX + 1)))
+	{
+		psSyncFbFenceDumpOUT->eError =
+		    PVRSRV_ERROR_BRIDGE_ARRAY_SIZE_TOO_BIG;
+		goto SyncFbFenceDump_exit;
+	}
+
+	if (unlikely
+	    (psSyncFbFenceDumpIN->ui32ModuleStrLength >
+	     (SYNC_FB_MODULE_STRING_LEN_MAX + 1)))
+	{
+		psSyncFbFenceDumpOUT->eError =
+		    PVRSRV_ERROR_BRIDGE_ARRAY_SIZE_TOO_BIG;
+		goto SyncFbFenceDump_exit;
+	}
+
+	if (unlikely
+	    (psSyncFbFenceDumpIN->ui32DescStrLength >
+	     (SYNC_FB_DESC_STRING_LEN_MAX + 1)))
+	{
+		psSyncFbFenceDumpOUT->eError =
+		    PVRSRV_ERROR_BRIDGE_ARRAY_SIZE_TOO_BIG;
+		goto SyncFbFenceDump_exit;
+	}
 
 	if (ui32BufferSize != 0)
 	{
@@ -687,10 +745,67 @@ PVRSRVBridgeSyncFbFenceDump(IMG_UINT32 ui32DispatchTableEntry,
 
 			goto SyncFbFenceDump_exit;
 		}
+		((IMG_CHAR *)
+		 uiFileStrInt)[(psSyncFbFenceDumpIN->ui32FileStrLength *
+				sizeof(IMG_CHAR)) - 1] = '\0';
+	}
+	if (psSyncFbFenceDumpIN->ui32ModuleStrLength != 0)
+	{
+		uiModuleStrInt =
+		    (IMG_CHAR *) (((IMG_UINT8 *) pArrayArgsBuffer) +
+				  ui32NextOffset);
+		ui32NextOffset +=
+		    psSyncFbFenceDumpIN->ui32ModuleStrLength * sizeof(IMG_CHAR);
+	}
+
+	/* Copy the data over */
+	if (psSyncFbFenceDumpIN->ui32ModuleStrLength * sizeof(IMG_CHAR) > 0)
+	{
+		if (OSCopyFromUser
+		    (NULL, uiModuleStrInt,
+		     (const void __user *)psSyncFbFenceDumpIN->puiModuleStr,
+		     psSyncFbFenceDumpIN->ui32ModuleStrLength *
+		     sizeof(IMG_CHAR)) != PVRSRV_OK)
+		{
+			psSyncFbFenceDumpOUT->eError =
+			    PVRSRV_ERROR_INVALID_PARAMS;
+
+			goto SyncFbFenceDump_exit;
+		}
+		((IMG_CHAR *)
+		 uiModuleStrInt)[(psSyncFbFenceDumpIN->ui32ModuleStrLength *
+				  sizeof(IMG_CHAR)) - 1] = '\0';
+	}
+	if (psSyncFbFenceDumpIN->ui32DescStrLength != 0)
+	{
+		uiDescStrInt =
+		    (IMG_CHAR *) (((IMG_UINT8 *) pArrayArgsBuffer) +
+				  ui32NextOffset);
+		ui32NextOffset +=
+		    psSyncFbFenceDumpIN->ui32DescStrLength * sizeof(IMG_CHAR);
+	}
+
+	/* Copy the data over */
+	if (psSyncFbFenceDumpIN->ui32DescStrLength * sizeof(IMG_CHAR) > 0)
+	{
+		if (OSCopyFromUser
+		    (NULL, uiDescStrInt,
+		     (const void __user *)psSyncFbFenceDumpIN->puiDescStr,
+		     psSyncFbFenceDumpIN->ui32DescStrLength *
+		     sizeof(IMG_CHAR)) != PVRSRV_OK)
+		{
+			psSyncFbFenceDumpOUT->eError =
+			    PVRSRV_ERROR_INVALID_PARAMS;
+
+			goto SyncFbFenceDump_exit;
+		}
+		((IMG_CHAR *)
+		 uiDescStrInt)[(psSyncFbFenceDumpIN->ui32DescStrLength *
+				sizeof(IMG_CHAR)) - 1] = '\0';
 	}
 
 	/* Lock over handle lookup. */
-	LockHandle();
+	LockHandle(psConnection->psProcessHandleBase->psHandleBase);
 
 	/* Look up the address from the handle */
 	psSyncFbFenceDumpOUT->eError =
@@ -699,24 +814,28 @@ PVRSRVBridgeSyncFbFenceDump(IMG_UINT32 ui32DispatchTableEntry,
 				       hFence,
 				       PVRSRV_HANDLE_TYPE_PVRSRV_FENCE_SERVER,
 				       IMG_TRUE);
-	if (psSyncFbFenceDumpOUT->eError != PVRSRV_OK)
+	if (unlikely(psSyncFbFenceDumpOUT->eError != PVRSRV_OK))
 	{
-		UnlockHandle();
+		UnlockHandle(psConnection->psProcessHandleBase->psHandleBase);
 		goto SyncFbFenceDump_exit;
 	}
 	/* Release now we have looked up handles. */
-	UnlockHandle();
+	UnlockHandle(psConnection->psProcessHandleBase->psHandleBase);
 
 	psSyncFbFenceDumpOUT->eError =
 	    SyncFbFenceDump(psFenceInt,
 			    psSyncFbFenceDumpIN->ui32Line,
 			    psSyncFbFenceDumpIN->ui32FileStrLength,
-			    uiFileStrInt);
+			    uiFileStrInt,
+			    psSyncFbFenceDumpIN->ui32ModuleStrLength,
+			    uiModuleStrInt,
+			    psSyncFbFenceDumpIN->ui32DescStrLength,
+			    uiDescStrInt);
 
  SyncFbFenceDump_exit:
 
 	/* Lock over handle lookup cleanup. */
-	LockHandle();
+	LockHandle(psConnection->psProcessHandleBase->psHandleBase);
 
 	/* Unreference the previously looked up handle */
 	if (psFenceInt)
@@ -726,7 +845,7 @@ PVRSRVBridgeSyncFbFenceDump(IMG_UINT32 ui32DispatchTableEntry,
 					    PVRSRV_HANDLE_TYPE_PVRSRV_FENCE_SERVER);
 	}
 	/* Release now we have cleaned up look up handles. */
-	UnlockHandle();
+	UnlockHandle(psConnection->psProcessHandleBase->psHandleBase);
 
 	/* Allocated space should be equal to the last updated offset */
 	PVR_ASSERT(ui32BufferSize == ui32NextOffset);
@@ -761,6 +880,15 @@ PVRSRVBridgeSyncFbTimelineCreateSW(IMG_UINT32 ui32DispatchTableEntry,
 	IMG_UINT32 ui32BufferSize =
 	    (psSyncFbTimelineCreateSWIN->ui32TimelineNameSize *
 	     sizeof(IMG_CHAR)) + 0;
+
+	if (unlikely
+	    (psSyncFbTimelineCreateSWIN->ui32TimelineNameSize >
+	     SYNC_FB_FENCE_MAX_LENGTH))
+	{
+		psSyncFbTimelineCreateSWOUT->eError =
+		    PVRSRV_ERROR_BRIDGE_ARRAY_SIZE_TOO_BIG;
+		goto SyncFbTimelineCreateSW_exit;
+	}
 
 	if (ui32BufferSize != 0)
 	{
@@ -822,6 +950,10 @@ PVRSRVBridgeSyncFbTimelineCreateSW(IMG_UINT32 ui32DispatchTableEntry,
 
 			goto SyncFbTimelineCreateSW_exit;
 		}
+		((IMG_CHAR *)
+		 uiTimelineNameInt)[(psSyncFbTimelineCreateSWIN->
+				     ui32TimelineNameSize * sizeof(IMG_CHAR)) -
+				    1] = '\0';
 	}
 
 	psSyncFbTimelineCreateSWOUT->eError =
@@ -829,13 +961,13 @@ PVRSRVBridgeSyncFbTimelineCreateSW(IMG_UINT32 ui32DispatchTableEntry,
 				   ui32TimelineNameSize, uiTimelineNameInt,
 				   &psTimelineInt);
 	/* Exit early if bridged call fails */
-	if (psSyncFbTimelineCreateSWOUT->eError != PVRSRV_OK)
+	if (unlikely(psSyncFbTimelineCreateSWOUT->eError != PVRSRV_OK))
 	{
 		goto SyncFbTimelineCreateSW_exit;
 	}
 
 	/* Lock over handle creation. */
-	LockHandle();
+	LockHandle(psConnection->psProcessHandleBase->psHandleBase);
 
 	psSyncFbTimelineCreateSWOUT->eError =
 	    PVRSRVAllocHandleUnlocked(psConnection->psProcessHandleBase->
@@ -846,14 +978,14 @@ PVRSRVBridgeSyncFbTimelineCreateSW(IMG_UINT32 ui32DispatchTableEntry,
 				      PVRSRV_HANDLE_ALLOC_FLAG_NONE,
 				      (PFN_HANDLE_RELEASE) &
 				      SyncFbTimelineRelease);
-	if (psSyncFbTimelineCreateSWOUT->eError != PVRSRV_OK)
+	if (unlikely(psSyncFbTimelineCreateSWOUT->eError != PVRSRV_OK))
 	{
-		UnlockHandle();
+		UnlockHandle(psConnection->psProcessHandleBase->psHandleBase);
 		goto SyncFbTimelineCreateSW_exit;
 	}
 
 	/* Release now we have created handles. */
-	UnlockHandle();
+	UnlockHandle(psConnection->psProcessHandleBase->psHandleBase);
 
  SyncFbTimelineCreateSW_exit:
 
@@ -899,6 +1031,15 @@ PVRSRVBridgeSyncFbFenceCreateSW(IMG_UINT32 ui32DispatchTableEntry,
 
 	IMG_UINT32 ui32BufferSize =
 	    (psSyncFbFenceCreateSWIN->ui32FenceNameSize * sizeof(IMG_CHAR)) + 0;
+
+	if (unlikely
+	    (psSyncFbFenceCreateSWIN->ui32FenceNameSize >
+	     SYNC_FB_FENCE_MAX_LENGTH))
+	{
+		psSyncFbFenceCreateSWOUT->eError =
+		    PVRSRV_ERROR_BRIDGE_ARRAY_SIZE_TOO_BIG;
+		goto SyncFbFenceCreateSW_exit;
+	}
 
 	if (ui32BufferSize != 0)
 	{
@@ -958,10 +1099,13 @@ PVRSRVBridgeSyncFbFenceCreateSW(IMG_UINT32 ui32DispatchTableEntry,
 
 			goto SyncFbFenceCreateSW_exit;
 		}
+		((IMG_CHAR *)
+		 uiFenceNameInt)[(psSyncFbFenceCreateSWIN->ui32FenceNameSize *
+				  sizeof(IMG_CHAR)) - 1] = '\0';
 	}
 
 	/* Lock over handle lookup. */
-	LockHandle();
+	LockHandle(psConnection->psProcessHandleBase->psHandleBase);
 
 	/* Look up the address from the handle */
 	psSyncFbFenceCreateSWOUT->eError =
@@ -970,26 +1114,28 @@ PVRSRVBridgeSyncFbFenceCreateSW(IMG_UINT32 ui32DispatchTableEntry,
 				       hTimeline,
 				       PVRSRV_HANDLE_TYPE_PVRSRV_TIMELINE_SERVER,
 				       IMG_TRUE);
-	if (psSyncFbFenceCreateSWOUT->eError != PVRSRV_OK)
+	if (unlikely(psSyncFbFenceCreateSWOUT->eError != PVRSRV_OK))
 	{
-		UnlockHandle();
+		UnlockHandle(psConnection->psProcessHandleBase->psHandleBase);
 		goto SyncFbFenceCreateSW_exit;
 	}
 	/* Release now we have looked up handles. */
-	UnlockHandle();
+	UnlockHandle(psConnection->psProcessHandleBase->psHandleBase);
 
 	psSyncFbFenceCreateSWOUT->eError =
 	    SyncFbFenceCreateSW(psTimelineInt,
 				psSyncFbFenceCreateSWIN->ui32FenceNameSize,
-				uiFenceNameInt, &psOutFenceInt);
+				uiFenceNameInt,
+				&psOutFenceInt,
+				&psSyncFbFenceCreateSWOUT->ui64SyncPtIdx);
 	/* Exit early if bridged call fails */
-	if (psSyncFbFenceCreateSWOUT->eError != PVRSRV_OK)
+	if (unlikely(psSyncFbFenceCreateSWOUT->eError != PVRSRV_OK))
 	{
 		goto SyncFbFenceCreateSW_exit;
 	}
 
 	/* Lock over handle creation. */
-	LockHandle();
+	LockHandle(psConnection->psProcessHandleBase->psHandleBase);
 
 	psSyncFbFenceCreateSWOUT->eError =
 	    PVRSRVAllocHandleUnlocked(psConnection->psProcessHandleBase->
@@ -1000,19 +1146,19 @@ PVRSRVBridgeSyncFbFenceCreateSW(IMG_UINT32 ui32DispatchTableEntry,
 				      PVRSRV_HANDLE_ALLOC_FLAG_MULTI,
 				      (PFN_HANDLE_RELEASE) &
 				      SyncFbFenceRelease);
-	if (psSyncFbFenceCreateSWOUT->eError != PVRSRV_OK)
+	if (unlikely(psSyncFbFenceCreateSWOUT->eError != PVRSRV_OK))
 	{
-		UnlockHandle();
+		UnlockHandle(psConnection->psProcessHandleBase->psHandleBase);
 		goto SyncFbFenceCreateSW_exit;
 	}
 
 	/* Release now we have created handles. */
-	UnlockHandle();
+	UnlockHandle(psConnection->psProcessHandleBase->psHandleBase);
 
  SyncFbFenceCreateSW_exit:
 
 	/* Lock over handle lookup cleanup. */
-	LockHandle();
+	LockHandle(psConnection->psProcessHandleBase->psHandleBase);
 
 	/* Unreference the previously looked up handle */
 	if (psTimelineInt)
@@ -1022,7 +1168,7 @@ PVRSRVBridgeSyncFbFenceCreateSW(IMG_UINT32 ui32DispatchTableEntry,
 					    PVRSRV_HANDLE_TYPE_PVRSRV_TIMELINE_SERVER);
 	}
 	/* Release now we have cleaned up look up handles. */
-	UnlockHandle();
+	UnlockHandle(psConnection->psProcessHandleBase->psHandleBase);
 
 	if (psSyncFbFenceCreateSWOUT->eError != PVRSRV_OK)
 	{
@@ -1057,7 +1203,7 @@ PVRSRVBridgeSyncFbTimelineAdvanceSW(IMG_UINT32 ui32DispatchTableEntry,
 	PVRSRV_TIMELINE_SERVER *psTimelineInt = NULL;
 
 	/* Lock over handle lookup. */
-	LockHandle();
+	LockHandle(psConnection->psProcessHandleBase->psHandleBase);
 
 	/* Look up the address from the handle */
 	psSyncFbTimelineAdvanceSWOUT->eError =
@@ -1066,21 +1212,23 @@ PVRSRVBridgeSyncFbTimelineAdvanceSW(IMG_UINT32 ui32DispatchTableEntry,
 				       hTimeline,
 				       PVRSRV_HANDLE_TYPE_PVRSRV_TIMELINE_SERVER,
 				       IMG_TRUE);
-	if (psSyncFbTimelineAdvanceSWOUT->eError != PVRSRV_OK)
+	if (unlikely(psSyncFbTimelineAdvanceSWOUT->eError != PVRSRV_OK))
 	{
-		UnlockHandle();
+		UnlockHandle(psConnection->psProcessHandleBase->psHandleBase);
 		goto SyncFbTimelineAdvanceSW_exit;
 	}
 	/* Release now we have looked up handles. */
-	UnlockHandle();
+	UnlockHandle(psConnection->psProcessHandleBase->psHandleBase);
 
 	psSyncFbTimelineAdvanceSWOUT->eError =
-	    SyncFbTimelineAdvanceSW(psTimelineInt);
+	    SyncFbTimelineAdvanceSW(psTimelineInt,
+				    &psSyncFbTimelineAdvanceSWOUT->
+				    ui64SyncPtIdx);
 
  SyncFbTimelineAdvanceSW_exit:
 
 	/* Lock over handle lookup cleanup. */
-	LockHandle();
+	LockHandle(psConnection->psProcessHandleBase->psHandleBase);
 
 	/* Unreference the previously looked up handle */
 	if (psTimelineInt)
@@ -1090,7 +1238,7 @@ PVRSRVBridgeSyncFbTimelineAdvanceSW(IMG_UINT32 ui32DispatchTableEntry,
 					    PVRSRV_HANDLE_TYPE_PVRSRV_TIMELINE_SERVER);
 	}
 	/* Release now we have cleaned up look up handles. */
-	UnlockHandle();
+	UnlockHandle(psConnection->psProcessHandleBase->psHandleBase);
 
 	return 0;
 }
@@ -1110,7 +1258,7 @@ PVRSRVBridgeSyncFbFenceExportInsecure(IMG_UINT32 ui32DispatchTableEntry,
 	IMG_HANDLE hExportInt = NULL;
 
 	/* Lock over handle lookup. */
-	LockHandle();
+	LockHandle(psConnection->psProcessHandleBase->psHandleBase);
 
 	/* Look up the address from the handle */
 	psSyncFbFenceExportInsecureOUT->eError =
@@ -1119,28 +1267,25 @@ PVRSRVBridgeSyncFbFenceExportInsecure(IMG_UINT32 ui32DispatchTableEntry,
 				       hFence,
 				       PVRSRV_HANDLE_TYPE_PVRSRV_FENCE_SERVER,
 				       IMG_TRUE);
-	if (psSyncFbFenceExportInsecureOUT->eError != PVRSRV_OK)
+	if (unlikely(psSyncFbFenceExportInsecureOUT->eError != PVRSRV_OK))
 	{
-		UnlockHandle();
+		UnlockHandle(psConnection->psProcessHandleBase->psHandleBase);
 		goto SyncFbFenceExportInsecure_exit;
 	}
 	/* Release now we have looked up handles. */
-	UnlockHandle();
+	UnlockHandle(psConnection->psProcessHandleBase->psHandleBase);
 
 	psSyncFbFenceExportInsecureOUT->eError =
 	    SyncFbFenceExportInsecure(psFenceInt, &psExportInt);
 	/* Exit early if bridged call fails */
-	if (psSyncFbFenceExportInsecureOUT->eError != PVRSRV_OK)
+	if (unlikely(psSyncFbFenceExportInsecureOUT->eError != PVRSRV_OK))
 	{
 		goto SyncFbFenceExportInsecure_exit;
 	}
 
-	/* Lock over handle creation. */
-	LockHandle();
-
 	/*
 	 * For cases where we need a cross process handle we actually allocate two.
-	 * 
+	 *
 	 * The first one is a connection specific handle and it gets given the real
 	 * release function. This handle does *NOT* get returned to the caller. It's
 	 * purpose is to release any leaked resources when we either have a bad or
@@ -1148,10 +1293,13 @@ PVRSRVBridgeSyncFbFenceExportInsecure(IMG_UINT32 ui32DispatchTableEntry,
 	 * wouldn't be freed until driver unload. If the resource is freed normally,
 	 * this handle can be looked up via the cross process handle and then
 	 * released accordingly.
-	 * 
+	 *
 	 * The second one is a cross process handle and it gets given a noop release
 	 * function. This handle does get returned to the caller.
 	 */
+
+	/* Lock over handle creation. */
+	LockHandle(psConnection->psProcessHandleBase->psHandleBase);
 
 	psSyncFbFenceExportInsecureOUT->eError =
 	    PVRSRVAllocHandleUnlocked(psConnection->psProcessHandleBase->
@@ -1161,12 +1309,17 @@ PVRSRVBridgeSyncFbFenceExportInsecure(IMG_UINT32 ui32DispatchTableEntry,
 				      PVRSRV_HANDLE_ALLOC_FLAG_NONE,
 				      (PFN_HANDLE_RELEASE) &
 				      SyncFbFenceExportDestroyInsecure);
-	if (psSyncFbFenceExportInsecureOUT->eError != PVRSRV_OK)
+	if (unlikely(psSyncFbFenceExportInsecureOUT->eError != PVRSRV_OK))
 	{
-		UnlockHandle();
+		UnlockHandle(psConnection->psProcessHandleBase->psHandleBase);
 		goto SyncFbFenceExportInsecure_exit;
 	}
 
+	/* Release now we have created handles. */
+	UnlockHandle(psConnection->psProcessHandleBase->psHandleBase);
+
+	/* Lock over handle creation. */
+	LockHandle(KERNEL_HANDLE_BASE);
 	psSyncFbFenceExportInsecureOUT->eError =
 	    PVRSRVAllocHandleUnlocked(KERNEL_HANDLE_BASE,
 				      &psSyncFbFenceExportInsecureOUT->hExport,
@@ -1174,18 +1327,18 @@ PVRSRVBridgeSyncFbFenceExportInsecure(IMG_UINT32 ui32DispatchTableEntry,
 				      PVRSRV_HANDLE_TYPE_PVRSRV_FENCE_EXPORT,
 				      PVRSRV_HANDLE_ALLOC_FLAG_NONE,
 				      (PFN_HANDLE_RELEASE) & ReleaseExport);
-	if (psSyncFbFenceExportInsecureOUT->eError != PVRSRV_OK)
+	if (unlikely(psSyncFbFenceExportInsecureOUT->eError != PVRSRV_OK))
 	{
-		UnlockHandle();
+		UnlockHandle(KERNEL_HANDLE_BASE);
 		goto SyncFbFenceExportInsecure_exit;
 	}
 	/* Release now we have created handles. */
-	UnlockHandle();
+	UnlockHandle(KERNEL_HANDLE_BASE);
 
  SyncFbFenceExportInsecure_exit:
 
 	/* Lock over handle lookup cleanup. */
-	LockHandle();
+	LockHandle(psConnection->psProcessHandleBase->psHandleBase);
 
 	/* Unreference the previously looked up handle */
 	if (psFenceInt)
@@ -1195,38 +1348,48 @@ PVRSRVBridgeSyncFbFenceExportInsecure(IMG_UINT32 ui32DispatchTableEntry,
 					    PVRSRV_HANDLE_TYPE_PVRSRV_FENCE_SERVER);
 	}
 	/* Release now we have cleaned up look up handles. */
-	UnlockHandle();
+	UnlockHandle(psConnection->psProcessHandleBase->psHandleBase);
 
 	if (psSyncFbFenceExportInsecureOUT->eError != PVRSRV_OK)
 	{
-		/* Lock over handle creation cleanup. */
-		LockHandle();
 		if (psSyncFbFenceExportInsecureOUT->hExport)
 		{
+			PVRSRV_ERROR eError;
 
-			PVRSRV_ERROR eError =
-			    PVRSRVReleaseHandleUnlocked(KERNEL_HANDLE_BASE,
-							(IMG_HANDLE)
-							psSyncFbFenceExportInsecureOUT->
-							hExport,
-							PVRSRV_HANDLE_TYPE_PVRSRV_FENCE_EXPORT);
-			if ((eError != PVRSRV_OK)
-			    && (eError != PVRSRV_ERROR_RETRY))
+			/* Lock over handle creation cleanup. */
+			LockHandle(KERNEL_HANDLE_BASE);
+
+			eError = PVRSRVReleaseHandleUnlocked(KERNEL_HANDLE_BASE,
+							     (IMG_HANDLE)
+							     psSyncFbFenceExportInsecureOUT->
+							     hExport,
+							     PVRSRV_HANDLE_TYPE_PVRSRV_FENCE_EXPORT);
+			if (unlikely
+			    ((eError != PVRSRV_OK)
+			     && (eError != PVRSRV_ERROR_RETRY)))
 			{
 				PVR_DPF((PVR_DBG_ERROR,
 					 "PVRSRVBridgeSyncFbFenceExportInsecure: %s",
-					 PVRSRVGetErrorStringKM(eError)));
+					 PVRSRVGetErrorString(eError)));
 			}
 			/* Releasing the handle should free/destroy/release the resource.
 			 * This should never fail... */
 			PVR_ASSERT((eError == PVRSRV_OK)
 				   || (eError == PVRSRV_ERROR_RETRY));
 
+			/* Release now we have cleaned up creation handles. */
+			UnlockHandle(KERNEL_HANDLE_BASE);
+
 		}
 
 		if (hExportInt)
 		{
-			PVRSRV_ERROR eError =
+			PVRSRV_ERROR eError;
+			/* Lock over handle creation cleanup. */
+			LockHandle(psConnection->psProcessHandleBase->
+				   psHandleBase);
+
+			eError =
 			    PVRSRVReleaseHandleUnlocked(psConnection->
 							psProcessHandleBase->
 							psHandleBase,
@@ -1237,7 +1400,7 @@ PVRSRVBridgeSyncFbFenceExportInsecure(IMG_UINT32 ui32DispatchTableEntry,
 			{
 				PVR_DPF((PVR_DBG_ERROR,
 					 "PVRSRVBridgeSyncFbFenceExportInsecure: %s",
-					 PVRSRVGetErrorStringKM(eError)));
+					 PVRSRVGetErrorString(eError)));
 			}
 			/* Releasing the handle should free/destroy/release the resource.
 			 * This should never fail... */
@@ -1246,10 +1409,11 @@ PVRSRVBridgeSyncFbFenceExportInsecure(IMG_UINT32 ui32DispatchTableEntry,
 
 			/* Avoid freeing/destroying/releasing the resource a second time below */
 			psExportInt = NULL;
+			/* Release now we have cleaned up creation handles. */
+			UnlockHandle(psConnection->psProcessHandleBase->
+				     psHandleBase);
 		}
 
-		/* Release now we have cleaned up creation handles. */
-		UnlockHandle();
 		if (psExportInt)
 		{
 			SyncFbFenceExportDestroyInsecure(psExportInt);
@@ -1280,8 +1444,7 @@ PVRSRVBridgeSyncFbFenceExportDestroyInsecure(IMG_UINT32 ui32DispatchTableEntry,
 	PVR_UNREFERENCED_PARAMETER(psConnection);
 
 	/* Lock over handle destruction. */
-	LockHandle();
-
+	LockHandle(KERNEL_HANDLE_BASE);
 	psSyncFbFenceExportDestroyInsecureOUT->eError =
 	    PVRSRVLookupHandleUnlocked(KERNEL_HANDLE_BASE,
 				       (void **)&psExportInt,
@@ -1290,15 +1453,21 @@ PVRSRVBridgeSyncFbFenceExportDestroyInsecure(IMG_UINT32 ui32DispatchTableEntry,
 				       hExport,
 				       PVRSRV_HANDLE_TYPE_PVRSRV_FENCE_EXPORT,
 				       IMG_FALSE);
-	if (psSyncFbFenceExportDestroyInsecureOUT->eError != PVRSRV_OK)
+	if (unlikely
+	    (psSyncFbFenceExportDestroyInsecureOUT->eError != PVRSRV_OK))
 	{
 		PVR_DPF((PVR_DBG_ERROR,
 			 "PVRSRVBridgeSyncFbFenceExportDestroyInsecure: %s",
-			 PVRSRVGetErrorStringKM
+			 PVRSRVGetErrorString
 			 (psSyncFbFenceExportDestroyInsecureOUT->eError)));
 	}
 	PVR_ASSERT(psSyncFbFenceExportDestroyInsecureOUT->eError == PVRSRV_OK);
 
+	/* Release now we have destroyed handles. */
+	UnlockHandle(KERNEL_HANDLE_BASE);
+
+	/* Lock over handle destruction. */
+	LockHandle(psConnection->psProcessHandleBase->psHandleBase);
 	/*
 	 * Find the connection specific handle that represents the same data
 	 * as the cross process handle as releasing it will actually call the
@@ -1309,11 +1478,12 @@ PVRSRVBridgeSyncFbFenceExportDestroyInsecure(IMG_UINT32 ui32DispatchTableEntry,
 	    PVRSRVFindHandleUnlocked(psConnection->psProcessHandleBase->
 				     psHandleBase, &hExportInt, psExportInt,
 				     PVRSRV_HANDLE_TYPE_PVRSRV_FENCE_EXPORT);
-	if (psSyncFbFenceExportDestroyInsecureOUT->eError != PVRSRV_OK)
+	if (unlikely
+	    (psSyncFbFenceExportDestroyInsecureOUT->eError != PVRSRV_OK))
 	{
 		PVR_DPF((PVR_DBG_ERROR,
 			 "PVRSRVBridgeSyncFbFenceExportDestroyInsecure: %s",
-			 PVRSRVGetErrorStringKM
+			 PVRSRVGetErrorString
 			 (psSyncFbFenceExportDestroyInsecureOUT->eError)));
 	}
 	PVR_ASSERT(psSyncFbFenceExportDestroyInsecureOUT->eError == PVRSRV_OK);
@@ -1322,18 +1492,24 @@ PVRSRVBridgeSyncFbFenceExportDestroyInsecure(IMG_UINT32 ui32DispatchTableEntry,
 	    PVRSRVReleaseHandleUnlocked(psConnection->psProcessHandleBase->
 					psHandleBase, hExportInt,
 					PVRSRV_HANDLE_TYPE_PVRSRV_FENCE_EXPORT);
-	if ((psSyncFbFenceExportDestroyInsecureOUT->eError != PVRSRV_OK)
-	    && (psSyncFbFenceExportDestroyInsecureOUT->eError !=
-		PVRSRV_ERROR_RETRY))
+	if (unlikely
+	    ((psSyncFbFenceExportDestroyInsecureOUT->eError != PVRSRV_OK)
+	     && (psSyncFbFenceExportDestroyInsecureOUT->eError !=
+		 PVRSRV_ERROR_RETRY)))
 	{
 		PVR_DPF((PVR_DBG_ERROR,
 			 "PVRSRVBridgeSyncFbFenceExportDestroyInsecure: %s",
-			 PVRSRVGetErrorStringKM
+			 PVRSRVGetErrorString
 			 (psSyncFbFenceExportDestroyInsecureOUT->eError)));
 	}
 	PVR_ASSERT((psSyncFbFenceExportDestroyInsecureOUT->eError == PVRSRV_OK)
 		   || (psSyncFbFenceExportDestroyInsecureOUT->eError ==
 		       PVRSRV_ERROR_RETRY));
+	/* Release now we have destroyed handles. */
+	UnlockHandle(psConnection->psProcessHandleBase->psHandleBase);
+
+	/* Lock over handle destruction. */
+	LockHandle(KERNEL_HANDLE_BASE);
 
 	psSyncFbFenceExportDestroyInsecureOUT->eError =
 	    PVRSRVReleaseHandleUnlocked(KERNEL_HANDLE_BASE,
@@ -1341,20 +1517,21 @@ PVRSRVBridgeSyncFbFenceExportDestroyInsecure(IMG_UINT32 ui32DispatchTableEntry,
 					psSyncFbFenceExportDestroyInsecureIN->
 					hExport,
 					PVRSRV_HANDLE_TYPE_PVRSRV_FENCE_EXPORT);
-	if ((psSyncFbFenceExportDestroyInsecureOUT->eError != PVRSRV_OK)
-	    && (psSyncFbFenceExportDestroyInsecureOUT->eError !=
-		PVRSRV_ERROR_RETRY))
+	if (unlikely
+	    ((psSyncFbFenceExportDestroyInsecureOUT->eError != PVRSRV_OK)
+	     && (psSyncFbFenceExportDestroyInsecureOUT->eError !=
+		 PVRSRV_ERROR_RETRY)))
 	{
 		PVR_DPF((PVR_DBG_ERROR,
 			 "PVRSRVBridgeSyncFbFenceExportDestroyInsecure: %s",
-			 PVRSRVGetErrorStringKM
+			 PVRSRVGetErrorString
 			 (psSyncFbFenceExportDestroyInsecureOUT->eError)));
-		UnlockHandle();
+		UnlockHandle(KERNEL_HANDLE_BASE);
 		goto SyncFbFenceExportDestroyInsecure_exit;
 	}
 
 	/* Release now we have destroyed handles. */
-	UnlockHandle();
+	UnlockHandle(KERNEL_HANDLE_BASE);
 
  SyncFbFenceExportDestroyInsecure_exit:
 
@@ -1379,7 +1556,7 @@ PVRSRVBridgeSyncFbFenceImportInsecure(IMG_UINT32 ui32DispatchTableEntry,
 	PVRSRV_FENCE_SERVER *psSyncHandleInt = NULL;
 
 	/* Lock over handle lookup. */
-	LockHandle();
+	LockHandle(KERNEL_HANDLE_BASE);
 
 	/* Look up the address from the handle */
 	psSyncFbFenceImportInsecureOUT->eError =
@@ -1388,25 +1565,25 @@ PVRSRVBridgeSyncFbFenceImportInsecure(IMG_UINT32 ui32DispatchTableEntry,
 				       hImport,
 				       PVRSRV_HANDLE_TYPE_PVRSRV_FENCE_EXPORT,
 				       IMG_TRUE);
-	if (psSyncFbFenceImportInsecureOUT->eError != PVRSRV_OK)
+	if (unlikely(psSyncFbFenceImportInsecureOUT->eError != PVRSRV_OK))
 	{
-		UnlockHandle();
+		UnlockHandle(KERNEL_HANDLE_BASE);
 		goto SyncFbFenceImportInsecure_exit;
 	}
 	/* Release now we have looked up handles. */
-	UnlockHandle();
+	UnlockHandle(KERNEL_HANDLE_BASE);
 
 	psSyncFbFenceImportInsecureOUT->eError =
 	    SyncFbFenceImportInsecure(psConnection, OSGetDevData(psConnection),
 				      psImportInt, &psSyncHandleInt);
 	/* Exit early if bridged call fails */
-	if (psSyncFbFenceImportInsecureOUT->eError != PVRSRV_OK)
+	if (unlikely(psSyncFbFenceImportInsecureOUT->eError != PVRSRV_OK))
 	{
 		goto SyncFbFenceImportInsecure_exit;
 	}
 
 	/* Lock over handle creation. */
-	LockHandle();
+	LockHandle(psConnection->psProcessHandleBase->psHandleBase);
 
 	psSyncFbFenceImportInsecureOUT->eError =
 	    PVRSRVAllocHandleUnlocked(psConnection->psProcessHandleBase->
@@ -1417,19 +1594,19 @@ PVRSRVBridgeSyncFbFenceImportInsecure(IMG_UINT32 ui32DispatchTableEntry,
 				      PVRSRV_HANDLE_ALLOC_FLAG_MULTI,
 				      (PFN_HANDLE_RELEASE) &
 				      SyncFbFenceRelease);
-	if (psSyncFbFenceImportInsecureOUT->eError != PVRSRV_OK)
+	if (unlikely(psSyncFbFenceImportInsecureOUT->eError != PVRSRV_OK))
 	{
-		UnlockHandle();
+		UnlockHandle(psConnection->psProcessHandleBase->psHandleBase);
 		goto SyncFbFenceImportInsecure_exit;
 	}
 
 	/* Release now we have created handles. */
-	UnlockHandle();
+	UnlockHandle(psConnection->psProcessHandleBase->psHandleBase);
 
  SyncFbFenceImportInsecure_exit:
 
 	/* Lock over handle lookup cleanup. */
-	LockHandle();
+	LockHandle(KERNEL_HANDLE_BASE);
 
 	/* Unreference the previously looked up handle */
 	if (psImportInt)
@@ -1439,7 +1616,7 @@ PVRSRVBridgeSyncFbFenceImportInsecure(IMG_UINT32 ui32DispatchTableEntry,
 					    PVRSRV_HANDLE_TYPE_PVRSRV_FENCE_EXPORT);
 	}
 	/* Release now we have cleaned up look up handles. */
-	UnlockHandle();
+	UnlockHandle(KERNEL_HANDLE_BASE);
 
 	if (psSyncFbFenceImportInsecureOUT->eError != PVRSRV_OK)
 	{
@@ -1457,195 +1634,6 @@ PVRSRVBridgeSyncFbFenceImportInsecure(IMG_UINT32 ui32DispatchTableEntry,
 #endif
 
 static IMG_INT
-PVRSRVBridgeSyncFbFenceDump2(IMG_UINT32 ui32DispatchTableEntry,
-			     PVRSRV_BRIDGE_IN_SYNCFBFENCEDUMP2 *
-			     psSyncFbFenceDump2IN,
-			     PVRSRV_BRIDGE_OUT_SYNCFBFENCEDUMP2 *
-			     psSyncFbFenceDump2OUT,
-			     CONNECTION_DATA * psConnection)
-{
-	IMG_HANDLE hFence = psSyncFbFenceDump2IN->hFence;
-	PVRSRV_FENCE_SERVER *psFenceInt = NULL;
-	IMG_CHAR *uiFileStrInt = NULL;
-	IMG_CHAR *uiModuleStrInt = NULL;
-	IMG_CHAR *uiDescStrInt = NULL;
-
-	IMG_UINT32 ui32NextOffset = 0;
-	IMG_BYTE *pArrayArgsBuffer = NULL;
-#if !defined(INTEGRITY_OS)
-	IMG_BOOL bHaveEnoughSpace = IMG_FALSE;
-#endif
-
-	IMG_UINT32 ui32BufferSize =
-	    (psSyncFbFenceDump2IN->ui32FileStrLength * sizeof(IMG_CHAR)) +
-	    (psSyncFbFenceDump2IN->ui32ModuleStrLength * sizeof(IMG_CHAR)) +
-	    (psSyncFbFenceDump2IN->ui32DescStrLength * sizeof(IMG_CHAR)) + 0;
-
-	if (ui32BufferSize != 0)
-	{
-#if !defined(INTEGRITY_OS)
-		/* Try to use remainder of input buffer for copies if possible, word-aligned for safety. */
-		IMG_UINT32 ui32InBufferOffset =
-		    PVR_ALIGN(sizeof(*psSyncFbFenceDump2IN),
-			      sizeof(unsigned long));
-		IMG_UINT32 ui32InBufferExcessSize =
-		    ui32InBufferOffset >=
-		    PVRSRV_MAX_BRIDGE_IN_SIZE ? 0 : PVRSRV_MAX_BRIDGE_IN_SIZE -
-		    ui32InBufferOffset;
-
-		bHaveEnoughSpace = ui32BufferSize <= ui32InBufferExcessSize;
-		if (bHaveEnoughSpace)
-		{
-			IMG_BYTE *pInputBuffer =
-			    (IMG_BYTE *) psSyncFbFenceDump2IN;
-
-			pArrayArgsBuffer = &pInputBuffer[ui32InBufferOffset];
-		}
-		else
-#endif
-		{
-			pArrayArgsBuffer = OSAllocMemNoStats(ui32BufferSize);
-
-			if (!pArrayArgsBuffer)
-			{
-				psSyncFbFenceDump2OUT->eError =
-				    PVRSRV_ERROR_OUT_OF_MEMORY;
-				goto SyncFbFenceDump2_exit;
-			}
-		}
-	}
-
-	if (psSyncFbFenceDump2IN->ui32FileStrLength != 0)
-	{
-		uiFileStrInt =
-		    (IMG_CHAR *) (((IMG_UINT8 *) pArrayArgsBuffer) +
-				  ui32NextOffset);
-		ui32NextOffset +=
-		    psSyncFbFenceDump2IN->ui32FileStrLength * sizeof(IMG_CHAR);
-	}
-
-	/* Copy the data over */
-	if (psSyncFbFenceDump2IN->ui32FileStrLength * sizeof(IMG_CHAR) > 0)
-	{
-		if (OSCopyFromUser
-		    (NULL, uiFileStrInt,
-		     (const void __user *)psSyncFbFenceDump2IN->puiFileStr,
-		     psSyncFbFenceDump2IN->ui32FileStrLength *
-		     sizeof(IMG_CHAR)) != PVRSRV_OK)
-		{
-			psSyncFbFenceDump2OUT->eError =
-			    PVRSRV_ERROR_INVALID_PARAMS;
-
-			goto SyncFbFenceDump2_exit;
-		}
-	}
-	if (psSyncFbFenceDump2IN->ui32ModuleStrLength != 0)
-	{
-		uiModuleStrInt =
-		    (IMG_CHAR *) (((IMG_UINT8 *) pArrayArgsBuffer) +
-				  ui32NextOffset);
-		ui32NextOffset +=
-		    psSyncFbFenceDump2IN->ui32ModuleStrLength *
-		    sizeof(IMG_CHAR);
-	}
-
-	/* Copy the data over */
-	if (psSyncFbFenceDump2IN->ui32ModuleStrLength * sizeof(IMG_CHAR) > 0)
-	{
-		if (OSCopyFromUser
-		    (NULL, uiModuleStrInt,
-		     (const void __user *)psSyncFbFenceDump2IN->puiModuleStr,
-		     psSyncFbFenceDump2IN->ui32ModuleStrLength *
-		     sizeof(IMG_CHAR)) != PVRSRV_OK)
-		{
-			psSyncFbFenceDump2OUT->eError =
-			    PVRSRV_ERROR_INVALID_PARAMS;
-
-			goto SyncFbFenceDump2_exit;
-		}
-	}
-	if (psSyncFbFenceDump2IN->ui32DescStrLength != 0)
-	{
-		uiDescStrInt =
-		    (IMG_CHAR *) (((IMG_UINT8 *) pArrayArgsBuffer) +
-				  ui32NextOffset);
-		ui32NextOffset +=
-		    psSyncFbFenceDump2IN->ui32DescStrLength * sizeof(IMG_CHAR);
-	}
-
-	/* Copy the data over */
-	if (psSyncFbFenceDump2IN->ui32DescStrLength * sizeof(IMG_CHAR) > 0)
-	{
-		if (OSCopyFromUser
-		    (NULL, uiDescStrInt,
-		     (const void __user *)psSyncFbFenceDump2IN->puiDescStr,
-		     psSyncFbFenceDump2IN->ui32DescStrLength *
-		     sizeof(IMG_CHAR)) != PVRSRV_OK)
-		{
-			psSyncFbFenceDump2OUT->eError =
-			    PVRSRV_ERROR_INVALID_PARAMS;
-
-			goto SyncFbFenceDump2_exit;
-		}
-	}
-
-	/* Lock over handle lookup. */
-	LockHandle();
-
-	/* Look up the address from the handle */
-	psSyncFbFenceDump2OUT->eError =
-	    PVRSRVLookupHandleUnlocked(psConnection->psProcessHandleBase->
-				       psHandleBase, (void **)&psFenceInt,
-				       hFence,
-				       PVRSRV_HANDLE_TYPE_PVRSRV_FENCE_SERVER,
-				       IMG_TRUE);
-	if (psSyncFbFenceDump2OUT->eError != PVRSRV_OK)
-	{
-		UnlockHandle();
-		goto SyncFbFenceDump2_exit;
-	}
-	/* Release now we have looked up handles. */
-	UnlockHandle();
-
-	psSyncFbFenceDump2OUT->eError =
-	    SyncFbFenceDump2(psFenceInt,
-			     psSyncFbFenceDump2IN->ui32Line,
-			     psSyncFbFenceDump2IN->ui32FileStrLength,
-			     uiFileStrInt,
-			     psSyncFbFenceDump2IN->ui32ModuleStrLength,
-			     uiModuleStrInt,
-			     psSyncFbFenceDump2IN->ui32DescStrLength,
-			     uiDescStrInt);
-
- SyncFbFenceDump2_exit:
-
-	/* Lock over handle lookup cleanup. */
-	LockHandle();
-
-	/* Unreference the previously looked up handle */
-	if (psFenceInt)
-	{
-		PVRSRVReleaseHandleUnlocked(psConnection->psProcessHandleBase->
-					    psHandleBase, hFence,
-					    PVRSRV_HANDLE_TYPE_PVRSRV_FENCE_SERVER);
-	}
-	/* Release now we have cleaned up look up handles. */
-	UnlockHandle();
-
-	/* Allocated space should be equal to the last updated offset */
-	PVR_ASSERT(ui32BufferSize == ui32NextOffset);
-
-#if defined(INTEGRITY_OS)
-	if (pArrayArgsBuffer)
-#else
-	if (!bHaveEnoughSpace && pArrayArgsBuffer)
-#endif
-		OSFreeMemNoStats(pArrayArgsBuffer);
-
-	return 0;
-}
-
-static IMG_INT
 PVRSRVBridgeSyncFbFenceExportSecure(IMG_UINT32 ui32DispatchTableEntry,
 				    PVRSRV_BRIDGE_IN_SYNCFBFENCEEXPORTSECURE *
 				    psSyncFbFenceExportSecureIN,
@@ -1659,7 +1647,7 @@ PVRSRVBridgeSyncFbFenceExportSecure(IMG_UINT32 ui32DispatchTableEntry,
 	CONNECTION_DATA *psSecureConnection;
 
 	/* Lock over handle lookup. */
-	LockHandle();
+	LockHandle(psConnection->psProcessHandleBase->psHandleBase);
 
 	/* Look up the address from the handle */
 	psSyncFbFenceExportSecureOUT->eError =
@@ -1668,13 +1656,13 @@ PVRSRVBridgeSyncFbFenceExportSecure(IMG_UINT32 ui32DispatchTableEntry,
 				       hFence,
 				       PVRSRV_HANDLE_TYPE_PVRSRV_FENCE_SERVER,
 				       IMG_TRUE);
-	if (psSyncFbFenceExportSecureOUT->eError != PVRSRV_OK)
+	if (unlikely(psSyncFbFenceExportSecureOUT->eError != PVRSRV_OK))
 	{
-		UnlockHandle();
+		UnlockHandle(psConnection->psProcessHandleBase->psHandleBase);
 		goto SyncFbFenceExportSecure_exit;
 	}
 	/* Release now we have looked up handles. */
-	UnlockHandle();
+	UnlockHandle(psConnection->psProcessHandleBase->psHandleBase);
 
 	psSyncFbFenceExportSecureOUT->eError =
 	    SyncFbFenceExportSecure(psConnection, OSGetDevData(psConnection),
@@ -1682,7 +1670,7 @@ PVRSRVBridgeSyncFbFenceExportSecure(IMG_UINT32 ui32DispatchTableEntry,
 				    &psSyncFbFenceExportSecureOUT->Export,
 				    &psExportInt, &psSecureConnection);
 	/* Exit early if bridged call fails */
-	if (psSyncFbFenceExportSecureOUT->eError != PVRSRV_OK)
+	if (unlikely(psSyncFbFenceExportSecureOUT->eError != PVRSRV_OK))
 	{
 		goto SyncFbFenceExportSecure_exit;
 	}
@@ -1690,7 +1678,7 @@ PVRSRVBridgeSyncFbFenceExportSecure(IMG_UINT32 ui32DispatchTableEntry,
  SyncFbFenceExportSecure_exit:
 
 	/* Lock over handle lookup cleanup. */
-	LockHandle();
+	LockHandle(psConnection->psProcessHandleBase->psHandleBase);
 
 	/* Unreference the previously looked up handle */
 	if (psFenceInt)
@@ -1700,7 +1688,7 @@ PVRSRVBridgeSyncFbFenceExportSecure(IMG_UINT32 ui32DispatchTableEntry,
 					    PVRSRV_HANDLE_TYPE_PVRSRV_FENCE_SERVER);
 	}
 	/* Release now we have cleaned up look up handles. */
-	UnlockHandle();
+	UnlockHandle(psConnection->psProcessHandleBase->psHandleBase);
 
 	if (psSyncFbFenceExportSecureOUT->eError != PVRSRV_OK)
 	{
@@ -1724,7 +1712,7 @@ PVRSRVBridgeSyncFbFenceExportDestroySecure(IMG_UINT32 ui32DispatchTableEntry,
 {
 
 	/* Lock over handle destruction. */
-	LockHandle();
+	LockHandle(psConnection->psHandleBase);
 
 	psSyncFbFenceExportDestroySecureOUT->eError =
 	    PVRSRVReleaseHandleUnlocked(psConnection->psHandleBase,
@@ -1732,20 +1720,21 @@ PVRSRVBridgeSyncFbFenceExportDestroySecure(IMG_UINT32 ui32DispatchTableEntry,
 					psSyncFbFenceExportDestroySecureIN->
 					hExport,
 					PVRSRV_HANDLE_TYPE_PVRSRV_FENCE_EXPORT);
-	if ((psSyncFbFenceExportDestroySecureOUT->eError != PVRSRV_OK)
-	    && (psSyncFbFenceExportDestroySecureOUT->eError !=
-		PVRSRV_ERROR_RETRY))
+	if (unlikely
+	    ((psSyncFbFenceExportDestroySecureOUT->eError != PVRSRV_OK)
+	     && (psSyncFbFenceExportDestroySecureOUT->eError !=
+		 PVRSRV_ERROR_RETRY)))
 	{
 		PVR_DPF((PVR_DBG_ERROR,
 			 "PVRSRVBridgeSyncFbFenceExportDestroySecure: %s",
-			 PVRSRVGetErrorStringKM
+			 PVRSRVGetErrorString
 			 (psSyncFbFenceExportDestroySecureOUT->eError)));
-		UnlockHandle();
+		UnlockHandle(psConnection->psHandleBase);
 		goto SyncFbFenceExportDestroySecure_exit;
 	}
 
 	/* Release now we have destroyed handles. */
-	UnlockHandle();
+	UnlockHandle(psConnection->psHandleBase);
 
  SyncFbFenceExportDestroySecure_exit:
 
@@ -1767,13 +1756,13 @@ PVRSRVBridgeSyncFbFenceImportSecure(IMG_UINT32 ui32DispatchTableEntry,
 				    psSyncFbFenceImportSecureIN->Import,
 				    &psSyncHandleInt);
 	/* Exit early if bridged call fails */
-	if (psSyncFbFenceImportSecureOUT->eError != PVRSRV_OK)
+	if (unlikely(psSyncFbFenceImportSecureOUT->eError != PVRSRV_OK))
 	{
 		goto SyncFbFenceImportSecure_exit;
 	}
 
 	/* Lock over handle creation. */
-	LockHandle();
+	LockHandle(psConnection->psProcessHandleBase->psHandleBase);
 
 	psSyncFbFenceImportSecureOUT->eError =
 	    PVRSRVAllocHandleUnlocked(psConnection->psProcessHandleBase->
@@ -1784,14 +1773,14 @@ PVRSRVBridgeSyncFbFenceImportSecure(IMG_UINT32 ui32DispatchTableEntry,
 				      PVRSRV_HANDLE_ALLOC_FLAG_MULTI,
 				      (PFN_HANDLE_RELEASE) &
 				      SyncFbFenceRelease);
-	if (psSyncFbFenceImportSecureOUT->eError != PVRSRV_OK)
+	if (unlikely(psSyncFbFenceImportSecureOUT->eError != PVRSRV_OK))
 	{
-		UnlockHandle();
+		UnlockHandle(psConnection->psProcessHandleBase->psHandleBase);
 		goto SyncFbFenceImportSecure_exit;
 	}
 
 	/* Release now we have created handles. */
-	UnlockHandle();
+	UnlockHandle(psConnection->psProcessHandleBase->psHandleBase);
 
  SyncFbFenceImportSecure_exit:
 
@@ -1806,8 +1795,8 @@ PVRSRVBridgeSyncFbFenceImportSecure(IMG_UINT32 ui32DispatchTableEntry,
 	return 0;
 }
 
-/* *************************************************************************** 
- * Server bridge dispatch related glue 
+/* ***************************************************************************
+ * Server bridge dispatch related glue
  */
 
 static IMG_BOOL bUseLock = IMG_FALSE;
@@ -1881,10 +1870,6 @@ PVRSRV_ERROR InitSYNCFALLBACKBridge(void)
 			      bUseLock);
 
 	SetDispatchTableEntry(PVRSRV_BRIDGE_SYNCFALLBACK,
-			      PVRSRV_BRIDGE_SYNCFALLBACK_SYNCFBFENCEDUMP2,
-			      PVRSRVBridgeSyncFbFenceDump2, NULL, bUseLock);
-
-	SetDispatchTableEntry(PVRSRV_BRIDGE_SYNCFALLBACK,
 			      PVRSRV_BRIDGE_SYNCFALLBACK_SYNCFBFENCEEXPORTSECURE,
 			      PVRSRVBridgeSyncFbFenceExportSecure, NULL,
 			      bUseLock);
@@ -1946,9 +1931,6 @@ PVRSRV_ERROR DeinitSYNCFALLBACKBridge(void)
 
 	UnsetDispatchTableEntry(PVRSRV_BRIDGE_SYNCFALLBACK,
 				PVRSRV_BRIDGE_SYNCFALLBACK_SYNCFBFENCEIMPORTINSECURE);
-
-	UnsetDispatchTableEntry(PVRSRV_BRIDGE_SYNCFALLBACK,
-				PVRSRV_BRIDGE_SYNCFALLBACK_SYNCFBFENCEDUMP2);
 
 	UnsetDispatchTableEntry(PVRSRV_BRIDGE_SYNCFALLBACK,
 				PVRSRV_BRIDGE_SYNCFALLBACK_SYNCFBFENCEEXPORTSECURE);

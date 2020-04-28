@@ -40,10 +40,10 @@ COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
 IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */ /**************************************************************************/
-#ifndef RGX_COMMON_H_
-#define RGX_COMMON_H_
+#ifndef RGX_COMMON_H
+#define RGX_COMMON_H
 
-#if defined (__cplusplus)
+#if defined(__cplusplus)
 extern "C" {
 #endif
 
@@ -55,98 +55,73 @@ extern "C" {
 /*! This macro represents a mask of LSBs that must be zero on data structure
  * sizes and offsets to ensure they are 8-byte granular on types shared between
  * the FW and host driver */
-#define RGX_FW_ALIGNMENT_LSB (7)
+#define RGX_FW_ALIGNMENT_LSB (7U)
 
 /*! Macro to test structure size alignment */
 #define RGX_FW_STRUCT_SIZE_ASSERT(_a)	\
-	static_assert((sizeof(_a) & RGX_FW_ALIGNMENT_LSB) == 0,	\
+	static_assert((sizeof(_a) & RGX_FW_ALIGNMENT_LSB) == 0U,	\
 				  "Size of " #_a " is not properly aligned")
 
 /*! Macro to test structure member alignment */
 #define RGX_FW_STRUCT_OFFSET_ASSERT(_a, _b)	\
-	static_assert((offsetof(_a, _b) & RGX_FW_ALIGNMENT_LSB) == 0,	\
+	static_assert((offsetof(_a, _b) & RGX_FW_ALIGNMENT_LSB) == 0U,	\
 				  "Offset of " #_a "." #_b " is not properly aligned")
 
 
-/* The following enum assumes only one of RGX_FEATURE_TLA or RGX_FEATURE_FASTRENDER_DM feature
- * is present. In case this is no more true, fail build to fix code */
-#if defined (RGX_FEATURE_TLA) && defined (RGX_FEATURE_FASTRENDER_DM)
+/* The following enum assumes only one of RGX_FEATURE_TLA or
+ * RGX_FEATURE_FASTRENDER_DM feature is present.
+ * In case this is no more true, fail build to fix code. */
+#if defined(RGX_FEATURE_TLA) && defined(RGX_FEATURE_FASTRENDER_DM)
 #error "Both RGX_FEATURE_TLA and RGX_FEATURE_FASTRENDER_DM defined. Fix code to handle this!"
 #endif
 
 /*! The master definition for data masters known to the firmware of RGX.
- * When a new DM is added to this enum, relevant entry should be added to
+ * When a new DM is added to this list, relevant entry should be added to
  * RGX_HWPERF_DM enum list.
  * The DM in a V1 HWPerf packet uses this definition. */
-typedef enum _RGXFWIF_DM_
-{
-	RGXFWIF_DM_GP			= 0,
 
-	/* Either TDM or 2D DM is present. The above build time error is present to verify this */
-	RGXFWIF_DM_2D			= 1, /* when RGX_FEATURE_TLA defined */
-	RGXFWIF_DM_TDM			= 1, /* when RGX_FEATURE_FASTRENDER_DM defined */
+typedef IMG_UINT32 RGXFWIF_DM;
 
-	RGXFWIF_DM_TA			= 2,
-	RGXFWIF_DM_3D			= 3,
-	RGXFWIF_DM_CDM			= 4,
+#define	RGXFWIF_DM_GP			IMG_UINT32_C(0)
+/* Either TDM or 2D DM is present. The above build time error is present to verify this */
+#define	RGXFWIF_DM_2D			IMG_UINT32_C(1) /* when RGX_FEATURE_TLA defined */
+#define	RGXFWIF_DM_TDM			IMG_UINT32_C(1) /* when RGX_FEATURE_FASTRENDER_DM defined */
 
-	/* present on Ray cores only */
-	RGXFWIF_DM_RTU			= 5,
-	RGXFWIF_DM_SHG			= 6,
+#define	RGXFWIF_DM_TA			IMG_UINT32_C(2)
+#define	RGXFWIF_DM_3D			IMG_UINT32_C(3)
+#define	RGXFWIF_DM_CDM			IMG_UINT32_C(4)
 
-	RGXFWIF_DM_LAST,
-
-	RGXFWIF_DM_FORCE_I32  = 0x7fffffff   /*!< Force enum to be at least 32-bits wide */
-} RGXFWIF_DM;
+#define	RGXFWIF_DM_LAST RGXFWIF_DM_CDM
 
 typedef enum _RGX_KICK_TYPE_DM_
 {
-	RGX_KICK_TYPE_DM_GP			= 1 << 0,
-	RGX_KICK_TYPE_DM_TDM_2D		= 1 << 1,
-	RGX_KICK_TYPE_DM_TA			= 1 << 2,
-	RGX_KICK_TYPE_DM_3D			= 1 << 3,
-	RGX_KICK_TYPE_DM_CDM		= 1 << 4,
-	RGX_KICK_TYPE_DM_RTU		= 1 << 5,
-	RGX_KICK_TYPE_DM_SHG		= 1 << 6,
-	RGX_KICK_TYPE_DM_TQ2D		= 1 << 7,
-	RGX_KICK_TYPE_DM_TQ3D		= 1 << 8,
-	RGX_KICK_TYPE_DM_LAST		= 1 << 9
+	RGX_KICK_TYPE_DM_GP			= 0x001,
+	RGX_KICK_TYPE_DM_TDM_2D		= 0x002,
+	RGX_KICK_TYPE_DM_TA			= 0x004,
+	RGX_KICK_TYPE_DM_3D			= 0x008,
+	RGX_KICK_TYPE_DM_CDM		= 0x010,
+	RGX_KICK_TYPE_DM_RTU		= 0x020,
+	RGX_KICK_TYPE_DM_SHG		= 0x040,
+	RGX_KICK_TYPE_DM_TQ2D		= 0x080,
+	RGX_KICK_TYPE_DM_TQ3D		= 0x100,
+	RGX_KICK_TYPE_DM_LAST		= 0x200
 } RGX_KICK_TYPE_DM;
 
 /* Maximum number of DM in use: GP, 2D/TDM, TA, 3D, CDM, SHG, RTU */
-#define RGXFWIF_DM_DEFAULT_MAX	(7)
+#define RGXFWIF_DM_DEFAULT_MAX	(RGXFWIF_DM_LAST + 1U)
 
-#if !defined(__KERNEL__)
-#if defined(RGX_FEATURE_RAY_TRACING)
-#define RGXFWIF_DM_MAX_MTS 8
-#else
-#define RGXFWIF_DM_MAX_MTS 6
-#endif
-
-#if defined(RGX_FEATURE_RAY_TRACING)
-/* Maximum number of DM in use: GP, 2D/TDM, TA, 3D, CDM, SHG, RTU */
-#define RGXFWIF_DM_MAX			(7)
-#else
 /* Maximum number of DM in use: GP, 2D/TDM, TA, 3D, CDM*/
-#define RGXFWIF_DM_MAX			(5)
-#endif
+#define RGXFWIF_DM_MAX			(5U)
 #define RGXFWIF_HWDM_MAX		(RGXFWIF_DM_MAX)
-#else
-	#define RGXFWIF_DM_MIN_MTS_CNT (6)
-	#define RGXFWIF_RAY_TRACING_DM_MTS_CNT (2)
-	#define RGXFWIF_DM_MIN_CNT			(5)
-	#define RGXFWIF_RAY_TRACING_DM_CNT	(2)
-	#define RGXFWIF_DM_MAX	(RGXFWIF_DM_MIN_CNT + RGXFWIF_RAY_TRACING_DM_CNT)
-#endif
 
 /* Min/Max number of HW DMs (all but GP) */
 #if defined(RGX_FEATURE_TLA)
-#define RGXFWIF_HWDM_MIN		(1)
+#define RGXFWIF_HWDM_MIN		(1U)
 #else
 #if defined(RGX_FEATURE_FASTRENDER_DM)
-#define RGXFWIF_HWDM_MIN		(1)
+#define RGXFWIF_HWDM_MIN		(1U)
 #else
-#define RGXFWIF_HWDM_MIN		(2)
+#define RGXFWIF_HWDM_MIN		(2U)
 #endif
 #endif
 
@@ -156,7 +131,7 @@ typedef enum _RGX_KICK_TYPE_DM_
  */
 #define RGX_RI_DM_TAG_KS   'K'
 #define RGX_RI_DM_TAG_CDM  'C'
-#define RGX_RI_DM_TAG_RC   'R' // To be removed once TA/3D Timelines are split
+#define RGX_RI_DM_TAG_RC   'R' /* To be removed once TA/3D Timelines are split */
 #define RGX_RI_DM_TAG_TA   'V'
 #define RGX_RI_DM_TAG_3D   'P'
 #define RGX_RI_DM_TAG_TDM  'T'
@@ -207,13 +182,12 @@ typedef enum _RGX_KICK_TYPE_DM_
  *****************************************************************************/
 #define UNCACHED_ALIGN      RGXFW_ALIGN
 
-#if defined (__cplusplus)
+#if defined(__cplusplus)
 }
 #endif
 
-#endif /* RGX_COMMON_H_ */
+#endif /* RGX_COMMON_H */
 
 /******************************************************************************
  End of file
 ******************************************************************************/
-

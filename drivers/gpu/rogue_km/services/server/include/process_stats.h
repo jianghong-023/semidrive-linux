@@ -52,7 +52,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  *  The publishing of Process Stats is controlled by the
  *  PVRSRV_ENABLE_PROCESS_STATS build option. The recording of all Memory
  *  allocations is controlled by the PVRSRV_ENABLE_MEMORY_STATS build option.
- * 
+ *
  *  Note: There will be a performance degradation with memory allocation
  *        recording enabled!
  */
@@ -70,7 +70,7 @@ typedef enum {
     PVRSRV_MEM_ALLOC_TYPE_IOREMAP_PT_LMA,		/* ALLOC_PAGES_PT_LMA mapped to kernel address space */
     PVRSRV_MEM_ALLOC_TYPE_ALLOC_LMA_PAGES,		/* pages allocated from LMA */
     PVRSRV_MEM_ALLOC_TYPE_ALLOC_UMA_PAGES,		/* pages allocated from UMA */
-    PVRSRV_MEM_ALLOC_TYPE_MAP_UMA_LMA_PAGES,	/* mapped UMA/LMA pages  */
+    PVRSRV_MEM_ALLOC_TYPE_MAP_UMA_LMA_PAGES,	/* mapped UMA/LMA pages */
     PVRSRV_MEM_ALLOC_TYPE_UMA_POOL_PAGES,		/* pages in the page pool */
 
 	/* Must be the last enum...*/
@@ -168,7 +168,7 @@ void  PVRSRVStatsUpdateFreelistStats(IMG_UINT32 ui32NumGrowReqByApp,
 #if defined(PVRSRV_ENABLE_CACHEOP_STATS)
 void  PVRSRVStatsUpdateCacheOpStats(PVRSRV_CACHE_OP uiCacheOp,
 									IMG_UINT32 ui32OpSeqNum,
-#if defined(PVR_RI_DEBUG)  && defined(DEBUG)
+#if defined(PVRSRV_ENABLE_GPU_MEMORY_INFO)  && defined(DEBUG)
 									IMG_DEV_VIRTADDR sDevVAddr,
 									IMG_DEV_PHYADDR sDevPAddr,
 									IMG_UINT32 eFenceOpType,
@@ -210,5 +210,15 @@ void SetFirmwareHandshakeIdleTime(IMG_UINT64 ui64Duration);
 /* Functions used for calculating the memory usage statistics of a process */
 PVRSRV_ERROR PVRSRVFindProcessMemStats(IMG_PID pid, IMG_UINT32 ui32ArrSize,
                                        IMG_BOOL bAllProcessStats, IMG_UINT32 *pui32MemoryStats);
+
+typedef struct {
+	IMG_UINT32 ui32Pid;
+	IMG_UINT32 ui32KernelMemUsage;
+	IMG_UINT32 ui32GraphicsMemUsage;
+} PVRSRV_PER_PROCESS_MEM_USAGE;
+
+PVRSRV_ERROR PVRSRVGetProcessMemUsage(IMG_UINT32 *pui32TotalMem,
+									  IMG_UINT32 *pui32NumberOfLivePids,
+									  PVRSRV_PER_PROCESS_MEM_USAGE **ppsPerProcessMemUsageData);
 
 #endif /* __PROCESS_STATS_H__ */

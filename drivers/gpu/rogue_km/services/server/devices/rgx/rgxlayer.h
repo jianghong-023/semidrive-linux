@@ -64,20 +64,17 @@ extern "C" {
 #include "img_types.h"
 #include "pvrsrv_error.h" /* includes pvrsrv_errors.h */
 #include "rgx_bvnc_defs_km.h"
+#include "rgx_fw_info.h"
+#include "rgx_fwif_shared.h" /* includes rgx_common.h and mem_types.h */
+#include "rgx_meta.h"
+#include "rgx_mips.h"
 
-#include "rgx_firmware_processor.h"
+#include "rgxdefs_km.h"
 /* includes:
- * rgx_meta.h and rgx_mips.h,
- * rgxdefs_km.h,
  * rgx_cr_defs_km.h,
  * RGX_BVNC_CORE_KM_HEADER (rgxcore_km_B.V.N.C.h),
  * RGX_BNC_CONFIG_KM_HEADER (rgxconfig_km_B.V.N.C.h)
  */
-
-#include "rgx_fwif_shared.h"
-/* FIXME required because of RGXFWIF_DEV_VIRTADDR but this header
- * includes a lot of other headers..  RGXFWIF_DEV_VIRTADDR must be moved
- * somewhere else (either img_types.h or a new header) */
 
 
 /*!
@@ -134,9 +131,10 @@ void RGXMemSet(const void *hPrivate,
  @Return         void
 
 ******************************************************************************/
+__printf(2, 3)
 void RGXCommentLog(const void *hPrivate,
                    const IMG_CHAR *pszString,
-                   ...) __printf(2, 3);
+                   ...);
 
 /*!
 *******************************************************************************
@@ -152,9 +150,10 @@ void RGXCommentLog(const void *hPrivate,
  @Return         void
 
 ******************************************************************************/
+__printf(2, 3)
 void RGXErrorLog(const void *hPrivate,
                  const IMG_CHAR *pszString,
-                 ...) __printf(2, 3);
+                 ...);
 
 /* This is used to get the value of a specific feature from hprivate.
  * Should be used instead of calling RGXDeviceHasFeature.  */

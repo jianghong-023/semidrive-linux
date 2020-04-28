@@ -55,7 +55,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #endif
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 12, 0))
-#define	ion_phys_addr_t phys_addr_t 
+#define	ion_phys_addr_t phys_addr_t
 #endif
 
 /* Ion heap for LMA allocations. This heap is identical to CARVEOUT except

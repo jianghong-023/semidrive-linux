@@ -69,7 +69,7 @@ SysVzPvzConnectionValidate(PVRSRV_DEVICE_CONFIG *psDevConfig)
 	{
 		PVR_DPF((PVR_DBG_ERROR,
 				"%s: %s PVZ config: Unable to acquire PVZ connection",
-				__FUNCTION__,
+				__func__,
 				PVRSRV_VZ_MODE_IS(DRIVER_MODE_GUEST) ? "Guest" : "Host"));
 		eError = PVRSRV_ERROR_INVALID_PVZ_CONFIG;
 		goto e0;
@@ -78,7 +78,7 @@ SysVzPvzConnectionValidate(PVRSRV_DEVICE_CONFIG *psDevConfig)
 	{
 		PVR_DPF((PVR_DBG_ERROR,
 				"%s: %s PVZ config: pfnGetDevPhysHeapOrigin cannot be NULL",
-				__FUNCTION__,
+				__func__,
 				PVRSRV_VZ_MODE_IS(DRIVER_MODE_GUEST) ? "Guest" : "Host"));
 		eError = PVRSRV_ERROR_INVALID_PVZ_CONFIG;
 		goto e1;
@@ -87,7 +87,7 @@ SysVzPvzConnectionValidate(PVRSRV_DEVICE_CONFIG *psDevConfig)
 	{
 		PVR_DPF((PVR_DBG_ERROR,
 				"%s: %s PVZ config: pfnGetDevPhysHeapAddrSize cannot be NULL",
-				__FUNCTION__,
+				__func__,
 				PVRSRV_VZ_MODE_IS(DRIVER_MODE_GUEST) ? "Guest" : "Host"));
 		eError = PVRSRV_ERROR_INVALID_PVZ_CONFIG;
 		goto e1;
@@ -99,7 +99,7 @@ SysVzPvzConnectionValidate(PVRSRV_DEVICE_CONFIG *psDevConfig)
 	{
 		PVR_DPF((PVR_DBG_ERROR,
 				"%s: %s PVZ config: pfnGetDevPhysHeapAddrSize(GPU) must return PVRSRV_OK",
-				__FUNCTION__,
+				__func__,
 				PVRSRV_VZ_MODE_IS(DRIVER_MODE_GUEST) ? "Guest" : "Host"));
 		eError = PVRSRV_ERROR_INVALID_PVZ_CONFIG;
 		goto e1;
@@ -111,7 +111,7 @@ SysVzPvzConnectionValidate(PVRSRV_DEVICE_CONFIG *psDevConfig)
 	{
 		PVR_DPF((PVR_DBG_ERROR,
 				"%s: %s PVZ config: pfnGetDevPhysHeapAddrSize(FW) must return PVRSRV_OK",
-				__FUNCTION__,
+				__func__,
 				PVRSRV_VZ_MODE_IS(DRIVER_MODE_GUEST) ? "Guest" : "Host"));
 		eError = PVRSRV_ERROR_INVALID_PVZ_CONFIG;
 		goto e1;
@@ -124,7 +124,7 @@ SysVzPvzConnectionValidate(PVRSRV_DEVICE_CONFIG *psDevConfig)
 		PVR_DPF((PVR_DBG_ERROR,
 				"%s: %s PVZ config: Invalid config. function table setup\n"
 				"=>: pfnGetDevPhysHeapOrigin() must return PVRSRV_OK",
-				__FUNCTION__,
+				__func__,
 				PVRSRV_VZ_MODE_IS(DRIVER_MODE_GUEST) ? "Guest" : "Host"));
 		eError = PVRSRV_ERROR_INVALID_PVZ_CONFIG;
 		goto e1;
@@ -134,7 +134,7 @@ SysVzPvzConnectionValidate(PVRSRV_DEVICE_CONFIG *psDevConfig)
 		PVR_DPF((PVR_DBG_ERROR,
 				"%s: %s PVZ config: Invalid config. function table setup\n"
 				"=>: pfnGetDevPhysHeapOrigin() returned an invalid physheap origin",
-				__FUNCTION__,
+				__func__,
 				PVRSRV_VZ_MODE_IS(DRIVER_MODE_GUEST) ? "Guest" : "Host"));
 		eError = PVRSRV_ERROR_INVALID_PVZ_CONFIG;
 		goto e1;
@@ -146,7 +146,7 @@ SysVzPvzConnectionValidate(PVRSRV_DEVICE_CONFIG *psDevConfig)
 		PVR_DPF((PVR_DBG_ERROR,
 				"%s: Guest PVZ config: Invalid config. function table setup\n"
 				"=>: implement pfnMapDevPhysHeap() when using GUEST physheap origin",
-				__FUNCTION__));
+				__func__));
 		eError = PVRSRV_ERROR_INVALID_PVZ_CONFIG;
 		goto e1;
 	}
@@ -160,7 +160,7 @@ SysVzPvzConnectionValidate(PVRSRV_DEVICE_CONFIG *psDevConfig)
 	{
 		PVR_DPF((PVR_DBG_ERROR,
 				"%s: Host PVZ config: Invalid guest function table setup\n",
-				__FUNCTION__));
+				__func__));
 		eError = PVRSRV_ERROR_INVALID_PVZ_CONFIG;
 		goto e1;
 	}
@@ -171,7 +171,7 @@ SysVzPvzConnectionValidate(PVRSRV_DEVICE_CONFIG *psDevConfig)
 		PVR_DPF((PVR_DBG_ERROR,
 				"%s: %s PVZ config: Invalid pfnGetDevPhysHeapAddrSize(FW) physheap config.\n"
 				"=>: HEAP_ORIGIN_HOST is not compatible with FW UMA allocator",
-				__FUNCTION__,
+				__func__,
 				PVRSRV_VZ_MODE_IS(DRIVER_MODE_GUEST) ? "Guest" : "Host"));
 		eError = PVRSRV_ERROR_INVALID_PVZ_CONFIG;
 		goto e1;
@@ -249,7 +249,7 @@ PVRSRV_ERROR SysVzDevInit(PVRSRV_DEVICE_CONFIG *psDevConfig)
 	}
 
 	/* Perform general device physheap initialisation */
-	eError =  SysVzInitDevPhysHeaps(psDevConfig);
+	eError = SysVzInitDevPhysHeaps(psDevConfig);
 	PVR_LOGR_IF_ERROR(eError, "SysVzInitDevPhysHeaps");
 
 	return eError;

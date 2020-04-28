@@ -54,14 +54,6 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #include "common_htbuffer_bridge.h"
 
-IMG_INTERNAL PVRSRV_ERROR IMG_CALLCONV BridgeHTBConfigure(IMG_HANDLE hBridge,
-							  IMG_UINT32
-							  ui32NameSize,
-							  const IMG_CHAR *
-							  puiName,
-							  IMG_UINT32
-							  ui32BufferSize);
-
 IMG_INTERNAL PVRSRV_ERROR IMG_CALLCONV BridgeHTBControl(IMG_HANDLE hBridge,
 							IMG_UINT32
 							ui32NumGroups,
@@ -75,7 +67,7 @@ IMG_INTERNAL PVRSRV_ERROR IMG_CALLCONV BridgeHTBControl(IMG_HANDLE hBridge,
 
 IMG_INTERNAL PVRSRV_ERROR IMG_CALLCONV BridgeHTBLog(IMG_HANDLE hBridge,
 						    IMG_UINT32 ui32PID,
-						    IMG_UINT32 ui32TimeStamp,
+						    IMG_UINT64 ui64TimeStamp,
 						    IMG_UINT32 ui32SF,
 						    IMG_UINT32 ui32NumArgs,
 						    IMG_UINT32 * pui32Args);

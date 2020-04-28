@@ -107,7 +107,7 @@ PVRSRV_PCI_DEV_HANDLE OSPCISetDev(void *pvPCICookie, HOST_PCI_INIT_FLAGS eFlags)
 #else
 		printk(KERN_ERR "OSPCISetDev: MSI support not enabled in the kernel");
 #endif
-}
+	}
 
 	/* Initialise the PCI resource and MTRR tracking array */
 	for (i = 0; i < DEVICE_COUNT_RESOURCE; i++)
@@ -129,8 +129,8 @@ PVRSRV_PCI_DEV_HANDLE OSPCISetDev(void *pvPCICookie, HOST_PCI_INIT_FLAGS eFlags)
 @Input          eFlags                  Flags
 @Return		PVRSRV_PCI_DEV_HANDLE   Pointer to PCI device handle
 */ /**************************************************************************/
-PVRSRV_PCI_DEV_HANDLE OSPCIAcquireDev(IMG_UINT16 ui16VendorID, 
-				      IMG_UINT16 ui16DeviceID, 
+PVRSRV_PCI_DEV_HANDLE OSPCIAcquireDev(IMG_UINT16 ui16VendorID,
+				      IMG_UINT16 ui16DeviceID,
 				      HOST_PCI_INIT_FLAGS eFlags)
 {
 	struct pci_dev *psPCIDev;
@@ -145,32 +145,10 @@ PVRSRV_PCI_DEV_HANDLE OSPCIAcquireDev(IMG_UINT16 ui16VendorID,
 }
 
 /*************************************************************************/ /*!
-@Function       OSPCIDevID
-@Description    Get the PCI device ID.
-@Input          hPVRPCI                 PCI device handle
-@Output         pui16DeviceID           Pointer to where the device ID should 
-                                        be returned
-@Return		PVRSRV_ERROR            Services error code
-*/ /**************************************************************************/
-PVRSRV_ERROR OSPCIDevID(PVRSRV_PCI_DEV_HANDLE hPVRPCI, IMG_UINT16 *pui16DeviceID)
-{
-	PVR_PCI_DEV *psPVRPCI = (PVR_PCI_DEV *)hPVRPCI;
-
-	if (pui16DeviceID == NULL)
-	{
-		return PVRSRV_ERROR_INVALID_PARAMS;
-	}
-
-	*pui16DeviceID = psPVRPCI->psPCIDev->device;
-
-	return PVRSRV_OK;
-}
-
-/*************************************************************************/ /*!
 @Function       OSPCIIRQ
 @Description    Get the interrupt number for the device.
 @Input          hPVRPCI                 PCI device handle
-@Output         pui16DeviceID           Pointer to where the interrupt number 
+@Output         pui16DeviceID           Pointer to where the interrupt number
                                         should be returned
 @Return		PVRSRV_ERROR            Services error code
 */ /**************************************************************************/
@@ -200,7 +178,7 @@ enum HOST_PCI_ADDR_RANGE_FUNC
 
 /*************************************************************************/ /*!
 @Function       OSPCIAddrRangeFunc
-@Description    Internal support function for various address range related 
+@Description    Internal support function for various address range related
                 functions
 @Input          eFunc                   Function to perform
 @Input          hPVRPCI                 PCI device handle
@@ -268,7 +246,7 @@ static IMG_UINT64 OSPCIAddrRangeFunc(enum HOST_PCI_ADDR_RANGE_FUNC eFunc,
 @Description    Returns length of a given address range
 @Input          hPVRPCI                 PCI device handle
 @Input          ui32Index               Address range index
-@Return		IMG_UINT32              Length of address range or 0 if no 
+@Return		IMG_UINT32              Length of address range or 0 if no
                                         such range
 */ /**************************************************************************/
 IMG_UINT64 OSPCIAddrRangeLen(PVRSRV_PCI_DEV_HANDLE hPVRPCI, IMG_UINT32 ui32Index)
@@ -281,12 +259,12 @@ IMG_UINT64 OSPCIAddrRangeLen(PVRSRV_PCI_DEV_HANDLE hPVRPCI, IMG_UINT32 ui32Index
 @Description    Returns the start of a given address range
 @Input          hPVRPCI                 PCI device handle
 @Input          ui32Index               Address range index
-@Return		IMG_UINT32              Start of address range or 0 if no 
+@Return		IMG_UINT32              Start of address range or 0 if no
                                         such range
 */ /**************************************************************************/
 IMG_UINT64 OSPCIAddrRangeStart(PVRSRV_PCI_DEV_HANDLE hPVRPCI, IMG_UINT32 ui32Index)
 {
-	return OSPCIAddrRangeFunc(HOST_PCI_ADDR_RANGE_FUNC_START, hPVRPCI, ui32Index); 
+	return OSPCIAddrRangeFunc(HOST_PCI_ADDR_RANGE_FUNC_START, hPVRPCI, ui32Index);
 }
 
 /*************************************************************************/ /*!
@@ -299,7 +277,7 @@ IMG_UINT64 OSPCIAddrRangeStart(PVRSRV_PCI_DEV_HANDLE hPVRPCI, IMG_UINT32 ui32Ind
 */ /**************************************************************************/
 IMG_UINT64 OSPCIAddrRangeEnd(PVRSRV_PCI_DEV_HANDLE hPVRPCI, IMG_UINT32 ui32Index)
 {
-	return OSPCIAddrRangeFunc(HOST_PCI_ADDR_RANGE_FUNC_END, hPVRPCI, ui32Index); 
+	return OSPCIAddrRangeFunc(HOST_PCI_ADDR_RANGE_FUNC_END, hPVRPCI, ui32Index);
 }
 
 /*************************************************************************/ /*!
@@ -346,7 +324,7 @@ PVRSRV_ERROR OSPCIReleaseAddrRange(PVRSRV_PCI_DEV_HANDLE hPVRPCI, IMG_UINT32 ui3
 @Description    Request a given region from an address range for subsequent use
 @Input          hPVRPCI                 PCI device handle
 @Input          ui32Index               Address range index
-@Input          uiOffset              Offset into the address range that forms 
+@Input          uiOffset              Offset into the address range that forms
                                         the start of the region
 @Input          uiLength              Length of the region
 @Return	        PVRSRV_ERROR	        Services error code
@@ -389,11 +367,11 @@ PVRSRV_ERROR OSPCIRequestAddrRegion(PVRSRV_PCI_DEV_HANDLE hPVRPCI,
 
 /*************************************************************************/ /*!
 @Function       OSPCIReleaseAddrRegion
-@Description    Release a given region, from an address range, that is no 
+@Description    Release a given region, from an address range, that is no
                 longer in use
 @Input          hPVRPCI                 PCI device handle
 @Input          ui32Index               Address range index
-@Input          ui32Offset              Offset into the address range that forms 
+@Input          ui32Offset              Offset into the address range that forms
                                         the start of the region
 @Input          ui32Length              Length of the region
 @Return	        PVRSRV_ERROR	        Services error code
@@ -500,7 +478,7 @@ PVRSRV_ERROR OSPCISuspendDev(PVRSRV_PCI_DEV_HANDLE hPVRPCI)
 	pci_disable_device(psPVRPCI->psPCIDev);
 
 	err = pci_set_power_state(psPVRPCI->psPCIDev, pci_choose_state(psPVRPCI->psPCIDev, PMSG_SUSPEND));
-	switch(err)
+	switch (err)
 	{
 		case 0:
 			break;
@@ -531,7 +509,7 @@ PVRSRV_ERROR OSPCIResumeDev(PVRSRV_PCI_DEV_HANDLE hPVRPCI)
 	int i;
 
 	err = pci_set_power_state(psPVRPCI->psPCIDev, pci_choose_state(psPVRPCI->psPCIDev, PMSG_ON));
-	switch(err)
+	switch (err)
 	{
 		case 0:
 			break;
@@ -570,6 +548,38 @@ PVRSRV_ERROR OSPCIResumeDev(PVRSRV_PCI_DEV_HANDLE hPVRPCI)
 			}
 		}
 	}
+
+	return PVRSRV_OK;
+}
+
+/*************************************************************************/ /*!
+@Function       OSPCIGetVendorDeviceIDs
+@Description    Retrieve PCI vendor ID and device ID.
+@Input          hPVRPCI                 PCI device handle
+@Output         pui16VendorID           Vendor ID
+@Output         pui16DeviceID           Device ID
+@Return         PVRSRV_ERROR            Services error code
+*/ /**************************************************************************/
+PVRSRV_ERROR OSPCIGetVendorDeviceIDs(PVRSRV_PCI_DEV_HANDLE hPVRPCI,
+                                     IMG_UINT16 *pui16VendorID,
+                                     IMG_UINT16 *pui16DeviceID)
+{
+	PVR_PCI_DEV *psPVRPCI = (PVR_PCI_DEV *)hPVRPCI;
+	struct pci_dev *psPCIDev;
+
+	if (psPVRPCI == NULL)
+	{
+		return PVRSRV_ERROR_INVALID_PARAMS;
+	}
+
+	psPCIDev = psPVRPCI->psPCIDev;
+	if (psPCIDev == NULL)
+	{
+		return PVRSRV_ERROR_INVALID_PARAMS;
+	}
+
+	*pui16VendorID = psPCIDev->vendor;
+	*pui16DeviceID = psPCIDev->device;
 
 	return PVRSRV_OK;
 }
@@ -683,7 +693,7 @@ PVRSRV_ERROR OSPCIClearResourceMTRRs(PVRSRV_PCI_DEV_HANDLE hPVRPCI, IMG_UINT32 u
 
 /*************************************************************************/ /*!
 @Function       OSPCIReleaseResourceMTRRs
-@Description    Release resources allocated by OSPCIClearResourceMTRRs 
+@Description    Release resources allocated by OSPCIClearResourceMTRRs
 @Input          hPVRPCI                 PCI device handle
 @Input          ui32Index               Address range index
 */ /**************************************************************************/

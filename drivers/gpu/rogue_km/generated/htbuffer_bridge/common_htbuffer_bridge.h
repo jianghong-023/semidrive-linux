@@ -51,33 +51,15 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "pvrsrv_error.h"
 
 #include "devicemem_typedefs.h"
+#include "htbuffer_types.h"
 
 #define PVRSRV_BRIDGE_HTBUFFER_CMD_FIRST			0
-#define PVRSRV_BRIDGE_HTBUFFER_HTBCONFIGURE			PVRSRV_BRIDGE_HTBUFFER_CMD_FIRST+0
-#define PVRSRV_BRIDGE_HTBUFFER_HTBCONTROL			PVRSRV_BRIDGE_HTBUFFER_CMD_FIRST+1
-#define PVRSRV_BRIDGE_HTBUFFER_HTBLOG			PVRSRV_BRIDGE_HTBUFFER_CMD_FIRST+2
-#define PVRSRV_BRIDGE_HTBUFFER_CMD_LAST			(PVRSRV_BRIDGE_HTBUFFER_CMD_FIRST+2)
+#define PVRSRV_BRIDGE_HTBUFFER_HTBCONTROL			PVRSRV_BRIDGE_HTBUFFER_CMD_FIRST+0
+#define PVRSRV_BRIDGE_HTBUFFER_HTBLOG			PVRSRV_BRIDGE_HTBUFFER_CMD_FIRST+1
+#define PVRSRV_BRIDGE_HTBUFFER_CMD_LAST			(PVRSRV_BRIDGE_HTBUFFER_CMD_FIRST+1)
 
 /*******************************************
-            HTBConfigure          
- *******************************************/
-
-/* Bridge in structure for HTBConfigure */
-typedef struct PVRSRV_BRIDGE_IN_HTBCONFIGURE_TAG
-{
-	IMG_UINT32 ui32NameSize;
-	const IMG_CHAR *puiName;
-	IMG_UINT32 ui32BufferSize;
-} __attribute__ ((packed)) PVRSRV_BRIDGE_IN_HTBCONFIGURE;
-
-/* Bridge out structure for HTBConfigure */
-typedef struct PVRSRV_BRIDGE_OUT_HTBCONFIGURE_TAG
-{
-	PVRSRV_ERROR eError;
-} __attribute__ ((packed)) PVRSRV_BRIDGE_OUT_HTBCONFIGURE;
-
-/*******************************************
-            HTBControl          
+            HTBControl
  *******************************************/
 
 /* Bridge in structure for HTBControl */
@@ -98,14 +80,14 @@ typedef struct PVRSRV_BRIDGE_OUT_HTBCONTROL_TAG
 } __attribute__ ((packed)) PVRSRV_BRIDGE_OUT_HTBCONTROL;
 
 /*******************************************
-            HTBLog          
+            HTBLog
  *******************************************/
 
 /* Bridge in structure for HTBLog */
 typedef struct PVRSRV_BRIDGE_IN_HTBLOG_TAG
 {
 	IMG_UINT32 ui32PID;
-	IMG_UINT32 ui32TimeStamp;
+	IMG_UINT64 ui64TimeStamp;
 	IMG_UINT32 ui32SF;
 	IMG_UINT32 ui32NumArgs;
 	IMG_UINT32 *pui32Args;

@@ -54,7 +54,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  * @return the resulting tree after the splay operation.
  */
 IMG_INTERNAL
-IMG_PSPLAY_TREE PVRSRVSplay (IMG_UINT32 ui32Flags, IMG_PSPLAY_TREE psTree) 
+IMG_PSPLAY_TREE PVRSRVSplay (IMG_UINT32 ui32Flags, IMG_PSPLAY_TREE psTree)
 {
 	IMG_SPLAY_TREE sTmp1;
 	IMG_PSPLAY_TREE psLeft;
@@ -151,7 +151,7 @@ IMG_PSPLAY_TREE PVRSRVSplay (IMG_UINT32 ui32Flags, IMG_PSPLAY_TREE psTree)
  * @return The resulting with the node in it
  */
 IMG_INTERNAL
-IMG_PSPLAY_TREE PVRSRVInsert(IMG_UINT32 ui32Flags, IMG_PSPLAY_TREE psTree) 
+IMG_PSPLAY_TREE PVRSRVInsert(IMG_UINT32 ui32Flags, IMG_PSPLAY_TREE psTree)
 {
 	IMG_PSPLAY_TREE psNew;
 
@@ -191,7 +191,7 @@ IMG_PSPLAY_TREE PVRSRVInsert(IMG_UINT32 ui32Flags, IMG_PSPLAY_TREE psTree)
 		psNew->psRight = psTree;
 		psTree->psLeft = NULL;
 	}
-	else 
+	else
 	{
 		psNew->psRight  = psTree->psRight;
 		psNew->psLeft   = psTree;
@@ -205,9 +205,9 @@ IMG_PSPLAY_TREE PVRSRVInsert(IMG_UINT32 ui32Flags, IMG_PSPLAY_TREE psTree)
 /**
  * Deletes a node from the tree (unless it is not there, in which case it is
  * equivalent to a splay operation)
- * 
+ *
  * @param ui32Flags the value of the node to remove
- * @param psTree the tree into which the node must be removed 
+ * @param psTree the tree into which the node must be removed
  * @return the resulting tree
  */
 IMG_INTERNAL

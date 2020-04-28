@@ -90,22 +90,18 @@ PVRSRV_ERROR InitRGXTQ2Bridge(void);
 PVRSRV_ERROR DeinitRGXTQ2Bridge(void);
 PVRSRV_ERROR InitRGXCMPBridge(void);
 PVRSRV_ERROR DeinitRGXCMPBridge(void);
-#if !defined(EXCLUDE_BREAKPOINT_BRIDGE)
-PVRSRV_ERROR InitBREAKPOINTBridge(void);
-PVRSRV_ERROR DeinitBREAKPOINTBridge(void);
+#if !defined(EXCLUDE_RGXBREAKPOINT_BRIDGE)
+PVRSRV_ERROR InitRGXBREAKPOINTBridge(void);
+PVRSRV_ERROR DeinitRGXBREAKPOINTBridge(void);
 #endif
-PVRSRV_ERROR InitDEBUGMISCBridge(void);
-PVRSRV_ERROR DeinitDEBUGMISCBridge(void);
+PVRSRV_ERROR InitRGXFWDBGBridge(void);
+PVRSRV_ERROR DeinitRGXFWDBGBridge(void);
 PVRSRV_ERROR InitRGXHWPERFBridge(void);
 PVRSRV_ERROR DeinitRGXHWPERFBridge(void);
-PVRSRV_ERROR InitRGXRAYBridge(void);
-PVRSRV_ERROR DeinitRGXRAYBridge(void);
-#if !defined(EXCLUDE_REGCONFIG_BRIDGE)
-PVRSRV_ERROR InitREGCONFIGBridge(void);
-PVRSRV_ERROR DeinitREGCONFIGBridge(void);
+#if !defined(EXCLUDE_RGXREGCONFIG_BRIDGE)
+PVRSRV_ERROR InitRGXREGCONFIGBridge(void);
+PVRSRV_ERROR DeinitRGXREGCONFIGBridge(void);
 #endif
-PVRSRV_ERROR InitTIMERQUERYBridge(void);
-PVRSRV_ERROR DeinitTIMERQUERYBridge(void);
 PVRSRV_ERROR InitRGXKICKSYNCBridge(void);
 PVRSRV_ERROR DeinitRGXKICKSYNCBridge(void);
 PVRSRV_ERROR InitRGXSIGNALSBridge(void);
@@ -123,14 +119,12 @@ PVRSRV_ERROR DeinitHTBUFFERBridge(void);
 #endif
 PVRSRV_ERROR InitPVRTLBridge(void);
 PVRSRV_ERROR DeinitPVRTLBridge(void);
-#if defined(PVR_RI_DEBUG)
+#if defined(PVRSRV_ENABLE_GPU_MEMORY_INFO)
 PVRSRV_ERROR InitRIBridge(void);
 PVRSRV_ERROR DeinitRIBridge(void);
 #endif
-#if defined(SUPPORT_PAGE_FAULT_DEBUG)
 PVRSRV_ERROR InitDEVICEMEMHISTORYBridge(void);
 PVRSRV_ERROR DeinitDEVICEMEMHISTORYBridge(void);
-#endif
 #if defined(SUPPORT_VALIDATION_BRIDGE)
 PVRSRV_ERROR InitVALIDATIONBridge(void);
 PVRSRV_ERROR DeinitVALIDATIONBridge(void);
@@ -139,10 +133,8 @@ PVRSRV_ERROR DeinitVALIDATIONBridge(void);
 PVRSRV_ERROR InitTUTILSBridge(void);
 PVRSRV_ERROR DeinitTUTILSBridge(void);
 #endif
-#if defined(PVRSRV_ENABLE_FULL_SYNC_TRACKING)
 PVRSRV_ERROR InitSYNCTRACKINGBridge(void);
 PVRSRV_ERROR DeinitSYNCTRACKINGBridge(void);
-#endif
 #if defined(SUPPORT_WRAP_EXTMEM)
 PVRSRV_ERROR InitMMEXTMEMBridge(void);
 PVRSRV_ERROR DeinitMMEXTMEMBridge(void);
@@ -154,7 +146,7 @@ PVRSRV_ERROR DeinitSYNCFALLBACKBridge(void);
 
 
 PVRSRV_ERROR
-CommonBridgeInit(void)
+ServerBridgeInit(void)
 {
 	PVRSRV_ERROR eError;
 
@@ -219,7 +211,7 @@ CommonBridgeInit(void)
 	eError = InitPVRTLBridge();
 	PVR_LOG_IF_ERROR(eError, "InitPVRTLBridge");
 
-#if defined(PVR_RI_DEBUG)
+#if defined(PVRSRV_ENABLE_GPU_MEMORY_INFO)
 	eError = InitRIBridge();
 	PVR_LOG_IF_ERROR(eError, "InitRIBridge");
 #endif
@@ -234,16 +226,11 @@ CommonBridgeInit(void)
 	PVR_LOG_IF_ERROR(eError, "InitTUTILSBridge");
 #endif
 
-#if defined(SUPPORT_PAGE_FAULT_DEBUG)
 	eError = InitDEVICEMEMHISTORYBridge();
 	PVR_LOG_IF_ERROR(eError, "InitDEVICEMEMHISTORYBridge");
-#endif
 
-
-#if defined(PVRSRV_ENABLE_FULL_SYNC_TRACKING)
 	eError = InitSYNCTRACKINGBridge();
 	PVR_LOG_IF_ERROR(eError, "InitSYNCTRACKINGBridge");
-#endif
 
 #if defined (SUPPORT_RGX)
 
@@ -253,13 +240,13 @@ CommonBridgeInit(void)
 	eError = InitRGXTA3DBridge();
 	PVR_LOG_IF_ERROR(eError, "InitRGXTA3DBridge");
 
-	#if !defined(EXCLUDE_BREAKPOINT_BRIDGE)
-	eError = InitBREAKPOINTBridge();
-	PVR_LOG_IF_ERROR(eError, "InitBREAKPOINTBridge");
+	#if !defined(EXCLUDE_RGXBREAKPOINT_BRIDGE)
+	eError = InitRGXBREAKPOINTBridge();
+	PVR_LOG_IF_ERROR(eError, "InitRGXBREAKPOINTBridge");
 #endif
 
-	eError = InitDEBUGMISCBridge();
-	PVR_LOG_IF_ERROR(eError, "InitDEBUGMISCBridge");
+	eError = InitRGXFWDBGBridge();
+	PVR_LOG_IF_ERROR(eError, "InitRGXFWDBGBridge");
 
 #if defined(PDUMP)
 	eError = InitRGXPDUMPBridge();
@@ -269,13 +256,10 @@ CommonBridgeInit(void)
 	eError = InitRGXHWPERFBridge();
 	PVR_LOG_IF_ERROR(eError, "InitRGXHWPERFBridge");
 
-#if !defined(EXCLUDE_REGCONFIG_BRIDGE)
-	eError = InitREGCONFIGBridge();
-	PVR_LOG_IF_ERROR(eError, "InitREGCONFIGBridge");
+#if !defined(EXCLUDE_RGXREGCONFIG_BRIDGE)
+	eError = InitRGXREGCONFIGBridge();
+	PVR_LOG_IF_ERROR(eError, "InitRGXREGCONFIGBridge");
 #endif
-
-	eError = InitTIMERQUERYBridge();
-	PVR_LOG_IF_ERROR(eError, "InitTIMERQUERYBridge");
 
 	eError = InitRGXKICKSYNCBridge();
 	PVR_LOG_IF_ERROR(eError, "InitRGXKICKSYNCBridge");
@@ -299,7 +283,7 @@ CommonBridgeInit(void)
 }
 
 PVRSRV_ERROR
-CommonBridgeDeInit(void)
+ServerBridgeDeInit(void)
 {
 	PVRSRV_ERROR eError;
 
@@ -386,21 +370,16 @@ CommonBridgeDeInit(void)
 	PVR_LOGR_IF_ERROR(eError, "DeinitVALIDATIONBridge");
 #endif
 
-#if defined(PVR_RI_DEBUG)
+#if defined(PVRSRV_ENABLE_GPU_MEMORY_INFO)
 	eError = DeinitRIBridge();
 	PVR_LOGR_IF_ERROR(eError, "DeinitRIBridge");
 #endif
 
-#if defined(SUPPORT_PAGE_FAULT_DEBUG)
 	eError = DeinitDEVICEMEMHISTORYBridge();
 	PVR_LOGR_IF_ERROR(eError, "DeinitDEVICEMEMHISTORYBridge");
-#endif
 
-
-#if defined(PVRSRV_ENABLE_FULL_SYNC_TRACKING)
 	eError = DeinitSYNCTRACKINGBridge();
 	PVR_LOGR_IF_ERROR(eError, "DeinitSYNCTRACKINGBridge");
-#endif
 
 #if defined (SUPPORT_RGX)
 
@@ -410,13 +389,13 @@ CommonBridgeDeInit(void)
 	eError = DeinitRGXTA3DBridge();
 	PVR_LOGR_IF_ERROR(eError, "DeinitRGXTA3DBridge");
 
-#if !defined(EXCLUDE_BREAKPOINT_BRIDGE)
-	eError = DeinitBREAKPOINTBridge();
-	PVR_LOGR_IF_ERROR(eError, "DeinitBREAKPOINTBridge");
+#if !defined(EXCLUDE_RGXBREAKPOINT_BRIDGE)
+	eError = DeinitRGXBREAKPOINTBridge();
+	PVR_LOGR_IF_ERROR(eError, "DeinitRGXBREAKPOINTBridge");
 #endif
 
-	eError = DeinitDEBUGMISCBridge();
-	PVR_LOGR_IF_ERROR(eError, "DeinitDEBUGMISCBridge");
+	eError = DeinitRGXFWDBGBridge();
+	PVR_LOGR_IF_ERROR(eError, "DeinitRGXFWDBGBridge");
 
 #if defined(PDUMP)
 	eError = DeinitRGXPDUMPBridge();
@@ -426,13 +405,10 @@ CommonBridgeDeInit(void)
 	eError = DeinitRGXHWPERFBridge();
 	PVR_LOGR_IF_ERROR(eError, "DeinitRGXHWPERFBridge");
 
-#if !defined(EXCLUDE_REGCONFIG_BRIDGE)
-	eError = DeinitREGCONFIGBridge();
-	PVR_LOGR_IF_ERROR(eError, "DeinitREGCONFIGBridge");
+#if !defined(EXCLUDE_RGXREGCONFIG_BRIDGE)
+	eError = DeinitRGXREGCONFIGBridge();
+	PVR_LOGR_IF_ERROR(eError, "DeinitRGXREGCONFIGBridge");
 #endif
-
-	eError = DeinitTIMERQUERYBridge();
-	PVR_LOGR_IF_ERROR(eError, "DeinitTIMERQUERYBridge");
 
 	eError = DeinitRGXKICKSYNCBridge();
 	PVR_LOGR_IF_ERROR(eError, "DeinitRGXKICKSYNCBridge");
@@ -448,27 +424,19 @@ DeviceDepBridgeInit(IMG_UINT64 ui64Features)
 {
 	PVRSRV_ERROR eError;
 
-	if(ui64Features & RGX_FEATURE_COMPUTE_BIT_MASK)
+	if (ui64Features & RGX_FEATURE_COMPUTE_BIT_MASK)
 	{
 		eError = InitRGXCMPBridge();
 		PVR_LOGR_IF_ERROR(eError, "InitRGXCMPBridge");
 	}
 
-	if(ui64Features & RGX_FEATURE_SIGNAL_SNOOPING_BIT_MASK)
+	if (ui64Features & RGX_FEATURE_SIGNAL_SNOOPING_BIT_MASK)
 	{
 		eError = InitRGXSIGNALSBridge();
 		PVR_LOGR_IF_ERROR(eError, "InitRGXCMPBridge");
 	}
 
-#if defined(RGX_FEATURE_RAY_TRACING)
-	if(ui64Features & RGX_FEATURE_RAY_TRACING_DEPRECATED_BIT_MASK)
-	{
-		eError = InitRGXRAYBridge();
-		PVR_LOGR_IF_ERROR(eError, "InitRGXRAYBridge");
-	}
-#endif
-
-	if(ui64Features & RGX_FEATURE_FASTRENDER_DM_BIT_MASK)
+	if (ui64Features & RGX_FEATURE_FASTRENDER_DM_BIT_MASK)
 	{
 		eError = InitRGXTQ2Bridge();
 		PVR_LOGR_IF_ERROR(eError, "InitRGXTQ2Bridge");
@@ -482,27 +450,19 @@ DeviceDepBridgeDeInit(IMG_UINT64 ui64Features)
 {
 	PVRSRV_ERROR eError;
 
-	if(ui64Features & RGX_FEATURE_COMPUTE_BIT_MASK)
+	if (ui64Features & RGX_FEATURE_COMPUTE_BIT_MASK)
 	{
 		eError = DeinitRGXCMPBridge();
 		PVR_LOGR_IF_ERROR(eError, "DeinitRGXCMPBridge");
 	}
 
-	if(ui64Features & RGX_FEATURE_SIGNAL_SNOOPING_BIT_MASK)
+	if (ui64Features & RGX_FEATURE_SIGNAL_SNOOPING_BIT_MASK)
 	{
 		eError = DeinitRGXSIGNALSBridge();
 		PVR_LOGR_IF_ERROR(eError, "DeinitRGXSIGNALSBridge");
 	}
 
-#if defined(RGX_FEATURE_RAY_TRACING)
-	if(ui64Features & RGX_FEATURE_RAY_TRACING_DEPRECATED_BIT_MASK)
-	{
-		eError = DeinitRGXRAYBridge();
-		PVR_LOGR_IF_ERROR(eError, "DeinitRGXRAYBridge");
-	}
-#endif
-
-	if(ui64Features & RGX_FEATURE_FASTRENDER_DM_BIT_MASK)
+	if (ui64Features & RGX_FEATURE_FASTRENDER_DM_BIT_MASK)
 	{
 		eError = DeinitRGXTQ2Bridge();
 		PVR_LOGR_IF_ERROR(eError, "DeinitRGXTQ2Bridge");

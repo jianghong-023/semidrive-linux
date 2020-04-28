@@ -68,6 +68,11 @@ TLMakeStreamDesc(PTL_SNODE f1, IMG_UINT32 f2, IMG_HANDLE f3)
 	ps->ui32Flags = f2;
 	ps->hReadEvent = f3;
 	ps->uiRefCount = 1;
+
+	if (f2 & PVRSRV_STREAM_FLAG_READ_LIMIT)
+	{
+		ps->ui32ReadLimit = f1->psStream->ui32Write;
+	}
 	return ps;
 }
 
@@ -110,7 +115,7 @@ TLInit(void)
 
 	/* Allocate a lock for TL global data, to be used while updating the TL data.
 	 * This is for making TL global data muti-thread safe */
-	eError = OSLockCreate (&sTLGlobalData.hTLGDLock, LOCK_TYPE_PASSIVE);
+	eError = OSLockCreate (&sTLGlobalData.hTLGDLock);
 	if (eError != PVRSRV_OK)
 	{
 		goto e0;

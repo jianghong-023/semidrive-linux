@@ -45,6 +45,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #define SRVSRV_PDUMP_PHYSMEM_H
 
 #include "img_types.h"
+#include "img_defs.h"
 #include "pvrsrv_error.h"
 #include "pmr.h"
 
@@ -81,7 +82,7 @@ PDumpMakeStringValid(IMG_CHAR *pszString,
 #else	/* PDUMP */
 
 #ifdef INLINE_IS_PRAGMA
-#pragma inline(PVRSRVSyncPrimPDumpPolKM)
+#pragma inline(PDumpGetSymbolicAddr)
 #endif
 static INLINE PVRSRV_ERROR
 PDumpGetSymbolicAddr(const IMG_HANDLE hPhysmemPDumpHandle,
@@ -221,7 +222,7 @@ PDumpPMRCBP(const IMG_CHAR *pszMemspaceName,
             IMG_DEVMEM_SIZE_T uiBufferSize);
 
 /*
- * PDumpWriteBuffer()
+ * PDumpWriteParameterBlob()
  *
  * writes a binary blob to the pdump param stream containing the
  * current contents of the memory, and returns the filename and offset
@@ -232,7 +233,7 @@ PDumpPMRCBP(const IMG_CHAR *pszMemspaceName,
  * of that buffer
  */
 extern PVRSRV_ERROR
-PDumpWriteBuffer(IMG_UINT8 *pcBuffer,
+PDumpWriteParameterBlob(IMG_UINT8 *pcBuffer,
                  size_t uiNumBytes,
                  PDUMP_FLAGS_T uiPDumpFlags,
                  IMG_CHAR *pszFilenameOut,

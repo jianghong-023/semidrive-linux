@@ -1,4 +1,4 @@
-/**************************************************************************/ /*!
+/*************************************************************************/ /*!
 @File
 @Title          OS functions header
 @Copyright      Copyright (c) Imagination Technologies Ltd. All Rights Reserved
@@ -39,7 +39,7 @@ PURPOSE AND NONINFRINGEMENT; AND (B) IN NO EVENT SHALL THE AUTHORS OR
 COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
 IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/ /***************************************************************************/
+*/ /**************************************************************************/
 
 #ifdef DEBUG_RELEASE_BUILD
 #pragma optimize( "", off )
@@ -47,19 +47,21 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #endif
 
 #ifndef __OSFUNC_H__
+/*! @cond Doxygen_Suppress */
 #define __OSFUNC_H__
-
+/*! @endcond */
 
 #if defined(LINUX) && defined(__KERNEL__)
 #include "kernel_nospec.h"
 #if !defined(NO_HARDWARE)
-#include <asm/io.h>
+#include <linux/io.h>
 #endif
 #endif
 
+#include <stdarg.h>
+
 #if defined(__QNXNTO__)
 #include <stdio.h>
-#include <stdarg.h>
 #include <string.h>
 #endif
 
@@ -69,14 +71,20 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #endif
 
 #include "img_types.h"
+#include "img_defs.h"
 #include "device.h"
 #include "pvrsrv_device.h"
+#include "cache_km.h"
+#include "osfunc_common.h"
 
 /******************************************************************************
  * Static defines
  *****************************************************************************/
+/*!
+ * Returned by OSGetCurrentProcessID() and OSGetCurrentThreadID() if the OS
+ * is currently operating in the interrupt context.
+ */
 #define KERNEL_ID			0xffffffffL
-#define ISR_ID				0xfffffffdL
 
 #if defined(LINUX) && defined(__KERNEL__)
 #define OSConfineArrayIndexNoSpeculation(index, size) array_index_nospec((index), (size))
@@ -176,7 +184,7 @@ PVRSRV_ERROR OSClockMonotonicus64(IMG_UINT64 *pui64Time);
 IMG_UINT64 OSClockMonotonicRawns64(void);
 
 /*************************************************************************/ /*!
-@Function       OSClockMonotonicRawns64
+@Function       OSClockMonotonicRawus64
 @Description    This function returns a clock value based on the system
                 monotonic raw clock.
 @Return         64bit us timestamp
@@ -194,9 +202,9 @@ size_t OSGetPageSize(void);
 
 /*************************************************************************/ /*!
 @Function       OSGetPageShift
-@Description    This function returns the page size expressed as a power
-                of two. A number of pages, left-shifted by this value, gives
-                the equivalent size in bytes.
+@Description    This function returns the page size expressed as a power of
+                two. A number of pages, left-shifted by this value, gives the
+                equivalent size in bytes.
                 If the OS is not using memory mappings it should return a
                 default value of 12.
 @Return         The page size expressed as a power of two.
@@ -235,7 +243,16 @@ size_t OSGetOrder(size_t uSize);
 */ /**************************************************************************/
 IMG_UINT64 OSGetRAMSize(void);
 
+/*************************************************************************/ /*!
+@Description    Pointer to a Mid-level Interrupt Service Routine (MISR).
+@Input  pvData  Pointer to MISR specific data.
+*/ /**************************************************************************/
 typedef void (*PFN_MISR)(void *pvData);
+
+/*************************************************************************/ /*!
+@Description    Pointer to a thread entry point function.
+@Input  pvData  Pointer to thread specific data.
+*/ /**************************************************************************/
 typedef void (*PFN_THREAD)(void *pvData);
 
 /**************************************************************************/ /*!
@@ -289,13 +306,16 @@ PVRSRV_ERROR OSChangeSparseMemCPUAddrMap(void **psPageArray,
 @Input          pfnMISR       pointer to the function to be installed
                               as the MISR
 @Input          hData         private data provided to the MISR
+@Input          pszMisrName   Name describing purpose of MISR worker thread
+                              (Must be a string literal).
 @Output         hMISRData     handle to the installed MISR (to be used
                               for a subsequent uninstall)
 @Return         PVRSRV_OK on success, a failure code otherwise.
 */ /**************************************************************************/
 PVRSRV_ERROR OSInstallMISR(IMG_HANDLE *hMISRData,
-						   PFN_MISR pfnMISR,
-						   void *hData);
+							PFN_MISR pfnMISR,
+							void *hData,
+							const IMG_CHAR *pszMisrName);
 
 /*************************************************************************/ /*!
 @Function       OSUninstallMISR
@@ -315,6 +335,19 @@ PVRSRV_ERROR OSUninstallMISR(IMG_HANDLE hMISRData);
 */ /**************************************************************************/
 PVRSRV_ERROR OSScheduleMISR(IMG_HANDLE hMISRData);
 
+/*************************************************************************/ /*!
+@Description    Pointer to a function implementing debug dump of thread-specific
+                data.
+@Input          pfnDumpDebugPrintf      Used to specify the print function used
+                                        to dump any debug information. If this
+                                        argument is NULL then a default print
+                                        function will be used.
+@Input          pvDumpDebugFile         File identifier to be passed to the
+                                        print function if specified.
+*/ /**************************************************************************/
+
+typedef void (*PFN_THREAD_DEBUG_DUMP)(DUMPDEBUG_PRINTF_FUNC* pfnDumpDebugPrintf,
+                                      void *pvDumpDebugFile);
 
 /*************************************************************************/ /*!
 @Function       OSThreadCreate
@@ -340,7 +373,7 @@ PVRSRV_ERROR OSScheduleMISR(IMG_HANDLE hMISRData);
 PVRSRV_ERROR OSThreadCreate(IMG_HANDLE *phThread,
                             IMG_CHAR *pszThreadName,
                             PFN_THREAD pfnThread,
-                            IMG_HANDLE pfnDebugDumpCB,
+                            PFN_THREAD_DEBUG_DUMP pfnDebugDumpCB,
                             IMG_BOOL bIsSupportingThread,
                             void *hData);
 
@@ -376,7 +409,7 @@ typedef enum priority_levels
 PVRSRV_ERROR OSThreadCreatePriority(IMG_HANDLE *phThread,
                                     IMG_CHAR *pszThreadName,
                                     PFN_THREAD pfnThread,
-                                    IMG_HANDLE pfnDebugDumpCB,
+                                    PFN_THREAD_DEBUG_DUMP pfnDebugDumpCB,
                                     IMG_BOOL bIsSupportingThread,
                                     void *hData,
                                     OS_THREAD_LEVEL eThreadPriority);
@@ -392,112 +425,6 @@ PVRSRV_ERROR OSThreadCreatePriority(IMG_HANDLE *phThread,
 @Return         Standard PVRSRV_ERROR error code.
 */ /**************************************************************************/
 PVRSRV_ERROR OSThreadDestroy(IMG_HANDLE hThread);
-
-/*************************************************************************/ /*!
-@Function       OSSetThreadPriority
-@Description    Set the priority and weight of a thread
-@Input          hThread  			The thread handle.
-@Input			nThreadPriority		The integer value of the thread priority
-@Input			nThreadWeight		The integer value of the thread weight
-@Return         Standard PVRSRV_ERROR error code.
-*/ /**************************************************************************/
-PVRSRV_ERROR OSSetThreadPriority( IMG_HANDLE hThread,
-								  IMG_UINT32  nThreadPriority,
-								  IMG_UINT32  nThreadWeight);
-
-#if defined(__arm64__) || defined(__aarch64__) || defined (PVRSRV_DEVMEM_TEST_SAFE_MEMSETCPY)
-
-/* Workarounds for assumptions made that memory will not be mapped uncached
- * in kernel or user address spaces on arm64 platforms (or other testing).
- */
-
-/**************************************************************************/ /*!
-@Function       DeviceMemSet
-@Description    Set memory, whose mapping may be uncached, to a given value.
-                On some architectures, additional processing may be needed
-                if the mapping is uncached. In such cases, OSDeviceMemSet()
-                is defined as a call to this function.
-@Input          pvDest     void pointer to the memory to be set
-@Input          ui8Value   byte containing the value to be set
-@Input          ui32Size   the number of bytes to be set to the given value
-@Return         None
- */ /**************************************************************************/
-void DeviceMemSet(void *pvDest, IMG_UINT8 ui8Value, size_t ui32Size);
-
-/**************************************************************************/ /*!
-@Function       DeviceMemCopy
-@Description    Copy values from one area of memory, to another, when one
-                or both mappings may be uncached.
-                On some architectures, additional processing may be needed
-                if mappings are uncached. In such cases, OSDeviceMemCopy()
-                is defined as a call to this function.
-@Input          pvDst      void pointer to the destination memory
-@Input          pvSrc      void pointer to the source memory
-@Input          ui32Size   the number of bytes to be copied
-@Return         None
- */ /**************************************************************************/
-void DeviceMemCopy(void *pvDst, const void *pvSrc, size_t ui32Size);
-
-#define OSDeviceMemSet(a,b,c)  DeviceMemSet((a), (b), (c))
-#define OSDeviceMemCopy(a,b,c) DeviceMemCopy((a), (b), (c))
-#define OSCachedMemSet(a,b,c)  memset((a), (b), (c))
-#define OSCachedMemCopy(a,b,c) memcpy((a), (b), (c))
-
-#else /* !(defined(__arm64__) || defined(__aarch64__) || defined(PVRSRV_DEVMEM_TEST_SAFE_MEMSETCPY)) */
-
-/* Everything else */
-
-/**************************************************************************/ /*!
-@Function       OSDeviceMemSet
-@Description    Set memory, whose mapping may be uncached, to a given value.
-                On some architectures, additional processing may be needed
-                if the mapping is uncached.
-@Input          a     void pointer to the memory to be set
-@Input          b     byte containing the value to be set
-@Input          c     the number of bytes to be set to the given value
-@Return         Pointer to the destination memory.
- */ /**************************************************************************/
-#define OSDeviceMemSet(a,b,c) memset((a), (b), (c))
-
-/**************************************************************************/ /*!
-@Function       OSDeviceMemCopy
-@Description    Copy values from one area of memory, to another, when one
-                or both mappings may be uncached.
-                On some architectures, additional processing may be needed
-                if mappings are uncached.
-@Input          a     void pointer to the destination memory
-@Input          b     void pointer to the source memory
-@Input          c     the number of bytes to be copied
-@Return         Pointer to the destination memory.
- */ /**************************************************************************/
-#define OSDeviceMemCopy(a,b,c) memcpy((a), (b), (c))
-
-/**************************************************************************/ /*!
-@Function       OSCachedMemSet
-@Description    Set memory, where the mapping is known to be cached, to a
-                given value. This function exists to allow an optimal memset
-                to be performed when memory is known to be cached.
-@Input          a     void pointer to the memory to be set
-@Input          b     byte containing the value to be set
-@Input          c     the number of bytes to be set to the given value
-@Return         Pointer to the destination memory.
- */ /**************************************************************************/
-#define OSCachedMemSet(a,b,c)  memset((a), (b), (c))
-
-/**************************************************************************/ /*!
-@Function       OSCachedMemCopy
-@Description    Copy values from one area of memory, to another, when both
-                mappings are known to be cached.
-                This function exists to allow an optimal memcpy to be
-                performed when memory is known to be cached.
-@Input          a     void pointer to the destination memory
-@Input          b     void pointer to the source memory
-@Input          c     the number of bytes to be copied
-@Return         Pointer to the destination memory.
- */ /**************************************************************************/
-#define OSCachedMemCopy(a,b,c) memcpy((a), (b), (c))
-
-#endif /* !(defined(__arm64__) || defined(__aarch64__) || defined(PVRSRV_DEVMEM_TEST_SAFE_MEMSETCPY)) */
 
 /**************************************************************************/ /*!
 @Function       OSMapPhysToLin
@@ -816,8 +743,24 @@ size_t OSStringLCopy(IMG_CHAR *pszDest, const IMG_CHAR *pszSrc, size_t uSize);
 /**************************************************************************/ /*!
 @Function       OSSNPrintf
 @Description    OS function to support the standard C snprintf() function.
+@Output         pStr        char array to print into
+@Input          ui32Size    maximum size of data to write (chars)
+@Input          pszFormat   format string
  */ /**************************************************************************/
 IMG_INT32 OSSNPrintf(IMG_CHAR *pStr, size_t ui32Size, const IMG_CHAR *pszFormat, ...) __printf(3, 4);
+
+/**************************************************************************/ /*!
+@Function       OSVSNPrintf
+@Description    Printf to IMG string using variable args (see stdarg.h).
+                This is necessary because the '...' notation does not
+                support nested function calls.
+@Input          ui32Size           maximum size of data to write (chars)
+@Input          pszFormat          format string
+@Input          vaArgs             variable args structure (from stdarg.h)
+@Output         pStr               char array to print into
+@Return         Number of character written in buffer if successful other wise -1 on error
+*/ /**************************************************************************/
+IMG_INT32 OSVSNPrintf(IMG_CHAR *pStr, size_t ui32Size, const IMG_CHAR* pszFormat, va_list vaArgs) __printf(3, 0);
 
 /**************************************************************************/ /*!
 @Function       OSStringLength
@@ -1013,6 +956,15 @@ PVRSRV_ERROR OSEventObjectWaitAndHoldBridgeLock(IMG_HANDLE hOSEventKM);
 PVRSRV_ERROR OSEventObjectWaitTimeoutAndHoldBridgeLock(IMG_HANDLE hOSEventKM, IMG_UINT64 uiTimeoutus);
 
 /*************************************************************************/ /*!
+@Function       OSEventObjectDumpDebugInfo
+@Description    Emits debug counters/stats related to the event object passed
+@Input          hOSEventKM    the OS event object handle associated with
+                              the event object.
+@Return         None.
+*/ /**************************************************************************/
+void OSEventObjectDumpDebugInfo(IMG_HANDLE hOSEventKM);
+
+/*************************************************************************/ /*!
 @Function       OSEventObjectOpen
 @Description    Open an OS handle on the specified event object.
                 This OS handle may then be used to make a thread wait for
@@ -1077,13 +1029,15 @@ void OSReleaseThreadQuanta(void);
  * makes up the PhyHeaps defined for the system and the CPU architecture. These
  * macros may change in future to accommodate different access requirements.
  */
+/*! Performs a 32 bit word read from the device memory. */
 #define OSReadDeviceMem32(addr)        (*((volatile IMG_UINT32 __force *)(addr)))
+/*! Performs a 32 bit word write to the device memory. */
 #define OSWriteDeviceMem32(addr, val)  (*((volatile IMG_UINT32 __force *)(addr)) = (IMG_UINT32)(val))
 
 #if defined(LINUX) && defined(__KERNEL__) && !defined(NO_HARDWARE)
-	#define OSReadHWReg8(addr, off)  (IMG_UINT8)readb((IMG_BYTE __iomem *)(addr) + (off))
-	#define OSReadHWReg16(addr, off) (IMG_UINT16)readw((IMG_BYTE __iomem *)(addr) + (off))
-	#define OSReadHWReg32(addr, off) (IMG_UINT32)readl((IMG_BYTE __iomem *)(addr) + (off))
+	#define OSReadHWReg8(addr, off)  ((IMG_UINT8)readb((IMG_BYTE __iomem *)(addr) + (off)))
+	#define OSReadHWReg16(addr, off) ((IMG_UINT16)readw((IMG_BYTE __iomem *)(addr) + (off)))
+	#define OSReadHWReg32(addr, off) ((IMG_UINT32)readl((IMG_BYTE __iomem *)(addr) + (off)))
 
 	/* Little endian support only */
 	#define OSReadHWReg64(addr, off) \
@@ -1254,7 +1208,12 @@ void OSReleaseThreadQuanta(void);
 	void OSWriteHWReg64(volatile void *pvLinRegBaseAddr, IMG_UINT32 ui32Offset, IMG_UINT64 ui64Value);
 #endif
 
-typedef void (*PFN_TIMER_FUNC)(void*);
+/*************************************************************************/ /*!
+@Description    Pointer to a timer callback function.
+@Input          pvData  Pointer to timer specific data.
+*/ /**************************************************************************/
+typedef void (*PFN_TIMER_FUNC)(void* pvData);
+
 /*************************************************************************/ /*!
 @Function       OSAddTimer
 @Description    OS specific function to install a timer callback. The
@@ -1338,7 +1297,7 @@ PVRSRV_ERROR OSCopyToUser(void *pvProcess, void __user *pvDest, const void *pvSr
 */ /**************************************************************************/
 PVRSRV_ERROR OSCopyFromUser(void *pvProcess, void *pvDest, const void __user *pvSrc, size_t ui32Bytes);
 
-#if defined (__linux__) || defined (WINDOWS_WDF) || defined(INTEGRITY_OS)
+#if defined(__linux__) || defined(INTEGRITY_OS)
 #define OSBridgeCopyFromUser OSCopyFromUser
 #define OSBridgeCopyToUser OSCopyToUser
 #else
@@ -1436,6 +1395,13 @@ PVRSRV_ERROR OSPlatformBridgeDeInit(void);
 @Return         PVRSRV_OK on success, a failure code otherwise.
 */ /**************************************************************************/
 void OSWriteMemoryBarrier(void);
+/*************************************************************************/ /*!
+@def            OSReadMemoryBarrier
+@Description    Insert a read memory barrier.
+                The read memory barrier guarantees that all load (read)
+                operations specified before the barrier will appear to happen
+                before all of the load operations specified after the barrier.
+*/ /**************************************************************************/
 #define OSReadMemoryBarrier() OSMemoryBarrier()
 /*************************************************************************/ /*!
 @Function       OSMemoryBarrier
@@ -1458,6 +1424,7 @@ void OSMemoryBarrier(void);
 @Return         The OS equivalent error code.
 */ /**************************************************************************/
 int PVRSRVToNativeError(PVRSRV_ERROR e);
+/** See PVRSRVToNativeError(). */
 #define OSPVRSRVToNativeError(e) ( (PVRSRV_OK == e)? 0: PVRSRVToNativeError(e) )
 
 
@@ -1505,7 +1472,7 @@ void OSWRLockReleaseWrite(POSWR_LOCK psLock);
 /* For now, spin-locks are required on Linux only, so other platforms fake
  * spinlocks with normal mutex locks */
 #define POS_SPINLOCK POS_LOCK
-#define OSSpinLockCreate(ppLock) OSLockCreate(ppLock, LOCK_TYPE_PASSIVE)
+#define OSSpinLockCreate(ppLock) OSLockCreate(ppLock)
 #define OSSpinLockDestroy(pLock) OSLockDestroy(pLock)
 #define OSSpinLockAcquire(pLock, pFlags) {PVR_UNREFERENCED_PARAMETER(pFlags); OSLockAcquire(pLock);}
 #define OSSpinLockRelease(pLock, flags) {PVR_UNREFERENCED_PARAMETER(flags); OSLockRelease(pLock);}
@@ -1655,13 +1622,41 @@ void OSReleaseBridgeLock(void);
 /*
  *  Functions for providing support for PID statistics.
  */
+
+/*************************************************************************/ /*!
+@Description    Pointer to a function for printing statistics.
+@Input  pvFilePtr   File identifier.
+@Input  pszFormat   Text to be printed including format specifiers.
+@Input  ...         Additional arguments depending on the pszFormat string.
+*/ /**************************************************************************/
 typedef void (OS_STATS_PRINTF_FUNC)(void *pvFilePtr, const IMG_CHAR *pszFormat, ...);
 
+/*************************************************************************/ /*!
+@Description    Pointer to a function responsible for parsing and printing of
+                formatted process statistics. Actual output should be done by
+                the function pointed to by the pfnOSGetStatsPrintf variable.
+@Input  pvFilePtr            File identifier passed to the pfnOSGetStatsPrintf function.
+@Input  pvStatPtr            Pointer to statistics structure.
+@Input  pfnOSGetStatsPrintf  Pointer to a function for printing the statistics.
+*/ /**************************************************************************/
 typedef void (OS_STATS_PRINT_FUNC)(void *pvFilePtr,
 								   void *pvStatPtr,
 								   OS_STATS_PRINTF_FUNC* pfnOSGetStatsPrintf);
 
+/*************************************************************************/ /*!
+@Description    Pointer to a function used to atomically increment a reference
+                count on the memory backing the statistic entry.
+@Input  pvStatPtr   Pointer to the statistics structure.
+@Return			Reference count after the operation.
+*/ /**************************************************************************/
 typedef IMG_UINT32 (OS_INC_STATS_MEM_REFCOUNT_FUNC)(void *pvStatPtr);
+
+/*************************************************************************/ /*!
+@Description    Pointer to a function used to atomically decrement a reference
+                count on the memory backing the statistic entry.
+@Input  pvStatPtr   Pointer to the statistics structure.
+@Return			Reference count after the operation.
+*/ /**************************************************************************/
 typedef IMG_UINT32 (OS_DEC_STATS_MEM_REFCOUNT_FUNC)(void *pvStatPtr);
 
 /*************************************************************************/ /*!
@@ -1675,12 +1670,6 @@ typedef IMG_UINT32 (OS_DEC_STATS_MEM_REFCOUNT_FUNC)(void *pvStatPtr);
                                root.
 @Input          pfnStatsPrint  Pointer to function that can be used to print the
                                values of all the statistics.
-@Input          pfnIncMemRefCt Pointer to function that can be used to take a
-                               reference on the memory backing the statistic
-                               entry.
-@Input          pfnDecMemRefCt Pointer to function that can be used to drop a
-                               reference on the memory backing the statistic
-                               entry.
 @Input          pvData         OS specific reference that can be used by
                                pfnGetElement.
 @Return	        Pointer void reference to the entry created, which can be
@@ -1688,8 +1677,6 @@ typedef IMG_UINT32 (OS_DEC_STATS_MEM_REFCOUNT_FUNC)(void *pvStatPtr);
 */ /**************************************************************************/
 void *OSCreateStatisticEntry(IMG_CHAR* pszName, void *pvFolder,
 							 OS_STATS_PRINT_FUNC* pfnStatsPrint,
-							 OS_INC_STATS_MEM_REFCOUNT_FUNC* pfnIncMemRefCt,
-							 OS_DEC_STATS_MEM_REFCOUNT_FUNC* pfnDecMemRefCt,
 							 void *pvData);
 
 /*************************************************************************/ /*!
@@ -1697,10 +1684,13 @@ void *OSCreateStatisticEntry(IMG_CHAR* pszName, void *pvFolder,
 @Description    Removes a statistic entry.
                 Where operating systems do not support a debugfs,
                 file system this function may be implemented as a stub.
-@Input          pvEntry  Pointer void reference to the entry created by
-                         OSCreateStatisticEntry().
+@Input          ppvEntry  Double Pointer void reference to the entry created by
+                          OSCreateStatisticEntry().
+                          Double pointer is used so that it can be NULLed
+                          right after memory is freed to avoid possible races
+                          and use-after-free situations.
 */ /**************************************************************************/
-void OSRemoveStatisticEntry(void *pvEntry);
+void OSRemoveStatisticEntry(void **ppvEntry);
 
 #if defined(PVRSRV_ENABLE_MEMTRACK_STATS_FILE)
 /*************************************************************************/ /*!
@@ -1725,10 +1715,13 @@ void *OSCreateRawStatisticEntry(const IMG_CHAR *pszFileName, void *pvParentDir,
 @Description    Removes a raw statistic entry.
                 Where operating systems do not support a debugfs
                 file system this function may be implemented as a stub.
-@Input          pvEntry  Pointer void reference to the entry created by
-                         OSCreateRawStatisticEntry().
+@Input          ppvEntry  Double Pointer void reference to the entry created by
+                          OSCreateRawStatisticEntry().
+                          Double pointer is used so that it can be NULLed
+                          right after memory is freed to avoid possible races
+                          and use-after-free situations.
 */ /**************************************************************************/
-void OSRemoveRawStatisticEntry(void *pvEntry);
+void OSRemoveRawStatisticEntry(void **ppvEntry);
 #endif
 
 /*************************************************************************/ /*!
@@ -1803,11 +1796,12 @@ PVRSRV_ERROR OSDebugSignalPID(IMG_UINT32 ui32PID);
 @Function       OSThreadDumpInfo
 @Description    Traverse the thread list and call each of the stored
                 callbacks to dump the info in debug_dump.
-                Where operating systems do not support a debugfs,
-                file system this function may be implemented as a stub.
+@Input          pfnDumpDebugPrintf  The 'printf' function to be called to
+                                    display the debug info
+@Input          pvDumpDebugFile     Optional file identifier to be passed to
+                                    the 'printf' function if required
 */ /**************************************************************************/
-void OSThreadDumpInfo(IMG_HANDLE hDbgReqestHandle,
-                      DUMPDEBUG_PRINTF_FUNC* pfnDumpDebugPrintf,
+void OSThreadDumpInfo(DUMPDEBUG_PRINTF_FUNC* pfnDumpDebugPrintf,
                       void *pvDumpDebugFile);
 
 /*************************************************************************/ /*!
@@ -1819,11 +1813,21 @@ void OSThreadDumpInfo(IMG_HANDLE hDbgReqestHandle,
                                     the 'printf' function if required
 */ /**************************************************************************/
 void OSDumpVersionInfo(DUMPDEBUG_PRINTF_FUNC *pfnDumpDebugPrintf,
-				       void *pvDumpDebugFile);
+                       void *pvDumpDebugFile);
+
+/*************************************************************************/ /*!
+@Function       OSIsWriteCombineUnalignedSafe
+@Description    Determine if unaligned accesses to write-combine memory are
+                safe to perform, i.e. whether we are safe from a CPU fault
+                occurring. This test is specifically aimed at ARM64 platforms
+                which cannot provide this guarantee if the memory is 'device'
+                memory rather than 'normal' under the ARM memory architecture.
+@Return         IMG_TRUE if safe, IMG_FALSE otherwise.
+*/ /**************************************************************************/
+IMG_BOOL OSIsWriteCombineUnalignedSafe(void);
 
 #endif /* __OSFUNC_H__ */
 
 /******************************************************************************
  End of file (osfunc.h)
 ******************************************************************************/
-

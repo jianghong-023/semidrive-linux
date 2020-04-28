@@ -172,21 +172,28 @@ int pdp_gem_object_vm_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
 	struct pdp_gem_object *pdp_obj = to_pdp_obj(obj);
 	unsigned long off;
 	unsigned long pfn;
-	int err;
 
 	off = addr - vma->vm_start;
 	pfn = (pdp_obj->cpu_addr + off) >> PAGE_SHIFT;
 
-	err = vm_insert_pfn(vma, addr, pfn);
-	switch (err) {
-	case 0:
-	case -EBUSY:
-		return VM_FAULT_NOPAGE;
-	case -ENOMEM:
-		return VM_FAULT_OOM;
-	default:
-		return VM_FAULT_SIGBUS;
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 20, 0))
+	return vmf_insert_pfn(vma, addr, pfn);
+#else
+	{
+		int err;
+
+		err = vm_insert_pfn(vma, addr, pfn);
+		switch (err) {
+		case 0:
+		case -EBUSY:
+			return VM_FAULT_NOPAGE;
+		case -ENOMEM:
+			return VM_FAULT_OOM;
+		default:
+			return VM_FAULT_SIGBUS;
+		}
 	}
+#endif
 }
 
 void pdp_gem_object_free_priv(struct pdp_gem_private *gem_priv,
@@ -213,14 +220,17 @@ void pdp_gem_object_free_priv(struct pdp_gem_private *gem_priv,
 	kfree(pdp_obj);
 }
 
-static int pdp_gem_prime_attach(struct dma_buf *dma_buf, struct device *dev,
+static int pdp_gem_prime_attach(struct dma_buf *dma_buf,
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(4, 19, 0))
+				struct device *dev,
+#endif
 				struct dma_buf_attachment *attach)
 {
 	struct drm_gem_object *obj = dma_buf->priv;
 
 	/* Restrict access to Rogue */
 	if (WARN_ON(!obj->dev->dev->parent) ||
-	    obj->dev->dev->parent != dev->parent)
+	    obj->dev->dev->parent != attach->dev->parent)
 		return -EPERM;
 
 	return 0;
@@ -259,11 +269,13 @@ static void pdp_gem_prime_unmap_dma_buf(struct dma_buf_attachment *attach,
 	kfree(sgt);
 }
 
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(4, 19, 0))
 static void *pdp_gem_prime_kmap_atomic(struct dma_buf *dma_buf,
 				       unsigned long page_num)
 {
 	return NULL;
 }
+#endif
 
 static void *pdp_gem_prime_kmap(struct dma_buf *dma_buf,
 				unsigned long page_num)
@@ -322,7 +334,9 @@ static const struct dma_buf_ops pdp_gem_prime_dmabuf_ops = {
 	.unmap_dma_buf	= pdp_gem_prime_unmap_dma_buf,
 	.release	= drm_gem_dmabuf_release,
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 12, 0))
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(4, 19, 0))
 	.map_atomic	= pdp_gem_prime_kmap_atomic,
+#endif
 	.map		= pdp_gem_prime_kmap,
 #else
 	.kmap_atomic	= pdp_gem_prime_kmap_atomic,
@@ -502,7 +516,7 @@ exit_unlock:
 
 struct pdp_gem_private *pdp_gem_init(struct drm_device *dev)
 {
-#if !defined(SUPPORT_ION)
+#if !defined(SUPPORT_ION) || defined(SUPPORT_GEM_ALLOC)
 	pdp_gem_platform_data *pdata =
 		to_platform_device(dev->dev)->dev.platform_data;
 #endif
@@ -516,7 +530,7 @@ struct pdp_gem_private *pdp_gem_init(struct drm_device *dev)
 
 	memset(&gem_priv->vram, 0, sizeof(gem_priv->vram));
 
-#if defined(SUPPORT_ION)
+#if defined(SUPPORT_ION) && !defined(SUPPORT_GEM_ALLOC)
 	drm_mm_init(&gem_priv->vram, 0, 0);
 	DRM_INFO("%s has no directly allocatable memory; the memory is managed by ION\n",
 		dev->driver->name);

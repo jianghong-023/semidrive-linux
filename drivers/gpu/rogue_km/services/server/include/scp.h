@@ -45,6 +45,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #define SCP_H
 
 #include "img_types.h"
+#include "img_defs.h"
 #include "pvrsrv_error.h"
 #include "sync_server.h"
 
@@ -59,14 +60,17 @@ typedef void (*SCPDo)(void *pvReadyData, void *pvCompleteData);
 
 @Description    Create a software command processor
 
-@Input          ui32CCBSizeLog2         Log2 of the CCB size
+@Input          psDevNode            Device node pointer
 
-@Output         ppvBufferSpace          Pointer to space allocated
+@Input          ui32CCBSizeLog2      Log2 of the CCB size
+
+@Output         ppsContext           Pointer to SCP context created
 
 @Return         PVRSRV_OK if the software command processor was created
 */
 /*****************************************************************************/
-PVRSRV_ERROR IMG_CALLCONV SCPCreate(IMG_UINT32 ui32CCBSizeLog2,
+PVRSRV_ERROR IMG_CALLCONV SCPCreate(PVRSRV_DEVICE_NODE *psDevNode,
+									IMG_UINT32 ui32CCBSizeLog2,
 									SCP_CONTEXT **ppsContext);
 
 /*************************************************************************/ /*!

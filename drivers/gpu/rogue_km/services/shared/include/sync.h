@@ -45,6 +45,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #define _SYNC_
 
 #include "img_types.h"
+#include "img_defs.h"
 #include "pvrsrv_error.h"
 #include <powervr/sync_external.h>
 #include "pdumpdefs.h"
@@ -186,7 +187,7 @@ SyncPrimNoHwUpdate(PVRSRV_CLIENT_SYNC_PRIM *psSync, IMG_UINT32 ui32Value);
 #endif
 
 PVRSRV_ERROR
-SyncPrimServerAlloc(SHARED_DEV_CONNECTION hDevConnection,
+SyncPrimServerAlloc(SYNC_BRIDGE_HANDLE hBridge,
 					PVRSRV_CLIENT_SYNC_PRIM **ppsSync,
 					const IMG_CHAR		*pszClassName
 					PVR_DBG_FILELINE_PARAM);
@@ -199,8 +200,10 @@ SyncPrimServerGetStatus(IMG_UINT32 ui32SyncCount,
 						IMG_UINT32 *pui32CurrentOp,
 						IMG_UINT32 *pui32NextOp);
 
+#if defined(SUPPORT_SERVER_SYNC_IMPL)
 PVRSRV_ERROR
 SyncPrimServerQueueOp(PVRSRV_CLIENT_SYNC_PRIM_OP *psSyncOp);
+#endif
 
 PVRSRV_ERROR
 SyncPrimIsServerSync(PVRSRV_CLIENT_SYNC_PRIM *psSync, IMG_BOOL *pbServerSync);
@@ -209,7 +212,7 @@ IMG_HANDLE
 SyncPrimGetServerHandle(PVRSRV_CLIENT_SYNC_PRIM *psSync);
 
 
-
+#if defined(SUPPORT_SERVER_SYNC_IMPL)
 PVRSRV_ERROR
 SyncPrimOpCreate(IMG_UINT32 ui32SyncCount,
 				 PVRSRV_CLIENT_SYNC_PRIM **papsSyncPrim,
@@ -230,13 +233,7 @@ SyncPrimOpComplete(PSYNC_OP_COOKIE psCookie);
 IMG_INTERNAL
 PVRSRV_ERROR SyncPrimOpDestroy(PSYNC_OP_COOKIE psCookie);
 
-PVRSRV_ERROR
-SyncPrimOpResolve(PSYNC_OP_COOKIE psCookie,
-				  IMG_UINT32 *pui32SyncCount,
-				  PVRSRV_CLIENT_SYNC_PRIM_OP **ppsSyncOp);
-
-PVRSRV_ERROR
-SyncPrimDumpSyncs(IMG_UINT32 ui32SyncCount, PVRSRV_CLIENT_SYNC_PRIM **papsSync, const IMG_CHAR *pcszExtraInfo);
+#endif
 
 #if defined(PDUMP)
 /*************************************************************************/ /*!
@@ -255,7 +252,7 @@ SyncPrimPDump(PVRSRV_CLIENT_SYNC_PRIM *psSync);
 /*************************************************************************/ /*!
 @Function       SyncPrimPDumpValue
 
-@Description    PDump the ui32Value as the value of the synchronisation 
+@Description    PDump the ui32Value as the value of the synchronisation
 				primitive (regardless of the current value).
 
 @Input          psSync          The synchronisation primitive to PDump
@@ -274,7 +271,7 @@ SyncPrimPDumpValue(PVRSRV_CLIENT_SYNC_PRIM *psSync, IMG_UINT32 ui32Value);
 
 @Input          psSync                  The synchronisation primitive to PDump
 
-@Input          ui32Value               Value to poll for 
+@Input          ui32Value               Value to poll for
 
 @Input          ui32Mask                PDump mask operator
 
@@ -290,6 +287,7 @@ SyncPrimPDumpPol(PVRSRV_CLIENT_SYNC_PRIM *psSync,
 				 PDUMP_POLL_OPERATOR eOperator,
 				 IMG_UINT32 ui32PDumpFlags);
 
+#if defined(SUPPORT_SERVER_SYNC_IMPL)
 /*************************************************************************/ /*!
 @Function       SyncPrimOpPDumpPol
 
@@ -307,6 +305,7 @@ void
 SyncPrimOpPDumpPol(PSYNC_OP_COOKIE psCookie,
 				 PDUMP_POLL_OPERATOR eOperator,
 				 IMG_UINT32 ui32PDumpFlags);
+#endif
 
 /*************************************************************************/ /*!
 @Function       SyncPrimPDumpCBP
@@ -364,19 +363,6 @@ SyncPrimPDumpPol(PVRSRV_CLIENT_SYNC_PRIM *psSync,
 	PVR_UNREFERENCED_PARAMETER(psSync);
 	PVR_UNREFERENCED_PARAMETER(ui32Value);
 	PVR_UNREFERENCED_PARAMETER(ui32Mask);
-	PVR_UNREFERENCED_PARAMETER(eOperator);
-	PVR_UNREFERENCED_PARAMETER(ui32PDumpFlags);
-}
-
-#ifdef INLINE_IS_PRAGMA
-#pragma inline(SyncPrimServerPDumpPol)
-#endif
-static INLINE void
-SyncPrimServerPDumpPol(PVRSRV_CLIENT_SYNC_PRIM *psSync,
-				 PDUMP_POLL_OPERATOR eOperator,
-				 IMG_UINT32 ui32PDumpFlags)
-{
-	PVR_UNREFERENCED_PARAMETER(psSync);
 	PVR_UNREFERENCED_PARAMETER(eOperator);
 	PVR_UNREFERENCED_PARAMETER(ui32PDumpFlags);
 }

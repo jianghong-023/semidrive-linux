@@ -62,7 +62,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #define PVRSRV_BRIDGE_RGXHWPERF_CMD_LAST			(PVRSRV_BRIDGE_RGXHWPERF_CMD_FIRST+4)
 
 /*******************************************
-            RGXCtrlHWPerf          
+            RGXCtrlHWPerf
  *******************************************/
 
 /* Bridge in structure for RGXCtrlHWPerf */
@@ -80,7 +80,7 @@ typedef struct PVRSRV_BRIDGE_OUT_RGXCTRLHWPERF_TAG
 } __attribute__ ((packed)) PVRSRV_BRIDGE_OUT_RGXCTRLHWPERF;
 
 /*******************************************
-            RGXConfigEnableHWPerfCounters          
+            RGXConfigEnableHWPerfCounters
  *******************************************/
 
 /* Bridge in structure for RGXConfigEnableHWPerfCounters */
@@ -97,7 +97,7 @@ typedef struct PVRSRV_BRIDGE_OUT_RGXCONFIGENABLEHWPERFCOUNTERS_TAG
 } __attribute__ ((packed)) PVRSRV_BRIDGE_OUT_RGXCONFIGENABLEHWPERFCOUNTERS;
 
 /*******************************************
-            RGXCtrlHWPerfCounters          
+            RGXCtrlHWPerfCounters
  *******************************************/
 
 /* Bridge in structure for RGXCtrlHWPerfCounters */
@@ -115,7 +115,7 @@ typedef struct PVRSRV_BRIDGE_OUT_RGXCTRLHWPERFCOUNTERS_TAG
 } __attribute__ ((packed)) PVRSRV_BRIDGE_OUT_RGXCTRLHWPERFCOUNTERS;
 
 /*******************************************
-            RGXConfigCustomCounters          
+            RGXConfigCustomCounters
  *******************************************/
 
 /* Bridge in structure for RGXConfigCustomCounters */
@@ -133,7 +133,7 @@ typedef struct PVRSRV_BRIDGE_OUT_RGXCONFIGCUSTOMCOUNTERS_TAG
 } __attribute__ ((packed)) PVRSRV_BRIDGE_OUT_RGXCONFIGCUSTOMCOUNTERS;
 
 /*******************************************
-            RGXGetHWPerfBvncFeatureFlags          
+            RGXGetHWPerfBvncFeatureFlags
  *******************************************/
 
 /* Bridge in structure for RGXGetHWPerfBvncFeatureFlags */
@@ -145,7 +145,7 @@ typedef struct PVRSRV_BRIDGE_IN_RGXGETHWPERFBVNCFEATUREFLAGS_TAG
 /* Bridge out structure for RGXGetHWPerfBvncFeatureFlags */
 typedef struct PVRSRV_BRIDGE_OUT_RGXGETHWPERFBVNCFEATUREFLAGS_TAG
 {
-	IMG_UINT32 ui32FeatureFlags;
+	RGX_HWPERF_BVNC sBVNC;
 	PVRSRV_ERROR eError;
 } __attribute__ ((packed)) PVRSRV_BRIDGE_OUT_RGXGETHWPERFBVNCFEATUREFLAGS;
 

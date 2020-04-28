@@ -27,8 +27,8 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 */ /**************************************************************************/
 
-#ifndef _POWERVR_SYNC_EXT_H_
-#define _POWERVR_SYNC_EXT_H_
+#ifndef POWERVR_SYNC_EXT_H
+#define POWERVR_SYNC_EXT_H
 
 #if defined (__cplusplus)
 extern "C" {
@@ -48,6 +48,7 @@ typedef int32_t PVRSRV_TIMELINE;
 #define PVRSRV_NO_TIMELINE      ((PVRSRV_TIMELINE) -1)
 #define PVRSRV_NO_FENCE         ((PVRSRV_FENCE)    -1)
 #define PVRSRV_NO_FENCE_PTR     NULL
+#define PVRSRV_NO_TIMELINE_PTR  NULL
 
 #if defined (__cplusplus)
 }

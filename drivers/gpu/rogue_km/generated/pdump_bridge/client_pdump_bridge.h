@@ -108,6 +108,8 @@ IMG_INTERNAL PVRSRV_ERROR IMG_CALLCONV BridgePDumpImageDescriptor(IMG_HANDLE
 								  const
 								  IMG_UINT32 *
 								  pui32FBCClearColour,
+								  PDUMP_FBC_SWIZZLE
+								  eeFBCSwizzle,
 								  IMG_DEV_VIRTADDR
 								  sHeaderDevAddr,
 								  IMG_UINT32
@@ -126,5 +128,24 @@ IMG_INTERNAL PVRSRV_ERROR IMG_CALLCONV BridgePVRSRVPDumpSetFrame(IMG_HANDLE
 								 hBridge,
 								 IMG_UINT32
 								 ui32Frame);
+
+IMG_INTERNAL PVRSRV_ERROR IMG_CALLCONV BridgePDumpDataDescriptor(IMG_HANDLE
+								 hBridge,
+								 IMG_HANDLE
+								 hDevmemCtx,
+								 IMG_UINT32
+								 ui32StringSize,
+								 const IMG_CHAR
+								 * puiFileName,
+								 IMG_DEV_VIRTADDR
+								 sDataDevAddr,
+								 IMG_UINT32
+								 ui32DataSize,
+								 IMG_UINT32
+								 ui32ElementType,
+								 IMG_UINT32
+								 ui32ElementCount,
+								 IMG_UINT32
+								 ui32PDumpFlags);
 
 #endif /* CLIENT_PDUMP_BRIDGE_H */

@@ -234,6 +234,8 @@ PVRSRV_ERROR SysDevInit(void *pvOSDevice, PVRSRV_DEVICE_CONFIG **ppsDevConfig)
 
 	gsDevices[0].hDevData               = &gsRGXData;
 
+	gsDevices[0].bHasFBCDCVersion31 = IMG_FALSE;
+
 	/* Rk Init */
 	gsDevices[0].hSysData = (IMG_HANDLE)RgxRkInit(&gsDevices[0]);
 	if (!gsDevices[0].hSysData)

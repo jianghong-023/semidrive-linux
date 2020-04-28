@@ -42,29 +42,28 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */ /**************************************************************************/
 
-#if !defined (__IMG_DEFS_H__)
-#define __IMG_DEFS_H__
+#ifndef IMG_DEFS_H
+#define IMG_DEFS_H
 
 #if defined(LINUX) && defined(__KERNEL__)
 #include <linux/types.h>
 #else
 #include <stddef.h>
 #endif
+#if !(defined(LINUX) && defined(__KERNEL__))
+#include <assert.h>
+#endif
 
 #include "img_types.h"
 
-#if defined (NO_INLINE_FUNCS)
+#if defined(NO_INLINE_FUNCS)
 	#define	INLINE
 	#define	FORCE_INLINE
-#elif defined(INTEGRITY_OS)
-	#ifndef INLINE
-	#define	INLINE
-	#endif
-	#define	FORCE_INLINE			static
-	#define INLINE_IS_PRAGMA
 #else
-#if defined (__cplusplus)
-	#define INLINE					inline
+#if defined(__cplusplus) || defined(INTEGRITY_OS)
+	#if	!defined(INLINE)
+		#define INLINE				inline
+	#endif
 	#define	FORCE_INLINE			static inline
 #else
 #if	!defined(INLINE)
@@ -85,11 +84,17 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 	(__GNUC__ > (major) || \
 	(__GNUC__ == (major) && __GNUC_MINOR__ >= (minor)))
 
-/* Ensure Clang's __has_extension macro is defined for all compilers so we
- * can use it safely in preprocessor conditionals.
- */
-#if !defined(__has_extension)
-#define __has_extension(e) 0
+/* Use Clang's __has_extension and __has_builtin macros if available. */
+#if defined(__has_extension)
+#define has_clang_extension(e) __has_extension(e)
+#else
+#define has_clang_extension(e) 0
+#endif
+
+#if defined(__has_builtin)
+#define has_clang_builtin(e) __has_builtin(e)
+#else
+#define has_clang_builtin(e) 0
 #endif
 
 /* Use this in any file, or use attributes under GCC - see below */
@@ -112,22 +117,83 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  * declaration.
  */
 #if !defined(static_assert) && !defined(_MSC_VER) && \
-		(!defined(__cplusplus) || __cplusplus < 201103L)
+		(!defined(__cplusplus) || __cplusplus < 201103L) || defined(__KLOCWORK__)
 	/* static_assert isn't already available */
 	#if !defined(__cplusplus) && (GCC_VERSION_AT_LEAST(4, 6) || \
-								  (defined(__clang__) && __has_extension(c_static_assert)))
+								  (defined(__clang__) && has_clang_extension(c_static_assert)))
 		#define static_assert _Static_assert
 	#else
 		#define static_assert(expr, message) \
-			extern int _static_assert_failed[2*!!(expr) - 1] __attribute__((unused))
+			extern int static_assert_failed[(expr) ? 1 : -1] __attribute__((unused))
 	#endif
 #else
 #if defined(CONFIG_L4)
-	/* Defined but not compatible with DDK usage
-	   so undefine & ignore */
+	/* Defined but not compatible with DDK usage, so undefine and ignore */
 	#undef static_assert
 	#define static_assert(expr, message)
 #endif
+#endif
+
+/*
+ * unreachable("explanation") can be used to indicate to the compiler that
+ * some parts of the code can never be reached, like the default branch
+ * of a switch that covers all real-world possibilities, even though there
+ * are other ints that exist for instance.
+ *
+ * The message will be printed as an assert() when debugging.
+ *
+ * Note: there is no need to add a 'return' or any error handling after
+ * calling unreachable(), as this call will never return.
+ */
+#if defined(LINUX) && defined(__KERNEL__)
+/* Kernel has its own unreachable(), which is a simple infinite loop */
+#elif GCC_VERSION_AT_LEAST(4, 5) || has_clang_builtin(__builtin_unreachable)
+	#define unreachable(msg) \
+		do { \
+			assert(!msg); \
+			__builtin_unreachable(); \
+		} while (0)
+#elif defined(_MSC_VER)
+	#define unreachable(msg) \
+		do { \
+			assert(!msg); \
+			__assume(0); \
+		} while (0)
+#else
+	#define unreachable(msg) \
+		do { \
+			assert(!msg); \
+			while (1); \
+		} while (0)
+#endif
+
+/*
+ * assume(x > 2 && x <= 7) works like an assert(), except it hints to the
+ * compiler what it can assume to optimise the code, like a limited range
+ * of parameter values.
+ */
+#if has_clang_builtin(__builtin_assume)
+	#define assume(expr) \
+		do { \
+			assert(expr); \
+			__builtin_assume(expr); \
+		} while (0)
+#elif defined(_MSC_VER)
+	#define assume(expr) \
+		do { \
+			assert(expr); \
+			__assume(expr); \
+		} while (0)
+#elif defined(LINUX) && defined(__KERNEL__)
+	#define assume(expr) ((void)(expr))
+#elif GCC_VERSION_AT_LEAST(4, 5) || has_clang_builtin(__builtin_unreachable)
+	#define assume(expr) \
+		do { \
+			if (unlikely(!(expr))) \
+				unreachable("Assumption isn't true: " # expr); \
+		} while (0)
+#else
+	#define assume(expr) assert(expr)
 #endif
 
 /*! Macro to calculate the n-byte aligned value from that supplied rounding up.
@@ -136,7 +202,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  * Both arguments should be of a type with the same size otherwise the macro may
  * cut off digits, e.g. imagine a 64 bit address in _x and a 32 bit value in _n.
  */
-#define PVR_ALIGN(_x, _n)   (((_x)+((_n)-1)) & ~((_n)-1))
+#define PVR_ALIGN(_x, _n)	(((_x)+((_n)-1U)) & ~((_n)-1U))
 
 #if defined(_WIN32)
 
@@ -156,13 +222,17 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 	/*
 	 * The proper way of dll linking under MS compilers is made of two things:
 	 * - decorate implementation with __declspec(dllexport)
-	 *   this decoration helps compiler with making the so called 'export library'
-	 * - decorate forward-declaration (in a source dependent on a dll) with __declspec(dllimport),
-	 *   this decoration helps compiler with making faster and smaller code in terms of calling dll-imported functions
+	 *   this decoration helps compiler with making the so called
+	 *   'export library'
+	 * - decorate forward-declaration (in a source dependent on a dll) with
+	 *   __declspec(dllimport), this decoration helps the compiler to make
+	 *   faster and smaller code in terms of calling dll-imported functions
 	 *
-	 * Usually these decorations are performed by having a single macro define that expands to a proper __declspec()
-	 * depending on the translation unit, dllexport inside the dll source and dllimport outside the dll source.
-	 * Having IMG_EXPORT and IMG_IMPORT resolving to the same __declspec() makes no sense, but at least works.
+	 * Usually these decorations are performed by having a single macro define
+	 * making that expands to a proper __declspec() depending on the
+	 * translation unit, dllexport inside the dll source and dllimport outside
+	 * the dll source. Having IMG_EXPORT and IMG_IMPORT resolving to the same
+	 * __declspec() makes no sense, but at least works.
 	 */
 	#define IMG_IMPORT __declspec(dllexport)
 	#define IMG_EXPORT __declspec(dllexport)
@@ -176,8 +246,9 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 	#define C_CALLCONV	__cdecl
 
 	/*
-	 * IMG_IMPORT is defined as IMG_EXPORT so that headers and implementations match.
-	 * Some compilers require the header to be declared IMPORT, while the implementation is declared EXPORT 
+	 * IMG_IMPORT is defined as IMG_EXPORT so that headers and implementations
+	 * match. Some compilers require the header to be declared IMPORT, while
+	 * the implementation is declared EXPORT.
 	 */
 	#define	IMG_IMPORT	IMG_EXPORT
 
@@ -198,7 +269,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 	#if (defined(LINUX) || defined(__QNXNTO__)) && defined(__KERNEL__)
 		#define IMG_INTERNAL
 		#define IMG_EXPORT
-		#define IMG_CALLCONV	
+		#define IMG_CALLCONV
 	#elif defined(LINUX) || defined(__METAG) || defined(__mips) || defined(__QNXNTO__)
 		#define IMG_CALLCONV
 		#define C_CALLCONV
@@ -228,7 +299,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #endif
 
-// Use default definition if not overridden
+/* Use default definition if not overridden */
 #ifndef IMG_ABORT
 	#if defined(EXIT_ON_ABORT)
 		#define IMG_ABORT()	exit(1)
@@ -238,15 +309,25 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #endif
 
 /* The best way to suppress unused parameter warnings using GCC is to use a
- * variable attribute.  Place the __maybe_unused between the type and name of an
- * unused parameter in a function parameter list, eg `int __maybe_unused var'. This
- * should only be used in GCC build environments, for example, in files that
- * compile only on Linux. Other files should use PVR_UNREFERENCED_PARAMETER */
+ * variable attribute. Place the __maybe_unused between the type and name of an
+ * unused parameter in a function parameter list e.g. 'int __maybe_unused var'.
+ * This should only be used in GCC build environments, for example, in files
+ * that compile only on Linux.
+ * Other files should use PVR_UNREFERENCED_PARAMETER
+ */
 
 /* Kernel macros for compiler attributes */
 /* Note: param positions start at 1 */
 #if defined(LINUX) && defined(__KERNEL__)
 	#include <linux/compiler.h>
+
+	#if !defined(__fallthrough)
+		#if defined(__GNUC__) && GCC_VERSION_AT_LEAST(7, 0)
+			#define __fallthrough __attribute__((__fallthrough__))
+		#else
+			#define __fallthrough
+		#endif
+	#endif
 #elif defined(__GNUC__) || defined(HAS_GNUC_ATTRIBUTES)
 	#define __must_check       __attribute__((warn_unused_result))
 	#define __maybe_unused     __attribute__((unused))
@@ -272,6 +353,14 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 		#define __printf(fmt, va)
 	#endif /* defined(__GNUC__) */
 
+	#if defined(__cplusplus) && (__cplusplus >= 201703L)
+		#define __fallthrough [[fallthrough]]
+	#elif defined(__GNUC__) && GCC_VERSION_AT_LEAST(7, 0)
+		#define __fallthrough __attribute__((__fallthrough__))
+	#else
+		#define __fallthrough
+	#endif
+
 	#define __user
 	#define __force
 	#define __iomem
@@ -290,6 +379,11 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 		#define __noreturn
 	#endif
 
+	/* This may already been defined, e.g. by SAL (Source Annotation Language) */
+	#if !defined(__fallthrough)
+		#define __fallthrough
+	#endif
+
 	#define __user
 	#define __force
 	#define __iomem
@@ -298,11 +392,9 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 /* Other attributes, following the same style */
 #if defined(__GNUC__) || defined(HAS_GNUC_ATTRIBUTES)
-	#define __param_nonnull(...)  __attribute__((nonnull(__VA_ARGS__)))
-	#define __returns_nonnull     __attribute__((returns_nonnull))
+	#define __const_function      __attribute__((const))
 #else
-	#define __param_nonnull(...)
-	#define __returns_nonnull
+	#define __const_function
 #endif
 
 
@@ -310,8 +402,13 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #if defined(LINUX) && defined(__KERNEL__)
 	#include <linux/compiler.h>
 #elif defined(__GNUC__)
+
+/* Klocwork does not support __builtin_expect, which makes the actual condition
+ * expressions hidden during analysis, affecting it negatively. */
+#if !defined(__KLOCWORK__) && !defined(DEBUG)
 	#define likely(x)   __builtin_expect(!!(x), 1)
 	#define unlikely(x) __builtin_expect(!!(x), 0)
+#endif
 
 	/* Compiler memory barrier to prevent reordering */
 	#define barrier() __asm__ __volatile__("": : :"memory")
@@ -347,11 +444,11 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #define BITMASK_HAS(f, m)     (((f) & (m)) == (m)) /* the bits from the mask are all set */
 
 #ifndef MAX
-#define MAX(a,b) 					(((a) > (b)) ? (a) : (b))
+#define MAX(a ,b)	(((a) > (b)) ? (a) : (b))
 #endif
 
 #ifndef MIN
-#define MIN(a,b) 					(((a) < (b)) ? (a) : (b))
+#define MIN(a, b)	(((a) < (b)) ? (a) : (b))
 #endif
 
 #ifndef CLAMP
@@ -364,7 +461,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 	#include <linux/bug.h>
 #endif
 
-/* Get a structures address from the address of a member */
+/* Get a structure's address from the address of a member */
 #define IMG_CONTAINER_OF(ptr, type, member) \
 	(type *) ((uintptr_t) (ptr) - offsetof(type, member))
 
@@ -406,18 +503,18 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 	#define VG_MARK_ACCESS(pvData,ui32Size) PVR_MSC_SUPPRESS_4127 do { } while(0)
 #endif
 
-#define _STRINGIFY(x) # x
-#define IMG_STRINGIFY(x) _STRINGIFY(x)
+#define IMG_STRINGIFY_IMPL(x) # x
+#define IMG_STRINGIFY(x) IMG_STRINGIFY_IMPL(x)
 
 #if defined(INTEGRITY_OS)
 	/* Definitions not present in INTEGRITY. */
 	#define PATH_MAX	200
 #endif
 
-#if defined (__clang__) || defined (__GNUC__)
+#if defined(__clang__) || defined(__GNUC__)
 	/* __SIZEOF_POINTER__ is defined already by these compilers */
-#elif defined (INTEGRITY_OS)
-	#if defined (__Ptr_Is_64)
+#elif defined(INTEGRITY_OS)
+	#if defined(__Ptr_Is_64)
 		#define __SIZEOF_POINTER__ 8
 	#else
 		#define __SIZEOF_POINTER__ 4
@@ -430,23 +527,24 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #endif
 
 /* RDI8567: gcc/clang/llvm load/store optimisations may cause issues with
- * uncached device memory allocations. Some pointers are made 'volatile' to
- * prevent those optimisations being applied to writes through those
+ * uncached device memory allocations. Some pointers are made 'volatile'
+ * to prevent those optimisations being applied to writes through those
  * pointers.
  */
 #if (GCC_VERSION_AT_LEAST(7, 0) || defined(__clang__)) && (defined(__arm64__) || defined(__aarch64__))
 #define NOLDSTOPT volatile
 /* after applying 'volatile' to a pointer, we may need to cast it to 'void *'
- * to keep it compatible with its existing uses
+ * to keep it compatible with its existing uses.
  */
 #define NOLDSTOPT_VOID (void *)
+
+#define NOLDSTOPT_REQUIRED 1
 #else
 #define NOLDSTOPT
 #define NOLDSTOPT_VOID
 #endif
 
-#endif /* #if !defined (__IMG_DEFS_H__) */
+#endif /* IMG_DEFS_H */
 /*****************************************************************************
- End of file (IMG_DEFS.H)
+ End of file (img_defs.h)
 *****************************************************************************/
-

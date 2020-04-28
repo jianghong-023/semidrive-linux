@@ -53,9 +53,17 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 PVRSRV_ERROR PDVFSLimitMaxFrequency(PVRSRV_RGXDEV_INFO *psDevInfo, IMG_UINT32 ui32MaxOPPPoint);
 
+PVRSRV_ERROR PDVFSLimitMinFrequency(PVRSRV_RGXDEV_INFO *psDevInfo, IMG_UINT32 ui32MinOPPPoint);
+
 void PDVFSRequestReactiveUpdate(PVRSRV_RGXDEV_INFO *psDevInfo);
 
-PVRSRV_ERROR PDVFSProcessCoreClkRateChange(PVRSRV_RGXDEV_INFO *psDevInfo, IMG_UINT32 ui32CoreClockRate);
+#if (PDVFS_COM == PDVFS_COM_HOST)
+PVRSRV_ERROR PDVFSProcessCoreClkChangeRequest(PVRSRV_RGXDEV_INFO *psDevInfo, IMG_UINT32 ui32CoreClockRate);
+#define PDVFS_PROCESS_CORE_CLK_RATE_CHANGE(devinfo, clk)  PDVFSProcessCoreClkChangeRequest(devinfo, clk)
+#else
+PVRSRV_ERROR PDVFSProcessCoreClkChangeNotification(PVRSRV_RGXDEV_INFO *psDevInfo, IMG_UINT32 ui32CoreClockRate);
+#define PDVFS_PROCESS_CORE_CLK_RATE_CHANGE(devinfo, clk)  PDVFSProcessCoreClkChangeNotification(devinfo, clk)
+#endif
 
 #if defined (RGXFW_META_SUPPORT_2ND_THREAD)
 void RGXPDVFSCheckCoreClkRateChange(PVRSRV_RGXDEV_INFO *psDevInfo);

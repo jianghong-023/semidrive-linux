@@ -1,4 +1,4 @@
-/****************************************************************************
+/*************************************************************************/ /*!
 @Copyright      Copyright (c) Imagination Technologies Ltd. All Rights Reserved
 @License        Dual MIT/GPLv2
 
@@ -36,14 +36,14 @@ PURPOSE AND NONINFRINGEMENT; AND (B) IN NO EVENT SHALL THE AUTHORS OR
 COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
 IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-****************************************************************************/
+*/ /**************************************************************************/
 
 /* bonnie_tcf.h - Bonnie TCF register definitions */
 
 /* tab size 4 */
 
-#ifndef _BONNIE_TCF_DEFS_H_
-#define _BONNIE_TCF_DEFS_H_
+#ifndef BONNIE_TCF_DEFS_H
+#define BONNIE_TCF_DEFS_H
 
 #define BONNIE_TCF_OFFSET_BONNIETC_REGBANK							0x00000000
 #define BONNIE_TCF_OFFSET_TC_IFACE_COUNTERS							0x00004000
@@ -65,4 +65,4 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #define BONNIE_TCF_OFFSET_SAI_TRAIN_ACK								0x00000018
 
 
-#endif //_BONNIE_TCF_DEFS_H_
+#endif /* BONNIE_TCF_DEFS_H */

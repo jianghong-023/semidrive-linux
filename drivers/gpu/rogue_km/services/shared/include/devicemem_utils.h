@@ -54,7 +54,6 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "osfunc.h"
 #include "lock.h"
 #include "osmmap.h"
-#include "devicemem_utils.h"
 
 #define DEVMEM_HEAPNAME_MAXLENGTH 160
 
@@ -64,14 +63,14 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #define DEVMEM_REFCOUNT_PRINT(fmt, ...)
 #endif
 
-/* If we need a "hMapping" but we don't have a server-side mapping, we
-   poison the entry with this value so that it's easily recognised in
-   the debugger.  Note that this is potentially a valid handle, but
-   then so is NULL, which is no better, indeed worse, as it's not
-   obvious in the debugger.  The value doesn't matter.  We _never_ use
-   it (and because it's valid, we never assert it isn't this) but it's
-   nice to have a value in the source code that we can grep for when
-   things go wrong. */
+/* If we need a "hMapping" but we don't have a server-side mapping, we poison
+ * the entry with this value so that it's easily recognised in the debugger.
+ * Note that this is potentially a valid handle, but then so is NULL, which is
+ * no better, indeed worse, as it's not obvious in the debugger. The value
+ * doesn't matter. We _never_ use it (and because it's valid, we never assert
+ * it isn't this) but it's nice to have a value in the source code that we can
+ * grep for if things go wrong.
+ */
 #define LACK_OF_MAPPING_POISON ((IMG_HANDLE)0x6116dead)
 #define LACK_OF_RESERVATION_POISON ((IMG_HANDLE)0x7117dead)
 
@@ -80,34 +79,37 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 struct _DEVMEM_CONTEXT_ {
 
 	SHARED_DEV_CONNECTION hDevConnection;
-	
-    /* Number of heaps that have been created in this context
-       (regardless of whether they have allocations) */
-    IMG_UINT32 uiNumHeaps;
 
-    /*
-      Each "DEVMEM_CONTEXT" has a counterpart in the server,
-      which is responsible for handling the mapping into device MMU.
-      We have a handle to that here.
-    */
-    IMG_HANDLE hDevMemServerContext;
+	/* Number of heaps that have been created in this context
+	 * (regardless of whether they have allocations)
+	 */
+	IMG_UINT32 uiNumHeaps;
 
-    /* Number of automagically created heaps in this context,
-       i.e. those that are born at context creation time from the
-       chosen "heap config" or "blueprint" */
-    IMG_UINT32 uiAutoHeapCount;
+	/* Each "DEVMEM_CONTEXT" has a counterpart in the server, which
+	 * is responsible for handling the mapping into device MMU.
+	 * We have a handle to that here.
+	 */
+	IMG_HANDLE hDevMemServerContext;
 
-    /* pointer to array of such heaps */
-    struct _DEVMEM_HEAP_ **ppsAutoHeapArray;
+	/* Number of automagically created heaps in this context,
+	 *  i.e. those that are born at context creation time from the
+	 * chosen "heap config" or "blueprint"
+	 */
+	IMG_UINT32 uiAutoHeapCount;
 
-    /* The cache line size for use when allocating memory, as it is not queryable on the client side */
-    IMG_UINT32 ui32CPUCacheLineSize;
+	/* Pointer to array of such heaps */
+	struct _DEVMEM_HEAP_ **ppsAutoHeapArray;
+
+	/* The cache line size for use when allocating memory,
+	 * as it is not queryable on the client side
+	 */
+	IMG_UINT32 ui32CPUCacheLineSize;
 
 	/* Private data handle for device specific data */
 	IMG_HANDLE hPrivData;
 
 	/* Memory allocated to be used for MCU fences */
-	DEVMEM_MEMDESC		*psMCUFenceMemDesc;
+	DEVMEM_MEMDESC *psMCUFenceMemDesc;
 };
 
 
@@ -126,37 +128,39 @@ struct _DEVMEM_HEAP_ {
 	/* Number of live imports in the heap */
 	ATOMIC_T hImportCount;
 
-	/*
-	* Base address and size of heap, required by clients due to some requesters
-	* not being full range
-	*/
+	/* Base address and size of heap, required by clients due to some
+	 * requesters not being full range
+	 */
 	IMG_DEV_VIRTADDR sBaseAddress;
 	DEVMEM_SIZE_T uiSize;
 
-	/* The heap type, describing if the space is managed by the user or an RA*/
+	/* The heap type, describing if the space is managed by the user or an RA
+	 */
 	DEVMEM_HEAP_TYPE eHeapType;
 
-	/* This RA is for managing sub-allocations in virtual space.  Two
-	more RA's will be used under the Hood for managing the coarser
-	allocation of virtual space from the heap, and also for
-	managing the physical backing storage. */
+	/* This RA is for managing sub-allocations in virtual space. Two more
+	 * RA's will be used under the Hood for managing the coarser allocation
+	 * of virtual space from the heap, and also for managing the physical
+	 * backing storage.
+	 */
 	RA_ARENA *psSubAllocRA;
 	IMG_CHAR *pszSubAllocRAName;
-	/*
-	This RA is for the coarse allocation of virtual space from the heap
-	*/
+
+	/* This RA is for the coarse allocation of virtual space from the heap */
 	RA_ARENA *psQuantizedVMRA;
 	IMG_CHAR *pszQuantizedVMRAName;
 
-	/* We also need to store a copy of the quantum size in order to
-	feed this down to the server */
+	/* We also need to store a copy of the quantum size in order to feed
+	 * this down to the server.
+	 */
 	IMG_UINT32 uiLog2Quantum;
 
 	/* Store a copy of the minimum import alignment */
 	IMG_UINT32 uiLog2ImportAlignment;
 
 	/* The relationship between tiled heap alignment and heap byte-stride
-	 * (dependent on tiling mode, abstracted here) */
+	 * (dependent on tiling mode, abstracted here)
+	 */
 	IMG_UINT32 uiLog2TilingStrideFactor;
 
 	/* The parent memory context for this heap */
@@ -165,11 +169,10 @@ struct _DEVMEM_HEAP_ {
 	/* Lock to protect this structure */
 	POS_LOCK hLock;
 
-	/*
-	Each "DEVMEM_HEAP" has a counterpart in the server,
-	which is responsible for handling the mapping into device MMU.
-	We have a handle to that here.
-	*/
+	/* Each "DEVMEM_HEAP" has a counterpart in the server, which is
+	 * responsible for handling the mapping into device MMU.
+	 * We have a handle to that here.
+	 */
 	IMG_HANDLE hDevMemServerHeap;
 };
 
@@ -182,102 +185,104 @@ typedef IMG_UINT32 DEVMEM_PROPERTIES_T;                  /*!< Typedef for Device
 #define DEVMEM_PROPERTIES_IMPORT_IS_CLEAN    (1UL<<5)    /*!< Is the memory clean, i.e. not been used before? */
 #define DEVMEM_PROPERTIES_SECURE             (1UL<<6)    /*!< Is it a special secure buffer? No CPU maps allowed! */
 #define DEVMEM_PROPERTIES_IMPORT_IS_POISONED (1UL<<7)    /*!< Is the memory fully poisoned? */
+#define DEVMEM_PROPERTIES_NO_CPU_MAPPING     (1UL<<8)    /* No CPU Mapping is allowed, RW attributes
+                                                            are further derived from allocation memory flags */
+#define DEVMEM_PROPERTIES_NO_LAYOUT_CHANGE	 (1UL<<9)    /* No sparse resizing allowed, once a memory
+                                                            layout is chosen, no change allowed later,
+                                                            This includes pinning and unpinning */
 
 
 typedef struct _DEVMEM_DEVICE_IMPORT_ {
-	DEVMEM_HEAP *psHeap;			/*!< Heap this import is bound to */
-	IMG_DEV_VIRTADDR sDevVAddr;		/*!< Device virtual address of the import */
-	IMG_UINT32 ui32RefCount;		/*!< Refcount of the device virtual address */
-	IMG_HANDLE hReservation;		/*!< Device memory reservation handle */
-	IMG_HANDLE hMapping;			/*!< Device mapping handle */
-	IMG_BOOL bMapped;				/*!< This is import mapped? */
-	POS_LOCK hLock;					/*!< Lock to protect the device import */
+	DEVMEM_HEAP *psHeap;            /*!< Heap this import is bound to */
+	IMG_DEV_VIRTADDR sDevVAddr;     /*!< Device virtual address of the import */
+	IMG_UINT32 ui32RefCount;        /*!< Refcount of the device virtual address */
+	IMG_HANDLE hReservation;        /*!< Device memory reservation handle */
+	IMG_HANDLE hMapping;            /*!< Device mapping handle */
+	IMG_BOOL bMapped;               /*!< This is import mapped? */
+	POS_LOCK hLock;                 /*!< Lock to protect the device import */
 } DEVMEM_DEVICE_IMPORT;
 
 typedef struct _DEVMEM_CPU_IMPORT_ {
-	void *pvCPUVAddr;			/*!< CPU virtual address of the import */
-	IMG_UINT32 ui32RefCount;		/*!< Refcount of the CPU virtual address */
-	IMG_HANDLE hOSMMapData;			/*!< CPU mapping handle */
-	POS_LOCK hLock;					/*!< Lock to protect the CPU import */
+	void *pvCPUVAddr;               /*!< CPU virtual address of the import */
+	IMG_UINT32 ui32RefCount;        /*!< Refcount of the CPU virtual address */
+	IMG_HANDLE hOSMMapData;         /*!< CPU mapping handle */
+	POS_LOCK hLock;                 /*!< Lock to protect the CPU import */
 } DEVMEM_CPU_IMPORT;
 
 typedef struct _DEVMEM_IMPORT_ {
 	SHARED_DEV_CONNECTION hDevConnection;
-	IMG_DEVMEM_ALIGN_T uiAlign;			/*!< Alignment of the PMR */
-	DEVMEM_SIZE_T uiSize;				/*!< Size of import */
-    ATOMIC_T hRefCount;					/*!< Refcount for this import */
-    DEVMEM_PROPERTIES_T uiProperties;	/*!< Stores properties of an import like if
-    										it is exportable, pinned or suballocatable */
-    IMG_HANDLE hPMR;					/*!< Handle to the PMR */
-    DEVMEM_FLAGS_T uiFlags;				/*!< Flags for this import */
-    POS_LOCK hLock;						/*!< Lock to protect the import */
+	IMG_DEVMEM_ALIGN_T uiAlign;         /*!< Alignment of the PMR */
+	DEVMEM_SIZE_T uiSize;               /*!< Size of import */
+	ATOMIC_T hRefCount;                 /*!< Refcount for this import */
+	DEVMEM_PROPERTIES_T uiProperties;   /*!< Stores properties of an import like if
+	                                         it is exportable, pinned or suballocatable */
+	IMG_HANDLE hPMR;                    /*!< Handle to the PMR */
+	DEVMEM_FLAGS_T uiFlags;             /*!< Flags for this import */
+	POS_LOCK hLock;                     /*!< Lock to protect the import */
 
-	DEVMEM_DEVICE_IMPORT sDeviceImport;	/*!< Device specifics of the import */
-	DEVMEM_CPU_IMPORT sCPUImport;		/*!< CPU specifics of the import */
+	DEVMEM_DEVICE_IMPORT sDeviceImport; /*!< Device specifics of the import */
+	DEVMEM_CPU_IMPORT sCPUImport;       /*!< CPU specifics of the import */
 } DEVMEM_IMPORT;
 
 typedef struct _DEVMEM_DEVICE_MEMDESC_ {
-	IMG_DEV_VIRTADDR sDevVAddr;		/*!< Device virtual address of the allocation */
-	IMG_UINT32 ui32RefCount;		/*!< Refcount of the device virtual address */
-	POS_LOCK hLock;					/*!< Lock to protect device memdesc */
+	IMG_DEV_VIRTADDR sDevVAddr;     /*!< Device virtual address of the allocation */
+	IMG_UINT32 ui32RefCount;        /*!< Refcount of the device virtual address */
+	POS_LOCK hLock;                 /*!< Lock to protect device memdesc */
 } DEVMEM_DEVICE_MEMDESC;
 
 typedef struct _DEVMEM_CPU_MEMDESC_ {
-	void *pvCPUVAddr;			/*!< CPU virtual address of the import */
-	IMG_UINT32 ui32RefCount;		/*!< Refcount of the device CPU address */
-	POS_LOCK hLock;					/*!< Lock to protect CPU memdesc */
+	void *pvCPUVAddr;           /*!< CPU virtual address of the import */
+	IMG_UINT32 ui32RefCount;    /*!< Refcount of the device CPU address */
+	POS_LOCK hLock;             /*!< Lock to protect CPU memdesc */
 } DEVMEM_CPU_MEMDESC;
 
 struct _DEVMEM_MEMDESC_ {
-    DEVMEM_IMPORT *psImport;				/*!< Import this memdesc is on */
-    IMG_DEVMEM_OFFSET_T uiOffset;			/*!< Offset into import where our allocation starts */
+	DEVMEM_IMPORT *psImport;                /*!< Import this memdesc is on */
+	IMG_DEVMEM_OFFSET_T uiOffset;           /*!< Offset into import where our allocation starts */
 	IMG_DEVMEM_SIZE_T uiAllocSize;          /*!< Size of the allocation */
-    ATOMIC_T hRefCount;						/*!< Refcount of the memdesc */
-    POS_LOCK hLock;							/*!< Lock to protect memdesc */
-    IMG_HANDLE hPrivData;
+	ATOMIC_T hRefCount;                     /*!< Refcount of the memdesc */
+	POS_LOCK hLock;                         /*!< Lock to protect memdesc */
+	IMG_HANDLE hPrivData;
 
-	DEVMEM_DEVICE_MEMDESC sDeviceMemDesc;	/*!< Device specifics of the memdesc */
-	DEVMEM_CPU_MEMDESC sCPUMemDesc;		/*!< CPU specifics of the memdesc */
+	DEVMEM_DEVICE_MEMDESC sDeviceMemDesc;   /*!< Device specifics of the memdesc */
+	DEVMEM_CPU_MEMDESC sCPUMemDesc;         /*!< CPU specifics of the memdesc */
 
 	IMG_CHAR szText[DEVMEM_ANNOTATION_MAX_LEN]; /*!< Annotation for this memdesc */
 
-#if defined(SUPPORT_PAGE_FAULT_DEBUG)
 	IMG_UINT32 ui32AllocationIndex;
-#endif
 
-#if defined(PVR_RI_DEBUG)
-    IMG_HANDLE hRIHandle;					/*!< Handle to RI information */
+#if defined(PVRSRV_ENABLE_GPU_MEMORY_INFO)
+	IMG_HANDLE hRIHandle;                   /*!< Handle to RI information */
 #endif
 };
 
-/* The physical descriptor used to store handles and information of
- * device physical allocations. */
+/* The physical descriptor used to store handles and information of device
+ * physical allocations.
+ */
 struct _DEVMEMX_PHYS_MEMDESC_ {
-	IMG_UINT32 uiNumPages;					/*!< Number of pages that the import has*/
-	IMG_UINT32 uiLog2PageSize;				/*!< Page size */
-	ATOMIC_T hRefCount;						/*!< Refcount of the memdesc */
-	DEVMEM_FLAGS_T uiFlags;					/*!< Flags for this import */
-	IMG_HANDLE hPMR;						/*!< Handle to the PMR */
-	DEVMEM_CPU_IMPORT sCPUImport;			/*!< CPU specifics of the memdesc */
-	DEVMEM_BRIDGE_HANDLE hBridge;			/*!< Bridge connection for the server */
+	IMG_UINT32 uiNumPages;                  /*!< Number of pages that the import has*/
+	IMG_UINT32 uiLog2PageSize;              /*!< Page size */
+	ATOMIC_T hRefCount;                     /*!< Refcount of the memdesc */
+	DEVMEM_FLAGS_T uiFlags;                 /*!< Flags for this import */
+	IMG_HANDLE hPMR;                        /*!< Handle to the PMR */
+	DEVMEM_CPU_IMPORT sCPUImport;           /*!< CPU specifics of the memdesc */
+	DEVMEM_BRIDGE_HANDLE hBridge;           /*!< Bridge connection for the server */
 };
 
-/* The virtual descriptor used to store handles and information of a
- * device virtual range and the mappings to it. */
+/* The virtual descriptor used to store handles and information of a device
+ * virtual range and the mappings to it.
+ */
 struct _DEVMEMX_VIRT_MEMDESC_ {
-	IMG_UINT32 uiNumPages;					/*!< Number of pages that the import has*/
-	DEVMEM_FLAGS_T uiFlags;					/*!< Flags for this import */
-	DEVMEMX_PHYSDESC **apsPhysDescTable;		/*!< Table to store links to physical descs */
-	DEVMEM_DEVICE_IMPORT sDeviceImport;		/*!< Device specifics of the memdesc */
+	IMG_UINT32 uiNumPages;                  /*!< Number of pages that the import has*/
+	DEVMEM_FLAGS_T uiFlags;                 /*!< Flags for this import */
+	DEVMEMX_PHYSDESC **apsPhysDescTable;    /*!< Table to store links to physical descs */
+	DEVMEM_DEVICE_IMPORT sDeviceImport;     /*!< Device specifics of the memdesc */
 
 	IMG_CHAR szText[DEVMEM_ANNOTATION_MAX_LEN]; /*!< Annotation for this virt memdesc */
-
-#if defined(SUPPORT_PAGE_FAULT_DEBUG)
 	IMG_UINT32 ui32AllocationIndex;         /*!< To track mappings in this range */
-#endif
 
-#if defined(PVR_RI_DEBUG)
-	IMG_HANDLE hRIHandle;					/*!< Handle to RI information */
+#if defined(PVRSRV_ENABLE_GPU_MEMORY_INFO)
+	IMG_HANDLE hRIHandle;                   /*!< Handle to RI information */
 #endif
 };
 
@@ -301,12 +306,12 @@ PVRSRV_ERROR _DevmemValidateParams(IMG_DEVMEM_SIZE_T uiSize,
 @Description    Allocates memory for an import struct. Does not allocate a PMR!
                 Create locks for CPU and Devmem mappings.
 
-@Input          hBridge       Bridge to use for calls from the import.
-@Input          ppsImport     The import to allocate.
+@Input          hDevConnection  Connection to use for calls from the import.
+@Input          ppsImport       The import to allocate.
 @return         PVRSRV_ERROR
 ******************************************************************************/
 PVRSRV_ERROR _DevmemImportStructAlloc(SHARED_DEV_CONNECTION hDevConnection,
-									  DEVMEM_IMPORT **ppsImport);
+                                      DEVMEM_IMPORT **ppsImport);
 
 /******************************************************************************
 @Function       _DevmemImportStructInit
@@ -322,11 +327,11 @@ PVRSRV_ERROR _DevmemImportStructAlloc(SHARED_DEV_CONNECTION hDevConnection,
                               imported, suballocatable, unpinned?
 ******************************************************************************/
 void _DevmemImportStructInit(DEVMEM_IMPORT *psImport,
-							 IMG_DEVMEM_SIZE_T uiSize,
-							 IMG_DEVMEM_ALIGN_T uiAlign,
-							 PVRSRV_MEMALLOCFLAGS_T uiMapFlags,
-							 IMG_HANDLE hPMR,
-							 DEVMEM_PROPERTIES_T uiProperties);
+                             IMG_DEVMEM_SIZE_T uiSize,
+                             IMG_DEVMEM_ALIGN_T uiAlign,
+                             PVRSRV_MEMALLOCFLAGS_T uiMapFlags,
+                             IMG_HANDLE hPMR,
+                             DEVMEM_PROPERTIES_T uiProperties);
 
 /******************************************************************************
 @Function       _DevmemImportStructDevMap
@@ -346,9 +351,9 @@ void _DevmemImportStructInit(DEVMEM_IMPORT *psImport,
 @return         PVRSRV_ERROR
 ******************************************************************************/
 PVRSRV_ERROR _DevmemImportStructDevMap(DEVMEM_HEAP *psHeap,
-									   IMG_BOOL bMap,
-									   DEVMEM_IMPORT *psImport,
-									   IMG_UINT64 uiOptionalMapAddress);
+                                       IMG_BOOL bMap,
+                                       DEVMEM_IMPORT *psImport,
+                                       IMG_UINT64 uiOptionalMapAddress);
 
 /******************************************************************************
 @Function       _DevmemImportStructDevUnmap
@@ -447,10 +452,10 @@ IMG_BOOL _DevmemMemDescRelease(DEVMEM_MEMDESC *psMemDesc);
 
 /******************************************************************************
 @Function       _DevmemMemDescDiscard
-@Description    Discard a created, but unitilised MemDesc structure.
-                This must only be called before _DevmemMemDescInit
-                after which _DevmemMemDescRelease must be used to
-                "free" the MemDesc structure.
+@Description    Discard a created, but uninitialised MemDesc structure.
+                This must only be called before _DevmemMemDescInit after
+                which _DevmemMemDescRelease must be used to "free" the
+                MemDesc structure.
 ******************************************************************************/
 void _DevmemMemDescDiscard(DEVMEM_MEMDESC *psMemDesc);
 

@@ -52,14 +52,14 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #if defined(LINUX) && defined(__KERNEL__)
 
 #include "allocmem.h"
-#include <asm/atomic.h>
+#include <linux/atomic.h>
 
-#define OSLockCreateNoStats(phLock, eLockType) ({ \
+#define OSLockCreateNoStats(phLock) ({ \
 	PVRSRV_ERROR e = PVRSRV_ERROR_OUT_OF_MEMORY; \
 	*(phLock) = OSAllocMemNoStats(sizeof(struct mutex)); \
 	if (*(phLock)) { mutex_init(*(phLock)); e = PVRSRV_OK; }; \
 	e;})
-#define OSLockCreate(phLock, eLockType) ({ \
+#define OSLockCreate(phLock) ({ \
 	PVRSRV_ERROR e = PVRSRV_ERROR_OUT_OF_MEMORY; \
 	*(phLock) = OSAllocMem(sizeof(struct mutex)); \
 	if (*(phLock)) { mutex_init(*(phLock)); e = PVRSRV_OK; }; \
@@ -93,31 +93,34 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #else /* defined(LINUX) && defined(__KERNEL__) */
 
 #include "img_types.h"
+#include "img_defs.h"
 #include "pvrsrv_error.h"
 
-/* Define for mapping INT32 to UINT32 for implementation that 
- * use unsigned integers
+/* INT mapping pattern:
  * -2147483648 to -1 ---> 0 to +2147483647
  * 0 to +2147483647  ---> +2147483648 to +4294967295 */
+
+/*! Used for mapping UINT32 to INT32 for implementation that
+ * use unsigned integers as atomic types.
+ */
 #define MAP_UNSIGNED32_TO_SIGNED32(x)   ((x) - 0x80000000)
+/*! Used for mapping INT32 to UINT32 for implementation that
+ * use signed integers as atomic types.
+ */
 #define MAP_SIGNED32_TO_UNSIGNED32(x)   ((x) + 0x80000000)
+
 
 /**************************************************************************/ /*!
 @Function       OSLockCreate
 @Description    Creates an operating system lock object.
 @Output         phLock           The created lock.
-@Input          eLockType        The type of lock required. This may be:
-                                 LOCK_TYPE_PASSIVE - the lock will not be used
-                                 in interrupt context or
-                                 LOCK_TYPE_DISPATCH - the lock may be used
-                                 in interrupt context.
 @Return         PVRSRV_OK on success. PVRSRV_ERROR_OUT_OF_MEMORY if the driver
                 cannot allocate CPU memory needed for the lock.
                 PVRSRV_ERROR_INIT_FAILURE if the Operating System fails to
                 allocate the lock.
  */ /**************************************************************************/
 IMG_INTERNAL
-PVRSRV_ERROR OSLockCreate(POS_LOCK *phLock, LOCK_TYPE eLockType);
+PVRSRV_ERROR OSLockCreate(POS_LOCK *phLock);
 #if defined(INTEGRITY_OS)
 #define OSLockCreateNoStats OSLockCreate
 #endif
@@ -244,7 +247,7 @@ IMG_INT32 OSAtomicRead(const ATOMIC_T *pCounter);
 IMG_INTERNAL
 void OSAtomicWrite(ATOMIC_T *pCounter, IMG_INT32 v);
 
-/* For the following atomic operations, in addition to being SMP-safe, 
+/* For the following atomic operations, in addition to being SMP-safe,
    should also  have a memory barrier around each operation  */
 /*************************************************************************/ /*!
 @Function       OSAtomicIncrement
@@ -294,7 +297,7 @@ IMG_INT32 OSAtomicAdd(ATOMIC_T *pCounter, IMG_INT32 v);
 @Input          v               The value to be added to 'pCounter'
 @Input          t               The test value. If 'pCounter' equals this,
                                 its value will not be adjusted
-@Return         The new value of *pCounter.
+@Return         The old value of *pCounter.
 */ /**************************************************************************/
 IMG_INTERNAL
 IMG_INT32 OSAtomicAddUnless(ATOMIC_T *pCounter, IMG_INT32 v, IMG_INT32 t);
@@ -323,7 +326,7 @@ IMG_INT32 OSAtomicSubtract(ATOMIC_T *pCounter, IMG_INT32 v);
 @Input          v               The value to be subtracted from 'pCounter'
 @Input          t               The test value. If 'pCounter' equals this,
                                 its value will not be adjusted
-@Return         The new value of *pCounter.
+@Return         The old value of *pCounter.
 */ /**************************************************************************/
 IMG_INTERNAL
 IMG_INT32 OSAtomicSubtractUnless(ATOMIC_T *pCounter, IMG_INT32 v, IMG_INT32 t);
@@ -341,7 +344,7 @@ IMG_INT32 OSAtomicSubtractUnless(ATOMIC_T *pCounter, IMG_INT32 v, IMG_INT32 t);
                                 order to be modified
 @Input          newv            The value to write to the atomic variable if
                                 it equals 'oldv'
-@Return         The value of *pCounter after the function.
+@Return         The old value of *pCounter
 */ /**************************************************************************/
 IMG_INTERNAL
 IMG_INT32 OSAtomicCompareExchange(ATOMIC_T *pCounter, IMG_INT32 oldv, IMG_INT32 newv);

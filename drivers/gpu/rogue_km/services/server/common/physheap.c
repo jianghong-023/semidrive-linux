@@ -45,6 +45,7 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */ /***************************************************************************/
 #include "img_types.h"
+#include "img_defs.h"
 #include "physheap.h"
 #include "allocmem.h"
 #include "pvr_debug.h"
@@ -157,7 +158,7 @@ void PhysHeapUnregister(PHYS_HEAP *psPhysHeap)
 	{
 		PHYS_HEAP *psTmp = g_psPhysHeapList;
 
-		while(psTmp->psNext != psPhysHeap)
+		while (psTmp->psNext != psPhysHeap)
 		{
 			psTmp = psTmp->psNext;
 		}
@@ -187,7 +188,7 @@ PVRSRV_ERROR PhysHeapAcquire(IMG_UINT32 ui32PhysHeapID,
 		}
 		psTmp = psTmp->psNext;
 	}
-	
+
 	if (psTmp == NULL)
 	{
 		eError = PVRSRV_ERROR_PHYSHEAP_ID_INVALID;
@@ -195,7 +196,8 @@ PVRSRV_ERROR PhysHeapAcquire(IMG_UINT32 ui32PhysHeapID,
 	else
 	{
 		psTmp->ui32RefCount++;
-		PHYSHEAP_REFCOUNT_PRINT("%s: Heap %p, refcount = %d", __FUNCTION__, psTmp, psTmp->ui32RefCount);
+		PHYSHEAP_REFCOUNT_PRINT("%s: Heap %p, refcount = %d",
+								__func__, psTmp, psTmp->ui32RefCount);
 	}
 
 	OSLockRelease(g_hPhysHeapLock);
@@ -210,7 +212,8 @@ void PhysHeapRelease(PHYS_HEAP *psPhysHeap)
 
 	OSLockAcquire(g_hPhysHeapLock);
 	psPhysHeap->ui32RefCount--;
-	PHYSHEAP_REFCOUNT_PRINT("%s: Heap %p, refcount = %d", __FUNCTION__, psPhysHeap, psPhysHeap->ui32RefCount);
+	PHYSHEAP_REFCOUNT_PRINT("%s: Heap %p, refcount = %d",
+							__func__, psPhysHeap, psPhysHeap->ui32RefCount);
 	OSLockRelease(g_hPhysHeapLock);
 
 	PVR_DPF_RETURN;
@@ -321,9 +324,9 @@ PVRSRV_ERROR PhysHeapInit(void)
 
 	g_psPhysHeapList = NULL;
 
-	eError = OSLockCreate(&g_hPhysHeapLock, LOCK_TYPE_NONE);
+	eError = OSLockCreate(&g_hPhysHeapLock);
 
-	if(eError != PVRSRV_OK)
+	if (eError != PVRSRV_OK)
 	{
 		PVR_DPF((PVR_DBG_ERROR, "%s: Failed to create PhysHeapLock: %s",
 										__func__,

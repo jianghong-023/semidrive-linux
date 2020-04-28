@@ -110,6 +110,7 @@ X( 6,  HTB_GROUP_CTRL,  HTB_SF_CTRL_FWSYNC_SCALE,       "HTBFWSync OSTS=%08x%08x
 X( 7,  HTB_GROUP_CTRL,  HTB_SF_CTRL_FWSYNC_SCALE_RPT,   "FW Sync scale info OSTS=%08x%08x CRTS=%08x%08x CalcClkSpd=%d\n", 5) \
 X( 8,  HTB_GROUP_CTRL,  HTB_SF_CTRL_FWSYNC_MARK,        "FW Sync Partition marker: %d\n", 1) \
 X( 9,  HTB_GROUP_CTRL,  HTB_SF_CTRL_FWSYNC_MARK_RPT,    "FW Sync Partition repeat: %d\n", 1) \
+X( 10, HTB_GROUP_CTRL,  HTB_SF_CTRL_FWSYNC_MARK_SCALE,  "Text not used", 6)\
 \
 X( 1,  HTB_GROUP_MMU,   HTB_SF_MMU_PAGE_OP_TABLE,       "MMU page op table entry page_id=%08x%08x index=%d level=%d val=%08x%08x map=%d\n", 7) \
 X( 2,  HTB_GROUP_MMU,   HTB_SF_MMU_PAGE_OP_ALLOC,       "MMU allocating DevVAddr from %08x%08x to %08x%08x\n", 4) \
@@ -185,7 +186,7 @@ typedef enum _HTB_LOG_TYPE {
  *   The following macro assigns those values to the enum generated SF ids list.
  */
 #define HTB_LOG_IDMARKER            (0x70000000)
-#define HTB_LOG_CREATESFID(a,b,e)   ((a) | (b<<12) | (e<<16)) | HTB_LOG_IDMARKER
+#define HTB_LOG_CREATESFID(a,b,e)   (((a) | (b << 12) | (e << 16)) | HTB_LOG_IDMARKER)
 
 #define HTB_LOG_IDMASK              (0xFFF00000)
 #define HTB_LOG_VALIDID(I)          ( ((I) & HTB_LOG_IDMASK) == HTB_LOG_IDMARKER )
@@ -202,15 +203,30 @@ typedef enum HTB_LOG_SFids {
 #define HTB_SF_LVL(x) (0)
 /* Returns how many arguments the SF(string format) for the given (enum generated) id requires */
 #define HTB_SF_PARAMNUM(x) (((x)>>16) & 0xf)
+/* Returns the id of given enum */
+#define HTB_SF_ID(x) (x & 0xfff)
 
-/* format of messages is: SF:PID:TIME:[PARn]*
+/* format of messages is: SF:PID:TIMEPT1:TIMEPT2:[PARn]*
  */
-#define HTB_LOG_HEADER_SIZE         3
+#define HTB_LOG_HEADER_SIZE         4
 #define HTB_LOG_MAX_PARAMS          15
 
 #if defined (__cplusplus)
 }
 #endif
+
+/* Defines for handling MARK_SCALE special case */
+#define HTB_GID_CTRL 1
+#define HTB_ID_MARK_SCALE 10
+#define HTB_MARK_SCALE_ARG_ARRAY_SIZE 6
+
+/* Defines for extracting args from array for special case MARK_SCALE */
+#define HTB_ARG_SYNCMARK 0
+#define HTB_ARG_OSTS_PT1 1
+#define HTB_ARG_OSTS_PT2 2
+#define HTB_ARG_CRTS_PT1 3
+#define HTB_ARG_CRTS_PT2 4
+#define HTB_ARG_CLKSPD   5
 
 #endif /* __HTBUFFER_SF_H__ */
 /*****************************************************************************

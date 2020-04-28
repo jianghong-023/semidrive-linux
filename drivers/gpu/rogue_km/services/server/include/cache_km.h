@@ -61,6 +61,8 @@ typedef IMG_UINT32 PVRSRV_CACHE_OP_ADDR_TYPE;	/*!< Represents CPU address type r
 #define PVRSRV_CACHE_OP_ADDR_TYPE_PHYSICAL	0x2	/*!< Operation requires CPU physical address only */
 #define PVRSRV_CACHE_OP_ADDR_TYPE_BOTH		0x3	/*!< Operation requires both CPU virtual & physical addresses */
 
+#include "connection_server.h"
+
 /*
  * CacheOpInit() & CacheOpDeInit()
  *
@@ -78,17 +80,6 @@ void CacheOpDeInit(void);
  */
 PVRSRV_ERROR CacheOpInit2(void);
 void CacheOpDeInit2(void);
-
-/*
- * CacheOpAcquireInfoPage() & CacheOpReleaseInfoPage()
- *
- * This interface is used for obtaining the global CacheOp info. page
- * which acts as a repository of meta-data for the cache maintenance
- * framework. The use of this information page outside of services
- * is _not_ recommended.
- */
-PVRSRV_ERROR CacheOpAcquireInfoPage (PMR **ppsPMR);
-PVRSRV_ERROR CacheOpReleaseInfoPage (PMR *psPMR);
 
 /*
  * CacheOpExec()
@@ -111,7 +102,7 @@ PVRSRV_ERROR CacheOpExec (PPVRSRV_DEVICE_NODE psDevNode,
  * Same as CacheOpExec(), except arguments are _Validated_ before being
  * presented to the underlying OS kernel for CPU data-cache maintenance.
  * The uiAddress is the start CPU virtual address for the to-be d-cache
- * maintained PMR, it can be NULL in which case a remap will be performed 
+ * maintained PMR, it can be NULL in which case a remap will be performed
  * internally, if required for cache maintenance. This is primarily used
  * as the services client bridge call handler for synchronous user-mode
  * cache maintenance requests.
@@ -125,7 +116,7 @@ PVRSRV_ERROR CacheOpValExec(PMR *psPMR,
 /*
  * CacheOpQueue()
  *
- * This is the secondary cache maintenance interface and it is not 
+ * This is the secondary cache maintenance interface and it is not
  * guaranteed to be synchronous in that requests could be deferred
  * and executed asynchronously. This interface is primarily meant
  * as services client bridge call handler. Both uiInfoPgGFSeqNum
@@ -133,7 +124,9 @@ PVRSRV_ERROR CacheOpValExec(PMR *psPMR,
  * server queueing protocol so making use of this interface outside
  * of services client is not recommended and should not be done.
  */
-PVRSRV_ERROR CacheOpQueue (IMG_UINT32 ui32OpCount,
+PVRSRV_ERROR CacheOpQueue (CONNECTION_DATA *psConnection,
+					    PPVRSRV_DEVICE_NODE psDevNode,
+						IMG_UINT32 ui32OpCount,
 						PMR **ppsPMR,
 						IMG_UINT64 *puiAddress,
 						IMG_DEVMEM_OFFSET_T *puiOffset,

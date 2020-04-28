@@ -40,8 +40,8 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */ /**************************************************************************/
 
-#include <asm/io.h>
 #include <asm/page.h>
+#include <linux/io.h>
 #include <linux/mm.h>
 #include <linux/dma-mapping.h>
 #if defined(CONFIG_L4)
@@ -274,12 +274,28 @@ static INLINE int _OSMMapPMR(PVRSRV_DEVICE_NODE *psDevNode,
 			 * This path is just for debugging. It should be
 			 * equivalent to the remap_pfn_range() path.
 			 */
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 20, 0))
+			vm_fault_t vmf;
+
+			vmf = vmf_insert_mixed(ps_vma,
+								  	ps_vma->vm_start + uiOffset,
+								  	sPFN);
+			if (vmf & VM_FAULT_ERROR)
+			{
+				iStatus = vm_fault_to_errno(vmf, 0);
+			}
+			else
+			{
+				iStatus = 0;
+			}
+#else
 			iStatus = vm_insert_mixed(ps_vma,
 									  ps_vma->vm_start + uiOffset,
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 5, 0))
 									  sPFN);
 #else
 									  uiPFN);
+#endif
 #endif
 		}
 		else
@@ -442,6 +458,7 @@ OSMMapPMRGeneric(PMR *psPMR, PMR_MMAP_DATA pOSMMapData)
 #if defined(PMR_OS_USE_VM_INSERT_PAGE)
 	bUseVMInsertPage = (uiLog2PageSize == PAGE_SHIFT) && (PMR_GetType(psPMR) != PMR_TYPE_EXTMEM);
 #if defined(CONFIG_L4)
+	/* L4 uses CMA allocations */
 	bUseVMInsertPage = IMG_FALSE;
 #endif
 #endif

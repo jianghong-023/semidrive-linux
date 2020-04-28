@@ -43,10 +43,10 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */ /**************************************************************************/
 
 #include "img_types.h"
+#include "img_defs.h"
 #include "client_sync_bridge.h"
-#if defined(PVRSRV_ENABLE_FULL_SYNC_TRACKING)
 #include "client_synctracking_bridge.h"
-#endif
+#include "info_page_client.h"
 #include "pvr_bridge.h"
 #include "allocmem.h"
 #include "osfunc.h"
@@ -75,6 +75,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 #define MAX_SYNC_MEM				(4 * 1024 * 1024)
 
+#if defined(SUPPORT_SERVER_SYNC_IMPL)
 typedef struct _SYNC_BLOCK_LIST_
 {
 	IMG_UINT32			ui32BlockCount;			/*!< Number of contexts in the list */
@@ -110,6 +111,7 @@ typedef struct _SYNC_OP_COOKIE_
 	IMG_HANDLE				*pahServerSync;
 	IMG_UINT32              *paui32ServerFlags;
 } SYNC_OP_COOKIE;
+#endif
 
 /* forward declaration */
 static PVRSRV_ERROR
@@ -169,7 +171,7 @@ AllocSyncPrimitiveBlock(SYNC_PRIM_CONTEXT *psContext,
 	psSyncBlk->psContext = psContext;
 
 	/* Allocate sync prim block */
-	eError = BridgeAllocSyncPrimitiveBlock(psContext->hDevConnection,
+	eError = BridgeAllocSyncPrimitiveBlock(GetBridgeHandle(psContext->hDevConnection),
 	                                       &psSyncBlk->hServerSyncPrimBlock,
 	                                       &psSyncBlk->ui32FirmwareAddr,
 	                                       &psSyncBlk->ui32SyncBlockSize,
@@ -221,7 +223,7 @@ AllocSyncPrimitiveBlock(SYNC_PRIM_CONTEXT *psContext,
 	DevmemFree(psSyncBlk->hMemDesc);
 	fail_import:
 	fail_export:
-	BridgeFreeSyncPrimitiveBlock(psContext->hDevConnection,
+	BridgeFreeSyncPrimitiveBlock(GetBridgeHandle(psContext->hDevConnection),
 	                             psSyncBlk->hServerSyncPrimBlock);
 	fail_blockalloc:
 	OSFreeMem(psSyncBlk);
@@ -236,7 +238,7 @@ FreeSyncPrimitiveBlock(SYNC_PRIM_BLOCK *psSyncBlk)
 
 	DevmemReleaseCpuVirtAddr(psSyncBlk->hMemDesc);
 	DevmemFree(psSyncBlk->hMemDesc);
-	BridgeFreeSyncPrimitiveBlock(psContext->hDevConnection,
+	BridgeFreeSyncPrimitiveBlock(GetBridgeHandle(psContext->hDevConnection),
 	                             psSyncBlk->hServerSyncPrimBlock);
 	OSFreeMem(psSyncBlk);
 }
@@ -256,10 +258,10 @@ SyncPrimBlockImport(RA_PERARENA_HANDLE hArena,
 	PVRSRV_ERROR eError;
 	PVR_UNREFERENCED_PARAMETER(uFlags);
 
-	/* Check we've not be called with an unexpected size */
+	/* Check we've not been called with an unexpected size */
 	if (!hArena || sizeof(IMG_UINT32) != uSize)
 	{
-		PVR_DPF((PVR_DBG_ERROR, "%s: invalid input params", __FUNCTION__));
+		PVR_DPF((PVR_DBG_ERROR, "%s: invalid input params", __func__));
 		eError = PVRSRV_ERROR_INVALID_PARAMS;
 		goto e0;
 	}
@@ -274,7 +276,9 @@ SyncPrimBlockImport(RA_PERARENA_HANDLE hArena,
 	eError = AllocSyncPrimitiveBlock(psContext, &psSyncBlock);
 	if (eError != PVRSRV_OK)
 	{
-		PVR_DPF((PVR_DBG_ERROR, "Failed to allocate syncprim block (%d)", eError));
+		PVR_DPF((PVR_DBG_ERROR,
+		         "%s: Failed to allocate syncprim block (%d)",
+		         __func__, eError));
 		goto fail_syncblockalloc;
 	}
 
@@ -322,7 +326,7 @@ SyncPrimBlockUnimport(RA_PERARENA_HANDLE hArena,
 
 	if (!psContext || !psSyncBlock || uiBase != psSyncBlock->uiSpanBase)
 	{
-		PVR_DPF((PVR_DBG_ERROR, "%s: invalid input params", __FUNCTION__));
+		PVR_DPF((PVR_DBG_ERROR, "%s: invalid input params", __func__));
 		return;
 	}
 
@@ -346,7 +350,7 @@ static INLINE IMG_UINT32 SyncPrimGetOffset(SYNC_PRIM *psSyncInt)
 	 * cast to 32-bit number. Need to review all call sequences that use this
 	 * function, added explicit casting for now.
 	 */
-	ui64Temp =  psSyncInt->u.sLocal.uiSpanAddr - psSyncInt->u.sLocal.psSyncBlock->uiSpanBase;
+	ui64Temp = psSyncInt->u.sLocal.uiSpanAddr - psSyncInt->u.sLocal.psSyncBlock->uiSpanBase;
 	PVR_ASSERT(ui64Temp<IMG_UINT32_MAX);
 	return (IMG_UINT32)ui64Temp;
 }
@@ -369,34 +373,33 @@ static void SyncPrimLocalFree(SYNC_PRIM *psSyncInt)
 
 	{
 		PVRSRV_ERROR eError;
-		IMG_HANDLE hConn =
-				psSyncInt->u.sLocal.psSyncBlock->psContext->hDevConnection;
+		IMG_HANDLE hBridge =
+				GetBridgeHandle(psSyncInt->u.sLocal.psSyncBlock->psContext->hDevConnection);
 
-#if defined(PVRSRV_ENABLE_FULL_SYNC_TRACKING)
-		if(PVRSRVIsBridgeEnabled(hConn, PVRSRV_BRIDGE_SYNCTRACKING))
+		if (GetInfoPageDebugFlags(psSyncInt->u.sLocal.psSyncBlock->psContext->hDevConnection) & DEBUG_FEATURE_FULL_SYNC_TRACKING_ENABLED)
 		{
-			if(psSyncInt->u.sLocal.hRecord)
+			if (psSyncInt->u.sLocal.hRecord)
 			{
 				/* remove this sync record */
-				eError = BridgeSyncRecordRemoveByHandle(hConn,
+				eError = BridgeSyncRecordRemoveByHandle(hBridge,
 				                                        psSyncInt->u.sLocal.hRecord);
 				if (PVRSRV_OK != eError)
 				{
-					PVR_DPF((PVR_DBG_ERROR, "%s: failed to remove SyncRecord", __FUNCTION__));
+					PVR_DPF((PVR_DBG_ERROR, "%s: failed to remove SyncRecord", __func__));
 				}
 			}
 		}
 		else
-#endif /* if defined(PVRSRV_ENABLE_FULL_SYNC_TRACKING) */
 		{
 			IMG_UINT32 ui32FWAddr = psSyncBlock->ui32FirmwareAddr +
 					SyncPrimGetOffset(psSyncInt);
 
-			eError = BridgeSyncFreeEvent(hConn, ui32FWAddr);
+			eError = BridgeSyncFreeEvent(hBridge, ui32FWAddr);
 			if (eError != PVRSRV_OK)
 			{
-				PVR_DPF((PVR_DBG_WARNING, "BridgeSyncAllocEvent failed with error:"
-						" %d", eError));
+				PVR_DPF((PVR_DBG_WARNING,
+				         "%s: BridgeSyncFreeEvent failed with error: %d",
+				         __func__, eError));
 			}
 		}
 	}
@@ -417,7 +420,7 @@ static void SyncPrimLocalFree(SYNC_PRIM *psSyncInt)
 	OSFreeMem(psSyncInt);
 	_SyncPrimContextUnref(psContext);
 }
-
+#if defined(SUPPORT_SERVER_SYNC_IMPL)
 static void SyncPrimServerFree(SYNC_PRIM *psSyncInt)
 {
 	PVRSRV_ERROR eError;
@@ -430,7 +433,7 @@ static void SyncPrimServerFree(SYNC_PRIM *psSyncInt)
 	}
 	OSFreeMem(psSyncInt);
 }
-
+#endif
 static void SyncPrimLocalUnref(SYNC_PRIM *psSyncInt)
 {
 	if (!OSAtomicRead(&psSyncInt->u.sLocal.hRefCount))
@@ -443,6 +446,7 @@ static void SyncPrimLocalUnref(SYNC_PRIM *psSyncInt)
 	}
 }
 
+#if defined(SUPPORT_SERVER_SYNC_IMPL)
 static void SyncPrimLocalRef(SYNC_PRIM *psSyncInt)
 {
 	if (!OSAtomicRead(&psSyncInt->u.sLocal.hRefCount))
@@ -454,24 +458,26 @@ static void SyncPrimLocalRef(SYNC_PRIM *psSyncInt)
 		OSAtomicIncrement(&psSyncInt->u.sLocal.hRefCount);
 	}
 }
+#endif
 
 static IMG_UINT32 SyncPrimGetFirmwareAddrLocal(SYNC_PRIM *psSyncInt)
 {
 	SYNC_PRIM_BLOCK *psSyncBlock;
 
 	psSyncBlock = psSyncInt->u.sLocal.psSyncBlock;
-	return psSyncBlock->ui32FirmwareAddr + SyncPrimGetOffset(psSyncInt);	
+	return psSyncBlock->ui32FirmwareAddr + SyncPrimGetOffset(psSyncInt);
 }
-
+#if defined(SUPPORT_SERVER_SYNC_IMPL)
 static IMG_UINT32 SyncPrimGetFirmwareAddrServer(SYNC_PRIM *psSyncInt)
 {
 	return psSyncInt->u.sServer.ui32FirmwareAddr;
 }
 
 #if !defined(__KERNEL__)
+
 static SYNC_BRIDGE_HANDLE _SyncPrimGetBridgeHandleLocal(SYNC_PRIM *psSyncInt)
 {
-	return psSyncInt->u.sLocal.psSyncBlock->psContext->hDevConnection;
+	return GetBridgeHandle(psSyncInt->u.sLocal.psSyncBlock->psContext->hDevConnection);
 }
 
 static SYNC_BRIDGE_HANDLE _SyncPrimGetBridgeHandleServer(SYNC_PRIM *psSyncInt)
@@ -634,7 +640,7 @@ static void _SyncPrimBlockListDestroy(SYNC_BLOCK_LIST *psBlockList)
 	OSFreeMem(psBlockList->papsSyncPrimBlock);
 	OSFreeMem(psBlockList);
 }
-
+#endif
 
 static INLINE IMG_UINT32 _Log2(IMG_UINT32 ui32Align)
 {
@@ -736,13 +742,13 @@ IMG_INTERNAL void SyncPrimContextDestroy(PSYNC_PRIM_CONTEXT hSyncPrimContext)
 	SYNC_PRIM_CONTEXT *psContext = hSyncPrimContext;
 	if (1 != OSAtomicRead(&psContext->hRefCount))
 	{
-		PVR_DPF((PVR_DBG_ERROR, "%s attempted with active references, may be the result of a race", __FUNCTION__));
+		PVR_DPF((PVR_DBG_ERROR, "%s attempted with active references, may be the result of a race", __func__));
 	}
 #if defined(PVRSRV_FORCE_UNLOAD_IF_BAD_STATE)
 #if defined(__KERNEL__)
 	if (PVRSRVGetPVRSRVData()->eServicesState != PVRSRV_SERVICES_STATE_OK)
 	{
-		PVR_DPF((PVR_DBG_ERROR, "%s: Forcing context destruction due to bad driver state.", __FUNCTION__));
+		PVR_DPF((PVR_DBG_ERROR, "%s: Forcing context destruction due to bad driver state", __func__));
 		OSAtomicWrite(&psContext->hRefCount, 1);
 	}
 #endif
@@ -798,13 +804,12 @@ static PVRSRV_ERROR _SyncPrimAlloc(PSYNC_PRIM_CONTEXT hSyncPrimContext,
 	(void) _SyncPrimSetValue(psNewSync, LOCAL_SYNC_PRIM_RESET_VALUE);
 #endif
 
-#if defined(PVRSRV_ENABLE_FULL_SYNC_TRACKING)
-	if(PVRSRVIsBridgeEnabled(psSyncBlock->psContext->hDevConnection, PVRSRV_BRIDGE_SYNCTRACKING))
+	if (GetInfoPageDebugFlags(psSyncBlock->psContext->hDevConnection) & DEBUG_FEATURE_FULL_SYNC_TRACKING_ENABLED)
 	{
 		IMG_CHAR szClassName[SYNC_MAX_CLASS_NAME_LEN];
 		size_t uiSize;
 
-		if(pszClassName)
+		if (pszClassName)
 		{
 			uiSize = OSStringNLength(pszClassName, SYNC_MAX_CLASS_NAME_LEN);
 			/* Copy the class name annotation into a fixed-size array */
@@ -823,7 +828,7 @@ static PVRSRV_ERROR _SyncPrimAlloc(PSYNC_PRIM_CONTEXT hSyncPrimContext,
 
 		/* record this sync */
 		eError = BridgeSyncRecordAdd(
-				psSyncBlock->psContext->hDevConnection,
+				GetBridgeHandle(psSyncBlock->psContext->hDevConnection),
 				&psNewSync->u.sLocal.hRecord,
 				psSyncBlock->hServerSyncPrimBlock,
 				psSyncBlock->ui32FirmwareAddr,
@@ -834,14 +839,13 @@ static PVRSRV_ERROR _SyncPrimAlloc(PSYNC_PRIM_CONTEXT hSyncPrimContext,
 		if (PVRSRV_OK != eError)
 		{
 			PVR_DPF((PVR_DBG_ERROR, "%s: failed to add SyncRecord \"%s\" (%s)",
-					__FUNCTION__,
+					__func__,
 					szClassName,
 					PVRSRVGETERRORSTRING(eError)));
 			psNewSync->u.sLocal.hRecord = NULL;
 		}
 	}
 	else
-#endif /* if defined(PVRSRV_ENABLE_FULL_SYNC_TRACKING) */
 	{
 		size_t	uiSize;
 
@@ -851,15 +855,17 @@ static PVRSRV_ERROR _SyncPrimAlloc(PSYNC_PRIM_CONTEXT hSyncPrimContext,
 			uiSize++;
 		/* uiSize now reflects size used for pszClassName + NUL byte */
 
-		eError = BridgeSyncAllocEvent(hSyncPrimContext->hDevConnection,
+		eError = BridgeSyncAllocEvent(GetBridgeHandle(hSyncPrimContext->hDevConnection),
 		                              bServerSync,
 		                              psSyncBlock->ui32FirmwareAddr + SyncPrimGetOffset(psNewSync),
 		                              uiSize,
 		                              pszClassName);
 		if (eError != PVRSRV_OK)
 		{
-			PVR_DPF((PVR_DBG_WARNING, "BridgeSyncAllocEvent failed with error: %d",
-					eError));
+			PVR_DPF((PVR_DBG_WARNING,
+			         "%s: BridgeSyncAllocEvent failed with error: %d",
+			         __func__,
+			         eError));
 		}
 	}
 
@@ -871,6 +877,7 @@ static PVRSRV_ERROR _SyncPrimAlloc(PSYNC_PRIM_CONTEXT hSyncPrimContext,
 	return eError;
 }
 
+#if defined(SUPPORT_SERVER_SYNC_IMPL)
 #if defined(__KERNEL__)
 IMG_INTERNAL PVRSRV_ERROR SyncPrimAllocForServerSync(PSYNC_PRIM_CONTEXT hSyncPrimContext,
                                                      PVRSRV_CLIENT_SYNC_PRIM **ppsSync,
@@ -881,6 +888,7 @@ IMG_INTERNAL PVRSRV_ERROR SyncPrimAllocForServerSync(PSYNC_PRIM_CONTEXT hSyncPri
 	                      pszClassName,
 	                      IMG_TRUE);
 }
+#endif
 #endif
 
 IMG_INTERNAL PVRSRV_ERROR SyncPrimAlloc(PSYNC_PRIM_CONTEXT hSyncPrimContext,
@@ -906,18 +914,22 @@ _SyncPrimSetValue(SYNC_PRIM *psSyncInt, IMG_UINT32 ui32Value)
 		psSyncBlock = psSyncInt->u.sLocal.psSyncBlock;
 		psContext = psSyncBlock->psContext;
 
-		eError = BridgeSyncPrimSet(psContext->hDevConnection,
+		eError = BridgeSyncPrimSet(GetBridgeHandle(psContext->hDevConnection),
 		                           psSyncBlock->hServerSyncPrimBlock,
 		                           SyncPrimGetOffset(psSyncInt)/sizeof(IMG_UINT32),
 		                           ui32Value);
 	}
 	else
 	{
+#if defined(SUPPORT_SERVER_SYNC_IMPL)
 		eError = BridgeServerSyncPrimSet(psSyncInt->u.sServer.hBridge,
 		                                 psSyncInt->u.sServer.hServerSync,
 		                                 ui32Value);
+#else
+	PVR_DPF((PVR_DBG_ERROR, "%s: Server sync not supported, attempted use of server sync", __func__));
+	return PVRSRV_ERROR_NOT_SUPPORTED;
+#endif
 	}
-	/* These functions don't actually fail */
 	return eError;
 }
 
@@ -928,7 +940,7 @@ IMG_INTERNAL PVRSRV_ERROR SyncPrimFree(PVRSRV_CLIENT_SYNC_PRIM *psSync)
 
 	if (!psSync)
 	{
-		PVR_DPF((PVR_DBG_ERROR, "%s: null sync pointer", __FUNCTION__));
+		PVR_DPF((PVR_DBG_ERROR, "%s: null sync pointer", __func__));
 		eError = PVRSRV_ERROR_INVALID_PARAMS;
 		goto err_out;
 	}
@@ -940,7 +952,12 @@ IMG_INTERNAL PVRSRV_ERROR SyncPrimFree(PVRSRV_CLIENT_SYNC_PRIM *psSync)
 	}
 	else if (psSyncInt->eType == SYNC_PRIM_TYPE_SERVER)
 	{
+#if defined(SUPPORT_SERVER_SYNC_IMPL)
 		SyncPrimServerFree(psSyncInt);
+#else
+	PVR_DPF((PVR_DBG_ERROR, "%s: Server sync not supported, attempted use of server sync", __func__));
+	return PVRSRV_ERROR_NOT_SUPPORTED;
+#endif
 	}
 	else
 	{
@@ -948,7 +965,7 @@ IMG_INTERNAL PVRSRV_ERROR SyncPrimFree(PVRSRV_CLIENT_SYNC_PRIM *psSync)
 			Either the client has given us a bad pointer or there is an
 			error in this module
 		 */
-		PVR_DPF((PVR_DBG_ERROR, "%s: Invalid sync type", __FUNCTION__));
+		PVR_DPF((PVR_DBG_ERROR, "%s: Invalid sync type", __func__));
 		eError = PVRSRV_ERROR_INVALID_SYNC_PRIM;
 		goto err_out;
 	}
@@ -966,7 +983,7 @@ SyncPrimNoHwUpdate(PVRSRV_CLIENT_SYNC_PRIM *psSync, IMG_UINT32 ui32Value)
 
 	if (!psSync)
 	{
-		PVR_DPF((PVR_DBG_ERROR, "%s: null sync pointer", __FUNCTION__));
+		PVR_DPF((PVR_DBG_ERROR, "%s: null sync pointer", __func__));
 		eError = PVRSRV_ERROR_INVALID_PARAMS;
 		goto err_out;
 	}
@@ -991,7 +1008,7 @@ SyncPrimSet(PVRSRV_CLIENT_SYNC_PRIM *psSync, IMG_UINT32 ui32Value)
 
 	if (!psSync)
 	{
-		PVR_DPF((PVR_DBG_ERROR, "%s: null sync pointer", __FUNCTION__));
+		PVR_DPF((PVR_DBG_ERROR, "%s: null sync pointer", __func__));
 		eError = PVRSRV_ERROR_INVALID_PARAMS;
 		goto err_out;
 	}
@@ -999,7 +1016,7 @@ SyncPrimSet(PVRSRV_CLIENT_SYNC_PRIM *psSync, IMG_UINT32 ui32Value)
 	psSyncInt = IMG_CONTAINER_OF(psSync, SYNC_PRIM, sCommon);
 	if (psSyncInt->eType != SYNC_PRIM_TYPE_LOCAL)
 	{
-		PVR_DPF((PVR_DBG_ERROR, "SyncPrimSet: Invalid sync type"));
+		PVR_DPF((PVR_DBG_ERROR, "%s: Invalid sync type", __func__));
 		eError = PVRSRV_ERROR_INVALID_SYNC_PRIM;
 		goto err_out;
 	}
@@ -1020,16 +1037,17 @@ IMG_INTERNAL PVRSRV_ERROR SyncPrimLocalGetHandleAndOffset(PVRSRV_CLIENT_SYNC_PRI
 	PVRSRV_ERROR eError = PVRSRV_OK;
 	SYNC_PRIM *psSyncInt;
 
-	if(!psSync || !phBlock || !pui32Offset)
+	if (unlikely(!psSync || !phBlock || !pui32Offset))
 	{
-		PVR_DPF((PVR_DBG_ERROR, "SyncPrimGetHandleAndOffset: invalid input pointer"));
+		PVR_DPF((PVR_DBG_ERROR, "%s: invalid input pointer",
+		         __func__));
 		eError = PVRSRV_ERROR_INVALID_PARAMS;
 		goto err_out;
 	}
 
 	psSyncInt = IMG_CONTAINER_OF(psSync, SYNC_PRIM, sCommon);
 
-	if (psSyncInt->eType == SYNC_PRIM_TYPE_LOCAL)
+	if (likely(psSyncInt->eType == SYNC_PRIM_TYPE_LOCAL))
 	{
 		*phBlock = psSyncInt->u.sLocal.psSyncBlock->hServerSyncPrimBlock;
 		*pui32Offset = psSyncInt->u.sLocal.uiSpanAddr - psSyncInt->u.sLocal.psSyncBlock->uiSpanBase;
@@ -1037,7 +1055,7 @@ IMG_INTERNAL PVRSRV_ERROR SyncPrimLocalGetHandleAndOffset(PVRSRV_CLIENT_SYNC_PRI
 	else
 	{
 		PVR_DPF((PVR_DBG_ERROR, "%s: psSync not a Local sync prim (%d)",
-				__FUNCTION__, psSyncInt->eType));
+				__func__, psSyncInt->eType));
 		eError = PVRSRV_ERROR_INVALID_PARAMS;
 		goto err_out;
 	}
@@ -1053,9 +1071,9 @@ SyncPrimGetFirmwareAddr(PVRSRV_CLIENT_SYNC_PRIM *psSync, IMG_UINT32 *pui32FwAddr
 	SYNC_PRIM *psSyncInt;
 
 	*pui32FwAddr = 0;
-	if (!psSync)
+	if (unlikely(!psSync))
 	{
-		PVR_DPF((PVR_DBG_ERROR, "%s: invalid input pointer", __FUNCTION__));
+		PVR_DPF((PVR_DBG_ERROR, "%s: invalid input pointer", __func__));
 		eError = PVRSRV_ERROR_INVALID_PARAMS;
 		goto err_out;
 	}
@@ -1067,14 +1085,19 @@ SyncPrimGetFirmwareAddr(PVRSRV_CLIENT_SYNC_PRIM *psSync, IMG_UINT32 *pui32FwAddr
 	}
 	else if (psSyncInt->eType == SYNC_PRIM_TYPE_SERVER)
 	{
+#if defined(SUPPORT_SERVER_SYNC_IMPL)
 		*pui32FwAddr = SyncPrimGetFirmwareAddrServer(psSyncInt);
+#else
+	PVR_DPF((PVR_DBG_ERROR, "%s: Server sync not supported, attempted use of server sync", __func__));
+	return PVRSRV_ERROR_NOT_SUPPORTED;
+#endif
 	}
 	else
 	{
 		/* Either the client has given us a bad pointer or there is an
 		 * error in this module
 		 */
-		PVR_DPF((PVR_DBG_ERROR, "%s: Invalid sync type", __FUNCTION__));
+		PVR_DPF((PVR_DBG_ERROR, "%s: Invalid sync type", __func__));
 		eError = PVRSRV_ERROR_INVALID_SYNC_PRIM;
 		goto err_out;
 	}
@@ -1083,131 +1106,7 @@ SyncPrimGetFirmwareAddr(PVRSRV_CLIENT_SYNC_PRIM *psSync, IMG_UINT32 *pui32FwAddr
 	return eError;
 }
 
-#if !defined(__KERNEL__)
-IMG_INTERNAL PVRSRV_ERROR SyncPrimDumpSyncs(IMG_UINT32 ui32SyncCount, PVRSRV_CLIENT_SYNC_PRIM **papsSync, const IMG_CHAR *pcszExtraInfo)
-{
-#if defined(PVRSRV_NEED_PVR_DPF)
-	SYNC_PRIM *psSyncInt;
-	PVRSRV_CLIENT_SYNC_PRIM **papsServerSync;
-	IMG_UINT32 ui32ServerSyncs = 0;
-	IMG_UINT32 *pui32UID = NULL;
-	IMG_UINT32 *pui32FWAddr = NULL;
-	IMG_UINT32 *pui32CurrentOp = NULL;
-	IMG_UINT32 *pui32NextOp = NULL;
-	IMG_UINT32 i;
-	PVRSRV_ERROR eError = PVRSRV_OK;
-
-	papsServerSync = OSAllocMem(ui32SyncCount * sizeof(PVRSRV_CLIENT_SYNC_PRIM *));
-	if (!papsServerSync)
-	{
-		return PVRSRV_ERROR_OUT_OF_MEMORY;
-	}
-
-	for (i = 0; i < ui32SyncCount; i++)
-	{
-		psSyncInt = IMG_CONTAINER_OF(papsSync[i], SYNC_PRIM, sCommon);
-		if (psSyncInt->eType == SYNC_PRIM_TYPE_LOCAL)
-		{
-			PVR_DPF((PVR_DBG_ERROR, "%s: sync=local  fw=0x%x curr=0x%04x",
-					pcszExtraInfo,
-					SyncPrimGetFirmwareAddrLocal(psSyncInt),
-					*psSyncInt->sCommon.pui32LinAddr));
-		}
-		else if (psSyncInt->eType == SYNC_PRIM_TYPE_SERVER)
-		{
-			papsServerSync[ui32ServerSyncs++] = papsSync[i];
-		}
-		else
-		{
-			PVR_DPF((PVR_DBG_ERROR, "SyncPrimDumpSyncs: Invalid sync type"));
-			/*
-			   Either the client has given us a bad pointer or there is an
-			   error in this module
-			 */
-			eError = PVRSRV_ERROR_INVALID_SYNC_PRIM;
-			goto err_free;
-		}
-	}
-
-	if (ui32ServerSyncs > 0)
-	{
-		pui32UID = OSAllocMem(ui32ServerSyncs * sizeof(IMG_UINT32));
-		if (!pui32UID)
-		{
-			eError = PVRSRV_ERROR_OUT_OF_MEMORY;
-			goto err_free;
-		}
-		pui32FWAddr = OSAllocMem(ui32ServerSyncs * sizeof(IMG_UINT32));
-		if (!pui32FWAddr)
-		{
-			eError = PVRSRV_ERROR_OUT_OF_MEMORY;
-			goto err_free;
-		}
-		pui32CurrentOp = OSAllocMem(ui32ServerSyncs * sizeof(IMG_UINT32));
-		if (!pui32CurrentOp)
-		{
-			eError = PVRSRV_ERROR_OUT_OF_MEMORY;
-			goto err_free;
-		}
-		pui32NextOp = OSAllocMem(ui32ServerSyncs * sizeof(IMG_UINT32));
-		if (!pui32NextOp)
-		{
-			eError = PVRSRV_ERROR_OUT_OF_MEMORY;
-			goto err_free;
-		}
-		eError = SyncPrimServerGetStatus(ui32ServerSyncs, papsServerSync,
-		                                 pui32UID,
-		                                 pui32FWAddr,
-		                                 pui32CurrentOp,
-		                                 pui32NextOp);
-		if (eError != PVRSRV_OK)
-		{
-			PVR_DPF((PVR_DBG_ERROR, "SyncPrimDumpSyncs: Error querying server sync status (%d)",
-					eError));
-			goto err_free;
-		}
-		for (i = 0; i < ui32ServerSyncs; i++)
-		{
-			PVR_DPF((PVR_DBG_ERROR, "%s: sync=server fw=0x%x curr=0x%04x next=0x%04x id=%u%s",
-					pcszExtraInfo,
-					pui32FWAddr[i],
-					pui32CurrentOp[i],
-					pui32NextOp[i],
-					pui32UID[i],
-					(pui32NextOp[i] - pui32CurrentOp[i] == 1) ? " *" :
-							(pui32NextOp[i] - pui32CurrentOp[i] >  1) ? " **" :
-									""));
-		}
-	}
-
-	err_free:
-	OSFreeMem(papsServerSync);
-	if (pui32UID)
-	{
-		OSFreeMem(pui32UID);
-	}
-	if (pui32FWAddr)
-	{
-		OSFreeMem(pui32FWAddr);
-	}
-	if (pui32CurrentOp)
-	{
-		OSFreeMem(pui32CurrentOp);
-	}
-	if (pui32NextOp)
-	{
-		OSFreeMem(pui32NextOp);
-	}
-	return eError;
-#else
-	PVR_UNREFERENCED_PARAMETER(ui32SyncCount);
-	PVR_UNREFERENCED_PARAMETER(papsSync);
-	PVR_UNREFERENCED_PARAMETER(pcszExtraInfo);
-	return PVRSRV_OK;
-#endif
-}
-#endif
-
+#if defined(SUPPORT_SERVER_SYNC_IMPL)
 IMG_INTERNAL
 PVRSRV_ERROR SyncPrimOpCreate(IMG_UINT32 ui32SyncCount,
                               PVRSRV_CLIENT_SYNC_PRIM **papsSyncPrim,
@@ -1304,7 +1203,7 @@ PVRSRV_ERROR SyncPrimOpCreate(IMG_UINT32 ui32SyncCount,
 	/* Check the pointer setup went ok */
 	if (!(pcPtr == (((IMG_CHAR *) psNewCookie) + ui32TotalAllocSize)))
 	{
-		PVR_DPF((PVR_DBG_ERROR, "%s: cookie setup failed", __FUNCTION__));
+		PVR_DPF((PVR_DBG_ERROR, "%s: cookie setup failed", __func__));
 		eError = PVRSRV_ERROR_INTERNAL_ERROR;
 		goto e2;
 	}
@@ -1332,7 +1231,7 @@ PVRSRV_ERROR SyncPrimOpCreate(IMG_UINT32 ui32SyncCount,
 	{
 		SYNC_PRIM *psSync = (SYNC_PRIM *) papsSyncPrim[0];
 
-		hBridge = psSync->u.sLocal.psSyncBlock->psContext->hDevConnection;
+		hBridge = GetBridgeHandle(psSync->u.sLocal.psSyncBlock->psContext->hDevConnection);
 	}
 
 	psNewCookie->hBridge = hBridge;
@@ -1501,7 +1400,7 @@ PVRSRV_ERROR SyncPrimOpReady(PSYNC_OP_COOKIE psCookie,
 	PVRSRV_ERROR eError;
 	if (!psCookie)
 	{
-		PVR_DPF((PVR_DBG_ERROR, "%s: invalid input pointer", __FUNCTION__));
+		PVR_DPF((PVR_DBG_ERROR, "%s: invalid input pointer", __func__));
 		eError = PVRSRV_ERROR_INVALID_PARAMS;
 		goto e0;
 	}
@@ -1519,7 +1418,7 @@ PVRSRV_ERROR SyncPrimOpReady(PSYNC_OP_COOKIE psCookie,
 		{
 			PVR_DPF((PVR_DBG_ERROR,
 					"%s: Failed to do sync check in server (Error = %d)",
-					__FUNCTION__, eError));
+					__func__, eError));
 			goto e0;
 		}
 	}
@@ -1576,7 +1475,7 @@ PVRSRV_ERROR SyncPrimOpDestroy(PSYNC_OP_COOKIE psCookie)
 	{
 		PVR_DPF((PVR_DBG_ERROR,
 				"%s: Failed to destroy SyncPrimOp (Error = %d)",
-				__FUNCTION__, eError));
+				__func__, eError));
 		goto err_out;
 	}
 
@@ -1597,56 +1496,6 @@ PVRSRV_ERROR SyncPrimOpDestroy(PSYNC_OP_COOKIE psCookie)
 	OSFreeMem(psCookie);
 
 	err_out:
-	return eError;
-}
-
-IMG_INTERNAL
-PVRSRV_ERROR SyncPrimOpResolve(PSYNC_OP_COOKIE psCookie,
-                               IMG_UINT32 *pui32SyncCount,
-                               PVRSRV_CLIENT_SYNC_PRIM_OP **ppsSyncOp)
-{
-	IMG_UINT32 ui32ServerIndex = 0;
-	IMG_UINT32 ui32ClientIndex = 0;
-	PVRSRV_CLIENT_SYNC_PRIM_OP *psSyncOps;
-	IMG_UINT32 i;
-	IMG_BOOL bServerSync;
-	PVRSRV_ERROR eError = PVRSRV_OK;
-
-	psSyncOps = OSAllocMem(sizeof(PVRSRV_CLIENT_SYNC_PRIM_OP) * 
-	                       psCookie->ui32SyncCount);
-	if (!psSyncOps)
-	{
-		eError = PVRSRV_ERROR_OUT_OF_MEMORY;
-		goto e0;
-	}
-
-	for (i=0; i<psCookie->ui32SyncCount; i++)
-	{
-		psSyncOps[i].psSync = psCookie->papsSyncPrim[i];
-		eError = SyncPrimIsServerSync(psCookie->papsSyncPrim[i], &bServerSync);
-		if (PVRSRV_OK != eError) goto e1;
-		if (bServerSync)
-		{
-			psSyncOps[i].ui32FenceValue = 0;
-			psSyncOps[i].ui32UpdateValue = 0;
-			psSyncOps[i].ui32Flags = psCookie->paui32ServerFlags[ui32ServerIndex];
-			ui32ServerIndex++;
-		}
-		else
-		{
-			psSyncOps[i].ui32FenceValue = psCookie->paui32FenceValue[ui32ClientIndex]; 
-			psSyncOps[i].ui32UpdateValue = psCookie->paui32UpdateValue[ui32ClientIndex]; 
-			psSyncOps[i].ui32Flags = psCookie->paui32Flags[ui32ClientIndex];
-			ui32ClientIndex++;
-		}
-	}
-
-	*ppsSyncOp = psSyncOps;
-	*pui32SyncCount = psCookie->ui32SyncCount;
-
-	e1:
-	OSFreeMem(psSyncOps);
-	e0:
 	return eError;
 }
 
@@ -1737,7 +1586,7 @@ PVRSRV_ERROR SyncPrimServerGetStatus(IMG_UINT32 ui32SyncCount,
 	}
 	if (!hBridge)
 	{
-		PVR_DPF((PVR_DBG_ERROR, "%s: invalid Sync connection\n", __FUNCTION__));
+		PVR_DPF((PVR_DBG_ERROR, "%s: invalid Sync connection", __func__));
 		eError = PVRSRV_ERROR_INVALID_SYNC_PRIM;
 		goto e0;
 	}
@@ -1767,7 +1616,7 @@ PVRSRV_ERROR SyncPrimServerGetStatus(IMG_UINT32 ui32SyncCount,
 
 		if (!papsSync[i] || hBridge != _SyncPrimGetBridgeHandle(papsSync[i]))
 		{
-			PVR_DPF((PVR_DBG_ERROR, "SyncServerGetStatus: Sync connection is different\n"));
+			PVR_DPF((PVR_DBG_ERROR, "%s: Sync connection is different", __func__));
 			eError = PVRSRV_ERROR_INVALID_SYNC_PRIM;
 			goto e1;
 		}
@@ -1796,7 +1645,8 @@ PVRSRV_ERROR SyncPrimServerGetStatus(IMG_UINT32 ui32SyncCount,
 	return eError;
 }
 
-#endif
+#endif /* defined(__KERNEL__) */
+#endif /* defined(SUPPORT_SERVER_SYNC_IMPL) */
 
 IMG_INTERNAL PVRSRV_ERROR
 SyncPrimIsServerSync(PVRSRV_CLIENT_SYNC_PRIM *psSync, IMG_BOOL *pbServerSync)
@@ -1804,9 +1654,9 @@ SyncPrimIsServerSync(PVRSRV_CLIENT_SYNC_PRIM *psSync, IMG_BOOL *pbServerSync)
 	PVRSRV_ERROR eError = PVRSRV_OK;
 	SYNC_PRIM *psSyncInt;
 
-	if (!psSync)
+	if (unlikely(!psSync))
 	{
-		PVR_DPF((PVR_DBG_ERROR, "%s: invalid input pointer", __FUNCTION__));
+		PVR_DPF((PVR_DBG_ERROR, "%s: invalid input pointer", __func__));
 		eError = PVRSRV_ERROR_INVALID_PARAMS;
 		goto e0;
 	}
@@ -1817,14 +1667,19 @@ SyncPrimIsServerSync(PVRSRV_CLIENT_SYNC_PRIM *psSync, IMG_BOOL *pbServerSync)
 	}
 	else if (psSyncInt->eType == SYNC_PRIM_TYPE_SERVER)
 	{
+#if defined(SUPPORT_SERVER_SYNC_IMPL)
 		*pbServerSync = IMG_TRUE;
+#else
+	PVR_DPF((PVR_DBG_ERROR, "%s: Server sync not supported, attempted use of server sync", __func__));
+	return PVRSRV_ERROR_NOT_SUPPORTED;
+#endif
 	}
 	else
 	{
 		/* Either the client has given us a bad pointer or there is an
 		 * error in this module
 		 */
-		PVR_DPF((PVR_DBG_ERROR, "%s: Invalid sync type", __FUNCTION__));
+		PVR_DPF((PVR_DBG_ERROR, "%s: Invalid sync type", __func__));
 		eError = PVRSRV_ERROR_INVALID_SYNC_PRIM;
 		goto e0;
 	}
@@ -1833,25 +1688,26 @@ SyncPrimIsServerSync(PVRSRV_CLIENT_SYNC_PRIM *psSync, IMG_BOOL *pbServerSync)
 	return eError;
 }
 
+#if defined(SUPPORT_SERVER_SYNC_IMPL)
 IMG_INTERNAL
 IMG_HANDLE SyncPrimGetServerHandle(PVRSRV_CLIENT_SYNC_PRIM *psSync)
 {
 	SYNC_PRIM *psSyncInt;
 
-	if (!psSync)
+	if (unlikely(!psSync))
 	{
-		PVR_DPF((PVR_DBG_ERROR, "%s: invalid input pointer", __FUNCTION__));
+		PVR_DPF((PVR_DBG_ERROR, "%s: invalid input pointer", __func__));
 		goto e0;
 	}
 	psSyncInt = IMG_CONTAINER_OF(psSync, SYNC_PRIM, sCommon);
-	if (psSyncInt->eType == SYNC_PRIM_TYPE_SERVER)
+	if (likely(psSyncInt->eType == SYNC_PRIM_TYPE_SERVER))
 	{
 		return psSyncInt->u.sServer.hServerSync;
 	}
 	else
 	{
 		PVR_DPF((PVR_DBG_ERROR, "%s: invalid sync type (%d)",
-				__FUNCTION__, psSyncInt->eType));
+				__func__, psSyncInt->eType));
 		goto e0;
 	}
 	e0:
@@ -1867,7 +1723,7 @@ PVRSRV_ERROR SyncPrimServerQueueOp(PVRSRV_CLIENT_SYNC_PRIM_OP *psSyncOp)
 
 	if (!psSyncOp)
 	{
-		PVR_DPF((PVR_DBG_ERROR, "%s: invalid input pointer", __FUNCTION__));
+		PVR_DPF((PVR_DBG_ERROR, "%s: invalid input pointer", __func__));
 		eError = PVRSRV_ERROR_INVALID_PARAMS;
 		goto e0;
 	}
@@ -1876,13 +1732,13 @@ PVRSRV_ERROR SyncPrimServerQueueOp(PVRSRV_CLIENT_SYNC_PRIM_OP *psSyncOp)
 	if (psSyncInt->eType != SYNC_PRIM_TYPE_SERVER)
 	{
 		PVR_DPF((PVR_DBG_ERROR, "%s: invalid sync type (%d)",
-				__FUNCTION__, psSyncInt->eType));
+				__func__, psSyncInt->eType));
 		eError = PVRSRV_ERROR_INVALID_SYNC_PRIM;
 		goto e0;
 	}
 	if (0 == psSyncOp->ui32Flags)
 	{
-		PVR_DPF((PVR_DBG_ERROR, "%s: no sync flags", __FUNCTION__));
+		PVR_DPF((PVR_DBG_ERROR, "%s: no sync flags", __func__));
 		eError = PVRSRV_ERROR_INVALID_SYNC_PRIM;
 		goto e0;
 	}
@@ -1903,6 +1759,7 @@ PVRSRV_ERROR SyncPrimServerQueueOp(PVRSRV_CLIENT_SYNC_PRIM_OP *psSyncOp)
 	e0:
 	return eError;
 }
+#endif
 
 #if defined(PDUMP)
 IMG_INTERNAL void SyncPrimPDump(PVRSRV_CLIENT_SYNC_PRIM *psSync)
@@ -1917,7 +1774,7 @@ IMG_INTERNAL void SyncPrimPDump(PVRSRV_CLIENT_SYNC_PRIM *psSync)
 
 	if (psSyncInt->eType != SYNC_PRIM_TYPE_LOCAL)
 	{
-		PVR_DPF((PVR_DBG_ERROR, "SyncPrimPDump: Invalid sync type"));
+		PVR_DPF((PVR_DBG_ERROR, "%s: Invalid sync type", __func__));
 		PVR_ASSERT(IMG_FALSE);
 		return;
 	}
@@ -1925,7 +1782,7 @@ IMG_INTERNAL void SyncPrimPDump(PVRSRV_CLIENT_SYNC_PRIM *psSync)
 	psSyncBlock = psSyncInt->u.sLocal.psSyncBlock;
 	psContext = psSyncBlock->psContext;
 
-	eError = BridgeSyncPrimPDump(psContext->hDevConnection,
+	eError = BridgeSyncPrimPDump(GetBridgeHandle(psContext->hDevConnection),
 	                             psSyncBlock->hServerSyncPrimBlock,
 	                             SyncPrimGetOffset(psSyncInt));
 
@@ -1933,7 +1790,7 @@ IMG_INTERNAL void SyncPrimPDump(PVRSRV_CLIENT_SYNC_PRIM *psSync)
 	{
 		PVR_DPF((PVR_DBG_ERROR,
 				"%s: failed with error %d",
-				__FUNCTION__, eError));
+				__func__, eError));
 	}
 	PVR_ASSERT(eError == PVRSRV_OK);
 }
@@ -1950,7 +1807,7 @@ IMG_INTERNAL void SyncPrimPDumpValue(PVRSRV_CLIENT_SYNC_PRIM *psSync, IMG_UINT32
 
 	if (psSyncInt->eType != SYNC_PRIM_TYPE_LOCAL)
 	{
-		PVR_DPF((PVR_DBG_ERROR, "SyncPrimPDump: Invalid sync type"));
+		PVR_DPF((PVR_DBG_ERROR, "%s: Invalid sync type", __func__));
 		PVR_ASSERT(IMG_FALSE);
 		return;
 	}
@@ -1958,7 +1815,7 @@ IMG_INTERNAL void SyncPrimPDumpValue(PVRSRV_CLIENT_SYNC_PRIM *psSync, IMG_UINT32
 	psSyncBlock = psSyncInt->u.sLocal.psSyncBlock;
 	psContext = psSyncBlock->psContext;
 
-	eError = BridgeSyncPrimPDumpValue(psContext->hDevConnection,
+	eError = BridgeSyncPrimPDumpValue(GetBridgeHandle(psContext->hDevConnection),
 	                                  psSyncBlock->hServerSyncPrimBlock,
 	                                  SyncPrimGetOffset(psSyncInt),
 	                                  ui32Value);
@@ -1967,7 +1824,7 @@ IMG_INTERNAL void SyncPrimPDumpValue(PVRSRV_CLIENT_SYNC_PRIM *psSync, IMG_UINT32
 	{
 		PVR_DPF((PVR_DBG_ERROR,
 				"%s: failed with error %d",
-				__FUNCTION__, eError));
+				__func__, eError));
 	}
 	PVR_ASSERT(eError == PVRSRV_OK);
 }
@@ -1988,7 +1845,9 @@ IMG_INTERNAL void SyncPrimPDumpPol(PVRSRV_CLIENT_SYNC_PRIM *psSync,
 
 	if (psSyncInt->eType != SYNC_PRIM_TYPE_LOCAL)
 	{
-		PVR_DPF((PVR_DBG_ERROR, "SyncPrimPDumpPol: Invalid sync type (expected SYNC_PRIM_TYPE_LOCAL)"));
+		PVR_DPF((PVR_DBG_ERROR,
+		         "%s: Invalid sync type (expected SYNC_PRIM_TYPE_LOCAL)",
+		         __func__));
 		PVR_ASSERT(IMG_FALSE);
 		return;
 	}
@@ -1996,7 +1855,7 @@ IMG_INTERNAL void SyncPrimPDumpPol(PVRSRV_CLIENT_SYNC_PRIM *psSync,
 	psSyncBlock = psSyncInt->u.sLocal.psSyncBlock;
 	psContext = psSyncBlock->psContext;
 
-	eError = BridgeSyncPrimPDumpPol(psContext->hDevConnection,
+	eError = BridgeSyncPrimPDumpPol(GetBridgeHandle(psContext->hDevConnection),
 	                                psSyncBlock->hServerSyncPrimBlock,
 	                                SyncPrimGetOffset(psSyncInt),
 	                                ui32Value,
@@ -2008,11 +1867,12 @@ IMG_INTERNAL void SyncPrimPDumpPol(PVRSRV_CLIENT_SYNC_PRIM *psSync,
 	{
 		PVR_DPF((PVR_DBG_ERROR,
 				"%s: failed with error %d",
-				__FUNCTION__, eError));
+				__func__, eError));
 	}
 	PVR_ASSERT(eError == PVRSRV_OK);
 }
 
+#if defined(SUPPORT_SERVER_SYNC_IMPL)
 IMG_INTERNAL void SyncPrimOpPDumpPol(PSYNC_OP_COOKIE psCookie,
                                      PDUMP_POLL_OPERATOR eOperator,
                                      IMG_UINT32 ui32PDumpFlags)
@@ -2030,11 +1890,12 @@ IMG_INTERNAL void SyncPrimOpPDumpPol(PSYNC_OP_COOKIE psCookie,
 	{
 		PVR_DPF((PVR_DBG_ERROR,
 				"%s: failed with error %d",
-				__FUNCTION__, eError));
+				__func__, eError));
 	}
 
 	PVR_ASSERT(eError == PVRSRV_OK);
 }
+#endif
 
 IMG_INTERNAL void SyncPrimPDumpCBP(PVRSRV_CLIENT_SYNC_PRIM *psSync,
                                    IMG_UINT64 uiWriteOffset,
@@ -2051,7 +1912,7 @@ IMG_INTERNAL void SyncPrimPDumpCBP(PVRSRV_CLIENT_SYNC_PRIM *psSync,
 
 	if (psSyncInt->eType != SYNC_PRIM_TYPE_LOCAL)
 	{
-		PVR_DPF((PVR_DBG_ERROR, "SyncPrimPDumpCBP: Invalid sync type"));
+		PVR_DPF((PVR_DBG_ERROR, "%s: Invalid sync type", __func__));
 		PVR_ASSERT(IMG_FALSE);
 		return;
 	}
@@ -2065,12 +1926,12 @@ IMG_INTERNAL void SyncPrimPDumpCBP(PVRSRV_CLIENT_SYNC_PRIM *psSync,
 	 * of implicit cast and loss of data.
 	 * Added explicit cast and assert to remove warning.
 	 */
-#if (defined(_WIN32) && !defined(_WIN64)) || (defined(LINUX) && defined(__i386__))
+#if defined(LINUX) && defined(__i386__)
 	PVR_ASSERT(uiWriteOffset<IMG_UINT32_MAX);
 	PVR_ASSERT(uiPacketSize<IMG_UINT32_MAX);
 	PVR_ASSERT(uiBufferSize<IMG_UINT32_MAX);
 #endif
-	eError = BridgeSyncPrimPDumpCBP(psContext->hDevConnection,
+	eError = BridgeSyncPrimPDumpCBP(GetBridgeHandle(psContext->hDevConnection),
 	                                psSyncBlock->hServerSyncPrimBlock,
 	                                SyncPrimGetOffset(psSyncInt),
 	                                (IMG_UINT32)uiWriteOffset,
@@ -2081,7 +1942,7 @@ IMG_INTERNAL void SyncPrimPDumpCBP(PVRSRV_CLIENT_SYNC_PRIM *psSync,
 	{
 		PVR_DPF((PVR_DBG_ERROR,
 				"%s: failed with error %d",
-				__FUNCTION__, eError));
+				__func__, eError));
 	}
 	PVR_ASSERT(eError == PVRSRV_OK);
 }

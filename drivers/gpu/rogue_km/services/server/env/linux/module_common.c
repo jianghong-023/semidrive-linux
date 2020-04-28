@@ -45,7 +45,6 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "pvr_debugfs.h"
 #include "private_data.h"
 #include "linkage.h"
-#include "lists.h"
 #include "power.h"
 #include "env_connection.h"
 #include "process_stats.h"
@@ -65,14 +64,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "pvr_sync.h"
 #endif
 
-#if defined(SUPPORT_GPUTRACE_EVENTS)
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 2, 0))
-#include <linux/trace_events.h>
-#else
-#include <linux/ftrace_event.h>
-#endif
-#endif
-#include "pvr_gputrace.h"
+#include "ospvr_gputrace.h"
 
 #include "km_apphint.h"
 #include "srvinit.h"
@@ -106,7 +98,7 @@ EXPORT_SYMBOL(PVRSRVSystemUninstallDeviceLISR);
 EXPORT_SYMBOL(PVRSRVCheckStatus);
 
 #include "pvr_debug.h"
-EXPORT_SYMBOL(PVRSRVGetErrorStringKM);
+EXPORT_SYMBOL(PVRSRVGetErrorString);
 #endif /* defined(SUPPORT_DISPLAY_CLASS) */
 
 #include "rgxapi_km.h"
@@ -164,14 +156,6 @@ int PVRSRVCommonDriverInit(void)
 	PVRSRV_ERROR pvrerr;
 	int error = 0;
 
-#if defined(PDUMP)
-	error = dbgdrv_init();
-	if (error != 0)
-	{
-		return error;
-	}
-#endif
-
 	error = PVRDebugFSInit();
 	if (error != 0)
 	{
@@ -203,16 +187,24 @@ int PVRSRVCommonDriverInit(void)
 			 __func__, error));
 	}
 
+#if defined(SUPPORT_RGX)
+	pvrerr = PVRGpuTraceSupportInit();
+	if (pvrerr != PVRSRV_OK)
+	{
+		return -ENOMEM;
+	}
+#endif
+
 	pvrerr = PVRSRVDriverInit();
 	if (pvrerr != PVRSRV_OK)
 	{
 		return -ENODEV;
 	}
 
-#if defined(SUPPORT_GPUTRACE_EVENTS)
+#if defined(SUPPORT_RGX)
 	/* calling here because we need to handle input from the file even
 	 * before the devices are initialised
-	 * note: we're not passing a device node because apphint callback don't
+	 * note: we're not passing a device node because apphint callbacks don't
 	 * need it */
 	PVRGpuTraceInitAppHintCallbacks(NULL);
 #endif
@@ -229,6 +221,10 @@ void PVRSRVCommonDriverDeinit(void)
 {
 	PVRSRVDriverDeInit();
 
+#if defined(SUPPORT_RGX)
+	PVRGpuTraceSupportDeInit();
+#endif
+
 	pvr_apphint_deinit();
 
 	PVROSFuncDeInit();
@@ -240,10 +236,6 @@ void PVRSRVCommonDriverDeinit(void)
 	HTB_DestroyFSEntry();
 
 	PVRDebugFSDeInit();
-
-#if defined(PDUMP)
-	dbgdrv_cleanup();
-#endif
 }
 
 /**************************************************************************/ /*!
@@ -277,7 +269,7 @@ int PVRSRVCommonDeviceInit(PVRSRV_DEVICE_NODE *psDeviceNode)
 			 __func__, error));
 	}
 
-#if defined(SUPPORT_GPUTRACE_EVENTS)
+#if defined(SUPPORT_RGX)
 	error = PVRGpuTraceInitDevice(psDeviceNode);
 	if (error != 0)
 	{
@@ -313,7 +305,7 @@ void PVRSRVCommonDeviceDeinit(PVRSRV_DEVICE_NODE *psDeviceNode)
 
 	pvr_apphint_device_unregister(psDeviceNode);
 
-#if defined(SUPPORT_GPUTRACE_EVENTS)
+#if defined(SUPPORT_RGX)
 	PVRGpuTraceDeInitDevice(psDeviceNode);
 #endif
 
@@ -344,7 +336,7 @@ void PVRSRVCommonDeviceShutdown(PVRSRV_DEVICE_NODE *psDeviceNode)
 	 */
 	eError = LinuxBridgeBlockClientsAccess(IMG_TRUE);
 
-	if(eError != PVRSRV_OK)
+	if (eError != PVRSRV_OK)
 	{
 		PVR_DPF((PVR_DBG_ERROR,
 			"%s: Failed to suspend driver (%d)",
@@ -441,16 +433,16 @@ int PVRSRVCommonDeviceOpen(PVRSRV_DEVICE_NODE *psDeviceNode,
 		goto e1;
 	}
 
-	/* 
+	/*
 	 * If the first attempt already set the state to bad,
-	 * there is no point in going the second time, so get out 
+	 * there is no point in going the second time, so get out
 	 */
 	if (psDeviceNode->eDevState == PVRSRV_DEVICE_STATE_BAD)
-	{    
+	{
 		PVR_DPF((PVR_DBG_ERROR, "%s: Driver already in bad state. Device open failed.",
 				 __func__));
 		iErr = -ENODEV;
-		goto e1; 
+		goto e1;
 	}
 
 	if (psDeviceNode->eDevState == PVRSRV_DEVICE_STATE_INIT)
@@ -459,52 +451,13 @@ int PVRSRVCommonDeviceOpen(PVRSRV_DEVICE_NODE *psDeviceNode,
 		if (eError != PVRSRV_OK)
 		{
 			PVR_DPF((PVR_DBG_ERROR, "%s: Failed to initialise device (%s)",
-					 __func__, PVRSRVGetErrorStringKM(eError)));
+					 __func__, PVRSRVGetErrorString(eError)));
 			iErr = -ENODEV;
 			goto e1;
 		}
 
-#if defined(SUPPORT_GPUTRACE_EVENTS)
-		if (PVRGpuTraceEnabled())
-		{
-			PVRSRV_ERROR eError = PVRGpuTraceEnabledSetNoBridgeLock(psDeviceNode,
-			                                                        IMG_TRUE);
-			if (eError != PVRSRV_OK)
-			{
-				PVR_DPF((PVR_DBG_ERROR, "Failed to initialise GPU event tracing"
-				        " (%s)", PVRSRVGetErrorStringKM(eError)));
-			}
-
-			/* below functions will enable FTrace events which in turn will
-			 * execute HWPerf callbacks that set appropriate filter values
-			 * note: unfortunately the functions don't allow to pass private
-			 *       data so they enable events for all of the devices
-			 *       at once, which means that this can happen more than once
-			 *       if there is more than one device */
-
-			/* single events can be enabled by calling trace_set_clr_event()
-			 * with the event name, e.g.:
-			 * trace_set_clr_event("rogue", "rogue_ufo_update", 1) */
-			if (trace_set_clr_event("gpu", NULL, 1))
-			{
-				PVR_DPF((PVR_DBG_ERROR, "Failed to enable \"gpu\" event"
-				        " group"));
-			}
-			else
-			{
-				PVR_LOG(("FTrace events from \"gpu\" group enabled"));
-			}
-			if (trace_set_clr_event("rogue", NULL, 1))
-			{
-				PVR_DPF((PVR_DBG_ERROR, "Failed to enable \"rogue\" event"
-				        " group"));
-			}
-			else
-			{
-				PVR_LOG(("FTrace events from \"rogue\" group enabled"));
-			}
-		}
-
+#if defined(SUPPORT_RGX)
+		PVRGpuTraceInitIfEnabled(psDeviceNode);
 #endif
 	}
 

@@ -42,6 +42,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */ /**************************************************************************/
 #include "pvrsrv.h"
 #include "img_types.h"
+#include "img_defs.h"
 #include "pvrsrv_error.h"
 #include "rgxheapconfig.h"
 

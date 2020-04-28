@@ -41,10 +41,10 @@ COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
 IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */ /**************************************************************************/
-#ifndef __PVR_TLCOMMON_H__
-#define __PVR_TLCOMMON_H__
+#ifndef PVR_TLCOMMON_H
+#define PVR_TLCOMMON_H
 
-#if defined (__cplusplus)
+#if defined(__cplusplus)
 extern "C" {
 #endif
 
@@ -57,9 +57,12 @@ typedef IMG_HANDLE PVRSRVTL_SD;
 /*! Maximum stream name length including the null byte */
 #define PRVSRVTL_MAX_STREAM_NAME_SIZE	40U
 
+/*! Maximum number of streams expected to exist */
+#define PVRSRVTL_MAX_DISCOVERABLE_STREAMS_BUFFER (32*PRVSRVTL_MAX_STREAM_NAME_SIZE)
+
 /*! Packet lengths are always rounded up to a multiple of 8 bytes */
 #define PVRSRVTL_PACKET_ALIGNMENT		8U
-#define PVRSRVTL_ALIGN(x) 				((x+PVRSRVTL_PACKET_ALIGNMENT-1) & ~(PVRSRVTL_PACKET_ALIGNMENT-1))
+#define PVRSRVTL_ALIGN(x)				((x+PVRSRVTL_PACKET_ALIGNMENT-1) & ~(PVRSRVTL_PACKET_ALIGNMENT-1))
 
 
 /*! A packet is made up of a header structure followed by the data bytes.
@@ -76,7 +79,7 @@ typedef IMG_HANDLE PVRSRVTL_SD;
  * |    Type   | Drop-Oldest |  UNUSED  |             Size            |
  *
  */
-typedef struct _PVRSRVTL_PACKETHDR_
+typedef struct
 {
 	IMG_UINT32 uiTypeSize;	/*!< Type, Drop-Oldest flag & number of bytes following header */
 	IMG_UINT32 uiReserved;	/*!< Reserve, packets and data must be 8 byte aligned */
@@ -87,11 +90,11 @@ typedef struct _PVRSRVTL_PACKETHDR_
 /* Structure must always be a size multiple of 8 as stream buffer
  * still an array of IMG_UINT32s.
  */
-static_assert((sizeof(PVRSRVTL_PACKETHDR) & (PVRSRVTL_PACKET_ALIGNMENT-1)) == 0,
+static_assert((sizeof(PVRSRVTL_PACKETHDR) & (PVRSRVTL_PACKET_ALIGNMENT-1U)) == 0U,
 			  "sizeof(PVRSRVTL_PACKETHDR) must be a multiple of 8");
 
 /*! Packet header reserved word fingerprint "TLP1" */
-#define PVRSRVTL_PACKETHDR_RESERVED    0x31504C54U
+#define PVRSRVTL_PACKETHDR_RESERVED 0x31504C54U
 
 /*! Packet header mask used to extract the size from the uiTypeSize member.
  * Do not use directly, see GET macros.
@@ -106,15 +109,15 @@ static_assert((sizeof(PVRSRVTL_PACKETHDR) & (PVRSRVTL_PACKET_ALIGNMENT-1)) == 0,
 #define PVRSRVTL_PACKETHDR_TYPE_MASK    0xFF000000U
 #define PVRSRVTL_PACKETHDR_TYPE_OFFSET  24U
 
-/*! Packet header mask used to check if packets before this one were dropped or not.
- * Do not use directly, see GET macros.
+/*! Packet header mask used to check if packets before this one were dropped
+ * or not. Do not use directly, see GET macros.
  */
 #define PVRSRVTL_PACKETHDR_OLDEST_DROPPED_MASK    0x00800000U
 #define PVRSRVTL_PACKETHDR_OLDEST_DROPPED_OFFSET    23U
 
 /*! Packet type enumeration.
  */
-typedef enum _PVRSRVTL_PACKETTYPE_
+typedef enum
 {
 	/*! Undefined packet */
 	PVRSRVTL_PACKETTYPE_UNDEF = 0,
@@ -124,8 +127,8 @@ typedef enum _PVRSRVTL_PACKETTYPE_
 	PVRSRVTL_PACKETTYPE_DATA = 1,
 
 	/*! When seen this packet type indicates that at this moment in the stream
-	 * packet(s) were not able to be accepted due to space constraints and that
-	 * recent data may be lost - depends on how the producer handles the
+	 * packet(s) were not able to be accepted due to space constraints and
+	 * that recent data may be lost - depends on how the producer handles the
 	 * error. Such packets have no data, data length is 0.
 	 */
 	PVRSRVTL_PACKETTYPE_MOST_RECENT_WRITE_FAILED = 2,
@@ -138,22 +141,27 @@ typedef enum _PVRSRVTL_PACKETTYPE_
 	 */
 	PVRSRVTL_PACKETTYPE_PADDING = 3,
 
-	/*! This packet type conveys to the stream consumer that the stream producer
-	 * has reached the end of data for that data sequence. The TLDaemon
-	 * has several options for processing these packets that can be selected
-	 * on a per stream basis.
+	/*! This packet type conveys to the stream consumer that the stream
+	 * producer has reached the end of data for that data sequence. The
+	 * TLDaemon has several options for processing these packets that can
+	 * be selected on a per stream basis.
 	 */
 	PVRSRVTL_PACKETTYPE_MARKER_EOS = 4,
+
+	/*! This is same as PVRSRVTL_PACKETTYPE_MARKER_EOS but additionally removes
+	 * old data record output file before opening new/next one
+	 */
+	PVRSRVTL_PACKETTYPE_MARKER_EOS_REMOVEOLD = 5,
 
 	/*! Packet emitted on first stream opened by writer. Packet carries a name
 	 * of the opened stream in a form of null-terminated string.
 	 */
-	PVRSRVTL_PACKETTYPE_STREAM_OPEN_FOR_WRITE = 5,
+	PVRSRVTL_PACKETTYPE_STREAM_OPEN_FOR_WRITE = 6,
 
 	/*! Packet emitted on last stream closed by writer. Packet carries a name
 	 * of the closed stream in a form of null-terminated string.
 	 */
-	PVRSRVTL_PACKETTYPE_STREAM_CLOSE_FOR_WRITE = 6,
+	PVRSRVTL_PACKETTYPE_STREAM_CLOSE_FOR_WRITE = 7,
 
 	PVRSRVTL_PACKETTYPE_LAST
 } PVRSRVTL_PACKETTYPE;
@@ -164,40 +172,43 @@ typedef enum _PVRSRVTL_PACKETTYPE_
 #define PVRSRVTL_SET_PACKET_DATA(len)       (len) | (PVRSRVTL_PACKETTYPE_DATA                     << PVRSRVTL_PACKETHDR_TYPE_OFFSET)
 #define PVRSRVTL_SET_PACKET_PADDING(len)    (len) | (PVRSRVTL_PACKETTYPE_PADDING                  << PVRSRVTL_PACKETHDR_TYPE_OFFSET)
 #define PVRSRVTL_SET_PACKET_WRITE_FAILED    (0)   | (PVRSRVTL_PACKETTYPE_MOST_RECENT_WRITE_FAILED << PVRSRVTL_PACKETHDR_TYPE_OFFSET)
-#define PVRSRVTL_SET_PACKET_HDR(len,type)   (len) | ((type)                                       << PVRSRVTL_PACKETHDR_TYPE_OFFSET)
+#define PVRSRVTL_SET_PACKET_HDR(len, type)  (len) | ((type)                                       << PVRSRVTL_PACKETHDR_TYPE_OFFSET)
 
-/*! Returns the number of bytes of data in the packet. p may be any address type
- * */
+/*! Returns the number of bytes of data in the packet.
+ * p may be any address type.
+ */
 #define GET_PACKET_DATA_LEN(p)	\
 	((IMG_UINT32) ((PVRSRVTL_PPACKETHDR)(p))->uiTypeSize & PVRSRVTL_PACKETHDR_SIZE_MASK)
 
 
 /*! Returns a IMG_BYTE* pointer to the first byte of data in the packet */
 #define GET_PACKET_DATA_PTR(p)	\
-	((IMG_PBYTE) ( ((size_t)p) + sizeof(PVRSRVTL_PACKETHDR)) )
+	((IMG_PBYTE) (((size_t)p) + sizeof(PVRSRVTL_PACKETHDR)))
 
 /*! Given a PVRSRVTL_PPACKETHDR address, return the address of the next pack
- *  It is up to the caller to determine if the new address is within the packet
- *  buffer.
+ *  It is up to the caller to determine if the new address is within the
+ *  packet buffer.
  */
 #define GET_NEXT_PACKET_ADDR(p) \
-	((PVRSRVTL_PPACKETHDR) ( ((IMG_UINT8 *)p) + sizeof(PVRSRVTL_PACKETHDR) + \
+	((PVRSRVTL_PPACKETHDR) (((IMG_UINT8 *)p) + sizeof(PVRSRVTL_PACKETHDR) + \
 	(((((PVRSRVTL_PPACKETHDR)p)->uiTypeSize & PVRSRVTL_PACKETHDR_SIZE_MASK) + \
-	(PVRSRVTL_PACKET_ALIGNMENT-1)) & (~(PVRSRVTL_PACKET_ALIGNMENT-1)) ) ))
+	(PVRSRVTL_PACKET_ALIGNMENT-1)) & (~(PVRSRVTL_PACKET_ALIGNMENT-1)))))
 
-/*! Turns the packet address p into a PVRSRVTL_PPACKETHDR pointer type
+/*! Turns the packet address p into a PVRSRVTL_PPACKETHDR pointer type.
  */
 #define GET_PACKET_HDR(p)		((PVRSRVTL_PPACKETHDR)(p))
 
-/*! Get the type of the packet. p is of type PVRSRVTL_PPACKETHDR
+/*! Get the type of the packet. p is of type PVRSRVTL_PPACKETHDR.
  */
 #define GET_PACKET_TYPE(p)		(((p)->uiTypeSize & PVRSRVTL_PACKETHDR_TYPE_MASK)>>PVRSRVTL_PACKETHDR_TYPE_OFFSET)
 
-/*! Set PACKETS_DROPPED flag in packet header as a part of uiTypeSize. p is of type PVRSRVTL_PPACKETHDR.
+/*! Set PACKETS_DROPPED flag in packet header as a part of uiTypeSize.
+ * p is of type PVRSRVTL_PPACKETHDR.
  */
 #define SET_PACKETS_DROPPED(p)		(((p)->uiTypeSize) | (1<<PVRSRVTL_PACKETHDR_OLDEST_DROPPED_OFFSET))
 
-/*! Check if packets were dropped before this packet. p is of type PVRSRVTL_PPACKETHDR
+/*! Check if packets were dropped before this packet.
+ * p is of type PVRSRVTL_PPACKETHDR.
  */
 #define CHECK_PACKETS_DROPPED(p)	(((p)->uiTypeSize & PVRSRVTL_PACKETHDR_OLDEST_DROPPED_MASK)>>PVRSRVTL_PACKETHDR_OLDEST_DROPPED_OFFSET)
 
@@ -217,24 +228,30 @@ typedef enum _PVRSRVTL_PACKETTYPE_
  *        context.
  * 0x10 - Reset stream on open.
  *        When this flag is used the stream will drop all of the stored data.
+ * 0x20 - Limit read position to the write position at time the stream
+ *        was opened. Hence this flag will freeze the content read to that
+ *        produced before the stream was opened for reading.
  * 0x40 - Ignore Open Callback.
  *        When this flag is set ignore any OnReaderOpenCallback setting for
  *        the stream. This allows access to the stream to be made without
  *        generating any extra packets into the stream.
  */
+
 #define PVRSRV_STREAM_FLAG_NONE                        (0U)
 #define PVRSRV_STREAM_FLAG_ACQUIRE_NONBLOCKING         (1U<<0)
 #define PVRSRV_STREAM_FLAG_OPEN_WAIT                   (1U<<1)
 #define PVRSRV_STREAM_FLAG_OPEN_WO                     (1U<<2)
 #define PVRSRV_STREAM_FLAG_DISABLE_PRODUCER_CALLBACK   (1U<<3)
 #define PVRSRV_STREAM_FLAG_RESET_ON_OPEN               (1U<<4)
+#define PVRSRV_STREAM_FLAG_READ_LIMIT                  (1U<<5)
 #define PVRSRV_STREAM_FLAG_IGNORE_OPEN_CALLBACK        (1U<<6)
 
-#if defined (__cplusplus)
+
+#if defined(__cplusplus)
 }
 #endif
 
-#endif /* __PVR_TLCOMMON_H__ */
+#endif /* PVR_TLCOMMON_H */
 /******************************************************************************
  End of file (pvrsrv_tlcommon.h)
 ******************************************************************************/

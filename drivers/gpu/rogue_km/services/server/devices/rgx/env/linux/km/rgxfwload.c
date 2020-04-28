@@ -245,38 +245,16 @@ static inline bool VerifyFirmware(const struct firmware *psFW)
 #endif /* defined(RGX_FW_SIGNED) */
 
 struct RGXFW *
-RGXLoadFirmware(PVRSRV_DEVICE_NODE *psDeviceNode, const IMG_CHAR *pszBVNCString, const IMG_CHAR *pszBVpNCString)
+RGXLoadFirmware(PVRSRV_DEVICE_NODE *psDeviceNode, const IMG_CHAR *pszBVNCString)
 {
 	const struct firmware *psFW;
-	int res;
+	IMG_INT32 res;
 
-	if(pszBVNCString != NULL)
-	{
-		res = request_firmware(&psFW, pszBVNCString, psDeviceNode->psDevConfig->pvOSDevice);
-		if (res != 0)
-		{
-			if(pszBVpNCString != NULL)
-			{
-				PVR_DPF((PVR_DBG_ERROR, "%s: request_firmware('%s') failed (%d), trying '%s'",
-										__func__, pszBVNCString, res, pszBVpNCString));
-				res = request_firmware(&psFW, pszBVpNCString, psDeviceNode->psDevConfig->pvOSDevice);
-			}
-			if (res != 0)
-			{
-				PVR_DPF((PVR_DBG_ERROR, "%s: request_firmware('%s') failed (%d), trying '%s'",
-										__func__, pszBVpNCString, res, RGX_FW_FILENAME));
-				res = request_firmware(&psFW, RGX_FW_FILENAME, psDeviceNode->psDevConfig->pvOSDevice);
-			}
-		}
-	}
-	else
-	{
-		res = request_firmware(&psFW, RGX_FW_FILENAME, psDeviceNode->psDevConfig->pvOSDevice);
-	}
+	res = request_firmware(&psFW, pszBVNCString, psDeviceNode->psDevConfig->pvOSDevice);
 	if (res != 0)
 	{
-		PVR_DPF((PVR_DBG_FATAL, "%s: request_firmware('%s') failed (%d)",
-								__func__, RGX_FW_FILENAME, res));
+		PVR_DPF((PVR_DBG_WARNING, "%s: request_firmware('%s') failed (%d)",
+						__func__, pszBVNCString, res));
 		return NULL;
 	}
 

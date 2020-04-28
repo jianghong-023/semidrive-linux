@@ -49,7 +49,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #if defined(__KERNEL__) && defined(LINUX) && !defined(__GENKSYMS__)
 #define __pvrsrv_defined_struct_enum__
-#include "services_kernel_client.h"
+#include <services_kernel_client.h>
 #endif
 
 #endif /* __PVRSRV_DEVICE_TYPES_H__ */

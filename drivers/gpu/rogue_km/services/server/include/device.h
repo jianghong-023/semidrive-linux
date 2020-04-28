@@ -55,7 +55,6 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include <powervr/sync_external.h>
 #include "sysinfo.h"
 #include "dllist.h"
-#include "cache_km.h"
 
 #include "rgx_bvnc_defs_km.h"
 
@@ -69,9 +68,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 typedef struct _PVRSRV_POWER_DEV_TAG_ *PPVRSRV_POWER_DEV;
 
-#if defined(PVRSRV_ENABLE_FULL_SYNC_TRACKING)
 struct SYNC_RECORD;
-#endif
 
 /*********************************************************************/ /*!
  @Function      AllocUFOCallback
@@ -139,20 +136,22 @@ typedef struct _PG_HANDLE_
 } PG_HANDLE;
 
 #define MMU_BAD_PHYS_ADDR (0xbadbad00badULL)
-typedef struct __DUMMY_PAGE__
-{
-	/*Page handle for the dummy page allocated (UMA/LMA)*/
-	PG_HANDLE	sDummyPageHandle;
-	POS_LOCK	psDummyPgLock;
-	ATOMIC_T	atRefCounter;
-	/*Dummy page size in terms of log2 */
-	IMG_UINT32	ui32Log2DummyPgSize;
-	IMG_UINT64	ui64DummyPgPhysAddr;
-#if defined(PDUMP)
 #define DUMMY_PAGE	("DUMMY_PAGE")
-	IMG_HANDLE hPdumpDummyPg;
+#define DEV_ZERO_PAGE	("DEV_ZERO_PAGE")
+
+typedef struct __DEFAULT_PAGE__
+{
+	/*Page handle for the page allocated (UMA/LMA)*/
+	PG_HANDLE	sPageHandle;
+	POS_LOCK	psPgLock;
+	ATOMIC_T	atRefCounter;
+	/*Default page size in terms of log2 */
+	IMG_UINT32	ui32Log2PgSize;
+	IMG_UINT64	ui64PgPhysAddr;
+#if defined(PDUMP)
+	IMG_HANDLE hPdumpPg;
 #endif
-} PVRSRV_DUMMY_PAGE;
+} PVRSRV_DEF_PAGE;
 
 typedef enum _PVRSRV_DEVICE_STATE_
 {
@@ -275,6 +274,8 @@ typedef struct _PVRSRV_DEVICE_NODE_
 
 	IMG_INT32	(*pfnGetDeviceFeatureValue)(struct _PVRSRV_DEVICE_NODE_ *psDevNode, enum _RGX_FEATURE_WITH_VALUE_INDEX_ eFeatureIndex);
 
+	IMG_BOOL (*pfnHasFBCDCVersion31)(struct _PVRSRV_DEVICE_NODE_ *psDevNode);
+
 	PVRSRV_DEVICE_CONFIG	*psDevConfig;
 
 	/* device post-finalise compatibility check */
@@ -354,7 +355,6 @@ typedef struct _PVRSRV_DEVICE_NODE_
 	POS_LOCK				hSyncServerListLock;
 	DLLIST_NODE				sSyncServerSyncsList;
 
-#if defined(PVRSRV_ENABLE_FULL_SYNC_TRACKING)
 	IMG_HANDLE				hSyncServerRecordNotify;
 	POS_LOCK				hSyncServerRecordLock;
 	IMG_UINT32				ui32SyncServerRecordCount;
@@ -370,7 +370,6 @@ typedef struct _PVRSRV_DEVICE_NODE_
 	DLLIST_NODE				sSyncCheckpointRecordList;
 	struct SYNC_CHECKPOINT_RECORD	*apsSyncCheckpointRecordsFreed[PVRSRV_FULL_SYNC_TRACKING_HISTORY_LEN];
 	IMG_UINT32				uiSyncCheckpointRecordFreeIdx;
-#endif
 
 	IMG_HANDLE				hSyncCheckpointNotify;
 	POS_LOCK				hSyncCheckpointListLock;
@@ -391,15 +390,13 @@ typedef struct _PVRSRV_DEVICE_NODE_
 	IMG_HANDLE				hAppHintDbgReqNotify;
 	IMG_HANDLE				hThreadsDbgReqNotify;
 
-	PVRSRV_DUMMY_PAGE		sDummyPage;
+	PVRSRV_DEF_PAGE			sDummyPage;
+	PVRSRV_DEF_PAGE		    sDevZeroPage;
 
 #if !defined(PVRSRV_USE_BRIDGE_LOCK)
 	POSWR_LOCK				hMemoryContextPageFaultNotifyListLock;
 #endif /* !defined(PVRSRV_USE_BRIDGE_LOCK) */
 	DLLIST_NODE				sMemoryContextPageFaultNotifyListHead;
-
-	/* PC address used to find contexts to be notified of a page fault */
-	IMG_UINT64				ui64ContextResetPCAddress;
 
 #if defined(PDUMP)
 	/* 	device-level callback which is called when pdump.exe starts.

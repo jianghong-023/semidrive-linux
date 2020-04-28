@@ -50,125 +50,105 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "device.h"
 #include "rgxdevice.h"
 #include "rgx_bridge.h"
+#include "rgxfwload.h"
 
 
 /*!
 *******************************************************************************
 
- @Function	PVRSRVRGXInitDevPart2KM
+ @Function	RGXInitDevPart2
 
  @Description
 
  Second part of server-side RGX initialisation
 
- @Input pvDeviceNode - device node
+ @Input psDeviceNode - device node
 
  @Return   PVRSRV_ERROR
 
 ******************************************************************************/
-PVRSRV_ERROR PVRSRVRGXInitDevPart2KM (PVRSRV_DEVICE_NODE	*psDeviceNode,
-									  IMG_UINT32			ui32DeviceFlags,
-									  IMG_UINT32			ui32HWPerfHostBufSizeKB,
-									  IMG_UINT32			ui32HWPerfHostFilter,
-									  RGX_ACTIVEPM_CONF		eActivePMConf);
+PVRSRV_ERROR RGXInitDevPart2 (PVRSRV_DEVICE_NODE	*psDeviceNode,
+							  IMG_UINT32			ui32DeviceFlags,
+							  IMG_UINT32			ui32HWPerfHostBufSizeKB,
+							  IMG_UINT32			ui32HWPerfHostFilter,
+							  RGX_ACTIVEPM_CONF		eActivePMConf);
 
-PVRSRV_ERROR PVRSRVRGXInitAllocFWImgMemKM(PVRSRV_DEVICE_NODE   *psDeviceNode,
-                                          IMG_DEVMEM_SIZE_T    ui32FWCodeLen,
-                                          IMG_DEVMEM_SIZE_T    ui32FWDataLen,
-                                          IMG_DEVMEM_SIZE_T    uiFWCorememLen,
-                                          PMR                  **ppsFWCodePMR,
-                                          IMG_DEV_VIRTADDR     *psFWCodeDevVAddrBase,
-                                          PMR                  **ppsFWDataPMR,
-                                          IMG_DEV_VIRTADDR     *psFWDataDevVAddrBase,
-                                          PMR                  **ppsFWCorememPMR,
-                                          IMG_DEV_VIRTADDR     *psFWCorememDevVAddrBase,
-                                          RGXFWIF_DEV_VIRTADDR *psFWCorememMetaVAddrBase);
-
-PVRSRV_ERROR PVRSRVRGXInitMipsWrapperRegistersKM(PVRSRV_DEVICE_NODE *psDeviceNode,
-												 IMG_UINT32 ui32Remap1Config1Offset,
-												 IMG_UINT32 ui32Remap1Config2Offset,
-												 IMG_UINT32 ui32WrapperConfigOffset,
-												 IMG_UINT32 ui32BootCodeOffset);
-PVRSRV_ERROR PVRSRVRGXPdumpBootldrDataInitKM(PVRSRV_DEVICE_NODE *psDeviceNode,
-												 IMG_UINT32 ui32BootConfOffset,
-												 IMG_UINT32 ui32ExceptionVectorsBaseAddress);
+PVRSRV_ERROR RGXInitAllocFWImgMem(PVRSRV_DEVICE_NODE   *psDeviceNode,
+                                  IMG_DEVMEM_SIZE_T    ui32FWCodeLen,
+                                  IMG_DEVMEM_SIZE_T    ui32FWDataLen,
+                                  IMG_DEVMEM_SIZE_T    uiFWCorememCodeLen,
+                                  IMG_DEVMEM_SIZE_T    uiFWCorememDataLen);
 
 
 /*!
 *******************************************************************************
 
- @Function	PVRSRVRGXInitFirmwareKM
+ @Function	RGXInitFirmware
 
  @Description
 
  Server-side RGX firmware initialisation
 
- @Input pvDeviceNode - device node
+ @Input psDeviceNode - device node
 
  @Return   PVRSRV_ERROR
 
 ******************************************************************************/
 PVRSRV_ERROR
-PVRSRVRGXInitFirmwareKM(PVRSRV_DEVICE_NODE       *psDeviceNode,
-                        RGXFWIF_DEV_VIRTADDR     *psRGXFwInit,
-                        IMG_BOOL                 bEnableSignatureChecks,
-                        IMG_UINT32               ui32SignatureChecksBufSize,
-                        IMG_UINT32               ui32HWPerfFWBufSizeKB,
-                        IMG_UINT64               ui64HWPerfFilter,
-                        IMG_UINT32               ui32RGXFWAlignChecksArrLength,
-                        IMG_UINT32               *pui32RGXFWAlignChecks,
-                        IMG_UINT32               ui32ConfigFlags,
-                        IMG_UINT32               ui32LogType,
-                        IMG_UINT32               ui32FilterFlags,
-                        IMG_UINT32               ui32JonesDisableMask,
-                        IMG_UINT32               ui32HWRDebugDumpLimit,
-                        RGXFWIF_COMPCHECKS_BVNC  *psClientBVNC,
-                        RGXFWIF_COMPCHECKS_BVNC  *psFirmwareBVNC,
-                        IMG_UINT32               ui32HWPerfCountersDataSize,
-                        PMR                      **ppsHWPerfPMR,
-                        RGX_RD_POWER_ISLAND_CONF eRGXRDPowerIslandingConf,
-                        FW_PERF_CONF             eFirmwarePerf,
-                        IMG_UINT32               ui32ConfigFlagsExt);
+RGXInitFirmware(PVRSRV_DEVICE_NODE       *psDeviceNode,
+                IMG_BOOL                 bEnableSignatureChecks,
+                IMG_UINT32               ui32SignatureChecksBufSize,
+                IMG_UINT32               ui32HWPerfFWBufSizeKB,
+                IMG_UINT64               ui64HWPerfFilter,
+                IMG_UINT32               ui32RGXFWAlignChecksArrLength,
+                IMG_UINT32               *pui32RGXFWAlignChecks,
+                IMG_UINT32               ui32ConfigFlags,
+                IMG_UINT32               ui32LogType,
+                IMG_UINT32               ui32FilterFlags,
+                IMG_UINT32               ui32JonesDisableMask,
+                IMG_UINT32               ui32HWRDebugDumpLimit,
+                IMG_UINT32               ui32HWPerfCountersDataSize,
+                IMG_UINT32               *pui32TPUTrilinearFracMask,
+                RGX_RD_POWER_ISLAND_CONF eRGXRDPowerIslandingConf,
+                FW_PERF_CONF             eFirmwarePerf,
+                IMG_UINT32               ui32ConfigFlagsExt);
 
-PVRSRV_ERROR PVRSRVRGXInitReleaseFWInitResourcesKM(PVRSRV_DEVICE_NODE *psDeviceNode,
-												   PMR *psFWCodePMR,
-												   PMR *psFWDataPMR,
-												   PMR *psFWCorePMR,
-												   PMR *psHWPerfPMR);
 
 /*!
 *******************************************************************************
 
- @Function  PVRSRVRGXInitFinaliseFWImageKM
+ @Function	RGXLoadAndGetFWData
 
  @Description
 
- Perform final steps of FW code setup when necessary
+ Load FW and return pointer to FW data.
 
- @Input psDeviceNode - Device node
+ @Input psDeviceNode - device node
 
- @Return   PVRSRV_ERROR
+ @Input ppsRGXFW - fw pointer
+
+ @Return   void * - pointer to FW data
 
 ******************************************************************************/
+const void *RGXLoadAndGetFWData(PVRSRV_DEVICE_NODE *psDeviceNode, struct RGXFW **ppsRGXFW);
 
-PVRSRV_ERROR
-PVRSRVRGXInitFinaliseFWImageKM(PVRSRV_DEVICE_NODE *psDeviceNode);
-
+#if defined(PDUMP)
 /*!
 *******************************************************************************
 
- @Function	PVRSRVRGXInitHWPerfCountersKM
+ @Function	RGXInitHWPerfCounters
 
  @Description
 
  Initialisation of the performance counters
 
- @Input pvDeviceNode - device node
+ @Input psDeviceNode - device node
 
  @Return   PVRSRV_ERROR
 
 ******************************************************************************/
-PVRSRV_ERROR PVRSRVRGXInitHWPerfCountersKM (PVRSRV_DEVICE_NODE	*psDeviceNode);
+PVRSRV_ERROR RGXInitHWPerfCounters(PVRSRV_DEVICE_NODE	*psDeviceNode);
+#endif
 
 /*!
 *******************************************************************************
@@ -182,12 +162,27 @@ PVRSRV_ERROR PVRSRVRGXInitHWPerfCountersKM (PVRSRV_DEVICE_NODE	*psDeviceNode);
  @Input:   psDeviceNode - device node
  @Output:  ppsDevInfo   - device info
 
- @Return   PVRSRV_ERROR :
+ @Return   PVRSRV_ERROR
 
 ******************************************************************************/
 PVRSRV_ERROR RGXRegisterDevice(PVRSRV_DEVICE_NODE *psDeviceNode,
                                PVRSRV_RGXDEV_INFO **ppsDevInfo);
 
+/*!
+*******************************************************************************
+
+ @Function	RGXDevBVNCString
+
+ @Description
+
+ Returns the Device BVNC string. It will allocate and fill it first, if necessary.
+
+ @Input:   psDevInfo - device info (must not be null)
+
+ @Return   IMG_PCHAR - pointer to BVNC string
+
+******************************************************************************/
+IMG_PCHAR RGXDevBVNCString(PVRSRV_RGXDEV_INFO *psDevInfo);
 
 /*!
 *******************************************************************************
@@ -198,7 +193,7 @@ PVRSRV_ERROR RGXRegisterDevice(PVRSRV_DEVICE_NODE *psDeviceNode,
 
  Reset and deinitialise Chip
 
- @Input pvDeviceNode - device info. structure
+ @Input psDeviceNode - device info. structure
 
  @Return   PVRSRV_ERROR
 
@@ -253,13 +248,13 @@ PVRSRV_ERROR SORgxGpuUtilStatsUnregister(IMG_HANDLE hGpuUtilUser);
 /*!
 *******************************************************************************
 
- @Function		PVRSRVGPUVIRTPopulateLMASubArenasKM
+ @Function		RGXVirtPopulateLMASubArenas
 
  @Description	Populates the LMA arenas based on the min max values passed by
 				the client during initialization. GPU Virtualisation Validation
 				only.
 
- @Input			pvDeviceNode	: Pointer to a device info structure.
+ @Input			psDeviceNode	: Pointer to a device info structure.
 				ui32NumElements	: Total number of min / max values passed by
 								  the client
 				pui32Elements	: The array containing all the min / max values
@@ -268,8 +263,55 @@ PVRSRV_ERROR SORgxGpuUtilStatsUnregister(IMG_HANDLE hGpuUtilUser);
  @Return   PVRSRV_ERROR
 
 ******************************************************************************/
-PVRSRV_ERROR PVRSRVGPUVIRTPopulateLMASubArenasKM(PVRSRV_DEVICE_NODE	* psDeviceNode,
-                                                 IMG_UINT32 aui32OSidMin[GPUVIRT_VALIDATION_NUM_REGIONS][GPUVIRT_VALIDATION_NUM_OS],
-                                                 IMG_UINT32 aui32OSidMax[GPUVIRT_VALIDATION_NUM_REGIONS][GPUVIRT_VALIDATION_NUM_OS],
-                                                 IMG_BOOL bEnableTrustedDeviceAceConfig);
+PVRSRV_ERROR RGXVirtPopulateLMASubArenas(PVRSRV_DEVICE_NODE	* psDeviceNode,
+                                         IMG_UINT32 aui32OSidMin[GPUVIRT_VALIDATION_NUM_REGIONS][GPUVIRT_VALIDATION_NUM_OS],
+                                         IMG_UINT32 aui32OSidMax[GPUVIRT_VALIDATION_NUM_REGIONS][GPUVIRT_VALIDATION_NUM_OS],
+                                         IMG_BOOL bEnableTrustedDeviceAceConfig);
+
+/*!
+ *******************************************************************************
+
+ @Function      RGXInitCreateFWKernelMemoryContext
+
+ @Description   Called to perform initialisation during firmware kernel context
+                creation.
+
+ @Input         psDeviceNode  device node
+ ******************************************************************************/
+PVRSRV_ERROR RGXInitCreateFWKernelMemoryContext(PVRSRV_DEVICE_NODE *psDeviceNode);
+
+/*!
+ *******************************************************************************
+
+ @Function      RGXDeInitDestroyFWKernelMemoryContext
+
+ @Description   Called to perform deinitialisation during firmware kernel
+                context destruction.
+
+ @Input         psDeviceNode  device node
+ ******************************************************************************/
+void RGXDeInitDestroyFWKernelMemoryContext(PVRSRV_DEVICE_NODE *psDeviceNode);
+
+/*!
+ *******************************************************************************
+
+ @Function      RGXVzInitCreateFWKernelMemoryContext
+
+ @Description   Called to perform additional initialisation during firmware
+                kernel context creation.
+
+ @Input         psDeviceNode  device node
+ ******************************************************************************/
+PVRSRV_ERROR RGXVzInitCreateFWKernelMemoryContext(PVRSRV_DEVICE_NODE *psDeviceNode);
+
+/*!
+ *******************************************************************************
+
+ @Function      RGXVzDeInitDestroyFWKernelMemoryContext
+
+ @Description   Called to perform additional deinitialisation during firmware
+                kernel context destruction.
+ ******************************************************************************/
+void RGXVzDeInitDestroyFWKernelMemoryContext(PVRSRV_DEVICE_NODE *psDeviceNode);
+
 #endif /* __RGXINIT_H__ */

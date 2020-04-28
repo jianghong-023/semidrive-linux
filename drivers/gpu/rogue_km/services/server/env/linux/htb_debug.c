@@ -41,7 +41,6 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */ /**************************************************************************/
 #include "rgxdevice.h"
-#include "debugmisc_server.h"
 #include "htbserver.h"
 #include "htbuffer.h"
 #include "htbuffer_types.h"
@@ -50,6 +49,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "pvrsrv_tlcommon.h"
 #include "pvr_debugfs.h"
 #include "img_types.h"
+#include "img_defs.h"
 #include "pvrsrv_error.h"
 #include "osfunc.h"
 #include "allocmem.h"
@@ -61,7 +61,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 // Global data handles for buffer manipulation and processing
 typedef struct
 {
-    PPVR_DEBUGFS_ENTRY_DATA psDumpHostDebugFSEntry;	/* debugFS entry hook */
+	PPVR_DEBUGFS_ENTRY_DATA psDumpHostDebugFSEntry;	/* debugFS entry hook */
 	IMG_HANDLE hStream;                 /* Stream handle for debugFS use */
 } HTB_DBG_INFO;
 
@@ -70,9 +70,9 @@ static HTB_DBG_INFO g_sHTBData;
 // Enable for extra debug level
 //#define HTB_CHATTY	1
 
-/*****************************************************************************
+/******************************************************************************
  * debugFS display routines
- ******************************************************************************/
+ *****************************************************************************/
 static int HTBDumpBuffer(DUMPDEBUG_PRINTF_FUNC *, void *, void *);
 static void _HBTraceSeqPrintf(void *, const IMG_CHAR *, ...);
 static int _DebugHBTraceSeqShow(struct seq_file *, void *);
@@ -87,7 +87,7 @@ static void _HBTraceSeqPrintf(void *pvDumpDebugFile,
 	va_list         ArgList;
 
 	va_start(ArgList, pszFormat);
-	seq_printf(psSeqFile, pszFormat, ArgList);
+	seq_vprintf(psSeqFile, pszFormat, ArgList);
 	va_end(ArgList);
 }
 
@@ -130,7 +130,7 @@ typedef struct {
 	IMG_UINT32	uiTotal;	/* Total bytes processed */
 	IMG_UINT32	uiMsgLen;	/* Length of HTB message to be processed */
 	IMG_PBYTE	pCurr;		/* pointer to current message to be decoded */
-	IMG_CHAR    szBuffer[PVR_MAX_DEBUG_MESSAGE_LEN];	/* Output string */
+	IMG_CHAR	szBuffer[PVR_MAX_DEBUG_MESSAGE_LEN];	/* Output string */
 } HTB_Sentinel_t;
 
 static IMG_UINT32 idToLogIdx(IMG_UINT32);	/* Forward declaration */
@@ -165,16 +165,16 @@ static IMG_PBYTE HTB_GetNextMessage(HTB_Sentinel_t *pSentinel)
 	IMG_UINT32	uiMsgSize;		/* Message size of current packet (bytes) */
 	IMG_UINT32	ui32DataSize;
 	IMG_UINT32	uiBufLen;
-	IMG_BOOL    bUnrecognizedErrorPrinted = IMG_FALSE;
-	IMG_UINT32  ui32Data;
-	IMG_UINT32  ui32LogIdx;
+	IMG_BOOL	bUnrecognizedErrorPrinted = IMG_FALSE;
+	IMG_UINT32	ui32Data;
+	IMG_UINT32	ui32LogIdx;
 	PVRSRV_ERROR eError;
 
 	PVR_ASSERT(NULL != pSentinel);
 
 	uiBufLen = pSentinel->uiBufLen;
 	/* Convert from byte to uint32 size */
-	ui32DataSize = pSentinel->uiBufLen / sizeof (IMG_UINT32);
+	ui32DataSize = pSentinel->uiBufLen / sizeof(IMG_UINT32);
 
 	pLast = pSentinel->pBuf + pSentinel->uiBufLen;
 
@@ -226,7 +226,8 @@ static IMG_PBYTE HTB_GetNextMessage(HTB_Sentinel_t *pSentinel)
 		if (ppHdr == NULL)
 		{
 			PVR_DPF((PVR_DBG_ERROR,
-	    		"%s: Unexpected NULL packet in Host Trace buffer", __func__));
+			         "%s: Unexpected NULL packet in Host Trace buffer",
+			         __func__));
 			pSentinel->uiMsgLen += uiMsgSize;
 			return NULL;		// This should never happen
 		}
@@ -333,8 +334,8 @@ static IMG_PBYTE HTB_GetNextMessage(HTB_Sentinel_t *pSentinel)
 		{
 			PVR_DPF((PVR_DBG_WARNING,
 			    "%s: Unrecognised LOG value '%x' GID %x Params %d ID %x @ '%p'",
-				__func__, ui32Data, HTB_SF_GID(ui32Data),
-				HTB_SF_PARAMNUM(ui32Data), ui32Data & 0xfff, pData));
+			    __func__, ui32Data, HTB_SF_GID(ui32Data),
+			    HTB_SF_PARAMNUM(ui32Data), ui32Data & 0xfff, pData));
 			bUnrecognizedErrorPrinted = IMG_FALSE;
 		}
 
@@ -490,7 +491,7 @@ static void *_DebugHBTraceSeqStart(struct seq_file *psSeqFile,
 	 */
 	if (pSentinel == NULL)
 	{
-		pSentinel = (HTB_Sentinel_t *)OSAllocZMem(sizeof (HTB_Sentinel_t));
+		pSentinel = (HTB_Sentinel_t *)OSAllocZMem(sizeof(HTB_Sentinel_t));
 		psSeqFile->private = pSentinel;
 	}
 
@@ -635,12 +636,12 @@ static void *_DebugHBTraceSeqNext(struct seq_file *psSeqFile,
 		if (PVRSRV_OK != eError)
 		{
 			PVR_DPF((PVR_DBG_WARNING, "%s: %s FAILED '%s' @ %p Length %d",
-				__func__, "TLClientReleaseDataLess",
-				PVRSRVGETERRORSTRING(eError), pSentinel->pCurr,
+			    __func__, "TLClientReleaseDataLess",
+			    PVRSRVGETERRORSTRING(eError), pSentinel->pCurr,
 			    pSentinel->uiMsgLen));
 			PVR_DPF((PVR_DBG_WARNING, "%s: Buffer @ %p..%p", __func__,
-				pSentinel->pBuf,
-				(IMG_PBYTE)(pSentinel->pBuf+pSentinel->uiBufLen)));
+			    pSentinel->pBuf,
+			    (IMG_PBYTE)(pSentinel->pBuf+pSentinel->uiBufLen)));
 
 		}
 
@@ -651,7 +652,7 @@ static void *_DebugHBTraceSeqNext(struct seq_file *psSeqFile,
 		{
 			PVR_DPF((PVR_DBG_WARNING, "%s: %s FAILED '%s'\nPrev message len %d",
 			    __func__, "TLClientAcquireData", PVRSRVGETERRORSTRING(eError),
-				pSentinel->uiMsgLen));
+			    pSentinel->uiMsgLen));
 			pSentinel->pBuf = NULL;
 		}
 
@@ -683,7 +684,7 @@ static const struct seq_operations gsHTBReadOps = {
 
 /******************************************************************************
  * HTB Dumping routines and definitions
- ******************************************************************************/
+ *****************************************************************************/
 #define IS_VALID_FMT_STRING(FMT) (strchr(FMT, '%') != NULL)
 #define MAX_STRING_SIZE (128)
 
@@ -803,7 +804,6 @@ _found_arg:
 	return eRet;
 }
 
-static IMG_UINT32 idToLogIdx(IMG_UINT32);
 static IMG_UINT32 idToLogIdx(IMG_UINT32 ui32CheckData)
 {
 	IMG_UINT32	i = 0;
@@ -864,7 +864,7 @@ DecodeHTB(HTB_Sentinel_t *pSentinel,
 	IMG_BOOL	bPacketsDropped;
 
 	/* Convert from byte to uint32 size */
-	ui32DataSize = uiBufLen / sizeof (IMG_UINT32);
+	ui32DataSize = uiBufLen / sizeof(IMG_UINT32);
 
 	pLast = pSentinel->pBuf + pSentinel->uiBufLen;
 	pStart = pSentinel->pCurr;
@@ -887,7 +887,7 @@ DecodeHTB(HTB_Sentinel_t *pSentinel,
 	if (ppHdr == NULL)
 	{
 			PVR_DPF((PVR_DBG_ERROR,
-	    		"%s: Unexpected NULL packet in Host Trace buffer", __func__));
+			    "%s: Unexpected NULL packet in Host Trace buffer", __func__));
 			return -1;
 	}
 
@@ -917,26 +917,37 @@ DecodeHTB(HTB_Sentinel_t *pSentinel,
 	ui32LogIdx = idToLogIdx(ui32Data);
 
 	/*
-	 * Check if the unrecognized ID is valid and therefore, tracebuf
+	 * Check if the unrecognised ID is valid and therefore, tracebuf
 	 * needs updating.
 	 */
-	if (HTB_SF_LAST == ui32LogIdx && HTB_LOG_VALIDID(ui32Data)
-		&& IMG_FALSE == bUnrecognizedErrorPrinted)
+	if (ui32LogIdx == HTB_SF_LAST)
 	{
-		PVR_DPF((PVR_DBG_WARNING,
-		    "%s: Unrecognised LOG value '%x' GID %x Params %d ID %x @ '%p'",
-			__func__, ui32Data, HTB_SF_GID(ui32Data),
-			HTB_SF_PARAMNUM(ui32Data), ui32Data & 0xfff, pData));
-		bUnrecognizedErrorPrinted = IMG_FALSE;
+		if (HTB_LOG_VALIDID(ui32Data))
+		{
+			if (!bUnrecognizedErrorPrinted)
+			{
+				PVR_DPF((PVR_DBG_WARNING,
+				    "%s: Unrecognised LOG value '%x' GID %x Params %d ID %x @ '%p'",
+				    __func__, ui32Data, HTB_SF_GID(ui32Data),
+				    HTB_SF_PARAMNUM(ui32Data), ui32Data & 0xfff, pData));
+				bUnrecognizedErrorPrinted = IMG_TRUE;
+			}
 
-		return 0;
+			return 0;
+		}
+
+		PVR_DPF((PVR_DBG_ERROR,
+		    "%s: Unrecognised and invalid LOG value detected '%x'",
+		    __func__, ui32Data));
+
+		return -1;
 	}
 
 	/* The string format we are going to display */
 	/*
 	 * The display will show the header (log-ID, group-ID, number of params)
 	 * The maximum parameter list length = 15 (only 4bits used to encode)
-	 * so we need HEADER + 15 * sizeof (UINT32) and the displayed string
+	 * so we need HEADER + 15 * sizeof(UINT32) and the displayed string
 	 * describing the event. We use a buffer in the per-process pSentinel
 	 * structure to hold the data.
 	 */
@@ -951,14 +962,13 @@ DecodeHTB(HTB_Sentinel_t *pSentinel,
 		(uiHdrType == PVRSRVTL_PACKETTYPE_MOST_RECENT_WRITE_FAILED))
 	{
 		/* Flag this as it is useful to know ... */
-		nPrinted = OSSNPrintf(aszOneArgFmt, sizeof (aszOneArgFmt),
-"\n<========================== *** PACKETS DROPPED *** ======================>\n");
 
-		PVR_DUMPDEBUG_LOG(aszOneArgFmt);
+		PVR_DUMPDEBUG_LOG("\n<========================== *** PACKETS DROPPED *** ======================>\n");
 	}
 
 	{
-		IMG_UINT32 ui32Timestamp, ui32PID;
+		IMG_UINT32 ui32Timestampns, ui32PID;
+		IMG_UINT64 ui64Timestamp, ui64TimestampSec;
 		IMG_CHAR	*szBuffer = pSentinel->szBuffer;	// Buffer start
 		IMG_CHAR	*pszBuffer = pSentinel->szBuffer;	// Current place in buf
 		size_t		uBufBytesAvailable = sizeof(pSentinel->szBuffer);
@@ -968,9 +978,12 @@ DecodeHTB(HTB_Sentinel_t *pSentinel,
 		// Get PID field from data stream
 		pui32Data++;
 		ui32PID = *pui32Data;
-		// Get Timestamp from data stream
+		// Get Timestamp part 1 from data stream
 		pui32Data++;
-		ui32Timestamp = *pui32Data;
+		ui64Timestamp = (IMG_UINT64) *pui32Data << 32;
+		// Get Timestamp part 2 from data stream
+		pui32Data++;
+		ui64Timestamp |= (IMG_UINT64) *pui32Data;
 		// Move to start of message contents data
 		pui32Data++;
 
@@ -979,14 +992,22 @@ DecodeHTB(HTB_Sentinel_t *pSentinel,
 		 * and then PVR_DUMPDEBUG_LOG() that in one shot
 		 */
 		ui_aGroupIdx = MIN(HTB_SF_GID(ui32Data), uiMax_aGroups);
- 		nPrinted = OSSNPrintf(szBuffer, uBufBytesAvailable, "%10u:%5u-%s> ",
-			ui32Timestamp, ui32PID, aGroups[ui_aGroupIdx]);
+
+		/* Divide by 1B to get seconds & mod using output var (nanosecond resolution)*/
+		ui64TimestampSec = OSDivide64r64(ui64Timestamp, 1000000000, &ui32Timestampns);
+
+ 		nPrinted = OSSNPrintf(szBuffer, uBufBytesAvailable, "%010"IMG_UINT64_FMTSPEC".%09u:%5u-%s> ",
+			ui64TimestampSec, ui32Timestampns, ui32PID, aGroups[ui_aGroupIdx]);
 		if (nPrinted >= uBufBytesAvailable)
 		{
-			PVR_DUMPDEBUG_LOG("Buffer overrun - %ld printed, max space %ld\n",
-				(long) nPrinted, (long) uBufBytesAvailable);
+			PVR_DUMPDEBUG_LOG("Buffer overrun - "IMG_SIZE_FMTSPEC" printed,"
+				" max space "IMG_SIZE_FMTSPEC"\n", nPrinted,
+				uBufBytesAvailable);
+
+			nPrinted = uBufBytesAvailable;	/* Ensure we don't overflow buffer */
 		}
 
+		PVR_DUMPDEBUG_LOG("%s", pszBuffer);
 		/* Update where our next 'output' point in the buffer is */
 		pszBuffer += nPrinted;
 		uBufBytesAvailable -= nPrinted;
@@ -1001,12 +1022,15 @@ DecodeHTB(HTB_Sentinel_t *pSentinel,
 		{
 			if (pszFmt)
 			{
-				nPrinted = OSSNPrintf(pszBuffer, uBufBytesAvailable, pszFmt);
+				nPrinted = OSStringLCopy(pszBuffer, pszFmt, uBufBytesAvailable);
 				if (nPrinted >= uBufBytesAvailable)
 				{
-					PVR_DUMPDEBUG_LOG("Buffer overrun - %ld printed,"
-						" max space %ld\n", (long) nPrinted, (long) uBufBytesAvailable);
+					PVR_DUMPDEBUG_LOG("Buffer overrun - "IMG_SIZE_FMTSPEC" printed,"
+						" max space "IMG_SIZE_FMTSPEC"\n", nPrinted,
+						uBufBytesAvailable);
+					nPrinted = uBufBytesAvailable;	/* Ensure we don't overflow buffer */
 				}
+				PVR_DUMPDEBUG_LOG("%s", pszBuffer);
 				pszBuffer += nPrinted;
 				/* Don't update the uBufBytesAvailable as we have finished this
 				 * message decode. pszBuffer - szBuffer is the total amount of
@@ -1016,61 +1040,110 @@ DecodeHTB(HTB_Sentinel_t *pSentinel,
 		}
 		else
 		{
-			while ( IS_VALID_FMT_STRING(pszFmt) && (uBufBytesAvailable > 0) )
+			if (HTB_SF_GID(ui32Data) == HTB_GID_CTRL && HTB_SF_ID(ui32Data) == HTB_ID_MARK_SCALE)
 			{
-				IMG_UINT32 ui32TmpArg = *pui32Data;
-				TRACEBUF_ARG_TYPE eArgType;
+				IMG_UINT32 i;
+				IMG_UINT32 ui32ArgArray[HTB_MARK_SCALE_ARG_ARRAY_SIZE];
+				IMG_UINT64 ui64OSTS = 0;
+				IMG_UINT32 ui32OSTSRem = 0;
+				IMG_UINT64 ui64CRTS = 0;
 
-				eArgType = ExtractOneArgFmt(&pszFmt, aszOneArgFmt);
-
-				pui32Data++;
-				ui32ArgsCur--;
-
-				switch (eArgType)
+				/* Retrieve 6 args to an array */
+				for (i = 0; i < ARRAY_SIZE(ui32ArgArray); i++)
 				{
-					case TRACEBUF_ARG_TYPE_INT:
-						nPrinted = OSSNPrintf(pszBuffer, uBufBytesAvailable,
-							aszOneArgFmt, ui32TmpArg);
-						break;
-
-					case TRACEBUF_ARG_TYPE_NONE:
-						nPrinted = OSSNPrintf(pszBuffer, uBufBytesAvailable,
-						    pszFmt);
-						break;
-
-					default:
-						nPrinted = OSSNPrintf(pszBuffer, uBufBytesAvailable,
-							"Error processing  arguments, type not "
-							"recognized (fmt: %s)", aszOneArgFmt);
-						break;
+					ui32ArgArray[i] = *pui32Data;
+					pui32Data++;
+					--ui32ArgsCur;
 				}
+
+				ui64OSTS = (IMG_UINT64) ui32ArgArray[HTB_ARG_OSTS_PT1] << 32 | ui32ArgArray[HTB_ARG_OSTS_PT2];
+				ui64CRTS = (IMG_UINT64) ui32ArgArray[HTB_ARG_CRTS_PT1] << 32 | ui32ArgArray[HTB_ARG_CRTS_PT2];
+
+				/* Divide by 1B to get seconds, remainder in nano seconds*/
+				ui64OSTS = OSDivide64r64(ui64OSTS, 1000000000, &ui32OSTSRem);
+
+				nPrinted = OSSNPrintf(pszBuffer,
+						              uBufBytesAvailable,
+						              "HTBFWMkSync Mark=%u OSTS=%010" IMG_UINT64_FMTSPEC ".%09u CRTS=%" IMG_UINT64_FMTSPEC " CalcClkSpd=%u \n",
+						              ui32ArgArray[HTB_ARG_SYNCMARK],
+						              ui64OSTS,
+						              ui32OSTSRem,
+						              ui64CRTS,
+						              ui32ArgArray[HTB_ARG_CLKSPD]);
+
 				if (nPrinted >= uBufBytesAvailable)
 				{
-					PVR_DUMPDEBUG_LOG("Buffer overrun - %ld printed,"
-						" max space %ld\n", (long) nPrinted,
-					    (long) uBufBytesAvailable);
+					PVR_DUMPDEBUG_LOG("Buffer overrun - "IMG_SIZE_FMTSPEC" printed,"
+						" max space "IMG_SIZE_FMTSPEC"\n", nPrinted,
+						uBufBytesAvailable);
+					nPrinted = uBufBytesAvailable;	/* Ensure we don't overflow buffer */
 				}
+
+				PVR_DUMPDEBUG_LOG("%s", pszBuffer);
 				pszBuffer += nPrinted;
 				uBufBytesAvailable -= nPrinted;
 			}
-			/* Display any remaining text in pszFmt string */
-			if (pszFmt)
+			else
 			{
-				nPrinted = OSSNPrintf(pszBuffer, uBufBytesAvailable, pszFmt);
-				if (nPrinted >= uBufBytesAvailable)
+				while (IS_VALID_FMT_STRING(pszFmt) && (uBufBytesAvailable > 0))
 				{
-					PVR_DUMPDEBUG_LOG("Buffer overrun - %ld printed,"
-						" max space %ld\n", (long) nPrinted, (long) uBufBytesAvailable);
+					IMG_UINT32 ui32TmpArg = *pui32Data;
+					TRACEBUF_ARG_TYPE eArgType;
+
+					eArgType = ExtractOneArgFmt(&pszFmt, aszOneArgFmt);
+
+					pui32Data++;
+					ui32ArgsCur--;
+
+					switch (eArgType)
+					{
+						case TRACEBUF_ARG_TYPE_INT:
+							nPrinted = OSSNPrintf(pszBuffer, uBufBytesAvailable,
+								aszOneArgFmt, ui32TmpArg);
+							break;
+
+						case TRACEBUF_ARG_TYPE_NONE:
+							nPrinted = OSStringLCopy(pszBuffer, pszFmt,
+								uBufBytesAvailable);
+							break;
+
+						default:
+							nPrinted = OSSNPrintf(pszBuffer, uBufBytesAvailable,
+								"Error processing arguments, type not "
+								"recognized (fmt: %s)", aszOneArgFmt);
+							break;
+					}
+					if (nPrinted >= uBufBytesAvailable)
+					{
+						PVR_DUMPDEBUG_LOG("Buffer overrun - "IMG_SIZE_FMTSPEC" printed,"
+							" max space "IMG_SIZE_FMTSPEC"\n", nPrinted,
+							uBufBytesAvailable);
+						nPrinted = uBufBytesAvailable;	/* Ensure we don't overflow buffer */
+					}
+					PVR_DUMPDEBUG_LOG("%s", pszBuffer);
+					pszBuffer += nPrinted;
+					uBufBytesAvailable -= nPrinted;
 				}
-				pszBuffer += nPrinted;
-				/* Don't update the uBufBytesAvailable as we have finished this
-				 * message decode. pszBuffer - szBuffer is the total amount of
-				 * data we have decoded.
-				 */
+				/* Display any remaining text in pszFmt string */
+				if (pszFmt)
+				{
+					nPrinted = OSStringLCopy(pszBuffer, pszFmt, uBufBytesAvailable);
+					if (nPrinted >= uBufBytesAvailable)
+					{
+						PVR_DUMPDEBUG_LOG("Buffer overrun - "IMG_SIZE_FMTSPEC" printed,"
+							" max space "IMG_SIZE_FMTSPEC"\n", nPrinted,
+							uBufBytesAvailable);
+						nPrinted = uBufBytesAvailable;	/* Ensure we don't overflow buffer */
+					}
+					PVR_DUMPDEBUG_LOG("%s", pszBuffer);
+					pszBuffer += nPrinted;
+					/* Don't update the uBufBytesAvailable as we have finished this
+					 * message decode. pszBuffer - szBuffer is the total amount of
+					 * data we have decoded.
+					 */
+				}
 			}
 		}
-
-		PVR_DUMPDEBUG_LOG(szBuffer);
 
 		/* Update total bytes processed */
 		pSentinel->uiTotal += (pszBuffer - szBuffer);
@@ -1120,8 +1193,8 @@ static int HTBDumpBuffer(DUMPDEBUG_PRINTF_FUNC *pfnDumpDebugPrintf,
 		PVR_ASSERT(pSentinel->pCurr != NULL);
 
 		/* Display a Header as we have data to process */
-		seq_printf(psSeqFile, "%-10s:%-5s-%s  %s\n",
-			"Timestamp", "Proc ID", "Group", "Log Entry");
+		seq_printf(psSeqFile, "%-20s:%-5s-%s  %s\n",
+			"Timestamp", "PID", "Group>", "Log Entry");
 	}
 	else
 	{
@@ -1137,24 +1210,23 @@ static int HTBDumpBuffer(DUMPDEBUG_PRINTF_FUNC *pfnDumpDebugPrintf,
 
 /******************************************************************************
  * External Entry Point routines ...
- ******************************************************************************/
-/**************************************************************************/ /*!
+ *****************************************************************************/
+/*************************************************************************/ /*!
  @Function     HTB_CreateFSEntry
 
  @Description  Create the debugFS entry-point for the host-trace-buffer
 
  @Returns      eError          internal error code, PVRSRV_OK on success
 
- */ /**************************************************************************/
+ */ /*************************************************************************/
 PVRSRV_ERROR HTB_CreateFSEntry(void)
 {
 	PVRSRV_ERROR eError;
 
-	eError = PVRDebugFSCreateEntry("host_trace", NULL,
-	                               &gsHTBReadOps,
-	                               NULL,
-	                               NULL, NULL, NULL,
-	                               &g_sHTBData.psDumpHostDebugFSEntry);
+	eError = PVRDebugFSCreateFile("host_trace", NULL,
+				      &gsHTBReadOps,
+				      NULL, NULL, NULL,
+				      &g_sHTBData.psDumpHostDebugFSEntry);
 
 	PVR_LOGR_IF_ERROR(eError, "PVRDebugFSCreateEntry");
 
@@ -1162,7 +1234,7 @@ PVRSRV_ERROR HTB_CreateFSEntry(void)
 }
 
 
-/**************************************************************************/ /*!
+/*************************************************************************/ /*!
  @Function     HTB_DestroyFSEntry
 
  @Description  Destroy the debugFS entry-point created by earlier
@@ -1172,8 +1244,7 @@ void HTB_DestroyFSEntry(void)
 {
 	if (g_sHTBData.psDumpHostDebugFSEntry)
 	{
-		PVRDebugFSRemoveEntry(&g_sHTBData.psDumpHostDebugFSEntry);
-		g_sHTBData.psDumpHostDebugFSEntry = NULL;
+		PVRDebugFSRemoveFile(&g_sHTBData.psDumpHostDebugFSEntry);
 	}
 }
 

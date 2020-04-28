@@ -64,13 +64,11 @@ void nlpvrdpy_destroy(struct nlpvrdpy *nlpvrdpy);
 
 int nlpvrdpy_send_flip(struct nlpvrdpy *nlpvrdpy,
 		       struct drm_framebuffer *fb,
-		       u64 *plane_addr,
-		       u64 *plane_size);
+		       struct drm_gem_object **objs);
 
 int nlpvrdpy_send_copy(struct nlpvrdpy *nlpvrdpy,
 		       struct drm_framebuffer *fb,
-		       u64 *plane_addr,
-		       u64 *plane_size);
+		       struct drm_gem_object **objs);
 
 void nlpvrdpy_send_disconnect(struct nlpvrdpy *nlpvrdpy);
 

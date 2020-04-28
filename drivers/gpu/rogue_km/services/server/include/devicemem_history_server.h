@@ -124,7 +124,7 @@ typedef struct _DEVICEMEM_HISTORY_QUERY_OUT_RESULT_
 {
 	IMG_CHAR szString[DEVMEM_ANNOTATION_MAX_LEN];
 	IMG_DEV_VIRTADDR sBaseDevVAddr;
-	size_t uiSize;
+	IMG_DEVMEM_SIZE_T uiSize;
 	IMG_BOOL bMap;
 	IMG_BOOL bRange;
 	IMG_BOOL bAll;

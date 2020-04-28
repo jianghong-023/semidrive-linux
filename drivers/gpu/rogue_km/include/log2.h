@@ -44,23 +44,23 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #include "img_defs.h"
 
-/**************************************************************************/ /*!
+/*************************************************************************/ /*!
 @Description    Determine if a number is a power of two.
 @Input          n
 @Return         True if n is a power of 2, false otherwise. True if n == 0.
-*/ /***************************************************************************/
-static INLINE IMG_BOOL IsPower2(uint32_t n)
+*/ /**************************************************************************/
+static INLINE IMG_BOOL __const_function IsPower2(uint32_t n)
 {
 	/* C++ needs this cast. */
 	return (IMG_BOOL)((n & (n - 1)) == 0);
 }
 
-/**************************************************************************/ /*!
+/*************************************************************************/ /*!
 @Description    Determine if a number is a power of two.
 @Input          n
 @Return         True if n is a power of 2, false otherwise. True if n == 0.
-*/ /***************************************************************************/
-static INLINE IMG_BOOL IsPower2_64(uint64_t n)
+*/ /**************************************************************************/
+static INLINE IMG_BOOL __const_function IsPower2_64(uint64_t n)
 {
 	/* C++ needs this cast. */
 	return (IMG_BOOL)((n & (n - 1)) == 0);
@@ -76,18 +76,14 @@ static INLINE IMG_BOOL IsPower2_64(uint64_t n)
 #define CHAR_BIT 8U
 #endif
 
-#ifndef unlikely
-#define unlikely(x) __builtin_expect(!!(x), 0)
-#endif
-
-/**************************************************************************/ /*!
+/*************************************************************************/ /*!
 @Description    Compute floor(log2(n))
 @Input          n
 @Return         log2(n) rounded down to the nearest integer. Returns 0 if n == 0
-*/ /***************************************************************************/
-static INLINE uint32_t FloorLog2(uint32_t n)
+*/ /**************************************************************************/
+static INLINE uint32_t __const_function FloorLog2(uint32_t n)
 {
-	if(unlikely(n == 0))
+	if (unlikely(n == 0))
 	{
 		return 0;
 	}
@@ -98,14 +94,14 @@ static INLINE uint32_t FloorLog2(uint32_t n)
 	}
 }
 
-/**************************************************************************/ /*!
+/*************************************************************************/ /*!
 @Description    Compute floor(log2(n))
 @Input          n
 @Return         log2(n) rounded down to the nearest integer. Returns 0 if n == 0
-*/ /***************************************************************************/
-static INLINE uint32_t FloorLog2_64(uint64_t n)
+*/ /**************************************************************************/
+static INLINE uint32_t __const_function FloorLog2_64(uint64_t n)
 {
-	if(unlikely(n == 0))
+	if (unlikely(n == 0))
 	{
 		return 0;
 	}
@@ -116,14 +112,14 @@ static INLINE uint32_t FloorLog2_64(uint64_t n)
 	}
 }
 
-/**************************************************************************/ /*!
+/*************************************************************************/ /*!
 @Description    Compute ceil(log2(n))
 @Input          n
 @Return         log2(n) rounded up to the nearest integer. Returns 0 if n == 0
-*/ /***************************************************************************/
-static INLINE uint32_t CeilLog2(uint32_t n)
+*/ /**************************************************************************/
+static INLINE uint32_t __const_function CeilLog2(uint32_t n)
 {
-	if(unlikely(n == 0 || n == 1))
+	if (unlikely(n == 0 || n == 1))
 	{
 		return 0;
 	}
@@ -136,14 +132,14 @@ static INLINE uint32_t CeilLog2(uint32_t n)
 	}
 }
 
-/**************************************************************************/ /*!
+/*************************************************************************/ /*!
 @Description    Compute ceil(log2(n))
 @Input          n
 @Return         log2(n) rounded up to the nearest integer. Returns 0 if n == 0
-*/ /***************************************************************************/
-static INLINE uint32_t CeilLog2_64(uint64_t n)
+*/ /**************************************************************************/
+static INLINE uint32_t __const_function CeilLog2_64(uint64_t n)
 {
-	if(unlikely(n == 0 || n == 1))
+	if (unlikely(n == 0 || n == 1))
 	{
 		return 0;
 	}
@@ -156,43 +152,43 @@ static INLINE uint32_t CeilLog2_64(uint64_t n)
 	}
 }
 
-/**************************************************************************/ /*!
+/*************************************************************************/ /*!
 @Description    Compute log2(n) for exact powers of two only
 @Input          n                   Must be a power of two
 @Return         log2(n)
-*/ /***************************************************************************/
-static INLINE uint32_t ExactLog2(uint32_t n)
+*/ /**************************************************************************/
+static INLINE uint32_t __const_function ExactLog2(uint32_t n)
 {
 	return (uint32_t)(CHAR_BIT * sizeof(n)) - (uint32_t)__builtin_clz(n) - 1U;
 }
 
-/**************************************************************************/ /*!
+/*************************************************************************/ /*!
 @Description    Compute log2(n) for exact powers of two only
 @Input          n                   Must be a power of two
 @Return         log2(n)
-*/ /***************************************************************************/
-static INLINE uint32_t ExactLog2_64(uint64_t n)
+*/ /**************************************************************************/
+static INLINE uint32_t __const_function ExactLog2_64(uint64_t n)
 {
 	return (uint32_t)(CHAR_BIT * sizeof(n)) - (uint32_t)__builtin_clzll(n) - 1U;
 }
 
-/**************************************************************************/ /*!
+/*************************************************************************/ /*!
 @Description    Round a non-power-of-two number up to the next power of two.
 @Input          n
 @Return         n rounded up to the next power of two. If n is zero or
                 already a power of two, return n unmodified.
-*/ /***************************************************************************/
-static INLINE uint32_t RoundUpToNextPowerOfTwo(uint32_t n)
+*/ /**************************************************************************/
+static INLINE uint32_t __const_function RoundUpToNextPowerOfTwo(uint32_t n)
 {
 	/* Cases with n greater than 2^31 needs separate handling
 	 * as result of (1<<32) is undefined. */
-	if( unlikely( n == 0 || n > (uint32_t)1 << (CHAR_BIT * sizeof(n) - 1) ))
+	if (unlikely( n == 0 || n > (uint32_t)1 << (CHAR_BIT * sizeof(n) - 1)))
 	{
 		return 0;
 	}
 
 	/* Return n if it is already a power of 2 */
-	if((IMG_BOOL)((n & (n - 1)) == 0))
+	if ((IMG_BOOL)((n & (n - 1)) == 0))
 	{
 		return n;
 	}
@@ -200,23 +196,23 @@ static INLINE uint32_t RoundUpToNextPowerOfTwo(uint32_t n)
 	return (uint32_t)1 << ((uint32_t)(CHAR_BIT * sizeof(n)) - (uint32_t)__builtin_clz(n));
 }
 
-/**************************************************************************/ /*!
+/*************************************************************************/ /*!
 @Description    Round a non-power-of-two number up to the next power of two.
 @Input          n
 @Return         n rounded up to the next power of two. If n is zero or
                 already a power of two, return n unmodified.
-*/ /***************************************************************************/
-static INLINE uint64_t RoundUpToNextPowerOfTwo_64(uint64_t n)
+*/ /**************************************************************************/
+static INLINE uint64_t __const_function RoundUpToNextPowerOfTwo_64(uint64_t n)
 {
 	/* Cases with n greater than 2^63 needs separate handling
 	 * as result of (1<<64) is undefined. */
-	if( unlikely( n == 0 || n > (uint64_t)1 << (CHAR_BIT * sizeof(n) - 1) ))
+	if (unlikely( n == 0 || n > (uint64_t)1 << (CHAR_BIT * sizeof(n) - 1)))
 	{
 		return 0;
 	}
 
 	/* Return n if it is already a power of 2 */
-	if((IMG_BOOL)((n & (n - 1)) == 0))
+	if ((IMG_BOOL)((n & (n - 1)) == 0))
 	{
 		return n;
 	}
@@ -226,13 +222,13 @@ static INLINE uint64_t RoundUpToNextPowerOfTwo_64(uint64_t n)
 
 #else /* #if (defined(__GNUC__) || defined(__GNUG__)) && !(defined(__clang__) || defined(__INTEL_COMPILER)) */
 
-/**************************************************************************/ /*!
+/*************************************************************************/ /*!
 @Description    Round a non-power-of-two number up to the next power of two.
 @Input          n
 @Return         n rounded up to the next power of two. If n is zero or
                 already a power of two, return n unmodified.
-*/ /***************************************************************************/
-static INLINE uint32_t RoundUpToNextPowerOfTwo(uint32_t n)
+*/ /**************************************************************************/
+static INLINE uint32_t __const_function RoundUpToNextPowerOfTwo(uint32_t n)
 {
 	n--;
 	n |= n >> 1;  /* handle  2 bit numbers */
@@ -245,13 +241,13 @@ static INLINE uint32_t RoundUpToNextPowerOfTwo(uint32_t n)
 	return n;
 }
 
-/**************************************************************************/ /*!
+/*************************************************************************/ /*!
 @Description    Round a non-power-of-two number up to the next power of two.
 @Input          n
 @Return         n rounded up to the next power of two. If n is zero or
                 already a power of two, return n unmodified.
-*/ /***************************************************************************/
-static INLINE uint64_t RoundUpToNextPowerOfTwo_64(uint64_t n)
+*/ /**************************************************************************/
+static INLINE uint64_t __const_function RoundUpToNextPowerOfTwo_64(uint64_t n)
 {
 	n--;
 	n |= n >> 1;  /* handle  2 bit numbers */
@@ -265,12 +261,12 @@ static INLINE uint64_t RoundUpToNextPowerOfTwo_64(uint64_t n)
 	return n;
 }
 
-/**************************************************************************/ /*!
+/*************************************************************************/ /*!
 @Description    Compute floor(log2(n))
 @Input          n
 @Return         log2(n) rounded down to the nearest integer. Returns 0 if n == 0
-*/ /***************************************************************************/
-static INLINE uint32_t FloorLog2(uint32_t n)
+*/ /**************************************************************************/
+static INLINE uint32_t __const_function FloorLog2(uint32_t n)
 {
 	uint32_t log2 = 0;
 
@@ -280,12 +276,12 @@ static INLINE uint32_t FloorLog2(uint32_t n)
 	return log2;
 }
 
-/**************************************************************************/ /*!
+/*************************************************************************/ /*!
 @Description    Compute floor(log2(n))
 @Input          n
 @Return         log2(n) rounded down to the nearest integer. Returns 0 if n == 0
-*/ /***************************************************************************/
-static INLINE uint32_t FloorLog2_64(uint64_t n)
+*/ /**************************************************************************/
+static INLINE uint32_t __const_function FloorLog2_64(uint64_t n)
 {
 	uint32_t log2 = 0;
 
@@ -295,21 +291,21 @@ static INLINE uint32_t FloorLog2_64(uint64_t n)
 	return log2;
 }
 
-/**************************************************************************/ /*!
+/*************************************************************************/ /*!
 @Description    Compute ceil(log2(n))
 @Input          n
 @Return         log2(n) rounded up to the nearest integer. Returns 0 if n == 0
-*/ /***************************************************************************/
-static INLINE uint32_t CeilLog2(uint32_t n)
+*/ /**************************************************************************/
+static INLINE uint32_t __const_function CeilLog2(uint32_t n)
 {
 	uint32_t log2 = 0;
 
-	if(n == 0)
+	if (n == 0)
 		return 0;
 
 	n--; /* Handle powers of 2 */
 
-	while(n)
+	while (n)
 	{
 		log2++;
 		n >>= 1;
@@ -318,21 +314,21 @@ static INLINE uint32_t CeilLog2(uint32_t n)
 	return log2;
 }
 
-/**************************************************************************/ /*!
+/*************************************************************************/ /*!
 @Description    Compute ceil(log2(n))
 @Input          n
 @Return         log2(n) rounded up to the nearest integer. Returns 0 if n == 0
-*/ /***************************************************************************/
-static INLINE uint32_t CeilLog2_64(uint64_t n)
+*/ /**************************************************************************/
+static INLINE uint32_t __const_function CeilLog2_64(uint64_t n)
 {
 	uint32_t log2 = 0;
 
-	if(n == 0)
+	if (n == 0)
 		return 0;
 
 	n--; /* Handle powers of 2 */
 
-	while(n)
+	while (n)
 	{
 		log2++;
 		n >>= 1;
@@ -341,15 +337,15 @@ static INLINE uint32_t CeilLog2_64(uint64_t n)
 	return log2;
 }
 
-/**************************************************************************/ /*!
+/*************************************************************************/ /*!
 @Description    Compute log2(n) for exact powers of two only
 @Input          n                   Must be a power of two
 @Return         log2(n)
-*/ /***************************************************************************/
-static INLINE uint32_t ExactLog2(uint32_t n)
+*/ /**************************************************************************/
+static INLINE uint32_t __const_function ExactLog2(uint32_t n)
 {
 	static const uint32_t b[] =
-		{ 0xAAAAAAAA, 0xCCCCCCCC, 0xF0F0F0F0, 0xFF00FF00, 0xFFFF0000};
+		{0xAAAAAAAA, 0xCCCCCCCC, 0xF0F0F0F0, 0xFF00FF00, 0xFFFF0000};
 	uint32_t r = (n & b[0]) != 0;
 
 	r |= (uint32_t) ((n & b[4]) != 0) << 4;
@@ -360,17 +356,17 @@ static INLINE uint32_t ExactLog2(uint32_t n)
 	return r;
 }
 
-/**************************************************************************/ /*!
+/*************************************************************************/ /*!
 @Description    Compute log2(n) for exact powers of two only
 @Input          n                   Must be a power of two
 @Return         log2(n)
-*/ /***************************************************************************/
-static INLINE uint32_t ExactLog2_64(uint64_t n)
+*/ /**************************************************************************/
+static INLINE uint32_t __const_function ExactLog2_64(uint64_t n)
 {
 	static const uint64_t b[] =
-		{ 0xAAAAAAAAAAAAAAAAULL, 0xCCCCCCCCCCCCCCCCULL,
-		  0xF0F0F0F0F0F0F0F0ULL, 0xFF00FF00FF00FF00ULL,
-		  0xFFFF0000FFFF0000ULL, 0xFFFFFFFF00000000ULL };
+		{0xAAAAAAAAAAAAAAAAULL, 0xCCCCCCCCCCCCCCCCULL,
+		 0xF0F0F0F0F0F0F0F0ULL, 0xFF00FF00FF00FF00ULL,
+		 0xFFFF0000FFFF0000ULL, 0xFFFFFFFF00000000ULL};
 	uint32_t r = (n & b[0]) != 0;
 
 	r |= (uint32_t) ((n & b[5]) != 0) << 5;
@@ -384,7 +380,7 @@ static INLINE uint32_t ExactLog2_64(uint64_t n)
 
 #endif /* #if (defined(__GNUC__) || defined(__GNUG__)) && !(defined(__clang__) || defined(__INTEL_COMPILER)) */
 
-/**************************************************************************/ /*!
+/*************************************************************************/ /*!
 @Description    Compute floor(log2(size)) , where size is the max of 3 sizes
 				This is almost always the ONLY EVER valid use of FloorLog2.
 				Usually CeilLog2() should be used instead.
@@ -402,13 +398,12 @@ static INLINE uint32_t ExactLog2_64(uint64_t n)
 
 @Input          sizeX, sizeY, sizeZ
 @Return         Count of mipmap levels for given dimensions
-*/ /***************************************************************************/
-static INLINE uint32_t NumMipLevels(uint32_t sizeX, uint32_t sizeY, uint32_t sizeZ)
+*/ /**************************************************************************/
+static INLINE uint32_t __const_function NumMipLevels(uint32_t sizeX, uint32_t sizeY, uint32_t sizeZ)
 {
 
 	uint32_t maxSize = MAX(MAX(sizeX, sizeY), sizeZ);
 	return FloorLog2(maxSize) + 1;
 }
-
 
 #endif /* LOG2_H */

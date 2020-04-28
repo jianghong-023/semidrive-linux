@@ -1,9 +1,8 @@
 /*************************************************************************/ /*!
-@File
-@Title          Version numbers and strings.
+@File           pvrversion.h
+@Title          PowerVR version numbers and strings.
 @Copyright      Copyright (c) Imagination Technologies Ltd. All Rights Reserved
-@Description    Version numbers and strings for PVR Consumer services
-                components.
+@Description    Version numbers and strings for PowerVR components.
 @License        Dual MIT/GPLv2
 
 The contents of this file are subject to the MIT license as set out below.
@@ -42,31 +41,28 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */ /**************************************************************************/
 
-#ifndef _PVRVERSION_H_
-#define _PVRVERSION_H_
+#ifndef PVRVERSION_H
+#define PVRVERSION_H
 
-#define PVR_STR(X) #X
-#define PVR_STR2(X) PVR_STR(X)
-
-#define PVRVERSION_MAJ               1
-#define PVRVERSION_MIN               10
+#define PVRVERSION_MAJ               1U
+#define PVRVERSION_MIN               11U
 
 #define PVRVERSION_FAMILY           "rogueddk"
-#define PVRVERSION_BRANCHNAME       "1.10"
-#define PVRVERSION_BUILD             5307123
-#define PVRVERSION_BSCONTROL        "Rogue_DDK_Android"
+#define PVRVERSION_BRANCHNAME       "1.11"
+#define PVRVERSION_BUILD             5516664
+#define PVRVERSION_BSCONTROL        "Rogue_DDK_Linux"
 
-#define PVRVERSION_STRING           "Rogue_DDK_Android rogueddk 1.10@" PVR_STR2(PVRVERSION_BUILD)
-#define PVRVERSION_STRING_SHORT     "1.10@" PVR_STR2(PVRVERSION_BUILD) ""
+#define PVRVERSION_STRING           "Rogue_DDK_Linux rogueddk 1.11@5516664"
+#define PVRVERSION_STRING_SHORT     "1.11@5516664"
 
 #define COPYRIGHT_TXT               "Copyright (c) Imagination Technologies Ltd. All Rights Reserved."
 
-#define PVRVERSION_BUILD_HI          530
-#define PVRVERSION_BUILD_LO          7123
-#define PVRVERSION_STRING_NUMERIC    PVR_STR2(PVRVERSION_MAJ) "." PVR_STR2(PVRVERSION_MIN) "." PVR_STR2(PVRVERSION_BUILD_HI) "." PVR_STR2(PVRVERSION_BUILD_LO)
+#define PVRVERSION_BUILD_HI          551
+#define PVRVERSION_BUILD_LO          6664
+#define PVRVERSION_STRING_NUMERIC   "1.11.551.6664"
 
-#define PVRVERSION_PACK(MAJ,MIN) ((((MAJ)&0xFFFF) << 16) | (((MIN)&0xFFFF) << 0))
-#define PVRVERSION_UNPACK_MAJ(VERSION) (((VERSION) >> 16) & 0xFFFF)
-#define PVRVERSION_UNPACK_MIN(VERSION) (((VERSION) >> 0) & 0xFFFF)
+#define PVRVERSION_PACK(MAJ,MIN) (((IMG_UINT32)((IMG_UINT32)(MAJ) & 0xFFFFU) << 16U) | (((MIN) & 0xFFFFU) << 0U))
+#define PVRVERSION_UNPACK_MAJ(VERSION) (((VERSION) >> 16U) & 0xFFFFU)
+#define PVRVERSION_UNPACK_MIN(VERSION) (((VERSION) >> 0U) & 0xFFFFU)
 
-#endif /* _PVRVERSION_H_ */
+#endif /* PVRVERSION_H */

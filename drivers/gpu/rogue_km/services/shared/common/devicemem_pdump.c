@@ -46,6 +46,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #include "allocmem.h"
 #include "img_types.h"
+#include "img_defs.h"
 #include "pvrsrv_error.h"
 #include "pdump.h"
 #include "devicemem.h"
@@ -69,7 +70,7 @@ DevmemPDumpLoadMem(DEVMEM_MEMDESC *psMemDesc,
 
 	PVR_ASSERT(uiOffset + uiSize <= psMemDesc->psImport->uiSize);
 
-	eError = BridgePMRPDumpLoadMem(psMemDesc->psImport->hDevConnection,
+	eError = BridgePMRPDumpLoadMem(GetBridgeHandle(psMemDesc->psImport->hDevConnection),
 	                               psMemDesc->psImport->hPMR,
 	                               psMemDesc->uiOffset + uiOffset,
 	                               uiSize,
@@ -80,7 +81,7 @@ DevmemPDumpLoadMem(DEVMEM_MEMDESC *psMemDesc,
 	{
 		PVR_DPF((PVR_DBG_ERROR,
 				"%s: failed with error %d",
-				__FUNCTION__, eError));
+				__func__, eError));
 	}
 	PVR_ASSERT(eError == PVRSRV_OK);
 }
@@ -95,7 +96,7 @@ DevmemPDumpLoadZeroMem(DEVMEM_MEMDESC *psMemDesc,
 
 	PVR_ASSERT(uiOffset + uiSize <= psMemDesc->psImport->uiSize);
 
-	eError = BridgePMRPDumpLoadMem(psMemDesc->psImport->hDevConnection,
+	eError = BridgePMRPDumpLoadMem(GetBridgeHandle(psMemDesc->psImport->hDevConnection),
 	                               psMemDesc->psImport->hPMR,
 	                               psMemDesc->uiOffset + uiOffset,
 	                               uiSize,
@@ -106,7 +107,7 @@ DevmemPDumpLoadZeroMem(DEVMEM_MEMDESC *psMemDesc,
 	{
 		PVR_DPF((PVR_DBG_ERROR,
 				"%s: failed with error %d",
-				__FUNCTION__, eError));
+				__func__, eError));
 	}
 	PVR_ASSERT(eError == PVRSRV_OK);
 }
@@ -119,7 +120,7 @@ DevmemPDumpLoadMemValue32(DEVMEM_MEMDESC *psMemDesc,
 {
 	PVRSRV_ERROR eError;
 
-	eError = BridgePMRPDumpLoadMemValue32(psMemDesc->psImport->hDevConnection,
+	eError = BridgePMRPDumpLoadMemValue32(GetBridgeHandle(psMemDesc->psImport->hDevConnection),
 	                                      psMemDesc->psImport->hPMR,
 	                                      psMemDesc->uiOffset + uiOffset,
 	                                      ui32Value,
@@ -129,7 +130,7 @@ DevmemPDumpLoadMemValue32(DEVMEM_MEMDESC *psMemDesc,
 	{
 		PVR_DPF((PVR_DBG_ERROR,
 				"%s: failed with error %d",
-				__FUNCTION__, eError));
+				__func__, eError));
 	}
 	PVR_ASSERT(eError == PVRSRV_OK);
 }
@@ -142,7 +143,7 @@ DevmemPDumpLoadMemValue64(DEVMEM_MEMDESC *psMemDesc,
 {
 	PVRSRV_ERROR eError;
 
-	eError = BridgePMRPDumpLoadMemValue64(psMemDesc->psImport->hDevConnection,
+	eError = BridgePMRPDumpLoadMemValue64(GetBridgeHandle(psMemDesc->psImport->hDevConnection),
 	                                      psMemDesc->psImport->hPMR,
 	                                      psMemDesc->uiOffset + uiOffset,
 	                                      ui64Value,
@@ -151,7 +152,7 @@ DevmemPDumpLoadMemValue64(DEVMEM_MEMDESC *psMemDesc,
 	{
 		PVR_DPF((PVR_DBG_ERROR,
 				"%s: failed with error %d",
-				__FUNCTION__, eError));
+				__func__, eError));
 	}
 	PVR_ASSERT(eError == PVRSRV_OK);
 }
@@ -170,7 +171,7 @@ DevmemPDumpPageCatBaseToSAddr(DEVMEM_MEMDESC		*psMemDesc,
 
 	*puiMemOffset += psMemDesc->uiOffset;
 
-	eError = BridgePMRPDumpSymbolicAddr(psMemDesc->psImport->hDevConnection,
+	eError = BridgePMRPDumpSymbolicAddr(GetBridgeHandle(psMemDesc->psImport->hDevConnection),
 	                                    psMemDesc->psImport->hPMR,
 	                                    *puiMemOffset,
 	                                    sizeof(aszMemspaceName),
@@ -184,7 +185,7 @@ DevmemPDumpPageCatBaseToSAddr(DEVMEM_MEMDESC		*psMemDesc,
 	{
 		PVR_DPF((PVR_DBG_ERROR,
 				"%s: failed with error %d",
-				__FUNCTION__, eError));
+				__func__, eError));
 	}
 	PVR_ASSERT(eError == PVRSRV_OK);
 
@@ -201,7 +202,7 @@ DevmemPDumpSaveToFile(DEVMEM_MEMDESC *psMemDesc,
 {
 	PVRSRV_ERROR eError;
 
-	eError = BridgePMRPDumpSaveToFile(psMemDesc->psImport->hDevConnection,
+	eError = BridgePMRPDumpSaveToFile(GetBridgeHandle(psMemDesc->psImport->hDevConnection),
 	                                  psMemDesc->psImport->hPMR,
 	                                  psMemDesc->uiOffset + uiOffset,
 	                                  uiSize,
@@ -213,7 +214,7 @@ DevmemPDumpSaveToFile(DEVMEM_MEMDESC *psMemDesc,
 	{
 		PVR_DPF((PVR_DBG_ERROR,
 				"%s: failed with error %d",
-				__FUNCTION__, eError));
+				__func__, eError));
 	}
 	PVR_ASSERT(eError == PVRSRV_OK);
 }
@@ -236,7 +237,7 @@ DevmemPDumpSaveToFileVirtual(DEVMEM_MEMDESC *psMemDesc,
 	sDevAddrStart.uiAddr += psMemDesc->uiOffset;
 	sDevAddrStart.uiAddr += uiOffset;
 
-	eError = BridgeDevmemIntPDumpSaveToFileVirtual(psMemDesc->psImport->hDevConnection,
+	eError = BridgeDevmemIntPDumpSaveToFileVirtual(GetBridgeHandle(psMemDesc->psImport->hDevConnection),
 	                                               psMemDesc->psImport->sDeviceImport.psHeap->psCtx->hDevMemServerContext,
 	                                               sDevAddrStart,
 	                                               uiSize,
@@ -249,7 +250,7 @@ DevmemPDumpSaveToFileVirtual(DEVMEM_MEMDESC *psMemDesc,
 	{
 		PVR_DPF((PVR_DBG_ERROR,
 				"%s: failed with error %d",
-				__FUNCTION__, eError));
+				__func__, eError));
 	}
 	PVR_ASSERT(eError == PVRSRV_OK);
 }
@@ -274,7 +275,7 @@ DevmemPDumpDevmemPol32(const DEVMEM_MEMDESC *psMemDesc,
 		goto e0;
 	}
 
-	eError = BridgePMRPDumpPol32(psMemDesc->psImport->hDevConnection,
+	eError = BridgePMRPDumpPol32(GetBridgeHandle(psMemDesc->psImport->hDevConnection),
 	                             psMemDesc->psImport->hPMR,
 	                             psMemDesc->uiOffset + uiOffset,
 	                             ui32Value,
@@ -312,7 +313,7 @@ DevmemPDumpCBP(const DEVMEM_MEMDESC *psMemDesc,
 		goto e0;
 	}
 
-	eError = BridgePMRPDumpCBP(psMemDesc->psImport->hDevConnection,
+	eError = BridgePMRPDumpCBP(GetBridgeHandle(psMemDesc->psImport->hDevConnection),
 	                           psMemDesc->psImport->hPMR,
 	                           psMemDesc->uiOffset + uiReadOffset,
 	                           uiWriteOffset,

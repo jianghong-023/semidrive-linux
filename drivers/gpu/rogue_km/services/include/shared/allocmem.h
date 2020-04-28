@@ -41,8 +41,8 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */ /**************************************************************************/
 
-#ifndef __ALLOCMEM_H__
-#define __ALLOCMEM_H__
+#ifndef ALLOCMEM_H
+#define ALLOCMEM_H
 
 #include "img_types.h"
 #include "pvr_debug.h"
@@ -75,10 +75,8 @@ void *OSAllocZMem(IMG_UINT32 ui32Size);
 #else
 void *_OSAllocMem(IMG_UINT32 ui32Size, void *pvAllocFromFile, IMG_UINT32 ui32AllocFromLine);
 void *_OSAllocZMem(IMG_UINT32 ui32Size, void *pvAllocFromFile, IMG_UINT32 ui32AllocFromLine);
-#define OSAllocMem(_size) \
-    _OSAllocMem ((_size), (__FILE__), (__LINE__));
-#define OSAllocZMem(_size) \
-    _OSAllocZMem ((_size), (__FILE__), (__LINE__));
+#define OSAllocMem(_size)	_OSAllocMem((_size), (__FILE__), (__LINE__))
+#define OSAllocZMem(_size)	_OSAllocZMem((_size), (__FILE__), (__LINE__))
 #endif
 
 /**************************************************************************/ /*!
@@ -142,14 +140,17 @@ void OSFreeMemNoStats(void *pvCpuVAddr);
  * prevent crashes on RELEASE builds.
  */
 
+/*! @cond Doxygen_Suppress */
 #if defined(DEBUG)
-#define double_free_sentinel (void*) &OSFreeMem
+#define double_free_sentinel ((void *)&OSFreeMem)
 #define ALLOCMEM_ASSERT(exp) PVR_ASSERT(exp)
 #else
 #define double_free_sentinel NULL
 #define ALLOCMEM_ASSERT(exp) do {} while(0)
 #endif
+/*! @endcond */
 
+/*! Frees memory allocated by OSAllocMem(). */
 #define OSFreeMem(_ptr) do { \
 		ALLOCMEM_ASSERT((_ptr) != double_free_sentinel); \
 		(OSFreeMem)(_ptr); \
@@ -157,6 +158,7 @@ void OSFreeMemNoStats(void *pvCpuVAddr);
 		MSC_SUPPRESS_4127 \
 	} while (0)
 
+/*! Frees memory allocated by OSAllocMemNoStats(). */
 #define OSFreeMemNoStats(_ptr) do { \
 		ALLOCMEM_ASSERT((_ptr) != double_free_sentinel); \
 		(OSFreeMemNoStats)(_ptr); \
@@ -168,7 +170,7 @@ void OSFreeMemNoStats(void *pvCpuVAddr);
 }
 #endif
 
-#endif /* __ALLOCMEM_H__ */
+#endif /* ALLOCMEM_H */
 
 /******************************************************************************
  End of file (allocmem.h)

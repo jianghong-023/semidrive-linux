@@ -239,7 +239,7 @@ typedef PVRSRV_ERROR (*SetBlank)(IMG_HANDLE hDeviceData,
 
 @Description    Enable VSync reporting. If enabled, the 3rd party display
                 driver is expected to call PVRSRVCheckStatus() after a VSync
-                event occurred. This will signal the Services driver global 
+                event occurred. This will signal the Services driver global
                 event object.
 
    Called by client function: #PVRSRVDCSetVSyncReporting()
@@ -346,7 +346,7 @@ typedef PVRSRV_ERROR (*ContextConfigureCheck)(IMG_HANDLE hDisplayContext,
                 The arrays should be z-sorted, with the farthest plane first
                 and the nearest plane last.
 
-   Called by client function: #PVRSRVDCContextConfigure(), #PVRSRVDCContextConfigureWithFDSync()
+   Called by client function: #PVRSRVDCContextConfigure(), #PVRSRVDCContextConfigureWithFence()
 
    Implementation of this callback is mandatory.
 
@@ -628,8 +628,7 @@ typedef PVRSRV_ERROR (*BufferSystemAcquire)(IMG_HANDLE hDeviceData,
    Implementation of this callback is optional.
 
 @Input          hSystemBuffer          Handle to the buffer object
-*/
-/*****************************************************************************/
+*/ /**************************************************************************/
 typedef	void (*BufferSystemRelease)(IMG_HANDLE hSystemBuffer);
 
 #if defined(INTEGRITY_OS)
@@ -650,56 +649,56 @@ typedef IMG_HANDLE (*GetPmr)(IMG_HANDLE hBuffer, size_t ulOffset);
 typedef struct _DC_DEVICE_FUNCTIONS_
 {
 	/* Mandatory query functions */
-	GetInfo						pfnGetInfo;
-	PanelQueryCount				pfnPanelQueryCount;
-	PanelQuery					pfnPanelQuery;
-	FormatQuery					pfnFormatQuery;
-	DimQuery					pfnDimQuery;
+	GetInfo                 pfnGetInfo; /*!< See #GetInfo  */
+	PanelQueryCount         pfnPanelQueryCount; /*!< See #PanelQueryCount  */
+	PanelQuery              pfnPanelQuery; /*!< See #PanelQuery  */
+	FormatQuery             pfnFormatQuery; /*!< See #FormatQuery  */
+	DimQuery                pfnDimQuery; /*!< See #DimQuery  */
 
 	/* Optional blank/vsync functions */
-	SetBlank					pfnSetBlank;
-	SetVSyncReporting			pfnSetVSyncReporting;
-	LastVSyncQuery				pfnLastVSyncQuery;
+	SetBlank                pfnSetBlank; /*!< See #SetBlank  */
+	SetVSyncReporting       pfnSetVSyncReporting; /*!< See #SetVSyncReporting  */
+	LastVSyncQuery          pfnLastVSyncQuery; /*!< See #LastVSyncQuery  */
 
 	/* Mandatory configure functions */
-	ContextCreate				pfnContextCreate;
-	ContextDestroy				pfnContextDestroy;
-	ContextConfigure			pfnContextConfigure;
+	ContextCreate           pfnContextCreate; /*!< See #ContextCreate  */
+	ContextDestroy          pfnContextDestroy; /*!< See #ContextDestroy  */
+	ContextConfigure        pfnContextConfigure; /*!< See #ContextConfigure  */
 
 	/* Optional context functions */
-	ContextConfigureCheck		pfnContextConfigureCheck;
+	ContextConfigureCheck   pfnContextConfigureCheck; /*!< See #ContextConfigureCheck  */
 
 	/* Mandatory buffer functions */
-	BufferAlloc					pfnBufferAlloc;
-	BufferAcquire				pfnBufferAcquire;
-	BufferRelease				pfnBufferRelease;
-	BufferFree					pfnBufferFree;
+	BufferAlloc             pfnBufferAlloc; /*!< See #BufferAlloc  */
+	BufferAcquire           pfnBufferAcquire; /*!< See #BufferAcquire  */
+	BufferRelease           pfnBufferRelease; /*!< See #BufferRelease  */
+	BufferFree              pfnBufferFree; /*!< See #BufferFree  */
 
 	/* Optional - Provide this function if your controller can
 	 * scan out arbitrary memory, allocated for another purpose
 	 * by Services. */
-	BufferImport				pfnBufferImport;
+	BufferImport            pfnBufferImport; /*!< See #BufferImport  */
 
 	/* Optional - Provide these functions if your controller
 	 * has an MMU and does not (or cannot) map/unmap buffers at
 	 * alloc/free time */
-	BufferMap					pfnBufferMap;
-	BufferUnmap					pfnBufferUnmap;
+	BufferMap               pfnBufferMap; /*!< See #BufferMap  */
+	BufferUnmap             pfnBufferUnmap; /*!< See #BufferUnmap  */
 
 	/* Optional - DEPRICATED */
-	BufferSystemAcquire			pfnBufferSystemAcquire;
-	BufferSystemRelease			pfnBufferSystemRelease;
+	BufferSystemAcquire     pfnBufferSystemAcquire; /*!< See #BufferSystemAcquire */
+	BufferSystemRelease     pfnBufferSystemRelease; /*!< See #BufferSystemRelease */
 
 #if defined(INTEGRITY_OS)
 	/* The addition of these functions allow dc_server to delegate calls to
 	 * the respective functions on its PMRs towards the DC module
 	 */
-	AcquireKernelMappingData	pfnAcquireKernelMappingData;
+	AcquireKernelMappingData    pfnAcquireKernelMappingData;
 	MapMemoryObject             pfnMapMemoryObject;
 	UnmapMemoryObject           pfnUnmapMemoryObject;
 
 #if defined(USING_HYPERVISOR)
-	GetPmr				pfnGetPmr;
+	GetPmr                      pfnGetPmr;
 #endif
 #endif
 } DC_DEVICE_FUNCTIONS;

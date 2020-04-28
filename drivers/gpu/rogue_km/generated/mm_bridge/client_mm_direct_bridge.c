@@ -1,6 +1,9 @@
 /*******************************************************************************
+@File
 @Title          Direct client bridge for mm
 @Copyright      Copyright (c) Imagination Technologies Ltd. All Rights Reserved
+@Description    Implements the client side of the bridge for mm
+                which is used in calls from Server context.
 @License        Dual MIT/GPLv2
 
 The contents of this file are subject to the MIT license as set out below.
@@ -53,6 +56,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "devicemem_heapcfg.h"
 #include "physmem.h"
 #include "physmem_tdsecbuf.h"
+#include "devicemem_utils.h"
 
 IMG_INTERNAL PVRSRV_ERROR IMG_CALLCONV BridgePMRExportPMR(IMG_HANDLE hBridge,
 							  IMG_HANDLE hPMR,

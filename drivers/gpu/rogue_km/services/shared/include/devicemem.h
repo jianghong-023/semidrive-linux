@@ -102,6 +102,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
 #include "img_types.h"
+#include "img_defs.h"
 #include "devicemem_typedefs.h"
 #include "pdumpdefs.h"
 #include "pvrsrv_error.h"
@@ -193,7 +194,8 @@ DevmemGetAnnotation(DEVMEM_MEMDESC *psMemDesc,
  * It is recommended that NULL be passed for the handle for now)
  *
  * hDeviceNode and uiHeapBlueprintID shall together dictate which
- * heap-config to use.
+ * heap-config to use. bMCUFenceAllocation specifies if the context
+ * requires a MCU Fence allocation setup.
  *
  * This will cause the server side counterpart to be created also.
  *
@@ -208,11 +210,12 @@ DevmemGetAnnotation(DEVMEM_MEMDESC *psMemDesc,
 extern PVRSRV_ERROR
 DevmemCreateContext(SHARED_DEV_CONNECTION hDevConnection,
                     DEVMEM_HEAPCFGID uiHeapBlueprintID,
+                    IMG_BOOL bMCUFenceAllocation,
                     DEVMEM_CONTEXT **ppsCtxPtr);
 
 /*
  * DevmemAcquireDevPrivData()
- * 
+ *
  * Acquire the device private data for this memory context
  */
 PVRSRV_ERROR
@@ -221,7 +224,7 @@ DevmemAcquireDevPrivData(DEVMEM_CONTEXT *psCtx,
 
 /*
  * DevmemReleaseDevPrivData()
- * 
+ *
  * Release the device private data for this memory context
  */
 PVRSRV_ERROR
@@ -298,9 +301,12 @@ DevmemDestroyHeap(DEVMEM_HEAP *psHeap);
 
 /*
  * DevmemExportalignAdjustSizeAndAlign()
- * Compute the Size and Align passed to avoid suballocations (used when allocation with PVRSRV_MEMALLOCFLAG_EXPORTALIGN)
+ * Compute the Size and Align passed to avoid suballocations
+ * (used when allocation with PVRSRV_MEMALLOCFLAG_EXPORTALIGN).
+ *
+ * Returns PVRSRV_ERROR_INVALID_PARAMS if uiLog2Quantum has invalid value.
  */
-IMG_INTERNAL void
+IMG_INTERNAL PVRSRV_ERROR
 DevmemExportalignAdjustSizeAndAlign(IMG_UINT32 uiLog2Quantum,
                                     IMG_DEVMEM_SIZE_T *puiSize,
                                     IMG_DEVMEM_ALIGN_T *puiAlign);
@@ -315,12 +321,12 @@ DevmemExportalignAdjustSizeAndAlign(IMG_UINT32 uiLog2Quantum,
  * that allocates the "suballocation".  The resulting allocation will
  * be mapped into GPU virtual memory and the physical memory to back
  * it will exist, by the time this call successfully completes.
- * 
+ *
  * The size must be a positive integer multiple of the alignment.
- * (i.e. the aligment specifies the alignment of both the start and
+ * (i.e. the alignment specifies the alignment of both the start and
  * the end of the resulting allocation.)
  *
- * Allocations made via this API are routed though a "suballocation
+ * Allocations made via this API are routed through a "suballocation
  * RA" which is responsible for ensuring that small allocations can be
  * made without wasting physical memory in the server.  Furthermore,
  * such suballocations can be made entirely client side without
@@ -384,14 +390,14 @@ DevmemAllocateSparse(SHARED_DEV_CONNECTION hDevConnection,
  * properly refcounted, so the caller does not have to care.
  */
 
-extern void
+extern IMG_BOOL
 DevmemFree(DEVMEM_MEMDESC *psMemDesc);
 
 /*
 	DevmemMapToDevice:
 
 	Map an allocation to the device it was allocated from.
-	This function _must_ be called before any call to 
+	This function _must_ be called before any call to
 	DevmemAcquireDevVirtAddr is made as it binds the allocation
 	to the heap.
 	DevmemReleaseDevVirtAddr is used to release the reference
@@ -496,7 +502,7 @@ DevmemImport(SHARED_DEV_CONNECTION hDevConnection,
 
 /*
  * DevmemMakeLocalImportHandle()
- * 
+ *
  * This is a "special case" function for making a server export cookie
  * which went through the direct bridge into an export cookie that can
  * be passed through the client bridge.
@@ -508,7 +514,7 @@ DevmemMakeLocalImportHandle(SHARED_DEV_CONNECTION hDevConnection,
 
 /*
  * DevmemUnmakeLocalImportHandle()
- * 
+ *
  * Free any resource associated with the Make operation
  */
 PVRSRV_ERROR
@@ -615,11 +621,11 @@ IMG_INTERNAL PVRSRV_ERROR
 DevmemGetFlags(DEVMEM_MEMDESC *psMemDesc,
 				DEVMEM_FLAGS_T *puiFlags);
 
-IMG_INTERNAL IMG_HANDLE
+IMG_INTERNAL SHARED_DEV_CONNECTION
 DevmemGetConnection(DEVMEM_MEMDESC *psMemDesc);
 
 PVRSRV_ERROR
-DevmemLocalImport(IMG_HANDLE hBridge,
+DevmemLocalImport(SHARED_DEV_CONNECTION hDevConnection,
 				  IMG_HANDLE hExtHandle,
 				  DEVMEM_FLAGS_T uiFlags,
 				  DEVMEM_MEMDESC **ppsMemDescPtr,
@@ -676,8 +682,8 @@ RegisterDevmemPFNotify(DEVMEM_CONTEXT *psContext,
 @Return         Error code
 */ /***************************************************************************/
 IMG_INTERNAL PVRSRV_ERROR
-GetMaxDevMemSize(SHARED_DEV_CONNECTION psConnection,
+GetMaxDevMemSize(SHARED_DEV_CONNECTION hDevConnection,
 		 IMG_DEVMEM_SIZE_T *puiLMASize,
 		 IMG_DEVMEM_SIZE_T *puiUMASize);
 
-#endif /* #ifndef SRVCLIENT_DEVICEMEM_CLIENT_H */
+#endif /* #ifndef SRVCLIENT_DEVICEMEM_H */

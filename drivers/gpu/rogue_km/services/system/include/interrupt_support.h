@@ -46,28 +46,29 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "pvrsrv_error.h"
 #include "pvrsrv_device.h"
 
+/*! Default trigger type for the interrupt line. */
 #define SYS_IRQ_FLAG_TRIGGER_DEFAULT (0x0 << 0)
+/*! Interrupt triggered when interrupt line is low. */
 #define SYS_IRQ_FLAG_TRIGGER_LOW     (0x1 << 0)
+/*! Interrupt triggered when interrupt line is high. */
 #define SYS_IRQ_FLAG_TRIGGER_HIGH    (0x2 << 0)
+/*! Interrupt trigger mask. */
 #define SYS_IRQ_FLAG_TRIGGER_MASK    (SYS_IRQ_FLAG_TRIGGER_DEFAULT | \
                                       SYS_IRQ_FLAG_TRIGGER_LOW | \
                                       SYS_IRQ_FLAG_TRIGGER_HIGH)
+/*! The irq is allowed to be shared among several devices. */
 #define SYS_IRQ_FLAG_SHARED          (0x1 << 8)
 
+/*! Interrupt flags mask. */
 #define SYS_IRQ_FLAG_MASK            (SYS_IRQ_FLAG_TRIGGER_MASK | \
                                       SYS_IRQ_FLAG_SHARED)
 
+/*************************************************************************/ /*!
+@Description    Pointer to a system Low-level Interrupt Service Routine (LISR).
+@Input  pvData  Private data provided to the LISR.
+@Return         IMG_TRUE if interrupt handled, IMG_FALSE otherwise.
+*/ /**************************************************************************/
 typedef IMG_BOOL (*PFN_SYS_LISR)(void *pvData);
-
-typedef struct _SYS_INTERRUPT_DATA_
-{
-	void			*psSysData;
-	const IMG_CHAR	*pszName;
-	PFN_SYS_LISR	pfnLISR;
-	void			*pvData;
-	IMG_UINT32		ui32InterruptFlag;
-	IMG_UINT32		ui32IRQ;
-} SYS_INTERRUPT_DATA;
 
 /*************************************************************************/ /*!
 @Function       OSInstallSystemLISR
@@ -85,10 +86,10 @@ typedef struct _SYS_INTERRUPT_DATA_
 @Input          ui32Flags               Interrupt flags
 @Return         PVRSRV_OK on success, a failure code otherwise
 */ /**************************************************************************/
-PVRSRV_ERROR OSInstallSystemLISR(IMG_HANDLE *phLISR, 
+PVRSRV_ERROR OSInstallSystemLISR(IMG_HANDLE *phLISR,
 				 IMG_UINT32 ui32IRQ,
-				 const IMG_CHAR *pszDevName, 
-				 PFN_SYS_LISR pfnLISR, 
+				 const IMG_CHAR *pszDevName,
+				 PFN_SYS_LISR pfnLISR,
 				 void *pvData,
 				 IMG_UINT32 ui32Flags);
 

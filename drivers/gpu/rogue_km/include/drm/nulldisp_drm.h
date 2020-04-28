@@ -3,6 +3,7 @@
 /*************************************************************************/ /*!
 @File
 @Title          Nulldisp DRM definitions shared between kernel and user space.
+@Codingstyle    LinuxKernel
 @Copyright      Copyright (c) Imagination Technologies Ltd. All Rights Reserved
 @License        Dual MIT/GPLv2
 
@@ -88,15 +89,19 @@ struct drm_nulldisp_gem_cpu_fini {
 
 /* These defines must be prefixed with "DRM_IOCTL_". */
 #define DRM_IOCTL_NULLDISP_GEM_CREATE \
-	DRM_IOWR(DRM_COMMAND_BASE + DRM_NULLDISP_GEM_CREATE, struct drm_nulldisp_gem_create)
+	DRM_IOWR(DRM_COMMAND_BASE + DRM_NULLDISP_GEM_CREATE, \
+		 struct drm_nulldisp_gem_create)
 
 #define DRM_IOCTL_NULLDISP_GEM_MMAP \
-	DRM_IOWR(DRM_COMMAND_BASE + DRM_NULLDISP_GEM_MMAP, struct drm_nulldisp_gem_mmap)
+	DRM_IOWR(DRM_COMMAND_BASE + DRM_NULLDISP_GEM_MMAP, \
+		 struct drm_nulldisp_gem_mmap)
 
 #define DRM_IOCTL_NULLDISP_GEM_CPU_PREP \
-	DRM_IOW(DRM_COMMAND_BASE + DRM_NULLDISP_GEM_CPU_PREP, struct drm_nulldisp_gem_cpu_prep)
+	DRM_IOW(DRM_COMMAND_BASE + DRM_NULLDISP_GEM_CPU_PREP, \
+		struct drm_nulldisp_gem_cpu_prep)
 
 #define DRM_IOCTL_NULLDISP_GEM_CPU_FINI \
-	DRM_IOW(DRM_COMMAND_BASE + DRM_NULLDISP_GEM_CPU_FINI, struct drm_nulldisp_gem_cpu_fini)
+	DRM_IOW(DRM_COMMAND_BASE + DRM_NULLDISP_GEM_CPU_FINI, \
+		struct drm_nulldisp_gem_cpu_fini)
 
 #endif /* defined(__NULLDISP_DRM_H__) */

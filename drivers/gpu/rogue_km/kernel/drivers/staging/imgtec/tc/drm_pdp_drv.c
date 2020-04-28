@@ -80,6 +80,9 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #define PVR_DRIVER_ATOMIC 0
 #endif
 
+/* This header must always be included last */
+#include "kernel_compatibility.h"
+
 static bool display_enable = true;
 
 module_param(display_enable, bool, 0444);
@@ -596,7 +599,7 @@ static int pdp_component_bind(struct device *dev)
 
 	ret = pdp_early_load(ddev);
 	if (ret)
-		goto err_drm_dev_unref;
+		goto err_drm_dev_put;
 
 	DRM_DEBUG_DRIVER("Binding other components\n");
 	/* Bind other components, including HDMI encoder/connector */
@@ -620,8 +623,8 @@ err_drm_dev_unregister:
 	drm_dev_unregister(ddev);
 err_drm_dev_late_unload:
 	pdp_late_unload(ddev);
-err_drm_dev_unref:
-	drm_dev_unref(ddev);
+err_drm_dev_put:
+	drm_dev_put(ddev);
 	return	ret;
 }
 
@@ -635,7 +638,7 @@ static void pdp_component_unbind(struct device *dev)
 	drm_dev_unregister(ddev);
 	pdp_late_unload(ddev);
 	component_unbind_all(dev, ddev);
-	drm_dev_unref(ddev);
+	drm_dev_put(ddev);
 }
 
 static const struct component_master_ops pdp_component_ops = {
@@ -688,7 +691,7 @@ static int pdp_probe(struct platform_device *pdev)
 
 	ret = pdp_early_load(ddev);
 	if (ret)
-		goto err_drm_dev_unref;
+		goto err_drm_dev_put;
 
 	ret = drm_dev_register(ddev, 0);
 	if (ret)
@@ -713,8 +716,8 @@ err_drm_dev_unregister:
 	drm_dev_unregister(ddev);
 err_drm_dev_late_unload:
 	pdp_late_unload(ddev);
-err_drm_dev_unref:
-	drm_dev_unref(ddev);
+err_drm_dev_put:
+	drm_dev_put(ddev);
 	return	ret;
 #else
 	return drm_platform_init(&pdp_drm_driver, pdev);
@@ -738,7 +741,7 @@ static int pdp_remove(struct platform_device *pdev)
 
 	pdp_late_unload(ddev);
 
-	drm_dev_unref(ddev);
+	drm_dev_put(ddev);
 #else
 	drm_put_dev(ddev);
 #endif

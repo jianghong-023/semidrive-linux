@@ -3,7 +3,7 @@
 @Title
 @Copyright      Copyright (c) Imagination Technologies Ltd. All Rights Reserved
 @Platform       RGX
-@Description    RGX MIPS definitions, user space
+@Description    RGX MIPS definitions, kernel/user space
 @License        Dual MIT/GPLv2
 
 The contents of this file are subject to the MIT license as set out below.
@@ -42,21 +42,20 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */ /**************************************************************************/
 
-#if !defined (__RGX_MIPS_H__)
-#define __RGX_MIPS_H__
+#if !defined (RGX_MIPS_H)
+#define RGX_MIPS_H
 
 /*
  * Utility defines for memory management
  */
-#define RGXMIPSFW_LOG2_PAGE_SIZE                 (12)
+#define RGXMIPSFW_LOG2_PAGE_SIZE_4K              (12)
+#define RGXMIPSFW_PAGE_SIZE_4K                   (0x1 << RGXMIPSFW_LOG2_PAGE_SIZE_4K)
+#define RGXMIPSFW_PAGE_MASK_4K                   (RGXMIPSFW_PAGE_SIZE_4K - 1)
 #define RGXMIPSFW_LOG2_PAGE_SIZE_64K             (16)
-#define RGXMIPSFW_PAGE_SIZE                      (0x1 << RGXMIPSFW_LOG2_PAGE_SIZE)
-#define RGXMIPSFW_PAGE_MASK                      (RGXMIPSFW_PAGE_SIZE - 1)
+#define RGXMIPSFW_PAGE_SIZE_64K                  (0x1 << RGXMIPSFW_LOG2_PAGE_SIZE_64K)
+#define RGXMIPSFW_PAGE_MASK_64K                  (RGXMIPSFW_PAGE_SIZE_64K - 1)
 #define RGXMIPSFW_LOG2_PAGETABLE_PAGE_SIZE       (15)
 #define RGXMIPSFW_LOG2_PTE_ENTRY_SIZE            (2)
-/* Page mask MIPS register setting for bigger pages */
-#define RGXMIPSFW_PAGE_MASK_16K                  (0x00007800)
-#define RGXMIPSFW_PAGE_MASK_64K                  (0x0001F800)
 /* Total number of TLB entries */
 #define RGXMIPSFW_NUMBER_OF_TLB_ENTRIES          (16)
 /* "Uncached" caching policy */
@@ -136,51 +135,6 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 
 /*
- * Firmware physical layout
- */
-#define RGXMIPSFW_CODE_BASE_PAGE                 (0x0)
-#define RGXMIPSFW_CODE_OFFSET                    (RGXMIPSFW_CODE_BASE_PAGE << RGXMIPSFW_LOG2_PAGE_SIZE)
-#if defined(SUPPORT_MIPS_CONTIGUOUS_FW_CODE) || defined(SUPPORT_MIPS_64K_PAGE_KERNEL)
-/* Clean way of getting a 256K allocation (62 + 1 + 1 pages) without using too many ifdefs */
-/* This will need to be changed if the non-contiguous builds reach this amount of pages */
-#define RGXMIPSFW_CODE_NUMPAGES                  (62)
-#else
-#define RGXMIPSFW_CODE_NUMPAGES                  (44)
-#endif
-#define RGXMIPSFW_CODE_SIZE                      (RGXMIPSFW_CODE_NUMPAGES << RGXMIPSFW_LOG2_PAGE_SIZE)
-
-#define RGXMIPSFW_EXCEPTIONSVECTORS_BASE_PAGE    (RGXMIPSFW_CODE_BASE_PAGE + RGXMIPSFW_CODE_NUMPAGES)
-#define RGXMIPSFW_EXCEPTIONSVECTORS_OFFSET       (RGXMIPSFW_EXCEPTIONSVECTORS_BASE_PAGE << RGXMIPSFW_LOG2_PAGE_SIZE)
-#define RGXMIPSFW_EXCEPTIONSVECTORS_NUMPAGES     (1)
-#define RGXMIPSFW_EXCEPTIONSVECTORS_SIZE         (RGXMIPSFW_EXCEPTIONSVECTORS_NUMPAGES << RGXMIPSFW_LOG2_PAGE_SIZE)
-
-#define RGXMIPSFW_BOOT_NMI_CODE_BASE_PAGE        (RGXMIPSFW_EXCEPTIONSVECTORS_BASE_PAGE + RGXMIPSFW_EXCEPTIONSVECTORS_NUMPAGES)
-#define RGXMIPSFW_BOOT_NMI_CODE_OFFSET           (RGXMIPSFW_BOOT_NMI_CODE_BASE_PAGE << RGXMIPSFW_LOG2_PAGE_SIZE)
-#define RGXMIPSFW_BOOT_NMI_CODE_NUMPAGES         (1)
-#define RGXMIPSFW_BOOT_NMI_CODE_SIZE             (RGXMIPSFW_BOOT_NMI_CODE_NUMPAGES << RGXMIPSFW_LOG2_PAGE_SIZE)
-
-
-#define RGXMIPSFW_DATA_BASE_PAGE                 (0x0)
-#define RGXMIPSFW_DATA_OFFSET                    (RGXMIPSFW_DATA_BASE_PAGE << RGXMIPSFW_LOG2_PAGE_SIZE)
-#if defined(SUPPORT_MIPS_64K_PAGE_KERNEL)
-/* Clean way of getting a 64K allocation (14 + 1 + 1 pages) without using too many ifdefs */
-#define RGXMIPSFW_DATA_NUMPAGES                  (14)
-#else
-#define RGXMIPSFW_DATA_NUMPAGES                  (7)
-#endif
-#define RGXMIPSFW_DATA_SIZE                      (RGXMIPSFW_DATA_NUMPAGES << RGXMIPSFW_LOG2_PAGE_SIZE)
-
-#define RGXMIPSFW_BOOT_NMI_DATA_BASE_PAGE        (RGXMIPSFW_DATA_BASE_PAGE + RGXMIPSFW_DATA_NUMPAGES)
-#define RGXMIPSFW_BOOT_NMI_DATA_OFFSET           (RGXMIPSFW_BOOT_NMI_DATA_BASE_PAGE << RGXMIPSFW_LOG2_PAGE_SIZE)
-#define RGXMIPSFW_BOOT_NMI_DATA_NUMPAGES         (1)
-#define RGXMIPSFW_BOOT_NMI_DATA_SIZE             (RGXMIPSFW_BOOT_NMI_DATA_NUMPAGES << RGXMIPSFW_LOG2_PAGE_SIZE)
-
-#define RGXMIPSFW_STACK_BASE_PAGE                (RGXMIPSFW_BOOT_NMI_DATA_BASE_PAGE + RGXMIPSFW_BOOT_NMI_DATA_NUMPAGES)
-#define RGXMIPSFW_STACK_OFFSET                   (RGXMIPSFW_STACK_BASE_PAGE << RGXMIPSFW_LOG2_PAGE_SIZE)
-#define RGXMIPSFW_STACK_NUMPAGES                 (1)
-#define RGXMIPSFW_STACK_SIZE                     (RGXMIPSFW_STACK_NUMPAGES << RGXMIPSFW_LOG2_PAGE_SIZE)
-
-/*
  * Pages to trampoline problematic physical addresses:
  *   - RGXMIPSFW_BOOT_REMAP_PHYS_ADDR_IN : 0x1FC0_0000
  *   - RGXMIPSFW_DATA_REMAP_PHYS_ADDR_IN : 0x1FC0_1000
@@ -192,8 +146,8 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #define RGXMIPSFW_TRAMPOLINE_LOG2_NUMPAGES       (2)
 #define RGXMIPSFW_TRAMPOLINE_NUMPAGES            (1 << RGXMIPSFW_TRAMPOLINE_LOG2_NUMPAGES)
-#define RGXMIPSFW_TRAMPOLINE_SIZE                (RGXMIPSFW_TRAMPOLINE_NUMPAGES << RGXMIPSFW_LOG2_PAGE_SIZE)
-#define RGXMIPSFW_TRAMPOLINE_LOG2_SEGMENT_SIZE   (RGXMIPSFW_TRAMPOLINE_LOG2_NUMPAGES + RGXMIPSFW_LOG2_PAGE_SIZE)
+#define RGXMIPSFW_TRAMPOLINE_SIZE                (RGXMIPSFW_TRAMPOLINE_NUMPAGES << RGXMIPSFW_LOG2_PAGE_SIZE_4K)
+#define RGXMIPSFW_TRAMPOLINE_LOG2_SEGMENT_SIZE   (RGXMIPSFW_TRAMPOLINE_LOG2_NUMPAGES + RGXMIPSFW_LOG2_PAGE_SIZE_4K)
 
 #define RGXMIPSFW_TRAMPOLINE_TARGET_PHYS_ADDR    (RGXMIPSFW_BOOT_REMAP_PHYS_ADDR_IN)
 #define RGXMIPSFW_TRAMPOLINE_OFFSET(a)           (a - RGXMIPSFW_BOOT_REMAP_PHYS_ADDR_IN)
@@ -232,25 +186,10 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #define RGXMIPSFW_CODE_REMAP_LOG2_SEGMENT_SIZE   (12)
 #define RGXMIPSFW_EXCEPTIONS_VIRTUAL_BASE        (RGXMIPSFW_CODE_REMAP_VIRTUAL_BASE)
 
-/* Fixed TLB setup */
+/* Permanent mappings setup */
 #define RGXMIPSFW_PT_VIRTUAL_BASE                (0xCF000000)
 #define RGXMIPSFW_REGISTERS_VIRTUAL_BASE         (0xCF400000)
 #define RGXMIPSFW_STACK_VIRTUAL_BASE             (0xCF600000)
-
-#if defined(SUPPORT_MIPS_CONTIGUOUS_FW_CODE)
-#define RGXMIPSFW_NUMBER_OF_RESERVED_TLB         (5)
-#else
-#define RGXMIPSFW_NUMBER_OF_RESERVED_TLB         (3)
-#endif
-
-/* Firmware heap setup */
-#define RGXMIPSFW_FIRMWARE_HEAP_BASE             (0xC0000000)
-#define RGXMIPSFW_CODE_VIRTUAL_BASE              (RGXMIPSFW_FIRMWARE_HEAP_BASE)
-/* The data virtual base takes into account the exception vectors page
- * and the boot code page mapped in the FW heap together with the FW code
- * (we can only map Firmware code allocation as a whole) */
-#define RGXMIPSFW_DATA_VIRTUAL_BASE              (RGXMIPSFW_CODE_VIRTUAL_BASE + RGXMIPSFW_CODE_SIZE + \
-                                                  RGXMIPSFW_EXCEPTIONSVECTORS_SIZE + RGXMIPSFW_BOOT_NMI_CODE_SIZE)
 
 
 /*
@@ -263,12 +202,6 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #define RGXMIPSFW_PAGE_TABLE_BASE_PHYADDR_OFFSET              (0x1)
 #define RGXMIPSFW_STACKPOINTER_PHYADDR_OFFSET                 (0x2)
 #define RGXMIPSFW_RESERVED_FUTURE_OFFSET                      (0x3)
-#define RGXMIPSFW_FWINIT_VIRTADDR_OFFSET                      (0x4)
-
-/*
- * MIPS Fence offset in the bootloader/NMI data page
- */
-#define RGXMIPSFW_FENCE_OFFSET                                (0x80)
 
 /*
  * NMI shared data
@@ -283,10 +216,16 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #define RGXMIPSFW_NMI_ERROR_STATE_SET                         (0x1)
 
 /*
- * MIPS fault data
+ * MIPS boot stage
  */
-/* Base address of the fault data within the bootloader/NMI data page */
-#define RGXMIPSFW_FAULT_DATA_BASE                             (0x404)
+#define RGXMIPSFW_BOOT_STAGE_OFFSET                           (0x400)
+
+/*
+ * MIPS private data in the bootloader data page.
+ * Memory below this offset is used by the FW only, no interface data allowed.
+ */
+#define RGXMIPSFW_PRIVATE_DATA_OFFSET                         (0x800)
+
 
 /* The things that follow are excluded when compiling assembly sources*/
 #if !defined (RGXMIPSFW_ASSEMBLY_CODE)
@@ -471,14 +410,7 @@ typedef struct {
 	RGX_MIPS_REMAP_ENTRY asRemap[RGXMIPSFW_NUMBER_OF_REMAP_ENTRIES];
 } RGX_MIPS_STATE;
 
-typedef struct {
-	IMG_UINT32 ui32FaultPageInfo;
-	IMG_UINT32 ui32BadVAddr;
-	IMG_UINT32 ui32EntryLo0;
-	IMG_UINT32 ui32EntryLo1;
-} RGX_MIPS_FAULT_DATA;
-
 #endif  /* RGXMIPSFW_ASSEMBLY_CODE */
 
 
-#endif /*__RGX_MIPS_H__*/
+#endif /*RGX_MIPS_H*/

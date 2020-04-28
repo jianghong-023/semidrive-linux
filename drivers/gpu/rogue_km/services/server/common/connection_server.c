@@ -51,7 +51,6 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "sync_server.h"
 #include "process_stats.h"
 #include "pdump_km.h"
-#include "lists.h"
 #include "osfunc.h"
 #include "tlstream.h"
 
@@ -65,7 +64,7 @@ static PVRSRV_ERROR ConnectionDataDestroy(CONNECTION_DATA *psConnection)
 	IMG_UINT64 ui64MaxBridgeTime;
 	PVRSRV_DATA *psPVRSRVData = PVRSRVGetPVRSRVData();
 
-	if(psPVRSRVData->bUnload)
+	if (psPVRSRVData->bUnload)
 	{
 		/* driver is unloading so do not allow the bridge lock to be released */
 		ui64MaxBridgeTime = 0;
@@ -77,7 +76,7 @@ static PVRSRV_ERROR ConnectionDataDestroy(CONNECTION_DATA *psConnection)
 
 	if (psConnection == NULL)
 	{
-		PVR_DPF((PVR_DBG_ERROR, "ConnectionDestroy: Missing connection!"));
+		PVR_DPF((PVR_DBG_ERROR, "%s: Missing connection!", __func__));
 		PVR_ASSERT(0);
 		return PVRSRV_ERROR_INVALID_PARAMS;
 	}
@@ -123,8 +122,8 @@ static PVRSRV_ERROR ConnectionDataDestroy(CONNECTION_DATA *psConnection)
 			if (eError != PVRSRV_OK)
 			{
 				PVR_DPF((PVR_DBG_ERROR,
-						"ConnectionDataDestroy: Couldn't free kernel handles for process (%d)",
-						eError));
+						"%s: Couldn't free kernel handles for process (%s)",
+						__func__, PVRSRVGetErrorString(eError)));
 
 				return eError;
 			}
@@ -135,8 +134,8 @@ static PVRSRV_ERROR ConnectionDataDestroy(CONNECTION_DATA *psConnection)
 				if (eError != PVRSRV_ERROR_RETRY)
 				{
 					PVR_DPF((PVR_DBG_ERROR,
-						 "ConnectionDataDestroy: Couldn't free handle base for process (%d)",
-						 eError));
+						 "%s: Couldn't free handle base for process (%s)",
+						 __func__, PVRSRVGetErrorString(eError)));
 				}
 
 				return eError;
@@ -161,8 +160,8 @@ static PVRSRV_ERROR ConnectionDataDestroy(CONNECTION_DATA *psConnection)
 			if (eError != PVRSRV_ERROR_RETRY)
 			{
 				PVR_DPF((PVR_DBG_ERROR,
-					 "ConnectionDataDestroy: Couldn't free handle base for connection (%d)",
-					 eError));
+					 "%s: Couldn't free handle base for connection (%s)",
+					 __func__, PVRSRVGetErrorString(eError)));
 			}
 
 			return eError;
@@ -190,8 +189,8 @@ static PVRSRV_ERROR ConnectionDataDestroy(CONNECTION_DATA *psConnection)
 		if (eError != PVRSRV_OK)
 		{
 			PVR_DPF((PVR_DBG_ERROR,
-				 "PVRSRVConnectionDataDestroy: OSConnectionPrivateDataDeInit failed (%d)",
-				 eError));
+				 "%s: OSConnectionPrivateDataDeInit failed (%s)",
+				 __func__, PVRSRVGetErrorString(eError)));
 
 			return eError;
 		}
@@ -225,7 +224,8 @@ PVRSRV_ERROR PVRSRVConnectionConnect(void **ppvPrivData, void *pvOSData)
 	if (psConnection == NULL)
 	{
 		PVR_DPF((PVR_DBG_ERROR,
-			 "PVRSRVConnectionConnect: Couldn't allocate connection data"));
+			 "%s: Couldn't allocate connection data",
+			 __func__));
 		return PVRSRV_ERROR_OUT_OF_MEMORY;
 	}
 
@@ -235,44 +235,44 @@ PVRSRV_ERROR PVRSRVConnectionConnect(void **ppvPrivData, void *pvOSData)
 	if (eError != PVRSRV_OK)
 	{
 		PVR_DPF((PVR_DBG_ERROR,
-			 "PVRSRVConnectionConnect: Couldn't register process statistics (%d)",
-			 eError));
+			 "%s: Couldn't register process statistics (%s)",
+			 __func__, PVRSRVGetErrorString(eError)));
 		goto failure;
 	}
 #endif
 
 	/* Call environment specific connection data init function */
 	eError = OSConnectionPrivateDataInit(&psConnection->hOsPrivateData, pvOSData);
-	if (eError != PVRSRV_OK)
-	{
-		 PVR_DPF((PVR_DBG_ERROR,
-			  "PVRSRVConnectionConnect: OSConnectionPrivateDataInit failed (%d)",
-			  eError));
-		 goto failure;
-	}
+	PVR_LOGG_IF_ERROR(eError, "OSConnectionPrivateDataInit", failure);
 
 	psConnection->pid = OSGetCurrentClientProcessIDKM();
 	OSStringLCopy(psConnection->pszProcName, OSGetCurrentClientProcessNameKM(), PVRSRV_CONNECTION_PROCESS_NAME_LEN);
+
+#if defined(DEBUG) || defined(PDUMP)
+	PVR_LOG(("%s connected", psConnection->pszProcName));
+#endif
 
 	/* Register this connection with the sync core */
 	eError = SyncRegisterConnection(&psConnection->psSyncConnectionData);
 	if (eError != PVRSRV_OK)
 	{
 		PVR_DPF((PVR_DBG_ERROR,
-			 "PVRSRVConnectionConnect: Couldn't register the sync data"));
+			 "%s: Couldn't register the sync data", __func__));
 		goto failure;
 	}
 
 	/*
-	 * Register this connection with the pdump core. Pass in the sync connection data
-	 * as it will be needed later when we only get passed in the PDump connection data.
+	 * Register this connection and Sync PDump callback with
+	 * the pdump core. Pass in the Sync connection data.
 	 */
 	eError = PDumpRegisterConnection(psConnection->psSyncConnectionData,
-					 &psConnection->psPDumpConnectionData);
+	                                  SyncConnectionPDumpSyncBlocks,
+	                                  &psConnection->psPDumpConnectionData);
 	if (eError != PVRSRV_OK)
 	{
 		PVR_DPF((PVR_DBG_ERROR,
-			 "PVRSRVConnectionConnect: Couldn't register the PDump data"));
+			 "%s: Couldn't register the PDump data",
+			 __func__));
 		goto failure;
 	}
 
@@ -282,8 +282,8 @@ PVRSRV_ERROR PVRSRVConnectionConnect(void **ppvPrivData, void *pvOSData)
 	if (eError != PVRSRV_OK)
 	{
 		PVR_DPF((PVR_DBG_ERROR,
-			 "PVRSRVConnectionConnect: Couldn't allocate handle base for connection (%d)",
-			 eError));
+			 "%s: Couldn't allocate handle base for connection (%s)",
+			 __func__, PVRSRVGetErrorString(eError)));
 		goto failure;
 	}
 
@@ -305,15 +305,17 @@ PVRSRV_ERROR PVRSRVConnectionConnect(void **ppvPrivData, void *pvOSData)
 			goto failureLock;
 		}
 
+		OSAtomicWrite(&psProcessHandleBase->iRefCount, 0);
+
 		/* Allocate handle base for this process */
 		eError = PVRSRVAllocHandleBase(&psProcessHandleBase->psHandleBase,
 		                               PVRSRV_HANDLE_BASE_TYPE_PROCESS);
 		if (eError != PVRSRV_OK)
 		{
 			PVR_DPF((PVR_DBG_ERROR,
-			         "%s: Couldn't allocate handle base for process (%d)",
+			         "%s: Couldn't allocate handle base for process (%s)",
 			         __func__,
-			         eError));
+			         PVRSRVGetErrorString(eError)));
 			OSFreeMem(psProcessHandleBase);
 			goto failureLock;
 		}
@@ -371,15 +373,17 @@ static PVRSRV_ERROR _CleanupThreadPurgeConnectionData(void *pvConnectionData)
 		if (eErrorConnection == PVRSRV_ERROR_RETRY)
 		{
 			PVR_DPF((PVR_DBG_MESSAGE,
-				 "_CleanupThreadPurgeConnectionData: Failed to purge connection data %p "
+				 "%s: Failed to purge connection data %p "
 				 "(deferring destruction)",
+				 __func__,
 				 psConnectionData));
 		}
 	}
 	else
 	{
 		PVR_DPF((PVR_DBG_MESSAGE,
-			 "_CleanupThreadPurgeConnectionData: Connection data %p deferred destruction finished",
+			 "%s: Connection data %p deferred destruction finished",
+			 __func__,
 			 psConnectionData));
 	}
 
@@ -388,8 +392,9 @@ static PVRSRV_ERROR _CleanupThreadPurgeConnectionData(void *pvConnectionData)
 	if (eErrorKernel != PVRSRV_OK)
 	{
 		PVR_DPF((PVR_DBG_ERROR,
-			 "_CleanupThreadPurgeConnectionData: Purge of global handle pool failed (%d)",
-			 eErrorKernel));
+			 "%s: Purge of global handle pool failed (%s)",
+			 __func__,
+			 PVRSRVGetErrorString(eErrorKernel)));
 	}
 
 	gCurrentPurgeConnectionPid = 0;
@@ -415,6 +420,11 @@ void PVRSRVConnectionDisconnect(void *pvDataPtr)
 	{
 		PDumpDisconnectionNotify();
 	}
+
+#if defined(DEBUG) || defined(PDUMP)
+	PVR_LOG(("%s disconnected", psConnectionData->pszProcName));
+#endif
+
 #if defined(PVRSRV_FORCE_UNLOAD_IF_BAD_STATE)
 	if (PVRSRVGetPVRSRVData()->eServicesState == PVRSRV_SERVICES_STATE_OK)
 #endif
@@ -455,7 +465,7 @@ void PVRSRVConnectionDebugNotify(DUMPDEBUG_PRINTF_FUNC *pfnDumpDebugPrintf,
 		IMG_CHAR sActiveConnections[MAX_DEBUG_DUMP_STRING_LEN];
 		IMG_UINT16 i, uiPos = 0;
 		IMG_BOOL bPrinted = IMG_FALSE;
-		size_t	uiSize = sizeof (sActiveConnections);
+		size_t uiSize = sizeof (sActiveConnections);
 
 		OSStringLCopy(sActiveConnections, ACTIVE_PREFIX, uiSize);
 		uiPos = sizeof (ACTIVE_PREFIX) - 1;	/* Next buffer location to fill */

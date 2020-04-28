@@ -521,9 +521,11 @@ static void pdp_crtc_flip_complete(struct drm_crtc *crtc)
 	pdp_crtc->flip_async = false;
 
 #if !defined(PDP_USE_ATOMIC)
-	dma_fence_put(pdp_crtc->flip_data->wait_fence);
-	kfree(pdp_crtc->flip_data);
-	pdp_crtc->flip_data = NULL;
+	if (pdp_crtc->flip_data) {
+		dma_fence_put(pdp_crtc->flip_data->wait_fence);
+		kfree(pdp_crtc->flip_data);
+		pdp_crtc->flip_data = NULL;
+	}
 #endif
 
 	if (pdp_crtc->flip_event) {

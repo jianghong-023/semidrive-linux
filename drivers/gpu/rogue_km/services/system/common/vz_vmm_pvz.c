@@ -42,6 +42,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */ /**************************************************************************/
 
 #include "pvrsrv.h"
+#include "img_defs.h"
 #include "img_types.h"
 #include "pvrsrv_error.h"
 #include "allocmem.h"
@@ -54,13 +55,13 @@ PVRSRV_ERROR SysVzPvzConnectionInit(void)
 	PVRSRV_DATA *psPVRSRVData = PVRSRVGetPVRSRVData();
 
 	/* Create para-virtualization connection lock */
-	eError = OSLockCreate(&psPVRSRVData->hPvzConnectionLock, LOCK_TYPE_PASSIVE);
+	eError = OSLockCreate(&psPVRSRVData->hPvzConnectionLock);
 	if (eError != PVRSRV_OK)
 	{
 		PVR_DPF((PVR_DBG_ERROR,
-				 "%s:  OSLockCreate failed (%s)",
-				__FUNCTION__,
-				PVRSRVGetErrorStringKM(eError)));
+				 "%s: OSLockCreate failed (%s)",
+				__func__,
+				PVRSRVGetErrorString(eError)));
 
 		goto e0;
 	}
@@ -74,8 +75,8 @@ PVRSRV_ERROR SysVzPvzConnectionInit(void)
 
 		PVR_DPF((PVR_DBG_ERROR,
 				 "%s: Unable to create PVZ connection (%s)",
-				__FUNCTION__,
-				PVRSRVGetErrorStringKM(eError)));
+				__func__,
+				PVRSRVGetErrorString(eError)));
 
 		goto e0;
 	}

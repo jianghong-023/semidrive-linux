@@ -39,7 +39,7 @@ PURPOSE AND NONINFRINGEMENT; AND (B) IN NO EVENT SHALL THE AUTHORS OR
 COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
 IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-********************************************************************************/
+*******************************************************************************/
 
 #include <linux/uaccess.h>
 
@@ -77,7 +77,7 @@ PVRSRVBridgeRIWritePMREntry(IMG_UINT32 ui32DispatchTableEntry,
 	PMR *psPMRHandleInt = NULL;
 
 	/* Lock over handle lookup. */
-	LockHandle();
+	LockHandle(psConnection->psHandleBase);
 
 	/* Look up the address from the handle */
 	psRIWritePMREntryOUT->eError =
@@ -86,20 +86,20 @@ PVRSRVBridgeRIWritePMREntry(IMG_UINT32 ui32DispatchTableEntry,
 				       hPMRHandle,
 				       PVRSRV_HANDLE_TYPE_PHYSMEM_PMR,
 				       IMG_TRUE);
-	if (psRIWritePMREntryOUT->eError != PVRSRV_OK)
+	if (unlikely(psRIWritePMREntryOUT->eError != PVRSRV_OK))
 	{
-		UnlockHandle();
+		UnlockHandle(psConnection->psHandleBase);
 		goto RIWritePMREntry_exit;
 	}
 	/* Release now we have looked up handles. */
-	UnlockHandle();
+	UnlockHandle(psConnection->psHandleBase);
 
 	psRIWritePMREntryOUT->eError = RIWritePMREntryKM(psPMRHandleInt);
 
  RIWritePMREntry_exit:
 
 	/* Lock over handle lookup cleanup. */
-	LockHandle();
+	LockHandle(psConnection->psHandleBase);
 
 	/* Unreference the previously looked up handle */
 	if (psPMRHandleInt)
@@ -109,7 +109,7 @@ PVRSRVBridgeRIWritePMREntry(IMG_UINT32 ui32DispatchTableEntry,
 					    PVRSRV_HANDLE_TYPE_PHYSMEM_PMR);
 	}
 	/* Release now we have cleaned up look up handles. */
-	UnlockHandle();
+	UnlockHandle(psConnection->psHandleBase);
 
 	return 0;
 }
@@ -135,6 +135,15 @@ PVRSRVBridgeRIWriteMEMDESCEntry(IMG_UINT32 ui32DispatchTableEntry,
 
 	IMG_UINT32 ui32BufferSize =
 	    (psRIWriteMEMDESCEntryIN->ui32TextBSize * sizeof(IMG_CHAR)) + 0;
+
+	if (unlikely
+	    (psRIWriteMEMDESCEntryIN->ui32TextBSize >
+	     DEVMEM_ANNOTATION_MAX_LEN))
+	{
+		psRIWriteMEMDESCEntryOUT->eError =
+		    PVRSRV_ERROR_BRIDGE_ARRAY_SIZE_TOO_BIG;
+		goto RIWriteMEMDESCEntry_exit;
+	}
 
 	if (ui32BufferSize != 0)
 	{
@@ -193,10 +202,13 @@ PVRSRVBridgeRIWriteMEMDESCEntry(IMG_UINT32 ui32DispatchTableEntry,
 
 			goto RIWriteMEMDESCEntry_exit;
 		}
+		((IMG_CHAR *)
+		 uiTextBInt)[(psRIWriteMEMDESCEntryIN->ui32TextBSize *
+			      sizeof(IMG_CHAR)) - 1] = '\0';
 	}
 
 	/* Lock over handle lookup. */
-	LockHandle();
+	LockHandle(psConnection->psHandleBase);
 
 	/* Look up the address from the handle */
 	psRIWriteMEMDESCEntryOUT->eError =
@@ -205,13 +217,13 @@ PVRSRVBridgeRIWriteMEMDESCEntry(IMG_UINT32 ui32DispatchTableEntry,
 				       hPMRHandle,
 				       PVRSRV_HANDLE_TYPE_PHYSMEM_PMR,
 				       IMG_TRUE);
-	if (psRIWriteMEMDESCEntryOUT->eError != PVRSRV_OK)
+	if (unlikely(psRIWriteMEMDESCEntryOUT->eError != PVRSRV_OK))
 	{
-		UnlockHandle();
+		UnlockHandle(psConnection->psHandleBase);
 		goto RIWriteMEMDESCEntry_exit;
 	}
 	/* Release now we have looked up handles. */
-	UnlockHandle();
+	UnlockHandle(psConnection->psHandleBase);
 
 	psRIWriteMEMDESCEntryOUT->eError =
 	    RIWriteMEMDESCEntryKM(psPMRHandleInt,
@@ -223,13 +235,13 @@ PVRSRVBridgeRIWriteMEMDESCEntry(IMG_UINT32 ui32DispatchTableEntry,
 				  psRIWriteMEMDESCEntryIN->bIsSuballoc,
 				  &psRIHandleInt);
 	/* Exit early if bridged call fails */
-	if (psRIWriteMEMDESCEntryOUT->eError != PVRSRV_OK)
+	if (unlikely(psRIWriteMEMDESCEntryOUT->eError != PVRSRV_OK))
 	{
 		goto RIWriteMEMDESCEntry_exit;
 	}
 
 	/* Lock over handle creation. */
-	LockHandle();
+	LockHandle(psConnection->psHandleBase);
 
 	psRIWriteMEMDESCEntryOUT->eError =
 	    PVRSRVAllocHandleUnlocked(psConnection->psHandleBase,
@@ -239,19 +251,19 @@ PVRSRVBridgeRIWriteMEMDESCEntry(IMG_UINT32 ui32DispatchTableEntry,
 				      PVRSRV_HANDLE_ALLOC_FLAG_MULTI,
 				      (PFN_HANDLE_RELEASE) &
 				      RIDeleteMEMDESCEntryKM);
-	if (psRIWriteMEMDESCEntryOUT->eError != PVRSRV_OK)
+	if (unlikely(psRIWriteMEMDESCEntryOUT->eError != PVRSRV_OK))
 	{
-		UnlockHandle();
+		UnlockHandle(psConnection->psHandleBase);
 		goto RIWriteMEMDESCEntry_exit;
 	}
 
 	/* Release now we have created handles. */
-	UnlockHandle();
+	UnlockHandle(psConnection->psHandleBase);
 
  RIWriteMEMDESCEntry_exit:
 
 	/* Lock over handle lookup cleanup. */
-	LockHandle();
+	LockHandle(psConnection->psHandleBase);
 
 	/* Unreference the previously looked up handle */
 	if (psPMRHandleInt)
@@ -261,7 +273,7 @@ PVRSRVBridgeRIWriteMEMDESCEntry(IMG_UINT32 ui32DispatchTableEntry,
 					    PVRSRV_HANDLE_TYPE_PHYSMEM_PMR);
 	}
 	/* Release now we have cleaned up look up handles. */
-	UnlockHandle();
+	UnlockHandle(psConnection->psHandleBase);
 
 	if (psRIWriteMEMDESCEntryOUT->eError != PVRSRV_OK)
 	{
@@ -303,6 +315,15 @@ PVRSRVBridgeRIWriteProcListEntry(IMG_UINT32 ui32DispatchTableEntry,
 
 	IMG_UINT32 ui32BufferSize =
 	    (psRIWriteProcListEntryIN->ui32TextBSize * sizeof(IMG_CHAR)) + 0;
+
+	if (unlikely
+	    (psRIWriteProcListEntryIN->ui32TextBSize >
+	     DEVMEM_ANNOTATION_MAX_LEN))
+	{
+		psRIWriteProcListEntryOUT->eError =
+		    PVRSRV_ERROR_BRIDGE_ARRAY_SIZE_TOO_BIG;
+		goto RIWriteProcListEntry_exit;
+	}
 
 	if (ui32BufferSize != 0)
 	{
@@ -361,6 +382,9 @@ PVRSRVBridgeRIWriteProcListEntry(IMG_UINT32 ui32DispatchTableEntry,
 
 			goto RIWriteProcListEntry_exit;
 		}
+		((IMG_CHAR *)
+		 uiTextBInt)[(psRIWriteProcListEntryIN->ui32TextBSize *
+			      sizeof(IMG_CHAR)) - 1] = '\0';
 	}
 
 	psRIWriteProcListEntryOUT->eError =
@@ -370,13 +394,13 @@ PVRSRVBridgeRIWriteProcListEntry(IMG_UINT32 ui32DispatchTableEntry,
 				   psRIWriteProcListEntryIN->ui64DevVAddr,
 				   &psRIHandleInt);
 	/* Exit early if bridged call fails */
-	if (psRIWriteProcListEntryOUT->eError != PVRSRV_OK)
+	if (unlikely(psRIWriteProcListEntryOUT->eError != PVRSRV_OK))
 	{
 		goto RIWriteProcListEntry_exit;
 	}
 
 	/* Lock over handle creation. */
-	LockHandle();
+	LockHandle(psConnection->psHandleBase);
 
 	psRIWriteProcListEntryOUT->eError =
 	    PVRSRVAllocHandleUnlocked(psConnection->psHandleBase,
@@ -386,14 +410,14 @@ PVRSRVBridgeRIWriteProcListEntry(IMG_UINT32 ui32DispatchTableEntry,
 				      PVRSRV_HANDLE_ALLOC_FLAG_MULTI,
 				      (PFN_HANDLE_RELEASE) &
 				      RIDeleteMEMDESCEntryKM);
-	if (psRIWriteProcListEntryOUT->eError != PVRSRV_OK)
+	if (unlikely(psRIWriteProcListEntryOUT->eError != PVRSRV_OK))
 	{
-		UnlockHandle();
+		UnlockHandle(psConnection->psHandleBase);
 		goto RIWriteProcListEntry_exit;
 	}
 
 	/* Release now we have created handles. */
-	UnlockHandle();
+	UnlockHandle(psConnection->psHandleBase);
 
  RIWriteProcListEntry_exit:
 
@@ -430,7 +454,7 @@ PVRSRVBridgeRIUpdateMEMDESCAddr(IMG_UINT32 ui32DispatchTableEntry,
 	RI_HANDLE psRIHandleInt = NULL;
 
 	/* Lock over handle lookup. */
-	LockHandle();
+	LockHandle(psConnection->psHandleBase);
 
 	/* Look up the address from the handle */
 	psRIUpdateMEMDESCAddrOUT->eError =
@@ -438,13 +462,13 @@ PVRSRVBridgeRIUpdateMEMDESCAddr(IMG_UINT32 ui32DispatchTableEntry,
 				       (void **)&psRIHandleInt,
 				       hRIHandle,
 				       PVRSRV_HANDLE_TYPE_RI_HANDLE, IMG_TRUE);
-	if (psRIUpdateMEMDESCAddrOUT->eError != PVRSRV_OK)
+	if (unlikely(psRIUpdateMEMDESCAddrOUT->eError != PVRSRV_OK))
 	{
-		UnlockHandle();
+		UnlockHandle(psConnection->psHandleBase);
 		goto RIUpdateMEMDESCAddr_exit;
 	}
 	/* Release now we have looked up handles. */
-	UnlockHandle();
+	UnlockHandle(psConnection->psHandleBase);
 
 	psRIUpdateMEMDESCAddrOUT->eError =
 	    RIUpdateMEMDESCAddrKM(psRIHandleInt,
@@ -453,7 +477,7 @@ PVRSRVBridgeRIUpdateMEMDESCAddr(IMG_UINT32 ui32DispatchTableEntry,
  RIUpdateMEMDESCAddr_exit:
 
 	/* Lock over handle lookup cleanup. */
-	LockHandle();
+	LockHandle(psConnection->psHandleBase);
 
 	/* Unreference the previously looked up handle */
 	if (psRIHandleInt)
@@ -463,7 +487,7 @@ PVRSRVBridgeRIUpdateMEMDESCAddr(IMG_UINT32 ui32DispatchTableEntry,
 					    PVRSRV_HANDLE_TYPE_RI_HANDLE);
 	}
 	/* Release now we have cleaned up look up handles. */
-	UnlockHandle();
+	UnlockHandle(psConnection->psHandleBase);
 
 	return 0;
 }
@@ -478,26 +502,27 @@ PVRSRVBridgeRIDeleteMEMDESCEntry(IMG_UINT32 ui32DispatchTableEntry,
 {
 
 	/* Lock over handle destruction. */
-	LockHandle();
+	LockHandle(psConnection->psHandleBase);
 
 	psRIDeleteMEMDESCEntryOUT->eError =
 	    PVRSRVReleaseHandleUnlocked(psConnection->psHandleBase,
 					(IMG_HANDLE) psRIDeleteMEMDESCEntryIN->
 					hRIHandle,
 					PVRSRV_HANDLE_TYPE_RI_HANDLE);
-	if ((psRIDeleteMEMDESCEntryOUT->eError != PVRSRV_OK)
-	    && (psRIDeleteMEMDESCEntryOUT->eError != PVRSRV_ERROR_RETRY))
+	if (unlikely
+	    ((psRIDeleteMEMDESCEntryOUT->eError != PVRSRV_OK)
+	     && (psRIDeleteMEMDESCEntryOUT->eError != PVRSRV_ERROR_RETRY)))
 	{
 		PVR_DPF((PVR_DBG_ERROR,
 			 "PVRSRVBridgeRIDeleteMEMDESCEntry: %s",
-			 PVRSRVGetErrorStringKM(psRIDeleteMEMDESCEntryOUT->
-						eError)));
-		UnlockHandle();
+			 PVRSRVGetErrorString(psRIDeleteMEMDESCEntryOUT->
+					      eError)));
+		UnlockHandle(psConnection->psHandleBase);
 		goto RIDeleteMEMDESCEntry_exit;
 	}
 
 	/* Release now we have destroyed handles. */
-	UnlockHandle();
+	UnlockHandle(psConnection->psHandleBase);
 
  RIDeleteMEMDESCEntry_exit:
 
@@ -514,7 +539,7 @@ PVRSRVBridgeRIDumpList(IMG_UINT32 ui32DispatchTableEntry,
 	PMR *psPMRHandleInt = NULL;
 
 	/* Lock over handle lookup. */
-	LockHandle();
+	LockHandle(psConnection->psHandleBase);
 
 	/* Look up the address from the handle */
 	psRIDumpListOUT->eError =
@@ -523,20 +548,20 @@ PVRSRVBridgeRIDumpList(IMG_UINT32 ui32DispatchTableEntry,
 				       hPMRHandle,
 				       PVRSRV_HANDLE_TYPE_PHYSMEM_PMR,
 				       IMG_TRUE);
-	if (psRIDumpListOUT->eError != PVRSRV_OK)
+	if (unlikely(psRIDumpListOUT->eError != PVRSRV_OK))
 	{
-		UnlockHandle();
+		UnlockHandle(psConnection->psHandleBase);
 		goto RIDumpList_exit;
 	}
 	/* Release now we have looked up handles. */
-	UnlockHandle();
+	UnlockHandle(psConnection->psHandleBase);
 
 	psRIDumpListOUT->eError = RIDumpListKM(psPMRHandleInt);
 
  RIDumpList_exit:
 
 	/* Lock over handle lookup cleanup. */
-	LockHandle();
+	LockHandle(psConnection->psHandleBase);
 
 	/* Unreference the previously looked up handle */
 	if (psPMRHandleInt)
@@ -546,7 +571,7 @@ PVRSRVBridgeRIDumpList(IMG_UINT32 ui32DispatchTableEntry,
 					    PVRSRV_HANDLE_TYPE_PHYSMEM_PMR);
 	}
 	/* Release now we have cleaned up look up handles. */
-	UnlockHandle();
+	UnlockHandle(psConnection->psHandleBase);
 
 	return 0;
 }
@@ -593,7 +618,7 @@ PVRSRVBridgeRIWritePMREntryWithOwner(IMG_UINT32 ui32DispatchTableEntry,
 	PMR *psPMRHandleInt = NULL;
 
 	/* Lock over handle lookup. */
-	LockHandle();
+	LockHandle(psConnection->psHandleBase);
 
 	/* Look up the address from the handle */
 	psRIWritePMREntryWithOwnerOUT->eError =
@@ -602,13 +627,13 @@ PVRSRVBridgeRIWritePMREntryWithOwner(IMG_UINT32 ui32DispatchTableEntry,
 				       hPMRHandle,
 				       PVRSRV_HANDLE_TYPE_PHYSMEM_PMR,
 				       IMG_TRUE);
-	if (psRIWritePMREntryWithOwnerOUT->eError != PVRSRV_OK)
+	if (unlikely(psRIWritePMREntryWithOwnerOUT->eError != PVRSRV_OK))
 	{
-		UnlockHandle();
+		UnlockHandle(psConnection->psHandleBase);
 		goto RIWritePMREntryWithOwner_exit;
 	}
 	/* Release now we have looked up handles. */
-	UnlockHandle();
+	UnlockHandle(psConnection->psHandleBase);
 
 	psRIWritePMREntryWithOwnerOUT->eError =
 	    RIWritePMREntryWithOwnerKM(psPMRHandleInt,
@@ -617,7 +642,7 @@ PVRSRVBridgeRIWritePMREntryWithOwner(IMG_UINT32 ui32DispatchTableEntry,
  RIWritePMREntryWithOwner_exit:
 
 	/* Lock over handle lookup cleanup. */
-	LockHandle();
+	LockHandle(psConnection->psHandleBase);
 
 	/* Unreference the previously looked up handle */
 	if (psPMRHandleInt)
@@ -627,13 +652,13 @@ PVRSRVBridgeRIWritePMREntryWithOwner(IMG_UINT32 ui32DispatchTableEntry,
 					    PVRSRV_HANDLE_TYPE_PHYSMEM_PMR);
 	}
 	/* Release now we have cleaned up look up handles. */
-	UnlockHandle();
+	UnlockHandle(psConnection->psHandleBase);
 
 	return 0;
 }
 
-/* *************************************************************************** 
- * Server bridge dispatch related glue 
+/* ***************************************************************************
+ * Server bridge dispatch related glue
  */
 
 static IMG_BOOL bUseLock = IMG_TRUE;

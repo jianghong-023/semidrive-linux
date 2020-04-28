@@ -47,6 +47,7 @@ extern "C" {
 #endif
 
 #include "img_types.h"
+#include "img_defs.h"
 
 /*************************************************************************/ /*!
  @Function      HTBConfigure

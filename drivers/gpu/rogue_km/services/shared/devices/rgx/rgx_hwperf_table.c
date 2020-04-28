@@ -43,7 +43,11 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #include "img_defs.h"
 #include "rgx_fwif_hwperf.h"
+#if defined(__KERNEL__)
 #include "rgxdefs_km.h"
+#else
+#include "rgxdefs.h"
+#endif
 #include "rgx_hwperf_table.h"
 
 /* Includes needed for PVRSRVKM (Server) context */
@@ -74,35 +78,35 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #	include "rgxfw_pow.h"
 #	include "rgxfw_utils.h"
 
-static IMG_BOOL rgxfw_hwperf_pow_st_direct(RGX_HWPERF_CNTBLK_ID eBlkType, IMG_UINT8 ui8UnitId)
+static bool rgxfw_hwperf_pow_st_direct(RGX_HWPERF_CNTBLK_ID eBlkType, IMG_UINT8 ui8UnitId)
 {
 	PVR_UNREFERENCED_PARAMETER(eBlkType);
 	PVR_UNREFERENCED_PARAMETER(ui8UnitId);
 
 #if defined(RGX_FEATURE_S7_TOP_INFRASTRUCTURE)
 	/* S7XT: JONES */
-	return (eBlkType == RGX_CNTBLK_ID_JONES) ? IMG_TRUE : IMG_FALSE;
+	return (eBlkType == RGX_CNTBLK_ID_JONES);
 #elif defined(RGX_FEATURE_XT_TOP_INFRASTRUCTURE)
 	/* S6XT: TA, TORNADO */
-	return IMG_TRUE;
+	return true;
 #else
 	/* S6  : TA, HUB, RASTER (RASCAL) */
-	return (gsPowCtl.ePowState & RGXFW_POW_ST_RD_ON) ? IMG_TRUE : IMG_FALSE;
+	return (gsPowCtl.ePowState & RGXFW_POW_ST_RD_ON) != 0U;
 #endif
 }
 
 /* Only use conditional compilation when counter blocks appear in different
  * islands for different Rogue families.
  */
-static IMG_BOOL rgxfw_hwperf_pow_st_indirect(RGX_HWPERF_CNTBLK_ID eBlkType, IMG_UINT8 ui8UnitId)
+static bool rgxfw_hwperf_pow_st_indirect(RGX_HWPERF_CNTBLK_ID eBlkType, IMG_UINT8 ui8UnitId)
 {
 	IMG_UINT32 ui32NumDustsEnabled = rgxfw_pow_get_enabled_dusts_num();
 
-	if ((gsPowCtl.ePowState & RGXFW_POW_ST_RD_ON) &&
-			(ui32NumDustsEnabled > 0))
+	if (((gsPowCtl.ePowState & RGXFW_POW_ST_RD_ON) != 0U) &&
+			(ui32NumDustsEnabled > 0U))
 	{
 #if defined(RGX_FEATURE_DYNAMIC_DUST_POWER)
-		IMG_UINT32 ui32NumUscEnabled = ui32NumDustsEnabled*2;
+		IMG_UINT32 ui32NumUscEnabled = ui32NumDustsEnabled*2U;
 
 		switch (eBlkType)
 		{
@@ -112,7 +116,7 @@ static IMG_BOOL rgxfw_hwperf_pow_st_indirect(RGX_HWPERF_CNTBLK_ID eBlkType, IMG_
 #endif
 			if (ui8UnitId >= ui32NumDustsEnabled)
 			{
-				return IMG_FALSE;
+				return false;
 			}
 			break;
 		case RGX_CNTBLK_ID_USC0:                       /* S6, S6XT, S7 */
@@ -120,7 +124,7 @@ static IMG_BOOL rgxfw_hwperf_pow_st_indirect(RGX_HWPERF_CNTBLK_ID eBlkType, IMG_
 			/* Handle single cluster cores */
 			if (ui8UnitId >= ((ui32NumUscEnabled > RGX_FEATURE_NUM_CLUSTERS) ? RGX_FEATURE_NUM_CLUSTERS : ui32NumUscEnabled))
 			{
-				return IMG_FALSE;
+				return false;
 			}
 			break;
 		case RGX_CNTBLK_ID_BLACKPEARL0:                /* S7 */
@@ -130,11 +134,11 @@ static IMG_BOOL rgxfw_hwperf_pow_st_indirect(RGX_HWPERF_CNTBLK_ID eBlkType, IMG_
 #endif
 			if (ui8UnitId >= (RGX_REQ_NUM_PHANTOMS(ui32NumUscEnabled)))
 			{
-				return IMG_FALSE;
+				return false;
 			}
 			break;
 		default:
-			RGXFW_ASSERT(IMG_FALSE);  /* should never get here, table error */
+			RGXFW_ASSERT(false);  /* should never get here, table error */
 			break;
 		}
 #else
@@ -145,9 +149,9 @@ static IMG_BOOL rgxfw_hwperf_pow_st_indirect(RGX_HWPERF_CNTBLK_ID eBlkType, IMG_
 	}
 	else
 	{
-		return IMG_FALSE;
+		return false;
 	}
-	return IMG_TRUE;
+	return true;
 }
 
 #else /* !defined(RGX_FIRMWARE) || !defined(RGX_FEATURE_PERFBUS) */
@@ -158,23 +162,7 @@ static IMG_BOOL rgxfw_hwperf_pow_st_indirect(RGX_HWPERF_CNTBLK_ID eBlkType, IMG_
 
 #endif /* !defined(RGX_FIRMWARE) || !defined(RGX_FEATURE_PERFBUS) */
 
-#if defined(RGX_FIRMWARE) && defined(RGX_FEATURE_RAY_TRACING)
-
-/* Currently there is no power island control in the firmware for ray tracing
- * so we currently assume these blocks are always powered. */
-static IMG_BOOL rgxfw_hwperf_pow_st_gandalf(RGX_HWPERF_CNTBLK_ID eBlkType, IMG_UINT8 ui8UnitId)
-{
-	PVR_UNREFERENCED_PARAMETER(eBlkType);
-	PVR_UNREFERENCED_PARAMETER(ui8UnitId);
-
-	return IMG_TRUE;
-}
-
-#else /* !defined(RGX_FIRMWARE) || !defined(RGX_FEATURE_RAY_TRACING) */
-
 # define rgxfw_hwperf_pow_st_gandalf  ((void*)NULL)
-
-#endif /* !defined(RGX_FIRMWARE) || !defined(RGX_FEATURE_RAY_TRACING) */
 
 /*****************************************************************************
  RGXFW_HWPERF_CNTBLK_TYPE_MODEL struct PFNs pfnIsBlkPowered() end
@@ -268,46 +256,28 @@ static IMG_BOOL rgx_hwperf_blk_present_raytracing(const RGXFW_HWPERF_CNTBLK_TYPE
 			(psBlkTypeDesc->uiCntBlkIdBase == RGX_CNTBLK_ID_SH) ||
 			(psBlkTypeDesc->uiCntBlkIdBase == RGX_CNTBLK_ID_BX_TU0));
 
-#if defined(RGX_FEATURE_RAY_TRACING) && defined(__KERNEL__) /* Server context */
-	PVR_ASSERT(pvDev_km != NULL);
-	{
-		PVRSRV_RGXDEV_INFO *psDevInfo = (PVRSRV_RGXDEV_INFO *)pvDev_km;
-		if (RGX_IS_FEATURE_SUPPORTED(psDevInfo, RAY_TRACING_DEPRECATED))
-		{
-			/* Exception case, read from table as ray-tracing units do not vary by feature. */
-			psRtInfo->uiNumUnits = psBlkTypeDesc->uiNumUnits;
-			return IMG_TRUE;
-		}
-	}
-#else /* FW context */
 	PVR_UNREFERENCED_PARAMETER(pvDev_km);
-# if defined(RGX_FEATURE_RAY_TRACING)
-	psRtInfo->uiNumUnits = psBlkTypeDesc->uiNumUnits;
-	DBG_ASSERT(psBlkTypeDesc->uiPerfReg != 0); /* Check for broken config */
-	return IMG_TRUE;
-# else
 	PVR_UNREFERENCED_PARAMETER(psBlkTypeDesc);
 	PVR_UNREFERENCED_PARAMETER(psRtInfo);
-# endif
-#endif
+
 	return IMG_FALSE;
 }
 
 #if defined(__KERNEL__) /* Server context */
-static INLINE IMG_UINT32 rgx_units_indirect_by_phantom(PVRSRV_DEVICE_FEATURE_CONFIG *psFeatCfg)
+IMG_UINT32 rgx_units_indirect_by_phantom(PVRSRV_DEVICE_FEATURE_CONFIG *psFeatCfg)
 {
 	/* Run-time math for RGX_HWPERF_INDIRECT_BY_PHANTOM */
 	return ((psFeatCfg->ui64Features & RGX_FEATURE_CLUSTER_GROUPING_BIT_MASK) == 0) ? 1
 			: (psFeatCfg->ui32FeaturesValues[RGX_FEATURE_NUM_CLUSTERS_IDX]+3)/4;
 }
 
-static INLINE IMG_UINT32 rgx_units_phantom_indirect_by_dust(PVRSRV_DEVICE_FEATURE_CONFIG *psFeatCfg)
+IMG_UINT32 rgx_units_phantom_indirect_by_dust(PVRSRV_DEVICE_FEATURE_CONFIG *psFeatCfg)
 {
 	/* Run-time math for RGX_HWPERF_PHANTOM_INDIRECT_BY_DUST */
 	return MAX((psFeatCfg->ui32FeaturesValues[RGX_FEATURE_NUM_CLUSTERS_IDX]>>1),1);
 }
 
-static INLINE IMG_UINT32 rgx_units_phantom_indirect_by_cluster(PVRSRV_DEVICE_FEATURE_CONFIG *psFeatCfg)
+IMG_UINT32 rgx_units_phantom_indirect_by_cluster(PVRSRV_DEVICE_FEATURE_CONFIG *psFeatCfg)
 {
 	/* Run-time math for RGX_HWPERF_PHANTOM_INDIRECT_BY_CLUSTER */
 	return psFeatCfg->ui32FeaturesValues[RGX_FEATURE_NUM_CLUSTERS_IDX];
@@ -554,7 +524,7 @@ static const RGXFW_HWPERF_CNTBLK_TYPE_MODEL gasCntBlkTypeModel[] =
 #endif
 
 		/*RGX_CNTBLK_ID_BF RGX_CNTBLK_ID_BT RGX_CNTBLK_ID_RT RGX_CNTBLK_ID_SH*/
-#if defined(RGX_FEATURE_RAY_TRACING ) || defined(__KERNEL__)
+#if defined(__KERNEL__)
 		{RGX_CNTBLK_ID_BF,      0, /* direct */                 DPX_CR_BF_PERF,             DPX_CR_BF_PERF_SELECT0,              DPX_CR_BF_PERF_COUNTER_0,             4,              1,                              21,                  3,  "RGX_CR_BF_PERF",              rgxfw_hwperf_pow_st_gandalf, rgx_hwperf_blk_present_raytracing },
 		{RGX_CNTBLK_ID_BT,      0, /* direct */                 DPX_CR_BT_PERF,             DPX_CR_BT_PERF_SELECT0,              DPX_CR_BT_PERF_COUNTER_0,             4,              1,                              21,                  3,  "RGX_CR_BT_PERF",              rgxfw_hwperf_pow_st_gandalf, rgx_hwperf_blk_present_raytracing },
 		{RGX_CNTBLK_ID_RT,      0, /* direct */                 DPX_CR_RT_PERF,             DPX_CR_RT_PERF_SELECT0,              DPX_CR_RT_PERF_COUNTER_0,             4,              1,                              21,                  3,  "RGX_CR_RT_PERF",              rgxfw_hwperf_pow_st_gandalf, rgx_hwperf_blk_present_raytracing },
@@ -624,7 +594,7 @@ static const RGXFW_HWPERF_CNTBLK_TYPE_MODEL gasCntBlkTypeModel[] =
 #endif
 
 		/*RGX_CNTBLK_ID_BX_TU0*/
-#if defined (RGX_FEATURE_RAY_TRACING) || defined(__KERNEL__)
+#if defined(__KERNEL__)
 		{RGX_CNTBLK_ID_BX_TU0, RGX_CR_BX_TU_PERF_INDIRECT,       DPX_CR_BX_TU_PERF,           DPX_CR_BX_TU_PERF_SELECT0,        DPX_CR_BX_TU_PERF_COUNTER_0,          4,              RGX_HWPERF_DOPPLER_BX_TU_BLKS,          21,          3,  "RGX_CR_BX_TU_PERF",           rgxfw_hwperf_pow_st_gandalf,  rgx_hwperf_blk_present_raytracing },
 #else
 		RGXFW_HWPERF_CNTBLK_TYPE_UNSUPPORTED(RGX_CNTBLK_ID_BX_TU0),

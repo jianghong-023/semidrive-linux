@@ -106,13 +106,10 @@ typedef struct RGXFW RGXFW_t;
 @Input        psDeviceNode    Device instance identifier.
 @Input        pszBVNCString   Identifier string of the FW image to
                               be loaded/acquired in production driver.
-@Input        pszBVpNCString  Identifier string of the FW image to
-                              be loaded/acquired in production driver.
 @Return       RGXFW*          Ptr to private data on success, NULL otherwise.
 */ /**************************************************************************/
 struct RGXFW* RGXLoadFirmware(PVRSRV_DEVICE_NODE *psDeviceNode,
-                       const IMG_CHAR *pszBVNCString,
-                       const IMG_CHAR *pszBVpNCString);
+                       const IMG_CHAR *pszBVNCString);
 
 /*************************************************************************/ /*!
 @Function     RGXFirmwareData

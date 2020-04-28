@@ -218,6 +218,7 @@ pvr_buffer_sync_pmrs_fence_count(u32 nr_pmrs, struct _PMR_ **pmrs,
 
 static struct pvr_buffer_sync_check_data *
 pvr_buffer_sync_check_fences_create(struct pvr_fence_context *fence_ctx,
+				    PSYNC_CHECKPOINT_CONTEXT sync_checkpoint_ctx,
 				    u32 nr_pmrs,
 				    struct _PMR_ **pmrs,
 				    u32 *pmr_flags)
@@ -251,7 +252,11 @@ pvr_buffer_sync_check_fences_create(struct pvr_fence_context *fence_ctx,
 
 		exclusive = !!(pmr_flags[i] & PVR_BUFFER_FLAG_WRITE);
 		if (!exclusive) {
-			err = reservation_object_reserve_shared(resv);
+			err = reservation_object_reserve_shared(resv
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 0, 0))
+								, 1
+#endif
+				);
 			if (err)
 				goto err_destroy_fences;
 		}
@@ -263,7 +268,9 @@ pvr_buffer_sync_check_fences_create(struct pvr_fence_context *fence_ctx,
 		    (!exclusive || !resv_list || !resv_list->shared_count)) {
 			data->fences[data->nr_fences++] =
 				pvr_fence_create_from_fence(fence_ctx,
+							    sync_checkpoint_ctx,
 							    fence,
+							    PVRSRV_NO_FENCE,
 							    "exclusive check fence");
 			if (!data->fences[data->nr_fences - 1]) {
 				data->nr_fences--;
@@ -279,7 +286,9 @@ pvr_buffer_sync_check_fences_create(struct pvr_fence_context *fence_ctx,
 								  reservation_object_held(resv));
 				data->fences[data->nr_fences++] =
 					pvr_fence_create_from_fence(fence_ctx,
+								    sync_checkpoint_ctx,
 								    fence,
+								    PVRSRV_NO_FENCE,
 								    "check fence");
 				if (!data->fences[data->nr_fences - 1]) {
 					data->nr_fences--;
@@ -359,6 +368,7 @@ pvr_buffer_sync_context_destroy(struct pvr_buffer_sync_context *ctx)
 
 int
 pvr_buffer_sync_resolve_and_create_fences(struct pvr_buffer_sync_context *ctx,
+					  PSYNC_CHECKPOINT_CONTEXT sync_checkpoint_ctx,
 					  u32 nr_pmrs,
 					  struct _PMR_ **pmrs,
 					  u32 *pmr_flags,
@@ -376,13 +386,13 @@ pvr_buffer_sync_resolve_and_create_fences(struct pvr_buffer_sync_context *ctx,
 	int j;
 	int err;
 
-	if ((nr_pmrs && !(pmrs && pmr_flags)) ||
+	if (unlikely((nr_pmrs && !(pmrs && pmr_flags)) ||
 	    !nr_fence_checkpoints_out || !fence_checkpoints_out ||
-	    !update_checkpoints_out)
+	    !update_checkpoints_out))
 		return -EINVAL;
 
 	for (i = 0; i < nr_pmrs; i++) {
-		if (!(pmr_flags[i] & PVR_BUFFER_FLAG_MASK)) {
+		if (unlikely(!(pmr_flags[i] & PVR_BUFFER_FLAG_MASK))) {
 			pr_err("%s: Invalid flags %#08x for pmr %p\n",
 			       __func__, pmr_flags[i], pmrs[i]);
 			return -EINVAL;
@@ -408,7 +418,7 @@ pvr_buffer_sync_resolve_and_create_fences(struct pvr_buffer_sync_context *ctx,
 	}
 
 	data = kzalloc(data_size + pmrs_size + pmr_flags_size, GFP_KERNEL);
-	if (!data)
+	if (unlikely(!data))
 		return -ENOMEM;
 
 	data->ctx = ctx;
@@ -438,7 +448,7 @@ pvr_buffer_sync_resolve_and_create_fences(struct pvr_buffer_sync_context *ctx,
 	}
 
 	err = pvr_buffer_sync_pmrs_lock(ctx, data->nr_pmrs, data->pmrs);
-	if (err) {
+	if (unlikely(err)) {
 		pr_err("%s: failed to lock pmrs (errno=%d)\n",
 		       __func__, err);
 		goto err_free_data;
@@ -446,10 +456,11 @@ pvr_buffer_sync_resolve_and_create_fences(struct pvr_buffer_sync_context *ctx,
 
 	/* create the check data */
 	data->check_data = pvr_buffer_sync_check_fences_create(ctx->fence_ctx,
+							 sync_checkpoint_ctx,
 							 data->nr_pmrs,
 							 data->pmrs,
 							 data->pmr_flags);
-	if (!data->check_data) {
+	if (unlikely(!data->check_data)) {
 		err = -ENOMEM;
 		goto err_pmrs_unlock;
 	}
@@ -462,7 +473,7 @@ pvr_buffer_sync_resolve_and_create_fences(struct pvr_buffer_sync_context *ctx,
 					  data->check_data->nr_fences,
 					  fence_checkpoints);
 	} else {
-		if (data->check_data->nr_fences) {
+		if (unlikely(data->check_data->nr_fences)) {
 			err = -ENOMEM;
 			goto err_free_check_data;
 		}
@@ -470,8 +481,9 @@ pvr_buffer_sync_resolve_and_create_fences(struct pvr_buffer_sync_context *ctx,
 
 	/* create the update fence */
 	data->update_fence = pvr_fence_create(ctx->fence_ctx,
+			sync_checkpoint_ctx,
 			SYNC_CHECKPOINT_FOREIGN_CHECKPOINT, "update fence");
-	if (!data->update_fence) {
+	if (unlikely(!data->update_fence)) {
 		err = -ENOMEM;
 		goto err_free_fence_checkpoints;
 	}
@@ -575,3 +587,17 @@ pvr_buffer_sync_kick_failed(struct pvr_buffer_sync_append_data *data)
 	/* free the append data */
 	kfree(data);
 }
+
+#if defined(PVRSRV_SYNC_CHECKPOINT_CCB)
+enum tag_img_bool
+pvr_buffer_sync_checkpoint_ufo_has_signalled(u32 fwaddr, u32 value)
+{
+	return pvr_fence_checkpoint_ufo_has_signalled(fwaddr, value);
+}
+
+void
+pvr_buffer_sync_check_state(void)
+{
+	pvr_fence_check_state();
+}
+#endif /* defined(PVRSRV_SYNC_CHECKPOINT_CCB) */

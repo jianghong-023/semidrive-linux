@@ -1,6 +1,9 @@
 /*******************************************************************************
+@File
 @Title          Direct client bridge for cache
 @Copyright      Copyright (c) Imagination Technologies Ltd. All Rights Reserved
+@Description    Implements the client side of the bridge for cache
+                which is used in calls from Server context.
 @License        Dual MIT/GPLv2
 
 The contents of this file are subject to the MIT license as set out below.
@@ -71,12 +74,12 @@ IMG_INTERNAL PVRSRV_ERROR IMG_CALLCONV BridgeCacheOpQueue(IMG_HANDLE hBridge,
 {
 	PVRSRV_ERROR eError;
 	PMR **psPMRInt;
-	PVR_UNREFERENCED_PARAMETER(hBridge);
 
 	psPMRInt = (PMR **) phPMR;
 
 	eError =
-	    CacheOpQueue(ui32NumCacheOps,
+	    CacheOpQueue(NULL, (PVRSRV_DEVICE_NODE *) ((void *)hBridge),
+			 ui32NumCacheOps,
 			 psPMRInt,
 			 pui64Address,
 			 puiOffset,

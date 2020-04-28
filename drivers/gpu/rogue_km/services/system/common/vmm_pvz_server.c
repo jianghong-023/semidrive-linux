@@ -43,6 +43,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #include "pvrsrv.h"
 #include "img_types.h"
+#include "img_defs.h"
 #include "pvrsrv_error.h"
 
 #include "vz_vm.h"
@@ -72,7 +73,7 @@ PvzServerLockRelease(void)
  * ===========================================================
  *  The following server para-virtualization (pvz) functions
  *  are exclusively called by the VM manager (hypervisor) on
- *  behalf of guests to complete guest pvz calls 
+ *  behalf of guests to complete guest pvz calls
  *  (guest -> vm manager -> host)
  * ===========================================================
  */
@@ -166,7 +167,6 @@ PvzServerCreateDevPhysHeaps(IMG_UINT32 ui32OSID,
 
 	return eError;
 }
-EXPORT_SYMBOL(PvzServerCreateDevPhysHeaps);
 
 PVRSRV_ERROR
 PvzServerDestroyDevPhysHeaps(IMG_UINT32 ui32OSID,
@@ -191,7 +191,6 @@ PvzServerDestroyDevPhysHeaps(IMG_UINT32 ui32OSID,
 
 	return eError;
 }
-EXPORT_SYMBOL(PvzServerDestroyDevPhysHeaps);
 
 PVRSRV_ERROR
 PvzServerMapDevPhysHeap(IMG_UINT32 ui32OSID,
@@ -244,7 +243,6 @@ e0:
 
 	return eError;
 }
-EXPORT_SYMBOL(PvzServerMapDevPhysHeap);
 
 PVRSRV_ERROR
 PvzServerUnmapDevPhysHeap(IMG_UINT32 ui32OSID,
@@ -269,7 +267,7 @@ PvzServerUnmapDevPhysHeap(IMG_UINT32 ui32OSID,
 
 	return eError;
 }
-EXPORT_SYMBOL(PvzServerUnmapDevPhysHeap);
+
 
 /*
  * ============================================================

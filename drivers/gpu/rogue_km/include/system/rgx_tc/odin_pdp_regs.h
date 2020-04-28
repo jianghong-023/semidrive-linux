@@ -40,8 +40,8 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 /* tab size 4 */
 
-#ifndef _ODN_PDP_REGS_H_
-#define _ODN_PDP_REGS_H_
+#ifndef ODN_PDP_REGS_H
+#define ODN_PDP_REGS_H
 
 /* Odin-PDP hardware register definitions */
 
@@ -1804,7 +1804,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #define ODN_PDP_GRPH3INTERLEAVE_CTRL_GRPH3INTFIELD_LENGTH (1)
 #define ODN_PDP_GRPH3INTERLEAVE_CTRL_GRPH3INTFIELD_SIGNED_FIELD	IMG_FALSE
 
-#define ODN_PDP_GRPH4INTERLEAVE_CTRL_OFFSET	    	(0x016C)
+#define ODN_PDP_GRPH4INTERLEAVE_CTRL_OFFSET		    (0x016C)
 
 /* PDP, GRPH4INTERLEAVE_CTRL, GRPH4INTFIELD
 */
@@ -8451,10 +8451,9 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #define ODN_PDP_BURST_BOUNDARY_BURST_BOUNDARY_SIGNED_FIELD	IMG_FALSE
 
 
-/* ------------------------ End of register definitions ------------------------ */
+/* ---------------------- End of register definitions ---------------------- */
 
-/*
-// NUMREG defines the extent of register address space.
+/* NUMREG defines the extent of register address space.
 */
 
 #define		ODN_PDP_NUMREG	   ((0x09C0 >> 2)+1)
@@ -8536,6 +8535,6 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #define ODN_PDP_PROCAMP_OUTPUT_OFFSET_FRACTIONAL_BITS 1
 #define ODN_PDP_PROCAMP_COEFFICIENT_FRACTIONAL_BITS	10
 
-/*-------------------------------------------------------------------------------*/
+/*---------------------------------------------------------------------------*/
 
-#endif /* _ODN_PDP_REGS_H_ */
+#endif /* ODN_PDP_REGS_H */

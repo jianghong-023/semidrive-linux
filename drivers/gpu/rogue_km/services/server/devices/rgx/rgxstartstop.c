@@ -54,10 +54,11 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "rgxdevice.h"
 #endif
 
+#include "km/tpu_cacheability_km.h"
+
 #define SOC_FEATURE_STRICT_SAME_ADDRESS_WRITE_ORDERING
 
 
-#if !defined(FIX_HW_BRN_37453)
 /*!
 *******************************************************************************
 
@@ -74,8 +75,6 @@ static void RGXEnableClocks(const void *hPrivate)
 {
 	RGXCommentLog(hPrivate, "RGX clock: use default (automatic clock gating)");
 }
-#endif
-
 
 static PVRSRV_ERROR RGXWriteMetaRegThroughSP(const void *hPrivate, IMG_UINT32 ui32RegAddr, IMG_UINT32 ui32RegValue)
 {
@@ -207,11 +206,6 @@ static void RGXInitMetaProcWrapper(const void *hPrivate)
 		ui64GartenConfig |= (IMG_UINT64)META_MMU_CONTEXT_MAPPING
 		                    << RGX_CR_MTS_GARTEN_WRAPPER_CONFIG__S7_TOP__FENCE_PC_BASE_SHIFT;
 
-		{
-			/* Ensure the META fences go all the way to external memory */
-			ui64GartenConfig |= RGX_CR_MTS_GARTEN_WRAPPER_CONFIG__S7_TOP__FENCE_SLC_COHERENT_EN;    /* SLC Coherent 1 */
-			ui64GartenConfig &= RGX_CR_MTS_GARTEN_WRAPPER_CONFIG__S7_TOP__FENCE_PERSISTENCE_CLRMSK; /* SLC Persistence 0 */
-		}
 	}
 	else
 	{
@@ -323,8 +317,16 @@ static void RGXInitMipsProcWrapper(const void *hPrivate)
 	RGXAcquireDataRemapAddr(hPrivate, &sPhyAddr);
 
 #if defined(SUPPORT_TRUSTED_DEVICE)
-	/* Remapped data in non-secure memory */
-	ui64RemapSettings &= RGX_CR_MIPS_ADDR_REMAP1_CONFIG2_TRUSTED_CLRMSK;
+	if (RGXGetDevicePhysBusWidth(hPrivate) > 32)
+	{
+		/* Remapped private data in secure memory */
+		ui64RemapSettings |= RGX_CR_MIPS_ADDR_REMAP1_CONFIG2_TRUSTED_EN;
+	}
+	else
+	{
+		/* Remapped data in non-secure memory */
+		ui64RemapSettings &= RGX_CR_MIPS_ADDR_REMAP1_CONFIG2_TRUSTED_CLRMSK;
+	}
 #endif
 
 #if defined(MIPS_FW_CODE_OSID)
@@ -365,30 +367,33 @@ static void RGXInitMipsProcWrapper(const void *hPrivate)
 	                   ~RGX_CR_MIPS_ADDR_REMAP3_CONFIG2_ADDR_OUT_CLRMSK,
 	                   ui64RemapSettings);
 
-	/*
-	 * Trampoline remap setup
-	 */
+	if (RGXGetDevicePhysBusWidth(hPrivate) == 32)
+	{
+		/*
+		 * Trampoline remap setup
+		 */
 
-	RGXAcquireTrampolineRemapAddr(hPrivate, &sPhyAddr);
-	ui64RemapSettings = RGXMIPSFW_TRAMPOLINE_LOG2_SEGMENT_SIZE;
+		RGXAcquireTrampolineRemapAddr(hPrivate, &sPhyAddr);
+		ui64RemapSettings = RGXMIPSFW_TRAMPOLINE_LOG2_SEGMENT_SIZE;
 
 #if defined(SUPPORT_TRUSTED_DEVICE)
-	/* Remapped data in non-secure memory */
-	ui64RemapSettings &= RGX_CR_MIPS_ADDR_REMAP1_CONFIG2_TRUSTED_CLRMSK;
+		/* Remapped data in non-secure memory */
+		ui64RemapSettings &= RGX_CR_MIPS_ADDR_REMAP1_CONFIG2_TRUSTED_CLRMSK;
 #endif
 
 #if defined(MIPS_FW_CODE_OSID)
-	ui64RemapSettings &= RGX_CR_MIPS_ADDR_REMAP1_CONFIG2_OS_ID_CLRMSK;
+		ui64RemapSettings &= RGX_CR_MIPS_ADDR_REMAP1_CONFIG2_OS_ID_CLRMSK;
 #endif
 
-	RGXCommentLog(hPrivate, "RGXStart: Write trampoline remap registers");
-	RGXTrampolineRemapConfig(hPrivate,
-	                   RGX_CR_MIPS_ADDR_REMAP4_CONFIG1,
-	                   sPhyAddr.uiAddr | RGX_CR_MIPS_ADDR_REMAP4_CONFIG1_MODE_ENABLE_EN,
-	                   RGX_CR_MIPS_ADDR_REMAP4_CONFIG2,
-	                   RGXMIPSFW_TRAMPOLINE_TARGET_PHYS_ADDR,
-	                   ~RGX_CR_MIPS_ADDR_REMAP4_CONFIG2_ADDR_OUT_CLRMSK,
-	                   ui64RemapSettings);
+		RGXCommentLog(hPrivate, "RGXStart: Write trampoline remap registers");
+		RGXTrampolineRemapConfig(hPrivate,
+		                         RGX_CR_MIPS_ADDR_REMAP4_CONFIG1,
+		                         sPhyAddr.uiAddr | RGX_CR_MIPS_ADDR_REMAP4_CONFIG1_MODE_ENABLE_EN,
+		                         RGX_CR_MIPS_ADDR_REMAP4_CONFIG2,
+		                         RGXMIPSFW_TRAMPOLINE_TARGET_PHYS_ADDR,
+		                         ~RGX_CR_MIPS_ADDR_REMAP4_CONFIG2_ADDR_OUT_CLRMSK,
+		                         ui64RemapSettings);
+	}
 
 	/* Garten IDLE bit controlled by MIPS */
 	RGXCommentLog(hPrivate, "RGXStart: Set GARTEN_IDLE type to MIPS");
@@ -418,6 +423,17 @@ static void __RGXInitSLC(const void *hPrivate)
 		IMG_UINT32 ui32Reg;
 		IMG_UINT32 ui32RegVal;
 
+		if (RGX_DEVICE_HAS_ERN(hPrivate, 51468))
+		{
+			/*
+			 * SLC control
+			 */
+			ui32Reg = RGX_CR_SLC3_CTRL_MISC;
+			ui32RegVal = RGX_CR_SLC3_CTRL_MISC_ADDR_DECODE_MODE_WEAVED_HASH |
+			             RGX_CR_SLC3_CTRL_MISC_WRITE_COMBINER_EN;
+			RGXWriteReg32(hPrivate, ui32Reg, ui32RegVal);
+		}
+		else
 		{
 			/*
 			 * SLC control
@@ -512,9 +528,9 @@ static void __RGXInitSLC(const void *hPrivate)
 						(IMG_UINT64) RGX_CR_SLC_CTRL_BYPASS_REQ_IPF_CPF_EN;
 		}
 
-		if (RGXGetDeviceSLCSize(hPrivate) < (128*1024))
+		if (RGXGetDeviceSLCSize(hPrivate) < RGX_TPU_CACHED_SLC_SIZE_THRESHOLD)
 		{
-			/* Bypass SLC for textures if the SLC size is less than 128kB */
+			/* Bypass SLC for textures if the SLC size is less than the threshold. */
 			RGXCommentLog(hPrivate, "Bypass SLC for TPU");
 			ui64RegVal |= (IMG_UINT64) RGX_CR_SLC_CTRL_BYPASS_REQ_TPU_EN;
 		}
@@ -719,12 +735,6 @@ PVRSRV_ERROR RGXStart(const void *hPrivate)
 		(void) RGXReadReg32(hPrivate, RGX_CR_SYS_BUS_SECURE); /* Fence write */
 	}
 
-#if defined(FIX_HW_BRN_37453)
-	/* Force all clocks on*/
-	RGXCommentLog(hPrivate, "RGXStart: force all clocks on");
-	RGXWriteReg64(hPrivate, RGX_CR_CLK_CTRL, RGX_CR_CLK_CTRL_ALL_ON);
-#endif
-
 #if defined(SUPPORT_SHARED_SLC) && !defined(FIX_HW_BRN_36492)
 	/* When the SLC is shared, the SLC reset is performed by the System layer when calling
 	 * RGXInitSLC (before any device uses it), therefore mask out the SLC bit to avoid
@@ -779,11 +789,8 @@ PVRSRV_ERROR RGXStart(const void *hPrivate)
 		RGXWriteReg64(hPrivate, RGX_CR_SOFT_RESET, RGX_CR_SOFT_RESET_GARTEN_EN);
 	}
 
-
-#if !defined(FIX_HW_BRN_37453)
 	/* Enable clocks */
 	RGXEnableClocks(hPrivate);
-#endif
 
 	/*
 	 * Initialise SLC.
@@ -843,14 +850,6 @@ PVRSRV_ERROR RGXStart(const void *hPrivate)
 	/* ... and afterwards */
 	RGXWaitCycles(hPrivate, 32, 3);
 
-#if defined(FIX_HW_BRN_37453)
-	/* We rely on the 32 clk sleep from above */
-
-	/* Switch clocks back to auto */
-	RGXCommentLog(hPrivate, "RGXStart: set clocks back to auto");
-	RGXWriteReg64(hPrivate, RGX_CR_CLK_CTRL, RGX_CR_CLK_CTRL_ALL_AUTO);
-#endif
-
 	if (bMetaFW && bDoFWSlaveBoot)
 	{
 		eError = RGXFabricCoherencyTest(hPrivate);
@@ -880,7 +879,7 @@ static INLINE void ClearIRQStatusRegister(const void *hPrivate, IMG_BOOL bMetaFW
 	IMG_UINT32 ui32IRQClearReg;
 	IMG_UINT32 ui32IRQClearMask;
 
-	if(bMetaFW)
+	if (bMetaFW)
 	{
 		ui32IRQClearReg = RGX_CR_META_SP_MSLVIRQSTATUS;
 		ui32IRQClearMask = RGX_CR_META_SP_MSLVIRQSTATUS_TRIGVECT2_CLRMSK;

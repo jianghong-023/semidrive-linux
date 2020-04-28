@@ -40,23 +40,22 @@ COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
 IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */ /**************************************************************************/
-#ifndef __TLINTERN_H__
-#define __TLINTERN_H__
+#ifndef TLINTERN_H
+#define TLINTERN_H
 
 
 #include "devicemem_typedefs.h"
 #include "pvrsrv_tlcommon.h"
-#include "device.h"
 #include "lock.h"
 #include "tlstream.h"
 
 /* Forward declarations */
 typedef struct _TL_SNODE_* PTL_SNODE;
 
-/* To debug buffer utilisation enable this macro here and
- * define PVRSRV_NEED_PVR_TRACE in the server pvr_debug.c and in tutils.c
- * before the inclusion of pvr_debug.h. Issue pvrtutils 6 on target to see
- * stream buffer utilisation. */
+/* To debug buffer utilisation enable this macro here and define
+ * PVRSRV_NEED_PVR_TRACE in the server pvr_debug.c and in tutils.c
+ * before the inclusion of pvr_debug.h.
+ * Issue pvrtutils 6 on target to see stream buffer utilisation. */
 //#define TL_BUFFER_STATS 1
 
 /*! TL stream structure container.
@@ -106,18 +105,24 @@ typedef struct _TL_STREAM_
                                                                          *   copied to user space */
 	IMG_UINT32              ui32Pending;                            /*!< Count pending bytes reserved in buffer */
 	IMG_UINT32              ui32Size;                               /*!< Buffer size */
+	IMG_UINT32              ui32ThresholdUsageForSignal;            /*!< Buffer usage threshold at which a TL writer signals a blocked/
+	                                                                     *    waiting reader when transitioning from empty->non-empty */
 	IMG_UINT32              ui32MaxPacketSize;                      /*! Max TL packet size */
 	IMG_BYTE                *pbyBuffer;                             /*!< Actual data buffer */
 
-	PTL_SNODE               psNode;	                                /*!< Ptr to parent stream node */
+	PTL_SNODE               psNode;                                 /*!< Ptr to parent stream node */
 	DEVMEM_MEMDESC          *psStreamMemDesc;                       /*!< MemDescriptor used to allocate buffer space through PMR */
 
 	IMG_HANDLE              hProducerEvent;	                        /*!< Handle to wait on if there is not enough space */
 	IMG_HANDLE              hProducerEventObj;                      /*!< Handle to signal blocked reserve calls */
+	IMG_BOOL                bSignalPending;                         /*!< Tracks if a "signal" is pending to be sent to a blocked/
+	                                                                     *    waiting reader */
 
 	POS_LOCK                hStreamWLock;                           /*!< Writers Lock for ui32Pending & ui32Write*/
 	POS_LOCK                hReadLock;                              /*!< Readers Lock for bReadPending & ui32Read*/
 	IMG_BOOL                bReadPending;                           /*!< Tracks if a read operation is pending or not*/
+	IMG_BOOL                bNoWrapPermanent;                       /*!< Flag: Prevents buffer wrap and subsequent data loss
+	                                                                     *    as well as resetting the read position on close. */
 
 #if defined(TL_BUFFER_STATS)
 	IMG_UINT32              ui32CntReadFails;                       /*!< Tracks how many times reader failed to acquire read lock */
@@ -126,13 +131,31 @@ typedef struct _TL_STREAM_
 	IMG_UINT32              ui32CntWriteWaits;                      /*!< Tracks how many times writer had to wait to acquire read lock */
 	IMG_UINT32              ui32CntNumWriteSuccess;	                /*!< Tracks how many write operations were successful*/
 	IMG_UINT32              ui32BufferUt;                           /*!< Buffer utilisation high watermark, see TL_BUFFER_STATS above */
+	IMG_UINT32              ui32MaxReserveWatermark;                /*!< Max stream reserve size that was ever requested by a writer */
+	IMG_UINT32              ui32SignalsSent;                        /*!< Number of signals that were actually sent by the write API */
+	ATOMIC_T                bNoReaderSinceFirstReserve;             /*!< Tracks if a read has been done since the buffer was last found empty */
+	IMG_UINT32              ui32TimeStart;                          /*!< Time at which a write (Reserve call) was done into an empty buffer.
+	                                                                     *    Guarded by hStreamWLock. */
+	IMG_UINT32              ui32MinTimeToFullInUs;                  /*!< Minimum time taken to (nearly) fully fill an empty buffer. Guarded
+	                                                                     *    by hStreamWLock. */
+	/* Behaviour counters, protected by hStreamLock in case of
+	 * multi-threaded access */
+	IMG_UINT32              ui32NumCommits;     /*!< Counters used to analysing stream performance, see ++ loc */
+	IMG_UINT32              ui32SignalNotSent;  /*!< Counters used to analysing stream performance, see ++ loc */
+	IMG_UINT32              ui32ManSyncs;       /*!< Counters used to analysing stream performance, see ++ loc */
+	IMG_UINT32              ui32ProducerByteCount; /*!< Counters used to analysing stream performance, see ++ loc */
+
+	/* Not protected by the lock, inc in the reader thread which is currently singular */
+	IMG_UINT32              ui32AcquireRead1;   /*!< Counters used to analysing stream performance, see ++ loc */
+	IMG_UINT32              ui32AcquireRead2;   /*!< Counters used to analysing stream performance, see ++ loc */
 #endif
+
 } TL_STREAM, *PTL_STREAM;
 
 /* there need to be enough space reserved in the buffer for 2 minimal packets
  * and it needs to be aligned the same way the buffer is or there will be a
  * compile error.*/
-#define BUFFER_RESERVED_SPACE 2*PVRSRVTL_PACKET_ALIGNMENT
+#define BUFFER_RESERVED_SPACE (2 * PVRSRVTL_PACKET_ALIGNMENT)
 
 /* ensure the space reserved follows the buffer's alignment */
 static_assert(!(BUFFER_RESERVED_SPACE&(PVRSRVTL_PACKET_ALIGNMENT-1)),
@@ -152,22 +175,24 @@ static_assert(!(BUFFER_RESERVED_SPACE&(PVRSRVTL_PACKET_ALIGNMENT-1)),
  */
 typedef struct _TL_STREAM_DESC_
 {
-	PTL_SNODE	psNode;			/*!< Ptr to parent stream node */
-	IMG_UINT32	ui32Flags;
-	IMG_HANDLE	hReadEvent; 	/*!< For wait call (only used/set in reader descriptors) */
-	IMG_INT		uiRefCount;     /*!< Reference count to the SD */
+	PTL_SNODE   psNode;         /*!< Ptr to parent stream node */
+	IMG_UINT32  ui32Flags;      /*!< Flags supplied by client on stream open */
+	IMG_HANDLE  hReadEvent;     /*!< For wait call (only used/set in reader descriptors) */
+	IMG_INT     uiRefCount;     /*!< Reference count to the SD */
 
 #if defined(TL_BUFFER_STATS)
 	/* Behaviour counters, no multi-threading protection need as they are
-	 * incremented in a single thread due to only supporting one reader 
+	 * incremented in a single thread due to only supporting one reader
 	 * at present */
 	IMG_UINT32  ui32AcquireCount;  /*!< Counters used to analysing stream performance, see ++ loc */
 	IMG_UINT32  ui32NoData;        /*!< Counters used to analysing stream performance, see ++ loc */
-	IMG_UINT32  ui32NoDataSleep;    /*!< Counters used to analysing stream performance, see ++ loc */
+	IMG_UINT32  ui32NoDataSleep;   /*!< Counters used to analysing stream performance, see ++ loc */
 	IMG_UINT32  ui32Signalled;     /*!< Counters used to analysing stream performance, see ++ loc */
 	IMG_UINT32  ui32TimeoutEmpty;  /*!< Counters used to analysing stream performance, see ++ loc */
 	IMG_UINT32  ui32TimeoutData;   /*!< Counters used to analysing stream performance, see ++ loc */
 #endif
+	IMG_UINT32  ui32ReadLimit;     /*!< Limit buffer reads to data present in the
+                                        buffer at the time of stream open. */
 	IMG_UINT32  ui32ReadLen;       /*!< Size of data returned by initial Acquire */
 } TL_STREAM_DESC, *PTL_STREAM_DESC;
 
@@ -180,20 +205,22 @@ PTL_STREAM_DESC TLMakeStreamDesc(PTL_SNODE f1, IMG_UINT32 f2, IMG_HANDLE f3);
 #define TL_STREAM_UM_FLAG_MASK	0x0000FFFF
 
 #if defined(TL_BUFFER_STATS)
-#	define TL_COUNTER_INC(a)     ((a)++)
+#	define TL_COUNTER_INC(a)    ((a)++)
+#	define TL_COUNTER_ADD(a,b)  ((a) += (b))
 #else
-#	define TL_COUNTER_INC(a)
+#	define TL_COUNTER_INC(a)    (void)(0)
+#	define TL_COUNTER_ADD(a,b)  (void)(0)
 #endif
 /*
  * Transport Layer stream list node
  */
 typedef struct _TL_SNODE_
 {
-	struct _TL_SNODE_*  psNext;				/*!< Linked list next element */
+	struct _TL_SNODE_*	psNext;				/*!< Linked list next element */
 	IMG_HANDLE			hReadEventObj;		/*!< Readers 'wait for data' event */
-	PTL_STREAM 			psStream;			/*!< TL Stream object */
+	PTL_STREAM			psStream;			/*!< TL Stream object */
 	IMG_INT				uiWRefCount;		/*!< Stream writer reference count */
-	PTL_STREAM_DESC 	psRDesc;			/*!< Stream reader 0 or ptr only */
+	PTL_STREAM_DESC		psRDesc;			/*!< Stream reader 0 or ptr only */
 	PTL_STREAM_DESC		psWDesc;			/*!< Stream writer 0 or ptr only */
 } TL_SNODE;
 
@@ -214,10 +241,10 @@ PTL_SNODE TLMakeSNode(IMG_HANDLE f2, TL_STREAM *f3, TL_STREAM_DESC *f4);
  */
 typedef struct _TL_GDATA_
 {
-	IMG_HANDLE hTLEventObj;         /* Global TL signal object, new streams, etc */
+	IMG_HANDLE hTLEventObj;        /* Global TL signal object, new streams, etc */
 
-	IMG_UINT   uiClientCnt;         /* Counter to track the number of client stream connections. */
-	PTL_SNODE  psHead;              /* List of TL streams and associated client handle */
+	IMG_UINT   uiClientCnt;        /* Counter to track the number of client stream connections. */
+	PTL_SNODE  psHead;             /* List of TL streams and associated client handle */
 
 	POS_LOCK   hTLGDLock;          /* Lock for structure AND psHead SNODE list */
 } TL_GLOBAL_DATA, *PTL_GLOBAL_DATA;
@@ -230,7 +257,7 @@ TL_GLOBAL_DATA* TLGGD(void);		/* TLGetGlobalData() */
 PVRSRV_ERROR TLInit(void);
 void TLDeInit(void);
 
-void  TLAddStreamNode(PTL_SNODE psAdd);
+void TLAddStreamNode(PTL_SNODE psAdd);
 PTL_SNODE TLFindStreamNodeByName(const IMG_CHAR *pszName);
 PTL_SNODE TLFindStreamNodeByDesc(PTL_STREAM_DESC psDesc);
 IMG_UINT32 TLDiscoverStreamNodes(const IMG_CHAR *pszNamePattern,
@@ -243,17 +270,17 @@ void TLReturnStreamNode(PTL_SNODE psNode);
  Function Name	: TLTryRemoveStreamAndFreeStreamNode
 
  Inputs		: PTL_SNODE	Pointer to the TL_SNODE whose stream is requested
- 			to be removed from TL_GLOBAL_DATA's list
+			to be removed from TL_GLOBAL_DATA's list
 
  Return Value	: IMG_TRUE	-	If the stream was made NULL and this
- 					TL_SNODE was removed from the
+					TL_SNODE was removed from the
 					TL_GLOBAL_DATA's list
 
- 		  IMG_FALSE	-	If the stream wasn't made NULL as there
-		  			is a client connected to this stream
+		  IMG_FALSE	-	If the stream wasn't made NULL as there
+					is a client connected to this stream
 
  Description	: If there is no client currently connected to this stream then,
- 			This function removes this TL_SNODE from the
+			This function removes this TL_SNODE from the
 			TL_GLOBAL_DATA's list. The caller is responsible for the
 			cleanup of the TL_STREAM whose TL_SNODE may be removed
 
@@ -265,22 +292,21 @@ IMG_BOOL  TLTryRemoveStreamAndFreeStreamNode(PTL_SNODE psRemove);
  Function Name	: TLUnrefDescAndTryFreeStreamNode
 
  Inputs		: PTL_SNODE	Pointer to the TL_SNODE whose descriptor is
- 			requested to be removed
- 			: PTL_STREAM_DESC	Pointer to the STREAM_DESC
+			requested to be removed
+			: PTL_STREAM_DESC	Pointer to the STREAM_DESC
 
  Return Value	: IMG_TRUE	-	If this	TL_SNODE was removed from the
 					TL_GLOBAL_DATA's list
 
- 		  IMG_FALSE	-	Otherwise
+		  IMG_FALSE	-	Otherwise
 
  Description	: This function removes the stream descriptor from this TL_SNODE
- 		  and,
-		  If there is no writer (producer context) currently bound to this stream,
- 			This function removes this TL_SNODE from the
-			TL_GLOBAL_DATA's list. The caller is responsible for the
-			cleanup of the TL_STREAM whose TL_SNODE may be removed
+			and, if there is no writer (producer context) currently bound to this
+			stream, this function removes this TL_SNODE from the TL_GLOBAL_DATA's
+			list. The caller is responsible for the cleanup of the TL_STREAM
+			whose TL_SNODE may be removed
 ******************************************************************************************/
-IMG_BOOL  TLUnrefDescAndTryFreeStreamNode(PTL_SNODE psRemove, PTL_STREAM_DESC psSD);
+IMG_BOOL TLUnrefDescAndTryFreeStreamNode(PTL_SNODE psRemove, PTL_STREAM_DESC psSD);
 
 /*
  * Transport Layer stream interface to server part declared here to avoid
@@ -292,9 +318,10 @@ IMG_UINT32 TLStreamAcquireReadPos(PTL_STREAM psStream,
 PVRSRV_ERROR TLStreamAdvanceReadPos(PTL_STREAM psStream,
                                     IMG_UINT32 uiReadLen,
                                     IMG_UINT32 uiOrigReadLen);
+void TLStreamResetReadPos(PTL_STREAM psStream);
 
 DEVMEM_MEMDESC* TLStreamGetBufferPointer(PTL_STREAM psStream);
-IMG_BOOL TLStreamEOS(PTL_STREAM psStream);
+IMG_BOOL TLStreamOutOfData(IMG_HANDLE psStream);
 
 /****************************************************************************************
  Function Name	: TLStreamDestroy
@@ -302,18 +329,18 @@ IMG_BOOL TLStreamEOS(PTL_STREAM psStream);
  Inputs		: PTL_STREAM	Pointer to the TL_STREAM to be destroyed
 
  Description	: This function performs all the clean-up operations required for
- 			destruction of this stream
+			destruction of this stream
 *****************************************************************************************/
-void TLStreamDestroy (PTL_STREAM);
+void TLStreamDestroy(PTL_STREAM psStream);
 
 /*
  * Test related functions
  */
-PVRSRV_ERROR TUtilsInit (PVRSRV_DEVICE_NODE *psDeviceNode);
-PVRSRV_ERROR TUtilsDeinit (PVRSRV_DEVICE_NODE *psDeviceNode);
+PVRSRV_ERROR TUtilsInit(PVRSRV_DEVICE_NODE *psDeviceNode);
+PVRSRV_ERROR TUtilsDeinit(PVRSRV_DEVICE_NODE *psDeviceNode);
 
 
-#endif /* __TLINTERN_H__ */
+#endif /* TLINTERN_H */
 /******************************************************************************
  End of file (tlintern.h)
 ******************************************************************************/

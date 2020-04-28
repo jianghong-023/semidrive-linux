@@ -1,4 +1,4 @@
-/**************************************************************************/ /*!
+/*************************************************************************/ /*!
 @File
 @Title          Common MMU Management
 @Copyright      Copyright (c) Imagination Technologies Ltd. All Rights Reserved
@@ -39,25 +39,26 @@ PURPOSE AND NONINFRINGEMENT; AND (B) IN NO EVENT SHALL THE AUTHORS OR
 COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
 IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/ /***************************************************************************/
+*/ /**************************************************************************/
 
 #ifndef MMU_COMMON_H
 #define MMU_COMMON_H
 
 /*
-	The Memory Management Unit (MMU) performs device virtual to physical translation.
+	The Memory Management Unit (MMU) performs device virtual to physical
+	translation.
 
 	Terminology:
 	 - page catalogue, PC	(optional, 3 tier MMU)
 	 - page directory, PD
 	 - page table, PT (can be variable sized)
 	 - data page, DP (can be variable sized)
-    Note: PD and PC are fixed size and can't be larger than
-           the native physical (CPU) page size
+	Note: PD and PC are fixed size and can't be larger than the native
+	      physical (CPU) page size
 	Shifts and AlignShift variables:
 	 - 'xxxShift' represent the number of bits a bitfield is shifted left from bit0
 	 - 'xxxAlignShift' is used to convert a bitfield (based at bit0) into byte units
-	 	by applying a bit shift left by 'xxxAlignShift' bits
+	   by applying a bit shift left by 'xxxAlignShift' bits
 */
 
 /*
@@ -83,6 +84,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 /* include/ */
 #include "img_types.h"
+#include "img_defs.h"
 #include "pvr_notifier.h"
 #include "pvrsrv_error.h"
 #include "servicesext.h"
@@ -300,8 +302,8 @@ typedef struct _MMU_PAGESIZECONFIG_
 /*****************************************************************************/
 extern PVRSRV_ERROR
 MMU_ContextCreate (struct _PVRSRV_DEVICE_NODE_ *psDevNode,
-				   MMU_CONTEXT **ppsMMUContext,
-				   MMU_DEVICEATTRIBS *psDevAttrs);
+                   MMU_CONTEXT **ppsMMUContext,
+                   MMU_DEVICEATTRIBS *psDevAttrs);
 
 
 /*************************************************************************/ /*!
@@ -427,21 +429,20 @@ MMU_MapPages(MMU_CONTEXT *psMMUContext,
 @Input          uiLog2PageSize          log2 size of the page
 
 
-@Input          bDummyBacking           Bool that indicates if the unmapped
-										regions need to be backed by dummy
-										page
+@Input          uiMemAllocFlags         Indicates if the unmapped regions need
+                                        to be backed by dummy or zero page
 
 @Return         None
 */
 /*****************************************************************************/
 extern void
 MMU_UnmapPages (MMU_CONTEXT *psMMUContext,
-				PVRSRV_MEMALLOCFLAGS_T uiMappingFlags,
+                PVRSRV_MEMALLOCFLAGS_T uiMappingFlags,
                 IMG_DEV_VIRTADDR sDevVAddr,
                 IMG_UINT32 ui32PageCount,
                 IMG_UINT32 *pai32UnmapIndicies,
                 IMG_UINT32 uiLog2PageSize,
-                IMG_BOOL bDummyBacking);
+                PVRSRV_MEMALLOCFLAGS_T uiMemAllocFlags);
 
 /*************************************************************************/ /*!
 @Function       MMU_MapPMRFast
@@ -569,8 +570,8 @@ MMU_ReleaseBaseAddr(MMU_CONTEXT *psMMUContext);
 
 @Input          ui32OSid                the OSid in question
 
-@Input			ui32OSidReg				The value that the firmware will assign to the
-										registers.
+@Input          ui32OSidReg             The value that the firmware will assign to the
+                                        registers.
 
 @Input          bOSidAxiProt            Toggles whether the AXI prot bit will be set or
                                         not.
@@ -578,7 +579,8 @@ MMU_ReleaseBaseAddr(MMU_CONTEXT *psMMUContext);
 */
 /***********************************************************************************/
 
-void MMU_SetOSids(MMU_CONTEXT *psMMUContext, IMG_UINT32 ui32OSid, IMG_UINT32 ui32OSidReg, IMG_BOOL bOSidAxiProt);
+void MMU_SetOSids(MMU_CONTEXT *psMMUContext, IMG_UINT32 ui32OSid,
+                  IMG_UINT32 ui32OSidReg, IMG_BOOL bOSidAxiProt);
 
 /***********************************************************************************/ /*!
 @Function       MMU_GetOSid
@@ -587,9 +589,9 @@ void MMU_SetOSids(MMU_CONTEXT *psMMUContext, IMG_UINT32 ui32OSid, IMG_UINT32 ui3
 
 @Input          psMMUContext            MMU context in which the OSid is stored
 
-@Output			pui32OSid               The OSid in question
+@Output         pui32OSid               The OSid in question
 
-@Output			pui32OSidReg            The OSid that the firmware will assign to the
+@Output         pui32OSidReg            The OSid that the firmware will assign to the
                                         registers.
 
 @Output         pbOSidAxiProt           Toggles whether the AXI prot bit will be set or
@@ -598,7 +600,8 @@ void MMU_SetOSids(MMU_CONTEXT *psMMUContext, IMG_UINT32 ui32OSid, IMG_UINT32 ui3
 */
 /***********************************************************************************/
 
-void MMU_GetOSids(MMU_CONTEXT *psMMUContext, IMG_UINT32 * pui32OSid, IMG_UINT32 * pui32OSidReg, IMG_BOOL *pbOSidAxiProt);
+void MMU_GetOSids(MMU_CONTEXT *psMMUContext, IMG_UINT32 * pui32OSid,
+                  IMG_UINT32 * pui32OSidReg, IMG_BOOL *pbOSidAxiProt);
 #endif
 
 /*************************************************************************/ /*!
@@ -636,17 +639,17 @@ void MMU_SetDeviceData(MMU_CONTEXT *psMMUContext, IMG_HANDLE hDevData);
 */
 /*****************************************************************************/
 void MMU_CheckFaultAddress(MMU_CONTEXT *psMMUContext,
-				IMG_DEV_VIRTADDR *psDevVAddr,
-				DUMPDEBUG_PRINTF_FUNC *pfnDumpDebugPrintf,
-				void *pvDumpDebugFile,
-				MMU_FAULT_DATA *psOutFaultData);
+                           IMG_DEV_VIRTADDR *psDevVAddr,
+                           DUMPDEBUG_PRINTF_FUNC *pfnDumpDebugPrintf,
+                           void *pvDumpDebugFile,
+                           MMU_FAULT_DATA *psOutFaultData);
 
 /*************************************************************************/ /*!
-@Function       MMUI_IsVDevAddrValid
+@Function       MMU_IsVDevAddrValid
 @Description    Checks if given address is valid.
 @Input          psMMUContext MMU context to store the data on
 @Input          uiLog2PageSize page size
-@Input          psDevVAddr Address to check
+@Input          sDevVAddr Address to check
 @Return         IMG_TRUE of address is valid
 */ /**************************************************************************/
 IMG_BOOL MMU_IsVDevAddrValid(MMU_CONTEXT *psMMUContext,
@@ -655,6 +658,8 @@ IMG_BOOL MMU_IsVDevAddrValid(MMU_CONTEXT *psMMUContext,
 
 
 #if defined(PDUMP)
+IMG_CHAR *MMU_GetPxPDumpMemSpaceName(MMU_CONTEXT *psMMUContext);
+
 /*************************************************************************/ /*!
 @Function       MMU_ContextDerivePCPDumpSymAddr
 
@@ -681,20 +686,20 @@ extern PVRSRV_ERROR MMU_ContextDerivePCPDumpSymAddr(MMU_CONTEXT *psMMUContext,
 
 @Input          psMMUContext        MMU context to operate on
 
-@Input          pszSpaceName		PDump name of the mem/reg space
+@Input          pszSpaceName        PDump name of the mem/reg space
 
-@Input          uiOffset			Offset to write the address to
+@Input          uiOffset            Offset to write the address to
 
 @Return         PVRSRV_OK if successful
 */
 /*****************************************************************************/
 PVRSRV_ERROR MMU_PDumpWritePageCatBase(MMU_CONTEXT *psMMUContext,
-        								const IMG_CHAR *pszSpaceName,
-        								IMG_DEVMEM_OFFSET_T uiOffset,
-        								IMG_UINT32 ui32WordSize,
-        								IMG_UINT32 ui32AlignShift,
-        								IMG_UINT32 ui32Shift,
-        								PDUMP_FLAGS_T uiPdumpFlags);
+                                       const IMG_CHAR *pszSpaceName,
+                                       IMG_DEVMEM_OFFSET_T uiOffset,
+                                       IMG_UINT32 ui32WordSize,
+                                       IMG_UINT32 ui32AlignShift,
+                                       IMG_UINT32 ui32Shift,
+                                       PDUMP_FLAGS_T uiPdumpFlags);
 
 /*************************************************************************/ /*!
 @Function       MMU_AcquirePDumpMMUContext
@@ -704,14 +709,13 @@ PVRSRV_ERROR MMU_PDumpWritePageCatBase(MMU_CONTEXT *psMMUContext,
 
 @Input          psMMUContext            MMU context to operate on
 
-@Input          pszRegSpaceName         PDump name of the register space
-
 @Output         pui32PDumpMMUContextID  PDump MMU context ID
 
 @Return         PVRSRV_OK if successful
 */
 /*****************************************************************************/
-PVRSRV_ERROR MMU_AcquirePDumpMMUContext(MMU_CONTEXT *psMMUContext, IMG_UINT32 *pui32PDumpMMUContextID);
+PVRSRV_ERROR MMU_AcquirePDumpMMUContext(MMU_CONTEXT *psMMUContext,
+                                        IMG_UINT32 *pui32PDumpMMUContextID);
 
 /*************************************************************************/ /*!
 @Function       MMU_ReleasePDumpMMUContext
@@ -719,10 +723,6 @@ PVRSRV_ERROR MMU_AcquirePDumpMMUContext(MMU_CONTEXT *psMMUContext, IMG_UINT32 *p
 @Description    Release a reference to the PDump MMU context for this MMU context
 
 @Input          psMMUContext            MMU context to operate on
-
-@Input          pszRegSpaceName         PDump name of the register space
-
-@Output         pui32PDumpMMUContextID  PDump MMU context ID
 
 @Return         PVRSRV_OK if successful
 */
@@ -735,12 +735,12 @@ PVRSRV_ERROR MMU_ReleasePDumpMMUContext(MMU_CONTEXT *psMMUContext);
 #endif
 static INLINE void
 MMU_PDumpWritePageCatBase(MMU_CONTEXT *psMMUContext,
-        						const IMG_CHAR *pszSpaceName,
-        						IMG_DEVMEM_OFFSET_T uiOffset,
-        						IMG_UINT32 ui32WordSize,
-        						IMG_UINT32 ui32AlignShift,
-        						IMG_UINT32 ui32Shift,
-        						PDUMP_FLAGS_T uiPdumpFlags)
+                          const IMG_CHAR *pszSpaceName,
+                          IMG_DEVMEM_OFFSET_T uiOffset,
+                          IMG_UINT32 ui32WordSize,
+                          IMG_UINT32 ui32AlignShift,
+                          IMG_UINT32 ui32Shift,
+                          PDUMP_FLAGS_T uiPdumpFlags)
 {
 	PVR_UNREFERENCED_PARAMETER(psMMUContext);
 	PVR_UNREFERENCED_PARAMETER(pszSpaceName);

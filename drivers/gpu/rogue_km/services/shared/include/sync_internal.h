@@ -46,6 +46,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #define _SYNC_INTERNAL_
 
 #include "img_types.h"
+#include "img_defs.h"
 #include <powervr/sync_external.h>
 #include "ra.h"
 #include "dllist.h"
@@ -94,17 +95,17 @@ typedef struct _SYNC_PRIM_LOCAL_
 	ATOMIC_T				hRefCount;	/*!< Ref count for this sync */
 	SYNC_PRIM_BLOCK			*psSyncBlock;	/*!< Synchronisation block this primitive is allocated on */
 	IMG_UINT64				uiSpanAddr;		/*!< Span address of the sync */
-#if defined(PVRSRV_ENABLE_FULL_SYNC_TRACKING)
 	IMG_HANDLE				hRecord;		/*!< Sync record handle */
-#endif
 } SYNC_PRIM_LOCAL;
 
+#if defined(SUPPORT_SERVER_SYNC_IMPL)
 typedef struct _SYNC_PRIM_SERVER_
 {
 	SYNC_BRIDGE_HANDLE		hBridge;			/*!< Bridge handle */
 	IMG_HANDLE				hServerSync;		/*!< Handle to the server sync */
 	IMG_UINT32				ui32FirmwareAddr;	/*!< Firmware address of the sync */
 } SYNC_PRIM_SERVER;
+#endif
 
 typedef struct _SYNC_PRIM_
 {
@@ -112,7 +113,9 @@ typedef struct _SYNC_PRIM_
 	SYNC_PRIM_TYPE			eType;			/*!< Sync primitive type */
 	union {
 		SYNC_PRIM_LOCAL		sLocal;			/*!< Local sync primitive data */
+#if defined(SUPPORT_SERVER_SYNC_IMPL)
 		SYNC_PRIM_SERVER	sServer;		/*!< Server sync primitive data */
+#endif
 	} u;
 } SYNC_PRIM;
 

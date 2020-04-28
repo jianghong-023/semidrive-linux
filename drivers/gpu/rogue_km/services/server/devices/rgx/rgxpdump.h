@@ -85,7 +85,7 @@ PVRSRV_ERROR PVRSRVPDumpTraceBufferKM(CONNECTION_DATA * psConnection,
 /*!
 ******************************************************************************
 
- @Function	RGXPDumpOutputImageHdr
+ @Function	RGXPDumpPrepareOutputImageDescriptorHdr
 
  @Description
 
@@ -94,7 +94,7 @@ PVRSRV_ERROR PVRSRVPDumpTraceBufferKM(CONNECTION_DATA * psConnection,
  @Return   PVRSRV_ERROR
 
 ******************************************************************************/
-PVRSRV_ERROR RGXPDumpOutputImageHdr(PVRSRV_DEVICE_NODE *psDeviceNode,
+PVRSRV_ERROR RGXPDumpPrepareOutputImageDescriptorHdr(PVRSRV_DEVICE_NODE *psDeviceNode,
 									IMG_UINT32 ui32HeaderSize,
 									IMG_UINT32 ui32DataSize,
 									IMG_UINT32 ui32LogicalWidth,
@@ -105,7 +105,27 @@ PVRSRV_ERROR RGXPDumpOutputImageHdr(PVRSRV_DEVICE_NODE *psDeviceNode,
 									IMG_MEMLAYOUT eMemLayout,
 									IMG_FB_COMPRESSION eFBCompression,
 									const IMG_UINT32 *paui32FBCClearColour,
+									PDUMP_FBC_SWIZZLE eFBCSwizzle,
 									IMG_PBYTE pbyPDumpImageHdr);
+
+/*!
+******************************************************************************
+
+ @Function	RGXPDumpPrepareOutputDataDescriptorHdr
+
+ @Description
+
+ Dumps the header for an OutputData command
+
+ @Return   PVRSRV_ERROR
+
+******************************************************************************/
+PVRSRV_ERROR RGXPDumpPrepareOutputDataDescriptorHdr(PVRSRV_DEVICE_NODE *psDeviceNode,
+									IMG_UINT32 ui32DataSize,
+									IMG_UINT32 ui32ElementType,
+									IMG_UINT32 ui32ElementCount,
+									IMG_PBYTE pbyPDumpDataHdr);
+
 #else  	/* PDUMP */
 
 #ifdef INLINE_IS_PRAGMA
@@ -130,7 +150,7 @@ PVRSRVPDumpTraceBufferKM(CONNECTION_DATA * psConnection,
                          PVRSRV_DEVICE_NODE	*psDeviceNode,
 						 IMG_UINT32			ui32PDumpFlags)
 {
-	PVR_UNREFERENCED_PARAMETER(psConnection);	
+	PVR_UNREFERENCED_PARAMETER(psConnection);
 	PVR_UNREFERENCED_PARAMETER(psDeviceNode);
 	PVR_UNREFERENCED_PARAMETER(ui32PDumpFlags);
 	return PVRSRV_OK;

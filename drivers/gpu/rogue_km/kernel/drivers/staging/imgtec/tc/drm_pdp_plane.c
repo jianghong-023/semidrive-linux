@@ -92,18 +92,18 @@ static void pdp_plane_helper_atomic_update(struct drm_plane *plane,
 }
 
 static const struct drm_plane_helper_funcs pdp_plane_helper_funcs = {
-       .prepare_fb =  drm_gem_fb_prepare_fb,
-       .atomic_check = pdp_plane_helper_atomic_check,
-       .atomic_update = pdp_plane_helper_atomic_update,
+	.prepare_fb =  drm_gem_fb_prepare_fb,
+	.atomic_check = pdp_plane_helper_atomic_check,
+	.atomic_update = pdp_plane_helper_atomic_update,
 };
 
 static const struct drm_plane_funcs pdp_plane_funcs = {
-       .update_plane = drm_atomic_helper_update_plane,
-       .disable_plane = drm_atomic_helper_disable_plane,
-       .destroy = drm_primary_helper_destroy,
-       .reset = drm_atomic_helper_plane_reset,
-       .atomic_duplicate_state = drm_atomic_helper_plane_duplicate_state,
-       .atomic_destroy_state = drm_atomic_helper_plane_destroy_state,
+	.update_plane = drm_atomic_helper_update_plane,
+	.disable_plane = drm_atomic_helper_disable_plane,
+	.destroy = drm_primary_helper_destroy,
+	.reset = drm_atomic_helper_plane_reset,
+	.atomic_duplicate_state = drm_atomic_helper_plane_duplicate_state,
+	.atomic_destroy_state = drm_atomic_helper_plane_destroy_state,
 };
 #else
 #define pdp_plane_funcs drm_primary_helper_funcs
@@ -237,7 +237,7 @@ void pdp_plane_set_surface(struct drm_crtc *crtc, struct drm_plane *plane,
 				      255,
 				      false);
 		break;
-		default:
+	default:
 			BUG();
 	}
 }
