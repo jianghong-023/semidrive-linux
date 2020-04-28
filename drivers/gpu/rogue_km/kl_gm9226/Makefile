@@ -62,12 +62,14 @@ OUT_DIR := $(shell mkdir -p $(PWD)/services/server/env/linux/ $(PWD)/services/se
         $(PWD)/generated/srvcore_bridge $(PWD)/generated/pvrtl_bridge $(PWD)/generated/dmabuf_bridge \
         $(PWD)/generated/cache_bridge $(PWD)/generated/rgxta3d_bridge $(PWD)/generated/rgxtq2_bridge \
         $(PWD)/generated/rgxtq_bridge/ $(PWD)/generated/htbuffer_bridge/ $(PWD)/generated/rgxhwperf_bridge\
-        $(PWD)/generated/rgxkicksync_bridge/  $(PWD)/generated/rgxcmp_bridge/ $(PWD)/generated/rgxray_bridge/\
+        $(PWD)/generated/rgxkicksync_bridge/  $(PWD)/generated/rgxcmp_bridge/ $(PWD)/generated/rgxray_bridge/ \
         $(PWD)/generated/regconfig_bridge/ $(PWD)/generated/debugmisc_bridge $(PWD)/generated/timerquery_bridge/ \
-        $(PWD)/generated/devicememhistory_bridge $(PWD)/generated/ri_bridge $(PWD)/generated/synctracking_bridge\
-        $(PWD)/generated/breakpoint_bridge $(PWD)/generated/rgxsignals_bridge/ $(PWD)/services/system/common\
+        $(PWD)/generated/devicememhistory_bridge $(PWD)/generated/ri_bridge $(PWD)/generated/synctracking_bridge \
+        $(PWD)/generated/breakpoint_bridge $(PWD)/generated/rgxsignals_bridge/ $(PWD)/services/system/common \
         $(PWD)/services/server/devices/rgx/env/linux/km $(PWD)/services/system/kl_gm9226 \
-        $(PWD)/services/system/common/env/linux/ $(PWD)/services/system/common/env/xen/)
+        $(PWD)/services/system/common/env/linux/ $(PWD)/services/system/common/env/xen/ \
+	$(PWD)/generated/rgxbreakpoint_bridge $(PWD)/generated/rgxregconfig_bridge \
+	$(PWD)/generated/rgxfwdbg_bridge)
 
 include $(PWD)/config_kernel.mk
 
