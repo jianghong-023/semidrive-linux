@@ -23,6 +23,12 @@
 #define SD_RMPSG_MAJOR		1
 #define SD_RMPSG_MINOR		0
 
+enum sd_rpmsg_rprocs {
+	SD_RPROC_SAF,
+	SD_RPROC_SEC,
+	SD_RPROC_MPC,
+};
+
 int sd_rpmsg_register_nb(const char *name, struct notifier_block *nb);
 int sd_rpmsg_unregister_nb(const char *name, struct notifier_block *nb);
 #endif /* __LINUX_SD_RPMSG_H__ */

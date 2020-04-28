@@ -34,55 +34,8 @@
 #include <linux/soc/semidrive/mb_msg.h>
 
 #define CONFIG_RPMSG_DUMP_HEX		(0)
-
-enum sd_rpmsg_variants {
-	X9HI,
-	X9MID,
-	X9ECO,
-};
-static enum sd_rpmsg_variants variant;
-
-struct sd_virtdev {
-	struct virtio_device vdev;
-	unsigned int vring[2];
-	struct virtqueue *vq[2];
-	int base_vq_id;
-	int num_of_vqs;
-	struct notifier_block nb;
-};
-
-struct sd_rpmsg_vproc {
-	char *rproc_name;
-	int rproc_id;
-	char *mbox_name;
-	struct mbox_chan *mbox;
-	struct mbox_client client;
-	struct mutex lock;
-	int vdev_nums;
+#define MAX_MSG_NUM 10	/* enlarge it if overflow happen */
 #define MAX_VDEV_NUMS	4
-	struct sd_virtdev ivdev[MAX_VDEV_NUMS];
-};
-
-struct sd_rpmsg_mbox {
-	const char *name;
-	struct blocking_notifier_head notifier;
-};
-
-static struct sd_rpmsg_mbox rpmsg_mbox = {
-	.name	= "rp_sec",
-};
-
-struct sd_notify_msg {
-	sd_msghdr_t msghead;
-	__u16 device_type;
-	__u16 vq_id;
-} __attribute__((packed));
-
-#define MAX_NUM 10	/* enlarge it if overflow happen */
-static __u64 rproc_message[MAX_NUM];
-static __u32 in_idx, out_idx;
-static DEFINE_SPINLOCK(rpmsg_mb_lock);
-static struct delayed_work rpmsg_work;
 
 /*
  * For now, allocate 256 buffers of 512 bytes for each side. each buffer
@@ -106,14 +59,53 @@ static struct delayed_work rpmsg_work;
 #define RPMSG_RING_SIZE	((DIV_ROUND_UP(vring_size(RPMSG_NUM_BUFS / 2, \
 				RPMSG_VRING_ALIGN), PAGE_SIZE)) * PAGE_SIZE)
 
+
+/* contains pool of descriptors and two circular buffers */
+#ifndef VRING_SIZE
+#define VRING_SIZE (0x8000)
+#endif
+
+struct sd_virtdev {
+	struct virtio_device vdev;
+	unsigned int vring[2];
+	struct virtqueue *vq[2];
+	int base_vq_id;
+	int num_of_vqs;
+	struct notifier_block nb;
+};
+
+struct sd_notify_msg {
+	sd_msghdr_t msghead;
+	__u16 device_type;
+	__u16 vq_id;
+} __attribute__((packed));
+
+struct sd_rpmsg_virt_device {
+	struct device *dev;
+	enum sd_rpmsg_rprocs	variant;
+	struct delayed_work delay_work;
+	spinlock_t rpmsg_mb_lock;
+	struct blocking_notifier_head notifier;
+
+	__u64 rproc_message[MAX_MSG_NUM];
+	__u32 in_idx, out_idx;
+
+	int rproc_id;
+	struct mbox_chan *mbox;
+	struct mbox_client client;
+	struct mutex lock;
+	int vdev_nums;
+	struct sd_virtdev ivdev[MAX_VDEV_NUMS];
+};
+
 #define to_sd_virtdev(vd) container_of(vd, struct sd_virtdev, vdev)
-#define to_sd_rpdev(vd, id) container_of(vd, struct sd_rpmsg_vproc, ivdev[id])
+#define to_sd_rvdev(vd, id) container_of(vd, struct sd_rpmsg_virt_device, ivdev[id])
 
 struct sd_rpmsg_vq_info {
 	__u16 num;	/* number of entries in the virtio_ring */
 	__u16 vq_id;	/* a globaly unique index of this virtqueue */
 	void *addr;	/* address where we mapped the virtio ring */
-	struct sd_rpmsg_vproc *rpdev;
+	struct sd_rpmsg_virt_device *rvdev;
 };
 
 static u64 sd_rpmsg_get_features(struct virtio_device *vdev)
@@ -134,22 +126,22 @@ static bool sd_rpmsg_notify(struct virtqueue *vq)
 {
 	struct sd_rpmsg_vq_info *rpvq = vq->priv;
 	struct sd_notify_msg msg;
-	struct sd_rpmsg_vproc *rpdev = rpvq->rpdev;
+	struct sd_rpmsg_virt_device *rvdev = rpvq->rvdev;
 	int ret;
 
-	MB_MSG_INIT_RPMSG_HEAD(&msg.msghead, rpdev->rproc_id,
+	MB_MSG_INIT_RPMSG_HEAD(&msg.msghead, rvdev->rproc_id,
 			sizeof(struct sd_notify_msg), IPCC_ADDR_RPMSG);
 	msg.vq_id = rpvq->vq_id;
 	msg.device_type = 0x99;
 
-	mutex_lock(&rpdev->lock);
+	mutex_lock(&rvdev->lock);
 	/* send the index of the triggered virtqueue as the mbox payload */
-	ret = mbox_send_message(rpdev->mbox, &msg);
-	mutex_unlock(&rpdev->lock);
+	ret = mbox_send_message(rvdev->mbox, &msg);
+	mutex_unlock(&rvdev->lock);
 
 	/* in case of TIMEOUT because remote proc may be off */
 	if (ret < 0) {
-		pr_info("%s rproc %s may be off\n", __func__, rpdev->rproc_name);
+		dev_info(rvdev->dev, "rproc %d may be off\n", rvdev->rproc_id);
 		return false;
 	}
 	return true;
@@ -158,7 +150,7 @@ static bool sd_rpmsg_notify(struct virtqueue *vq)
 static int sd_rpmsg_callback(struct notifier_block *this,
 					unsigned long index, void *data)
 {
-	struct sd_virtdev *virdev;
+	struct sd_virtdev *svdev;
 	__u64 msg_data = (__u64) data;
 	struct sd_notify_msg *msg = (struct sd_notify_msg*) &msg_data;
 	__u16 vq_id;
@@ -167,18 +159,18 @@ static int sd_rpmsg_callback(struct notifier_block *this,
  	print_hex_dump_bytes("rpmsg : cb: ", DUMP_PREFIX_ADDRESS,
  				msg, 8);
 #endif
-	virdev = container_of(this, struct sd_virtdev, nb);
+	svdev = container_of(this, struct sd_virtdev, nb);
 	/* ignore vq indices which are clearly not for us */
 	vq_id = msg->vq_id;
-	if (vq_id < virdev->base_vq_id || vq_id > virdev->base_vq_id + 1) {
+	if (vq_id < svdev->base_vq_id || vq_id > svdev->base_vq_id + 1) {
 		pr_err("vq_id: 0x%x is invalid\n", vq_id);
 		return NOTIFY_DONE;
 	}
 
-	vq_id -= virdev->base_vq_id;
+	vq_id -= svdev->base_vq_id;
 
 	pr_debug("%s vqid: %d rproc: %d nvqs: %d\n", __func__, msg->vq_id,
-				msg->msghead.rproc, virdev->num_of_vqs);
+				msg->msghead.rproc, svdev->num_of_vqs);
 
 	/*
 	 * Currently both PENDING_MSG and explicit-virtqueue-index
@@ -186,37 +178,10 @@ static int sd_rpmsg_callback(struct notifier_block *this,
 	 * Whatever approach is taken, at this point 'mu_msg' contains
 	 * the index of the vring which was just triggered.
 	 */
-	if (vq_id < virdev->num_of_vqs) {
-		vring_interrupt(vq_id, virdev->vq[vq_id]);
+	if (vq_id < svdev->num_of_vqs) {
+		vring_interrupt(vq_id, svdev->vq[vq_id]);
 	}
 	return NOTIFY_DONE;
-}
-
-int sd_rpmsg_register_nb(const char *name, struct notifier_block *nb)
-{
-	if ((name == NULL) || (nb == NULL))
-		return -EINVAL;
-
-	if (!strcmp(rpmsg_mbox.name, name))
-		blocking_notifier_chain_register(&(rpmsg_mbox.notifier), nb);
-	else
-		return -ENOENT;
-
-	return 0;
-}
-
-int sd_rpmsg_unregister_nb(const char *name, struct notifier_block *nb)
-{
-	if ((name == NULL) || (nb == NULL))
-		return -EINVAL;
-
-	if (!strcmp(rpmsg_mbox.name, name))
-		blocking_notifier_chain_unregister(&(rpmsg_mbox.notifier),
-				nb);
-	else
-		return -ENOENT;
-
-	return 0;
 }
 
 static struct virtqueue *rp_find_vq(struct virtio_device *vdev,
@@ -224,19 +189,20 @@ static struct virtqueue *rp_find_vq(struct virtio_device *vdev,
 				    void (*callback)(struct virtqueue *vq),
 				    const char *name, bool ctx)
 {
-	struct sd_virtdev *virdev = to_sd_virtdev(vdev);
-	struct sd_rpmsg_vproc *rpdev = to_sd_rpdev(virdev,
-						     virdev->base_vq_id / 2);
+	struct sd_virtdev *svdev = to_sd_virtdev(vdev);
+	struct sd_rpmsg_virt_device *rvdev = to_sd_rvdev(svdev,
+						     svdev->base_vq_id / 2);
 	struct sd_rpmsg_vq_info *rpvq;
 	struct virtqueue *vq;
+	struct device *dev = &vdev->dev;
 	int err;
 
-	rpvq = kmalloc(sizeof(*rpvq), GFP_KERNEL);
+	rpvq = kzalloc(sizeof(*rpvq), GFP_KERNEL);
 	if (!rpvq)
 		return ERR_PTR(-ENOMEM);
 
 	/* ioremap'ing normal memory, so we cast away sparse's complaints */
-	rpvq->addr = (__force void *) ioremap_nocache(virdev->vring[index],
+	rpvq->addr = (__force void *) ioremap_nocache(svdev->vring[index],
 							RPMSG_RING_SIZE);
 	if (!rpvq->addr) {
 		err = -ENOMEM;
@@ -245,24 +211,24 @@ static struct virtqueue *rp_find_vq(struct virtio_device *vdev,
 
 	memset_io(rpvq->addr, 0, RPMSG_RING_SIZE);
 
-	pr_debug("vring%d: phys 0x%x, virt 0x%p\n", index, virdev->vring[index],
+	dev_dbg(dev, "vring%d: phys 0x%x, virt 0x%p\n", index, svdev->vring[index],
 					rpvq->addr);
 
 	vq = vring_new_virtqueue(index, RPMSG_NUM_BUFS / 2, RPMSG_VRING_ALIGN,
 			vdev, true, ctx, rpvq->addr, sd_rpmsg_notify, callback,
 			name);
 	if (!vq) {
-		pr_err("vring_new_virtqueue failed\n");
+		dev_err(dev, "vring_new_virtqueue failed\n");
 		err = -ENOMEM;
 		goto unmap_vring;
 	}
 
-	virdev->vq[index] = vq;
+	svdev->vq[index] = vq;
 	vq->priv = rpvq;
 	/* system-wide unique id for this virtqueue */
-	rpvq->vq_id = virdev->base_vq_id + index;
-	rpvq->rpdev = rpdev;
-	mutex_init(&rpdev->lock);
+	rpvq->vq_id = svdev->base_vq_id + index;
+	rpvq->rvdev = rvdev;
+	mutex_init(&rvdev->lock);
 
 	return vq;
 
@@ -277,9 +243,9 @@ free_rpvq:
 static void sd_rpmsg_del_vqs(struct virtio_device *vdev)
 {
 	struct virtqueue *vq, *n;
-	struct sd_virtdev *virdev = to_sd_virtdev(vdev);
-	struct sd_rpmsg_vproc *rpdev = to_sd_rpdev(virdev,
-						     virdev->base_vq_id / 2);
+	struct sd_virtdev *svdev = to_sd_virtdev(vdev);
+	struct sd_rpmsg_virt_device *rvdev = to_sd_rvdev(svdev,
+						     svdev->base_vq_id / 2);
 
 	list_for_each_entry_safe(vq, n, &vdev->vqs, list) {
 		struct sd_rpmsg_vq_info *rpvq = vq->priv;
@@ -289,9 +255,8 @@ static void sd_rpmsg_del_vqs(struct virtio_device *vdev)
 		kfree(rpvq);
 	}
 
-	if (&virdev->nb)
-		sd_rpmsg_unregister_nb((const char *)rpdev->rproc_name,
-				&virdev->nb);
+	if (&svdev->nb)
+		blocking_notifier_chain_unregister(&rvdev->notifier, &svdev->nb);
 }
 
 static int sd_rpmsg_find_vqs(struct virtio_device *vdev, unsigned int nvqs,
@@ -301,9 +266,9 @@ static int sd_rpmsg_find_vqs(struct virtio_device *vdev, unsigned int nvqs,
 				const bool * ctx,
 				struct irq_affinity *desc)
 {
-	struct sd_virtdev *virdev = to_sd_virtdev(vdev);
-	struct sd_rpmsg_vproc *rpdev = to_sd_rpdev(virdev,
-						     virdev->base_vq_id / 2);
+	struct sd_virtdev *svdev = to_sd_virtdev(vdev);
+	struct sd_rpmsg_virt_device *rvdev = to_sd_rvdev(svdev,
+						     svdev->base_vq_id / 2);
 	int i, err;
 
 	/* we maintain two virtqueues per remote processor (for RX and TX) */
@@ -318,10 +283,10 @@ static int sd_rpmsg_find_vqs(struct virtio_device *vdev, unsigned int nvqs,
 		}
 	}
 
-	virdev->num_of_vqs = nvqs;
+	svdev->num_of_vqs = nvqs;
 
-	virdev->nb.notifier_call = sd_rpmsg_callback;
-	sd_rpmsg_register_nb((const char *)rpdev->rproc_name, &virdev->nb);
+	svdev->nb.notifier_call = sd_rpmsg_callback;
+	blocking_notifier_chain_register(&rvdev->notifier, &svdev->nb);
 
 	return 0;
 
@@ -345,7 +310,7 @@ static void sd_rpmsg_set_status(struct virtio_device *vdev, u8 status)
 	dev_dbg(&vdev->dev, "%s new status: %d\n", __func__, status);
 }
 
-static void sd_rpmsg_vproc_release(struct device *dev)
+static void sd_rpmsg_virt_device_release(struct device *dev)
 {
 	/* this handler is provided so driver core doesn't yell at us */
 }
@@ -360,189 +325,177 @@ static struct virtio_config_ops sd_rpmsg_config_ops = {
 	.get_status	= sd_rpmsg_get_status,
 };
 
-static struct sd_rpmsg_vproc sd_rpmsg_vprocs[] = {
-	{
-		.rproc_name	= "rp_sec",
-		.rproc_id	= 1,
-	}
-};
-
-static const struct of_device_id sd_rpmsg_dt_ids[] = {
-	{ .compatible = "sd,rpmsg-x9",  .data = (void *)X9HI, },
-	{ /* sentinel */ }
-};
-MODULE_DEVICE_TABLE(of, sd_rpmsg_dt_ids);
-
-/* contains pool of descriptors and two circular buffers */
-#ifndef VRING_SIZE
-#define VRING_SIZE (0x8000)
-#endif
-
 static int set_vring_phy_buf(struct platform_device *pdev,
-		       struct sd_rpmsg_vproc *rpdev, int index)
+		       struct sd_rpmsg_virt_device *rvdev, int index)
 {
 	struct resource *res;
 	resource_size_t size;
 	unsigned int start, end;
+	struct device *dev = &pdev->dev;
 
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	if (res) {
 		size = resource_size(res);
 		start = res->start;
 		end = res->start + size;
-		rpdev->ivdev[0].vring[0] = start; /* rx vring first */
-		rpdev->ivdev[0].vring[1] = start + VRING_SIZE; /* tx vring */
+		rvdev->ivdev[0].vring[0] = start; /* rx vring first */
+		rvdev->ivdev[0].vring[1] = start + VRING_SIZE; /* tx vring */
 	} else {
-		pr_err("%s: no rpmsg mem resource!\n", __func__);
+		dev_err(dev, "no rpmsg vring resource!\n");
 		return -ENOMEM;
 	}
 
 	return 0;
 }
 
-static void rpmsg_work_handler(struct work_struct *work)
+static void rpmsg_rx_work_handler(struct work_struct *work)
 {
+	struct sd_rpmsg_virt_device *rvdev = container_of(to_delayed_work(work),
+					 struct sd_rpmsg_virt_device, delay_work);
 	__u64 message;
 	unsigned long flags;
 
-	spin_lock_irqsave(&rpmsg_mb_lock, flags);
+	spin_lock_irqsave(&rvdev->rpmsg_mb_lock, flags);
 	/* handle all incoming mbox message */
-	while (in_idx != out_idx) {
-		message = rproc_message[out_idx % MAX_NUM];
-		spin_unlock_irqrestore(&rpmsg_mb_lock, flags);
+	while (rvdev->in_idx != rvdev->out_idx) {
+		message = rvdev->rproc_message[rvdev->out_idx % MAX_MSG_NUM];
+		spin_unlock_irqrestore(&rvdev->rpmsg_mb_lock, flags);
 
-		blocking_notifier_call_chain(&(rpmsg_mbox.notifier), 8,
-						(void *)message);
+		blocking_notifier_call_chain(&(rvdev->notifier), 8, (void *)message);
 
-		spin_lock_irqsave(&rpmsg_mb_lock, flags);
-		rproc_message[out_idx % MAX_NUM] = 0;
-		out_idx++;
+		spin_lock_irqsave(&rvdev->rpmsg_mb_lock, flags);
+		rvdev->rproc_message[rvdev->out_idx % MAX_MSG_NUM] = 0;
+		rvdev->out_idx++;
 	}
-	spin_unlock_irqrestore(&rpmsg_mb_lock, flags);
+	spin_unlock_irqrestore(&rvdev->rpmsg_mb_lock, flags);
 }
 
 static void sd_rpmsg_mbox_callback(struct mbox_client *client, void *mssg)
 {
-	struct sd_rpmsg_vproc *rpdev = container_of(client, struct sd_rpmsg_vproc,
-						client);
+	struct sd_rpmsg_virt_device *rvdev = container_of(client,
+					 struct sd_rpmsg_virt_device, client);
 	struct device *dev = client->dev;
 	__u64 message;
 	unsigned long flags;
 
-	pr_debug("rpmsg cb msg from: %s\n", rpdev->rproc_name);
+	dev_dbg(dev, "rpmsg cb msg from: %d\n", rvdev->rproc_id);
 
 	memcpy(&message, mssg, 8);
-	spin_lock_irqsave(&rpmsg_mb_lock, flags);
+	spin_lock_irqsave(&rvdev->rpmsg_mb_lock, flags);
 	/* get message from receive buffer */
-	rproc_message[in_idx % MAX_NUM] = message;
-	in_idx++;
+	rvdev->rproc_message[rvdev->in_idx % MAX_MSG_NUM] = message;
+	rvdev->in_idx++;
 	/*
 	 * Too many mu message not be handled in timely, can enlarge
-	 * MAX_NUM
+	 * MAX_MSG_NUM
 	 */
-	if (in_idx == out_idx) {
-		spin_unlock_irqrestore(&rpmsg_mb_lock, flags);
-		pr_err("mbox msg overflow!\n");
+	if (rvdev->in_idx == rvdev->out_idx) {
+		spin_unlock_irqrestore(&rvdev->rpmsg_mb_lock, flags);
+		dev_err(dev, "mbox msg overflow!\n");
 		return;
 	}
-	spin_unlock_irqrestore(&rpmsg_mb_lock, flags);
+	spin_unlock_irqrestore(&rvdev->rpmsg_mb_lock, flags);
 
-	schedule_delayed_work(&rpmsg_work, 0);
+	schedule_delayed_work(&rvdev->delay_work, 0);
 
 	return;
 }
 
-static int sd_rpmsg_probe(struct platform_device *pdev)
+static int sd_rpmsg_virt_probe(struct platform_device *pdev)
 {
-	int i, j, ret = 0;
+	int j, ret = 0;
 	struct device *dev = &pdev->dev;
 	struct device_node *np = pdev->dev.of_node;
+	struct sd_rpmsg_virt_device *rvdev;
+	struct mbox_client *client;
 
-	variant = (enum sd_rpmsg_variants)of_device_get_match_data(dev);
+	rvdev = kzalloc(sizeof(struct sd_rpmsg_virt_device), GFP_KERNEL);
+	if (!rvdev)
+		return -ENOMEM;
 
-	INIT_DELAYED_WORK(&rpmsg_work, rpmsg_work_handler);
+	rvdev->dev = dev;
+	rvdev->variant = (enum sd_rpmsg_rprocs)of_device_get_match_data(dev);
+	rvdev->rproc_id = rvdev->variant;
+	INIT_DELAYED_WORK(&rvdev->delay_work, rpmsg_rx_work_handler);
+	spin_lock_init(&rvdev->rpmsg_mb_lock);
+	BLOCKING_INIT_NOTIFIER_HEAD(&(rvdev->notifier));
 
-	BLOCKING_INIT_NOTIFIER_HEAD(&(rpmsg_mbox.notifier));
+	dev_info(dev, "Semidrive rpmsg is initializing!\n");
 
-	pr_info("Semidrive rpmsg is initializing!\n");
+	client = &rvdev->client;
+	/* Initialize the mbox unit used by rpmsg */
+	client->dev = dev;
+	client->tx_done = NULL;
+	client->rx_callback = sd_rpmsg_mbox_callback;
+	client->tx_block = true;
+	client->tx_tout = 1000;
+	client->knows_txdone = false;
 
-	for (i = 0; i < ARRAY_SIZE(sd_rpmsg_vprocs); i++) {
-		struct sd_rpmsg_vproc *rpdev = &sd_rpmsg_vprocs[i];
-		struct mbox_client *client = &rpdev->client;
+	rvdev->mbox = mbox_request_channel(client, 0);
+	if (IS_ERR(rvdev->mbox)) {
+		ret = -EBUSY;
+		dev_err(dev, "failed to request mbox channel\n");
+		return ret;
+	}
 
-		/* Initialize the mbox unit used by rpmsg */
-		client->dev = dev;
-		client->tx_done = NULL;
-		client->rx_callback = sd_rpmsg_mbox_callback;
-		client->tx_block = true;
-		client->tx_tout = 1000;
-		client->knows_txdone = false;
+	ret = set_vring_phy_buf(pdev, rvdev, 0);
+	if (ret) {
+		dev_err(dev, "No vring buffer.\n");
+		return -ENOMEM;
+	}
 
-		rpdev->mbox = mbox_request_channel_byname(client, rpdev->rproc_name);
-		if (IS_ERR(rpdev->mbox)) {
-			ret = -EBUSY;
-			pr_err("mbox_request_channel failed: %ld\n",
-				PTR_ERR(rpdev->mbox));
+	if (of_reserved_mem_device_init_by_idx(dev, np, 0)) {
+		dev_err(dev, "No specific DMA pool.\n");
+		ret = -ENOMEM;
+		return ret;
+	}
+
+	rvdev->vdev_nums = 1;
+	for (j = 0; j < rvdev->vdev_nums; j++) {
+		dev_err(dev, "rvdev%d: vring0 0x%x, vring1 0x%x\n",
+			 rvdev->rproc_id,
+			 rvdev->ivdev[j].vring[0],
+			 rvdev->ivdev[j].vring[1]);
+		rvdev->ivdev[j].vdev.id.device = VIRTIO_ID_RPMSG;
+		rvdev->ivdev[j].vdev.config = &sd_rpmsg_config_ops;
+		rvdev->ivdev[j].vdev.dev.parent = &pdev->dev;
+		rvdev->ivdev[j].vdev.dev.release = sd_rpmsg_virt_device_release;
+		rvdev->ivdev[j].base_vq_id = j * 2;
+
+		ret = register_virtio_device(&rvdev->ivdev[j].vdev);
+		if (ret) {
+			dev_err(dev, "failed to register rvdev: %d\n", ret);
 			return ret;
-		}
-
-		rpdev->vdev_nums = 1;
-		if (!strcmp(rpdev->rproc_name, "rp_sec")) {
-			ret = set_vring_phy_buf(pdev, rpdev, 0);
-			if (ret) {
-				pr_err("No vring buffer.\n");
-				return -ENOMEM;
-			}
-		} else {
-			pr_err("No remote processor.\n");
-			return -ENODEV;
-		}
-
-		if (of_reserved_mem_device_init_by_idx(dev, np, 0)) {
-			pr_err("dev doesn't have specific DMA pool.\n");
-			ret = -ENOMEM;
-			return ret;
-		}
-
-		for (j = 0; j < rpdev->vdev_nums; j++) {
-			pr_info("%s rpdev%d vdev%d: vring0 0x%x, vring1 0x%x\n",
-				 __func__, i, rpdev->vdev_nums,
-				 rpdev->ivdev[j].vring[0],
-				 rpdev->ivdev[j].vring[1]);
-			rpdev->ivdev[j].vdev.id.device = VIRTIO_ID_RPMSG;
-			rpdev->ivdev[j].vdev.config = &sd_rpmsg_config_ops;
-			rpdev->ivdev[j].vdev.dev.parent = &pdev->dev;
-			rpdev->ivdev[j].vdev.dev.release = sd_rpmsg_vproc_release;
-			rpdev->ivdev[j].base_vq_id = j * 2;
-
-			ret = register_virtio_device(&rpdev->ivdev[j].vdev);
-			if (ret) {
-				pr_err("%s failed to register rpdev: %d\n",
-						__func__, ret);
-				return ret;
-			}
 		}
 	}
 
-	platform_set_drvdata(pdev, sd_rpmsg_vprocs);
+	platform_set_drvdata(pdev, rvdev);
 
 	return ret;
 }
 
-static struct platform_driver sd_rpmsg_driver = {
+static const struct of_device_id sd_rpmsg_dt_ids[] = {
+	{ .compatible = "sd,rpmsg-vq,rp_saf",  .data = (void *)SD_RPROC_SAF, },
+	{ .compatible = "sd,rpmsg-vq,rp_sec",  .data = (void *)SD_RPROC_SEC, },
+	{ .compatible = "sd,rpmsg-vq,rp_mp",   .data = (void *)SD_RPROC_MPC, },
+	{ /* sentinel */ }
+};
+MODULE_DEVICE_TABLE(of, sd_rpmsg_dt_ids);
+
+static struct platform_driver sd_rpmsg_virt_driver = {
 	.driver = {
 		   .owner = THIS_MODULE,
 		   .name = "sd-rpmsg",
 		   .of_match_table = sd_rpmsg_dt_ids,
 		   },
-	.probe = sd_rpmsg_probe,
+	.probe = sd_rpmsg_virt_probe,
 };
 
 static int __init sd_rpmsg_init(void)
 {
 	int ret;
 
-	ret = platform_driver_register(&sd_rpmsg_driver);
+	ret = platform_driver_register(&sd_rpmsg_virt_driver);
 	if (ret)
 		pr_err("Unable to initialize rpmsg driver\n");
 	else
