@@ -80,6 +80,10 @@ ifeq ($(CONFIG_ANDROID), y)
 ccflags-y += -DANDROID
 endif
 
+ifeq ($(CONFIG_BUFFER_SYNC), y)
+ccflags-y += -DSUPPORT_BUFFER_SYNC
+endif
+
 ccflags-y += -DPVR_BUILD_DIR=\"$(PVR_BUILD_DIR)\"
 ccflags-y += -DPVRSRV_VZ_NUM_OSID=$(PVRSRV_VZ_NUM_OSID)
 ccflags-y += -DVMM_TYPE=$(VMM_TYPE)
