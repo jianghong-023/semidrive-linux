@@ -533,6 +533,13 @@ config KAPROBE
 	help
 	  add debugfs register node
 
+config SEMIDRIVE_REGCTL
+	tristate "Semidrive generic register programming driver"
+	depends on ARCH_SEMIDRIVE_X9
+	default n
+	help
+	  This adds support for Semidriver SOC generic register programming.
+
 source "drivers/misc/c2port/Kconfig"
 source "drivers/misc/eeprom/Kconfig"
 source "drivers/misc/cb710/Kconfig"
