@@ -21,6 +21,7 @@
 
 int sd_pmx_set_one_pin_mem(struct sd_pinctrl *ipctl, struct sd_pin *pin)
 {
+#ifndef DUMMY_PINCTRL
 	const struct sd_pinctrl_soc_info *info = ipctl->info;
 	unsigned int pin_id = pin->pin;
 	struct sd_pin_reg *pin_reg;
@@ -44,6 +45,10 @@ int sd_pmx_set_one_pin_mem(struct sd_pinctrl *ipctl, struct sd_pin *pin)
 		* dev_err(ipctl->dev, "write: offset 0x%x val 0x%x\n", pin_reg->mux_reg, mux_val);
 		*/
 	}
+#else
+	ipctl;
+	pin;
+#endif
 
 	return 0;
 }
@@ -51,6 +56,7 @@ int sd_pmx_set_one_pin_mem(struct sd_pinctrl *ipctl, struct sd_pin *pin)
 int sd_pinconf_backend_get_mem(struct pinctrl_dev *pctldev,
 			    unsigned pin_id, unsigned long *config)
 {
+#ifndef DUMMY_PINCTRL
 	struct sd_pinctrl *ipctl = pinctrl_dev_get_drvdata(pctldev);
 	struct sd_pinctrl_soc_info *info = ipctl->info;
 	const struct sd_pin_reg *pin_reg = &info->pin_regs[pin_id];
@@ -67,6 +73,11 @@ int sd_pinconf_backend_get_mem(struct pinctrl_dev *pctldev,
 		 * *config = readl(ipctl->base + pin_reg->conf_reg);
 		 */
 	}
+#else
+	pctldev;
+	pin_id;
+	config;
+#endif
 
 	return 0;
 }
@@ -75,6 +86,7 @@ int sd_pinconf_backend_set_mem(struct pinctrl_dev *pctldev,
 			    unsigned pin_id, unsigned long *configs,
 			    unsigned num_configs)
 {
+#ifndef DUMMY_PINCTRL
 	struct sd_pinctrl *ipctl = pinctrl_dev_get_drvdata(pctldev);
 	struct sd_pinctrl_soc_info *info = ipctl->info;
 	const struct sd_pin_reg *pin_reg = &info->pin_regs[pin_id];
@@ -97,6 +109,12 @@ int sd_pinconf_backend_set_mem(struct pinctrl_dev *pctldev,
 			*/
 		}
 	} /* for each config */
+#else
+	pctldev;
+	pin_id;
+	configs;
+	num_configs;
+#endif
 
 	return 0;
 }
@@ -108,6 +126,7 @@ int sd_pinctrl_parse_pin_mem(struct sd_pinctrl_soc_info *info,
 			  unsigned int *grp_pin_id, struct sd_pin *pin,
 			  const __be32 **list_p, u32 generic_config)
 {
+#ifndef DUMMY_PINCTRL
 	struct sd_pin_memmap *pin_memmap = &pin->pin_memmap;
 	u32 mux_reg = be32_to_cpu(*((*list_p)++));  /* [0] mux_reg */
 	u32 conf_reg;
@@ -147,6 +166,13 @@ int sd_pinctrl_parse_pin_mem(struct sd_pinctrl_soc_info *info,
 	//if (mux_reg)
 	//	dev_err(info->dev, "%s: 0x%x 0x%08lx, direction[%d]", info->pins[pin_id].name,
 	//		pin_memmap->mux_mode, pin_memmap->config, pin_memmap->direct_val);
+#else
+	info;
+	grp_pin_id;
+	pin;
+	list_p;
+	generic_config;
+#endif
 
 	return 0;
 }
