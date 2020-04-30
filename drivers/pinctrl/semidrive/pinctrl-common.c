@@ -527,7 +527,9 @@ int sd_pinctrl_probe(struct platform_device *pdev,
 	struct pinctrl_desc *sd_pinctrl_desc;
 	struct device_node *np;
 	struct sd_pinctrl *ipctl;
+#ifndef DUMMY_PINCTRL
 	struct resource *res;
+#endif
 	struct regmap *gpr;
 	int ret, i;
 
@@ -558,10 +560,12 @@ int sd_pinctrl_probe(struct platform_device *pdev,
 		info->pin_regs[i].conf_reg = -1;
 	}
 
+#ifndef DUMMY_PINCTRL
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	ipctl->base = devm_ioremap_resource(&pdev->dev, res);
 	if (IS_ERR(ipctl->base))
 		return PTR_ERR(ipctl->base);
+#endif
 
 	if (of_property_read_bool(dev_np, "kunlun,input-sel")) {
 		np = of_parse_phandle(dev_np, "kunlun,input-sel", 0);

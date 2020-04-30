@@ -10,6 +10,8 @@
 #include <linux/pinctrl/pinconf-generic.h>
 #include <linux/pinctrl/pinmux.h>
 
+#define 	DUMMY_PINCTRL  (1)
+
 struct platform_device;
 
 extern struct pinmux_ops sd_pmx_ops;
