@@ -41,7 +41,7 @@ typedef struct {
 	mb_msg_init_head(m, rproc, MB_MSG_PROTO_RPMSG, true, size, dest)
 
 inline static void mb_msg_init_head(sd_msghdr_t *msg, int rproc,
-        int proto, bool priority, u8 size, u8 dest)
+        int proto, bool priority, u16 size, u8 dest)
 {
 	msg->rproc = rproc;
 	msg->protocol = proto;
