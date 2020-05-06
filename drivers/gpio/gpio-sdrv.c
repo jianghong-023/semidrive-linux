@@ -22,7 +22,7 @@
 #include <linux/platform_device.h>
 #include <linux/property.h>
 #include <linux/spinlock.h>
-#include <linux/platform_data/gpio-kunlun.h>
+#include <linux/platform_data/gpio-sdrv.h>
 #include <linux/slab.h>
 
 #include "gpiolib.h"
@@ -159,7 +159,7 @@
 #define GPIO_INT_PCLK_ACTIVE_PORT_X(n) \
 	(GPIO_INT_PCLK_ACTIVE_PORT_1 + ((n) * GPIO_INT_PCLK_ACTIVE_PORT_SIZE))
 
-#define KUNLUN_MAX_PORTS		5
+#define SEMIDRIVE_MAX_PORTS		5
 
 #define LAST(k, n) ((k) & ((1L<<(n))-1))
 #define MID(k, m, n) LAST((k>>m), ((n)-(m)+1))
@@ -171,17 +171,17 @@
 #define APB_SCR_SEC_LEN	(0x200000)
 
 /* used for store Register Port index */
-struct kunlun_gpio_port_idx {
+struct sdrv_gpio_port_idx {
 	u32 irq;
 	u32 port_idx;
 	u32 hwirq_start; /* dts gpio_ranges[2] % 32 */
 };
 
-struct kunlun_gpio;
+struct sdrv_gpio;
 
 #ifdef CONFIG_PM_SLEEP
 /* Store GPIO context across system-wide suspend/resume transitions */
-struct kunlun_context {
+struct sdrv_context {
 	u32 data;
 	u32 dir;
 	u32 ext;
@@ -193,34 +193,34 @@ struct kunlun_context {
 };
 #endif
 
-struct kunlun_gpio_port {
+struct sdrv_gpio_port {
 	struct gpio_chip	gc;
 	bool			is_registered;
-	struct kunlun_gpio	*gpio;
+	struct sdrv_gpio	*gpio;
 #ifdef CONFIG_PM_SLEEP
-	struct kunlun_context	*ctx;
+	struct sdrv_context	*ctx;
 #endif
 	unsigned int		idx;
 	struct irq_domain	*domain;  /* each port has one domain */
 };
 
-struct kunlun_gpio {
+struct sdrv_gpio {
 	struct	device		*dev;
 	void __iomem		*regs;
-	struct kunlun_gpio_port	*ports;
+	struct sdrv_gpio_port	*ports;
 	unsigned int		nr_ports;
 	unsigned int		flags;
 
-	struct kunlun_gpio_port_idx	k_port_idx[5];
+	struct sdrv_gpio_port_idx	k_port_idx[5];
 };
 
 static inline u32
-gpio_reg_convert(struct kunlun_gpio *gpio, unsigned int offset)
+gpio_reg_convert(struct sdrv_gpio *gpio, unsigned int offset)
 {
 	return offset;
 }
 
-static inline u32 kunlun_read(struct kunlun_gpio *gpio, unsigned int offset)
+static inline u32 sdrv_read(struct sdrv_gpio *gpio, unsigned int offset)
 {
 	struct gpio_chip *gc	= &gpio->ports[0].gc;
 	void __iomem *reg_base	= gpio->regs;
@@ -231,7 +231,7 @@ static inline u32 kunlun_read(struct kunlun_gpio *gpio, unsigned int offset)
 	return val;
 }
 
-static inline void kunlun_write(struct kunlun_gpio *gpio, unsigned int offset,
+static inline void sdrv_write(struct sdrv_gpio *gpio, unsigned int offset,
 			       u32 val)
 {
 	struct gpio_chip *gc	= &gpio->ports[0].gc;
@@ -241,9 +241,9 @@ static inline void kunlun_write(struct kunlun_gpio *gpio, unsigned int offset,
 
 }
 
-static int kunlun_gpio_to_irq(struct gpio_chip *gc, unsigned offset)
+static int sdrv_gpio_to_irq(struct gpio_chip *gc, unsigned offset)
 {
-	struct kunlun_gpio_port *port = gpiochip_get_data(gc);
+	struct sdrv_gpio_port *port = gpiochip_get_data(gc);
 	int irq;
 
 	irq = irq_find_mapping(port->domain, offset);
@@ -251,7 +251,7 @@ static int kunlun_gpio_to_irq(struct gpio_chip *gc, unsigned offset)
 	return irq;
 }
 
-static u32 kunlun_do_irq(struct kunlun_gpio_port *port)
+static u32 sdrv_do_irq(struct sdrv_gpio_port *port)
 {
 	unsigned int reg_idx = 0;
 	unsigned int bit_idx = 0;
@@ -260,23 +260,23 @@ static u32 kunlun_do_irq(struct kunlun_gpio_port *port)
 	u32 ret = irq_status;
 	unsigned long reg_read;
 	unsigned long reg_mask_read;
-	struct kunlun_gpio *gpio = port->gpio;
+	struct sdrv_gpio *gpio = port->gpio;
 
 	reg_idx = port->idx;
 
-	irq_status = kunlun_read(gpio, GPIO_INT_STATUS_PORT_X(reg_idx));
+	irq_status = sdrv_read(gpio, GPIO_INT_STATUS_PORT_X(reg_idx));
 	ret = irq_status;
 
 	bit_idx = fls(irq_status) - 1;
 	hwirq = bit_idx;
 
 	/* mask the port INT */
-	reg_mask_read = kunlun_read(gpio, GPIO_INT_MASK_PORT_X(reg_idx));
-	kunlun_write(gpio,  GPIO_INT_MASK_PORT_X(reg_idx), 0xffffffff);
+	reg_mask_read = sdrv_read(gpio, GPIO_INT_MASK_PORT_X(reg_idx));
+	sdrv_write(gpio,  GPIO_INT_MASK_PORT_X(reg_idx), 0xffffffff);
 
 	/* clear INT */
-	reg_read = kunlun_read(gpio, GPIO_INT_EDGE_CLR_PORT_X(reg_idx));
-	kunlun_write(gpio,
+	reg_read = sdrv_read(gpio, GPIO_INT_EDGE_CLR_PORT_X(reg_idx));
+	sdrv_write(gpio,
 		GPIO_INT_EDGE_CLR_PORT_X(reg_idx),
 		(reg_read | BIT(bit_idx)));
 
@@ -289,27 +289,27 @@ static u32 kunlun_do_irq(struct kunlun_gpio_port *port)
 	}
 
 	/* restore mask value */
-	kunlun_write(gpio,  GPIO_INT_MASK_PORT_X(reg_idx), reg_mask_read);
+	sdrv_write(gpio,  GPIO_INT_MASK_PORT_X(reg_idx), reg_mask_read);
 
 	return ret;
 }
 
-static void kunlun_irq_handler(struct irq_desc *desc)
+static void sdrv_irq_handler(struct irq_desc *desc)
 {
-	struct kunlun_gpio_port *port = irq_desc_get_handler_data(desc);
+	struct sdrv_gpio_port *port = irq_desc_get_handler_data(desc);
 	struct irq_chip *chip = irq_desc_get_chip(desc);
 
-	kunlun_do_irq(port);
+	sdrv_do_irq(port);
 
 	if (chip->irq_eoi)
 		chip->irq_eoi(irq_desc_get_irq_data(desc));
 }
 
-static void kunlun_irq_enable(struct irq_data *d)
+static void sdrv_irq_enable(struct irq_data *d)
 {
 	struct irq_chip_generic *igc = irq_data_get_irq_chip_data(d);
-	struct kunlun_gpio_port *port = igc->private;
-	struct kunlun_gpio *gpio = port->gpio;
+	struct sdrv_gpio_port *port = igc->private;
+	struct sdrv_gpio *gpio = port->gpio;
 	struct gpio_chip *gc;
 	unsigned long flags;
 	u32 val;
@@ -324,27 +324,27 @@ static void kunlun_irq_enable(struct irq_data *d)
 
 	spin_lock_irqsave(&gc->bgpio_lock, flags);
 
-	val = kunlun_read(gpio, GPIO_INT_EN_PORT_X(reg_idx));
+	val = sdrv_read(gpio, GPIO_INT_EN_PORT_X(reg_idx));
 	val |= BIT(bit_idx);
 
 	/* unmask */
-	kunlun_write(gpio,
+	sdrv_write(gpio,
 		GPIO_CLEAR_PIN_X((reg_idx * 32 + bit_idx)),
 		BIT(GPIO_CTRL_INT_MASK_BIT));
 
 	/* INT EN */
-	kunlun_write(gpio,  GPIO_INT_EN_PORT_X(reg_idx), val);
+	sdrv_write(gpio,  GPIO_INT_EN_PORT_X(reg_idx), val);
 
-	reg_read = kunlun_read(gpio, GPIO_CTRL_PIN_X((reg_idx * 32 + bit_idx)));
+	reg_read = sdrv_read(gpio, GPIO_CTRL_PIN_X((reg_idx * 32 + bit_idx)));
 
 	spin_unlock_irqrestore(&gc->bgpio_lock, flags);
 }
 
-static void kunlun_irq_disable(struct irq_data *d)
+static void sdrv_irq_disable(struct irq_data *d)
 {
 	struct irq_chip_generic *igc = irq_data_get_irq_chip_data(d);
-	struct kunlun_gpio_port *port = igc->private;
-	struct kunlun_gpio *gpio = port->gpio;
+	struct sdrv_gpio_port *port = igc->private;
+	struct sdrv_gpio *gpio = port->gpio;
 	struct gpio_chip *gc;
 	unsigned long flags;
 	u32 val;
@@ -358,17 +358,17 @@ static void kunlun_irq_disable(struct irq_data *d)
 
 
 	spin_lock_irqsave(&gc->bgpio_lock, flags);
-	val = kunlun_read(gpio, GPIO_INT_EN_PORT_X(reg_idx));
+	val = sdrv_read(gpio, GPIO_INT_EN_PORT_X(reg_idx));
 	val &= ~BIT(bit_idx);
-	kunlun_write(gpio, GPIO_INT_EN_PORT_X(reg_idx), val);
+	sdrv_write(gpio, GPIO_INT_EN_PORT_X(reg_idx), val);
 	spin_unlock_irqrestore(&gc->bgpio_lock, flags);
 }
 
-static int kunlun_irq_reqres(struct irq_data *d)
+static int sdrv_irq_reqres(struct irq_data *d)
 {
 	struct irq_chip_generic *igc = irq_data_get_irq_chip_data(d);
-	struct kunlun_gpio_port *port = igc->private;
-	struct kunlun_gpio *gpio = port->gpio;
+	struct sdrv_gpio_port *port = igc->private;
+	struct sdrv_gpio *gpio = port->gpio;
 	struct gpio_chip *gc;
 	unsigned int reg_idx = 0;
 
@@ -384,11 +384,11 @@ static int kunlun_irq_reqres(struct irq_data *d)
 	return 0;
 }
 
-static void kunlun_irq_relres(struct irq_data *d)
+static void sdrv_irq_relres(struct irq_data *d)
 {
 	struct irq_chip_generic *igc = irq_data_get_irq_chip_data(d);
-	struct kunlun_gpio_port *port = igc->private;
-	struct kunlun_gpio *gpio = port->gpio;
+	struct sdrv_gpio_port *port = igc->private;
+	struct sdrv_gpio *gpio = port->gpio;
 	struct gpio_chip *gc;
 	unsigned int reg_idx = 0;
 
@@ -398,11 +398,11 @@ static void kunlun_irq_relres(struct irq_data *d)
 	gpiochip_unlock_as_irq(gc, irqd_to_hwirq(d));
 }
 
-static int kunlun_irq_set_type(struct irq_data *d, u32 type)
+static int sdrv_irq_set_type(struct irq_data *d, u32 type)
 {
 	struct irq_chip_generic *igc = irq_data_get_irq_chip_data(d);
-	struct kunlun_gpio_port *port = igc->private;
-	struct kunlun_gpio *gpio = port->gpio;
+	struct sdrv_gpio_port *port = igc->private;
+	struct sdrv_gpio *gpio = port->gpio;
 	struct gpio_chip *gc;
 	unsigned long flags;
 	unsigned int reg_idx = 0;
@@ -423,32 +423,32 @@ static int kunlun_irq_set_type(struct irq_data *d, u32 type)
 
 	switch (type) {
 	case IRQ_TYPE_EDGE_BOTH:
-		kunlun_write(gpio, GPIO_SET_PIN_X((reg_idx * 32 + bit_idx)),
+		sdrv_write(gpio, GPIO_SET_PIN_X((reg_idx * 32 + bit_idx)),
 			BIT(GPIO_CTRL_INT_TYPE_BIT) |
 			BIT(GPIO_CTRL_INT_BOTH_EDGE_BIT));
 		break;
 	case IRQ_TYPE_EDGE_RISING:
-		kunlun_write(gpio, GPIO_SET_PIN_X((reg_idx * 32 + bit_idx)),
+		sdrv_write(gpio, GPIO_SET_PIN_X((reg_idx * 32 + bit_idx)),
 			BIT(GPIO_CTRL_INT_TYPE_BIT));
-		kunlun_write(gpio, GPIO_SET_PIN_X((reg_idx * 32 + bit_idx)),
+		sdrv_write(gpio, GPIO_SET_PIN_X((reg_idx * 32 + bit_idx)),
 			BIT(GPIO_CTRL_INT_POL_BIT));
 		break;
 	case IRQ_TYPE_EDGE_FALLING:
-		kunlun_write(gpio, GPIO_SET_PIN_X((reg_idx * 32 + bit_idx)),
+		sdrv_write(gpio, GPIO_SET_PIN_X((reg_idx * 32 + bit_idx)),
 			BIT(GPIO_CTRL_INT_TYPE_BIT));
-		kunlun_write(gpio, GPIO_CLEAR_PIN_X((reg_idx * 32 + bit_idx)),
+		sdrv_write(gpio, GPIO_CLEAR_PIN_X((reg_idx * 32 + bit_idx)),
 			BIT(GPIO_CTRL_INT_POL_BIT));
 		break;
 	case IRQ_TYPE_LEVEL_HIGH:
-		kunlun_write(gpio, GPIO_CLEAR_PIN_X((reg_idx * 32 + bit_idx)),
+		sdrv_write(gpio, GPIO_CLEAR_PIN_X((reg_idx * 32 + bit_idx)),
 			BIT(GPIO_CTRL_INT_TYPE_BIT));
-		kunlun_write(gpio, GPIO_SET_PIN_X((reg_idx * 32 + bit_idx)),
+		sdrv_write(gpio, GPIO_SET_PIN_X((reg_idx * 32 + bit_idx)),
 			BIT(GPIO_CTRL_INT_POL_BIT));
 		break;
 	case IRQ_TYPE_LEVEL_LOW:
-		kunlun_write(gpio, GPIO_CLEAR_PIN_X((reg_idx * 32 + bit_idx)),
+		sdrv_write(gpio, GPIO_CLEAR_PIN_X((reg_idx * 32 + bit_idx)),
 			BIT(GPIO_CTRL_INT_TYPE_BIT));
-		kunlun_write(gpio, GPIO_CLEAR_PIN_X((reg_idx * 32 + bit_idx)),
+		sdrv_write(gpio, GPIO_CLEAR_PIN_X((reg_idx * 32 + bit_idx)),
 			BIT(GPIO_CTRL_INT_POL_BIT));
 		break;
 	}
@@ -460,11 +460,11 @@ static int kunlun_irq_set_type(struct irq_data *d, u32 type)
 	return 0;
 }
 
-static int kunlun_gpio_set_debounce(struct gpio_chip *gc,
+static int sdrv_gpio_set_debounce(struct gpio_chip *gc,
 				   unsigned offset, unsigned debounce)
 {
-	struct kunlun_gpio_port *port = gpiochip_get_data(gc);
-	struct kunlun_gpio *gpio = port->gpio;
+	struct sdrv_gpio_port *port = gpiochip_get_data(gc);
+	struct sdrv_gpio *gpio = port->gpio;
 	unsigned long flags, val_deb;
 	unsigned int reg_idx = port->idx;
 	unsigned long mask = gc->pin2mask(gc,
@@ -473,12 +473,12 @@ static int kunlun_gpio_set_debounce(struct gpio_chip *gc,
 	spin_lock_irqsave(&gc->bgpio_lock, flags);
 
 
-	val_deb = kunlun_read(gpio, GPIO_INT_DEB_EN_PORT_X(reg_idx));
+	val_deb = sdrv_read(gpio, GPIO_INT_DEB_EN_PORT_X(reg_idx));
 	if (debounce)
-		kunlun_write(gpio,
+		sdrv_write(gpio,
 			GPIO_INT_DEB_EN_PORT_X(reg_idx), val_deb | mask);
 	else
-		kunlun_write(gpio,
+		sdrv_write(gpio,
 			GPIO_INT_DEB_EN_PORT_X(reg_idx), val_deb & ~mask);
 
 	spin_unlock_irqrestore(&gc->bgpio_lock, flags);
@@ -486,11 +486,11 @@ static int kunlun_gpio_set_debounce(struct gpio_chip *gc,
 	return 0;
 }
 
-static int kunlun_gpio_set_config(struct gpio_chip *gc, unsigned offset,
+static int sdrv_gpio_set_config(struct gpio_chip *gc, unsigned offset,
 				 unsigned long config)
 {
-	struct kunlun_gpio_port *port = gpiochip_get_data(gc);
-	struct kunlun_gpio *gpio = port->gpio;
+	struct sdrv_gpio_port *port = gpiochip_get_data(gc);
+	struct sdrv_gpio *gpio = port->gpio;
 	u32 debounce;
 
 
@@ -500,22 +500,22 @@ static int kunlun_gpio_set_config(struct gpio_chip *gc, unsigned offset,
 	}
 
 	debounce = pinconf_to_config_argument(config);
-	return kunlun_gpio_set_debounce(gc, offset, debounce);
+	return sdrv_gpio_set_debounce(gc, offset, debounce);
 }
 
-static irqreturn_t kunlun_irq_handler_mfd(int irq, void *dev_id)
+static irqreturn_t sdrv_irq_handler_mfd(int irq, void *dev_id)
 {
 	u32 worked = 0;
-	struct kunlun_gpio_port *port = dev_id;
+	struct sdrv_gpio_port *port = dev_id;
 
-	worked = kunlun_do_irq(port);
+	worked = sdrv_do_irq(port);
 
 	return worked ? IRQ_HANDLED : IRQ_NONE;
 }
 
-static void kunlun_configure_irqs(struct kunlun_gpio *gpio,
-				 struct kunlun_gpio_port *port,
-				 struct kunlun_port_property *pp)
+static void sdrv_configure_irqs(struct sdrv_gpio *gpio,
+				 struct sdrv_gpio_port *port,
+				 struct sdrv_port_property *pp)
 {
 	struct gpio_chip *gc = &port->gc;
 	struct fwnode_handle  *fwnode = pp->fwnode;
@@ -530,7 +530,7 @@ static void kunlun_configure_irqs(struct kunlun_gpio *gpio,
 		return;
 
 	err = irq_alloc_domain_generic_chips(port->domain, ngpio, 2,
-					     "gpio-kunlun", handle_level_irq,
+					     "gpio-sdrv", handle_level_irq,
 					     IRQ_NOREQUEST, 0,
 					     IRQ_GC_INIT_NESTED_LOCK);
 	if (err) {
@@ -555,11 +555,11 @@ static void kunlun_configure_irqs(struct kunlun_gpio *gpio,
 		ct->chip.irq_ack = irq_gc_ack_set_bit;
 		ct->chip.irq_mask = irq_gc_mask_set_bit;
 		ct->chip.irq_unmask = irq_gc_mask_clr_bit;
-		ct->chip.irq_set_type = kunlun_irq_set_type;
-		ct->chip.irq_enable = kunlun_irq_enable;
-		ct->chip.irq_disable = kunlun_irq_disable;
-		ct->chip.irq_request_resources = kunlun_irq_reqres;
-		ct->chip.irq_release_resources = kunlun_irq_relres;
+		ct->chip.irq_set_type = sdrv_irq_set_type;
+		ct->chip.irq_enable = sdrv_irq_enable;
+		ct->chip.irq_disable = sdrv_irq_disable;
+		ct->chip.irq_request_resources = sdrv_irq_reqres;
+		ct->chip.irq_release_resources = sdrv_irq_relres;
 
 		ct->regs.ack =
 			gpio_reg_convert(gpio,
@@ -574,18 +574,18 @@ static void kunlun_configure_irqs(struct kunlun_gpio *gpio,
 	irq_gc->chip_types[1].handler = handle_edge_irq;
 
 	if (!pp->irq_shared) {
-		dev_info(gpio->dev, "kunlun_gpio irq Not shared...\n");
+		dev_info(gpio->dev, "sdrv_gpio irq Not shared...\n");
 		irq_set_chained_handler_and_data(pp->irq,
-			kunlun_irq_handler, port);
+			sdrv_irq_handler, port);
 	} else {
 		/*
 		 * Request a shared IRQ since where MFD would have devices
 		 * using the same irq pin
 		 */
-		dev_info(gpio->dev, "kunlun_gpio irq shared...\n");
+		dev_info(gpio->dev, "sdrv_gpio irq shared...\n");
 		err = devm_request_irq(gpio->dev, pp->irq,
-			kunlun_irq_handler_mfd,
-			IRQF_SHARED, "gpio-kunlun-mfd", port);
+			sdrv_irq_handler_mfd,
+			IRQF_SHARED, "gpio-sdrv-mfd", port);
 		if (err) {
 			dev_err(gpio->dev, "error requesting IRQ\n");
 			irq_domain_remove(port->domain);
@@ -597,12 +597,12 @@ static void kunlun_configure_irqs(struct kunlun_gpio *gpio,
 	for (hwirq = 0 ; hwirq < ngpio ; hwirq++)
 		irq_create_mapping(port->domain, hwirq);
 
-	port->gc.to_irq = kunlun_gpio_to_irq;
+	port->gc.to_irq = sdrv_gpio_to_irq;
 }
 
-static void kunlun_irq_teardown(struct kunlun_gpio *gpio)
+static void sdrv_irq_teardown(struct sdrv_gpio *gpio)
 {
-	struct kunlun_gpio_port *port = &gpio->ports[0];
+	struct sdrv_gpio_port *port = &gpio->ports[0];
 	struct gpio_chip *gc = &port->gc;
 	unsigned int ngpio = gc->ngpio;
 	irq_hw_number_t hwirq;
@@ -628,11 +628,11 @@ static void kunlun_irq_teardown(struct kunlun_gpio *gpio)
 
 }
 
-static int kunlun_gpio_add_port(struct kunlun_gpio *gpio,
-			       struct kunlun_port_property *pp,
+static int sdrv_gpio_add_port(struct sdrv_gpio *gpio,
+			       struct sdrv_port_property *pp,
 			       unsigned int offs)
 {
-	struct kunlun_gpio_port *port;
+	struct sdrv_gpio_port *port;
 	void __iomem *dat, *set, *dirout;
 	int err;
 
@@ -672,10 +672,10 @@ static int kunlun_gpio_add_port(struct kunlun_gpio *gpio,
 	port->gc.ngpio = pp->ngpio;
 	port->gc.base = pp->gpio_base;
 
-	port->gc.set_config = kunlun_gpio_set_config;
+	port->gc.set_config = sdrv_gpio_set_config;
 
 	if (pp->irq)
-		kunlun_configure_irqs(gpio, port, pp);
+		sdrv_configure_irqs(gpio, port, pp);
 
 	/* pass reg bit offset to gpiochip */
 	port->gc.offset = gpio->k_port_idx[offs].hwirq_start;
@@ -689,7 +689,7 @@ static int kunlun_gpio_add_port(struct kunlun_gpio *gpio,
 	return err;
 }
 
-static void kunlun_gpio_unregister(struct kunlun_gpio *gpio)
+static void sdrv_gpio_unregister(struct sdrv_gpio *gpio)
 {
 	unsigned int m;
 
@@ -698,12 +698,12 @@ static void kunlun_gpio_unregister(struct kunlun_gpio *gpio)
 			gpiochip_remove(&gpio->ports[m].gc);
 }
 
-static struct kunlun_platform_data *
-kunlun_gpio_get_pdata(struct device *dev, struct kunlun_gpio *gpio)
+static struct sdrv_platform_data *
+sdrv_gpio_get_pdata(struct device *dev, struct sdrv_gpio *gpio)
 {
 	struct fwnode_handle *fwnode;
-	struct kunlun_platform_data *pdata;
-	struct kunlun_port_property *pp;
+	struct sdrv_platform_data *pdata;
+	struct sdrv_port_property *pp;
 	int nports;
 	int i;
 
@@ -728,7 +728,7 @@ kunlun_gpio_get_pdata(struct device *dev, struct kunlun_gpio *gpio)
 		pp->fwnode = fwnode;
 
 		if (fwnode_property_read_u32(fwnode, "reg", &pp->idx) ||
-		    pp->idx >= KUNLUN_MAX_PORTS) {
+		    pp->idx >= SEMIDRIVE_MAX_PORTS) {
 			dev_err(dev,
 				"missing/invalid port index for port%d\n", i);
 			fwnode_handle_put(fwnode);
@@ -762,7 +762,7 @@ kunlun_gpio_get_pdata(struct device *dev, struct kunlun_gpio *gpio)
 			pp->irq = irq_of_parse_and_map(to_of_node(fwnode), 0);
 			if (!pp->irq)
 				dev_warn(dev, "no irq for port%d\n", pp->idx);
-			dev_err(dev, "kunlun_gpio: irq [%d]\n", pp->irq);
+			dev_err(dev, "sdrv_gpio: irq [%d]\n", pp->irq);
 		}
 
 		pp->irq_shared	= false;
@@ -784,20 +784,20 @@ kunlun_gpio_get_pdata(struct device *dev, struct kunlun_gpio *gpio)
 	return pdata;
 }
 
-static const struct of_device_id kunlun_of_match[] = {
-	{ .compatible = "semidrive,kunlun-gpio", .data = (void *)0},
+static const struct of_device_id sdrv_of_match[] = {
+	{ .compatible = "semidrive,sdrv-gpio", .data = (void *)0},
 	{ /* Sentinel */ }
 };
-MODULE_DEVICE_TABLE(of, kunlun_of_match);
+MODULE_DEVICE_TABLE(of, sdrv_of_match);
 
-static int kunlun_gpio_probe(struct platform_device *pdev)
+static int sdrv_gpio_probe(struct platform_device *pdev)
 {
 	unsigned int i;
 	struct resource *res;
-	struct kunlun_gpio *gpio;
+	struct sdrv_gpio *gpio;
 	int err;
 	struct device *dev = &pdev->dev;
-	struct kunlun_platform_data *pdata = dev_get_platdata(dev);
+	struct sdrv_platform_data *pdata = dev_get_platdata(dev);
 	const struct of_device_id *of_devid;
 
 
@@ -806,15 +806,15 @@ static int kunlun_gpio_probe(struct platform_device *pdev)
 		return -ENOMEM;
 
 	if (!pdata) {
-		pdata = kunlun_gpio_get_pdata(dev, gpio);
+		pdata = sdrv_gpio_get_pdata(dev, gpio);
 		if (IS_ERR(pdata)) {
-			dev_err(dev, "kunlun_gpio kunlun_gpio_get_pdata error!\n");
+			dev_err(dev, "sdrv_gpio sdrv_gpio_get_pdata error!\n");
 			return PTR_ERR(pdata);
 		}
 	}
 
 	if (!pdata->nports) {
-		dev_err(dev, "kunlun_gpio No ports found!\n");
+		dev_err(dev, "sdrv_gpio No ports found!\n");
 		return -ENODEV;
 	}
 
@@ -829,15 +829,15 @@ static int kunlun_gpio_probe(struct platform_device *pdev)
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	gpio->regs = devm_ioremap_resource(&pdev->dev, res);
 	if (IS_ERR(gpio->regs)) {
-		dev_err(dev, "kunlun_gpio regs devm_ioremap_resource failed !\n");
+		dev_err(dev, "sdrv_gpio regs devm_ioremap_resource failed !\n");
 		return PTR_ERR(gpio->regs);
 	}
 
 	gpio->flags = 0;
 	if (dev->of_node) {
-		dev_info(dev, "kunlun_gpio of_node found !\n");
+		dev_info(dev, "sdrv_gpio of_node found !\n");
 
-		of_devid = of_match_device(kunlun_of_match, dev);
+		of_devid = of_match_device(sdrv_of_match, dev);
 		if (of_devid) {
 			if (of_devid->data)
 				gpio->flags = (uintptr_t)of_devid->data;
@@ -845,9 +845,9 @@ static int kunlun_gpio_probe(struct platform_device *pdev)
 	}
 
 	for (i = 0; i < gpio->nr_ports; i++) {
-		err = kunlun_gpio_add_port(gpio, &pdata->properties[i], i);
+		err = sdrv_gpio_add_port(gpio, &pdata->properties[i], i);
 		if (err) {
-			dev_err(dev, "kunlun_gpio kunlun_gpio_add_port failed !\n");
+			dev_err(dev, "sdrv_gpio sdrv_gpio_add_port failed !\n");
 			goto out_unregister;
 		}
 	}
@@ -856,27 +856,27 @@ static int kunlun_gpio_probe(struct platform_device *pdev)
 	return 0;
 
 out_unregister:
-	kunlun_gpio_unregister(gpio);
-	kunlun_irq_teardown(gpio);
+	sdrv_gpio_unregister(gpio);
+	sdrv_irq_teardown(gpio);
 
 	return err;
 }
 
-static int kunlun_gpio_remove(struct platform_device *pdev)
+static int sdrv_gpio_remove(struct platform_device *pdev)
 {
-	struct kunlun_gpio *gpio = platform_get_drvdata(pdev);
+	struct sdrv_gpio *gpio = platform_get_drvdata(pdev);
 
-	kunlun_gpio_unregister(gpio);
-	kunlun_irq_teardown(gpio);
+	sdrv_gpio_unregister(gpio);
+	sdrv_irq_teardown(gpio);
 
 	return 0;
 }
 
 #ifdef CONFIG_PM_SLEEP
-static int kunlun_gpio_suspend(struct device *dev)
+static int sdrv_gpio_suspend(struct device *dev)
 {
 	struct platform_device *pdev = to_platform_device(dev);
-	struct kunlun_gpio *gpio = platform_get_drvdata(pdev);
+	struct sdrv_gpio *gpio = platform_get_drvdata(pdev);
 	struct gpio_chip *gc	= &gpio->ports[0].gc;
 	unsigned long flags;
 	int i;
@@ -885,28 +885,28 @@ static int kunlun_gpio_suspend(struct device *dev)
 	for (i = 0; i < gpio->nr_ports; i++) {
 		unsigned int offset;
 		unsigned int idx = gpio->ports[i].idx;
-		struct kunlun_context *ctx = gpio->ports[i].ctx;
+		struct sdrv_context *ctx = gpio->ports[i].ctx;
 
 		BUG_ON(!ctx);
 
 		offset = GPIO_DIR_PORT_X(idx);
-		ctx->dir = kunlun_read(gpio, offset);
+		ctx->dir = sdrv_read(gpio, offset);
 
 		offset = GPIO_DATA_IN_PORT_X(idx);
-		ctx->data = kunlun_read(gpio, offset);
+		ctx->data = sdrv_read(gpio, offset);
 
 		offset = GPIO_DATA_OUT_PORT_X(idx);
-		ctx->ext = kunlun_read(gpio, offset);
+		ctx->ext = sdrv_read(gpio, offset);
 
 		/* interrupts */
-		ctx->int_mask = kunlun_read(gpio, GPIO_INT_MASK_PORT_X(idx));
-		ctx->int_en	= kunlun_read(gpio, GPIO_INT_EN_PORT_X(idx));
-		ctx->int_pol = kunlun_read(gpio, GPIO_INT_POL_PORT_X(idx));
-		ctx->int_type = kunlun_read(gpio, GPIO_INT_TYPE_PORT_X(idx));
-		ctx->int_deb = kunlun_read(gpio, GPIO_INT_DEB_EN_PORT_X(idx));
+		ctx->int_mask = sdrv_read(gpio, GPIO_INT_MASK_PORT_X(idx));
+		ctx->int_en	= sdrv_read(gpio, GPIO_INT_EN_PORT_X(idx));
+		ctx->int_pol = sdrv_read(gpio, GPIO_INT_POL_PORT_X(idx));
+		ctx->int_type = sdrv_read(gpio, GPIO_INT_TYPE_PORT_X(idx));
+		ctx->int_deb = sdrv_read(gpio, GPIO_INT_DEB_EN_PORT_X(idx));
 
 		/* Mask out interrupts */
-		kunlun_write(gpio, GPIO_INT_MASK_PORT_X(idx), 0xffffffff);
+		sdrv_write(gpio, GPIO_INT_MASK_PORT_X(idx), 0xffffffff);
 
 	}
 	spin_unlock_irqrestore(&gc->bgpio_lock, flags);
@@ -914,10 +914,10 @@ static int kunlun_gpio_suspend(struct device *dev)
 	return 0;
 }
 
-static int kunlun_gpio_resume(struct device *dev)
+static int sdrv_gpio_resume(struct device *dev)
 {
 	struct platform_device *pdev = to_platform_device(dev);
-	struct kunlun_gpio *gpio = platform_get_drvdata(pdev);
+	struct sdrv_gpio *gpio = platform_get_drvdata(pdev);
 	struct gpio_chip *gc	= &gpio->ports[0].gc;
 	unsigned long flags;
 	int i;
@@ -926,28 +926,28 @@ static int kunlun_gpio_resume(struct device *dev)
 	for (i = 0; i < gpio->nr_ports; i++) {
 		unsigned int offset;
 		unsigned int idx = gpio->ports[i].idx;
-		struct kunlun_context *ctx = gpio->ports[i].ctx;
+		struct sdrv_context *ctx = gpio->ports[i].ctx;
 
 		BUG_ON(!ctx);
 
 		offset = GPIO_DATA_IN_PORT_X(idx);
-		kunlun_write(gpio, offset, ctx->data);
+		sdrv_write(gpio, offset, ctx->data);
 
 		offset = GPIO_DIR_PORT_X(idx);
-		kunlun_write(gpio, offset, ctx->dir);
+		sdrv_write(gpio, offset, ctx->dir);
 
 		offset = GPIO_DATA_OUT_PORT_X(idx);
-		kunlun_write(gpio, offset, ctx->ext);
+		sdrv_write(gpio, offset, ctx->ext);
 
 		/* interrupts */
-		kunlun_write(gpio, GPIO_INT_TYPE_PORT_X(idx), ctx->int_type);
-		kunlun_write(gpio, GPIO_INT_POL_PORT_X(idx), ctx->int_pol);
-		kunlun_write(gpio, GPIO_INT_DEB_EN_PORT_X(idx), ctx->int_deb);
-		kunlun_write(gpio, GPIO_INT_EN_PORT_X(idx), ctx->int_en);
-		kunlun_write(gpio, GPIO_INT_MASK_PORT_X(idx), ctx->int_mask);
+		sdrv_write(gpio, GPIO_INT_TYPE_PORT_X(idx), ctx->int_type);
+		sdrv_write(gpio, GPIO_INT_POL_PORT_X(idx), ctx->int_pol);
+		sdrv_write(gpio, GPIO_INT_DEB_EN_PORT_X(idx), ctx->int_deb);
+		sdrv_write(gpio, GPIO_INT_EN_PORT_X(idx), ctx->int_en);
+		sdrv_write(gpio, GPIO_INT_MASK_PORT_X(idx), ctx->int_mask);
 
 		/* Clear out spurious interrupts */
-		kunlun_write(gpio, GPIO_INT_EDGE_CLR_PORT_X(idx), 0xffffffff);
+		sdrv_write(gpio, GPIO_INT_EDGE_CLR_PORT_X(idx), 0xffffffff);
 
 	}
 	spin_unlock_irqrestore(&gc->bgpio_lock, flags);
@@ -956,20 +956,20 @@ static int kunlun_gpio_resume(struct device *dev)
 }
 #endif
 
-static SIMPLE_DEV_PM_OPS(kunlun_gpio_pm_ops, kunlun_gpio_suspend,
-			 kunlun_gpio_resume);
+static SIMPLE_DEV_PM_OPS(sdrv_gpio_pm_ops, sdrv_gpio_suspend,
+			 sdrv_gpio_resume);
 
-static struct platform_driver kunlun_gpio_driver = {
+static struct platform_driver sdrv_gpio_driver = {
 	.driver		= {
-		.name	= "semidrive,kunlun-gpio",
-		.pm	= &kunlun_gpio_pm_ops,
-		.of_match_table = of_match_ptr(kunlun_of_match),
+		.name	= "semidrive,sdrv-gpio",
+		.pm	= &sdrv_gpio_pm_ops,
+		.of_match_table = of_match_ptr(sdrv_of_match),
 	},
-	.probe		= kunlun_gpio_probe,
-	.remove		= kunlun_gpio_remove,
+	.probe		= sdrv_gpio_probe,
+	.remove		= sdrv_gpio_remove,
 };
 
-module_platform_driver(kunlun_gpio_driver);
+module_platform_driver(sdrv_gpio_driver);
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Semidrive");

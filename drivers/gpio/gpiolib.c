@@ -209,7 +209,7 @@ int gpiod_get_direction(struct gpio_desc *desc)
 	if (!chip->get_direction)
 		return status;
 
-#ifdef		CONFIG_GPIO_KUNLUN
+#ifdef CONFIG_SEMIDRIVE_GPIO
 	status = chip->get_direction(chip,
 		(offset + desc->gdev->pin_offset));
 #else
@@ -1140,7 +1140,7 @@ int gpiochip_add_data(struct gpio_chip *chip, void *data)
 		return -ENOMEM;
 	gdev->dev.bus = &gpio_bus_type;
 	gdev->chip = chip;
-#ifdef		CONFIG_GPIO_KUNLUN
+#ifdef CONFIG_SEMIDRIVE_GPIO
 	gdev->pin_offset = chip->offset;
 	printk(KERN_ERR "%s: offset[%d]\n", __func__, gdev->pin_offset);
 #endif
@@ -1248,7 +1248,7 @@ int gpiochip_add_data(struct gpio_chip *chip, void *data)
 			 * If we have .get_direction, set up the initial
 			 * direction flag from the hardware.
 			 */
-#ifdef		CONFIG_GPIO_KUNLUN
+#ifdef CONFIG_SEMIDRIVE_GPIO
 			int dir = chip->get_direction(chip, (i + gdev->pin_offset));
 #else
 			int dir = chip->get_direction(chip, i);
@@ -2290,7 +2290,7 @@ int gpiod_direction_input(struct gpio_desc *desc)
 		return -EIO;
 	}
 
-#ifdef		CONFIG_GPIO_KUNLUN
+#ifdef CONFIG_SEMIDRIVE_GPIO
 	status = chip->direction_input(chip,
 		(gpio_chip_hwgpio(desc) + desc->gdev->pin_offset));
 #else
@@ -2358,7 +2358,7 @@ set_output_value:
 		return -EIO;
 	}
 
-#ifdef		CONFIG_GPIO_KUNLUN
+#ifdef CONFIG_SEMIDRIVE_GPIO
 	ret = gc->direction_output(gc,
 		(gpio_chip_hwgpio(desc) + desc->gdev->pin_offset), val);
 #else
@@ -2483,7 +2483,7 @@ static int _gpiod_get_raw_value(const struct gpio_desc *desc)
 
 	chip = desc->gdev->chip;
 	offset = gpio_chip_hwgpio(desc);
-#ifdef		CONFIG_GPIO_KUNLUN
+#ifdef CONFIG_SEMIDRIVE_GPIO
 	value = chip->get ?
 		chip->get(chip, (offset  + desc->gdev->pin_offset)) : -EIO;
 #else
@@ -2554,7 +2554,7 @@ static void _gpio_set_open_drain_value(struct gpio_desc *desc, bool value)
 	int offset = gpio_chip_hwgpio(desc);
 
 	if (value) {
-#ifdef		CONFIG_GPIO_KUNLUN
+#ifdef CONFIG_SEMIDRIVE_GPIO
 		err = chip->direction_input(chip,
 			(offset + desc->gdev->pin_offset));
 #else
@@ -2563,7 +2563,7 @@ static void _gpio_set_open_drain_value(struct gpio_desc *desc, bool value)
 		if (!err)
 			clear_bit(FLAG_IS_OUT, &desc->flags);
 	} else {
-#ifdef		CONFIG_GPIO_KUNLUN
+#ifdef CONFIG_SEMIDRIVE_GPIO
 		err = chip->direction_output(chip,
 			(offset + desc->gdev->pin_offset), 0);
 #else
@@ -2591,7 +2591,7 @@ static void _gpio_set_open_source_value(struct gpio_desc *desc, bool value)
 	int offset = gpio_chip_hwgpio(desc);
 
 	if (value) {
-#ifdef		CONFIG_GPIO_KUNLUN
+#ifdef CONFIG_SEMIDRIVE_GPIO
 		err = chip->direction_output(chip,
 			(offset + desc->gdev->pin_offset), 1);
 #else
@@ -2600,7 +2600,7 @@ static void _gpio_set_open_source_value(struct gpio_desc *desc, bool value)
 		if (!err)
 			set_bit(FLAG_IS_OUT, &desc->flags);
 	} else {
-#ifdef		CONFIG_GPIO_KUNLUN
+#ifdef CONFIG_SEMIDRIVE_GPIO
 		err = chip->direction_input(chip,
 			(offset + desc->gdev->pin_offset));
 #else
@@ -2627,7 +2627,7 @@ static void _gpiod_set_raw_value(struct gpio_desc *desc, bool value)
 	else if (test_bit(FLAG_OPEN_SOURCE, &desc->flags))
 		_gpio_set_open_source_value(desc, value);
 	else
-#ifdef		CONFIG_GPIO_KUNLUN
+#ifdef CONFIG_SEMIDRIVE_GPIO
 		chip->set(chip,
 			(gpio_chip_hwgpio(desc) + desc->gdev->pin_offset), value);
 #else
@@ -2654,7 +2654,7 @@ static void gpio_chip_set_multiple(struct gpio_chip *chip,
 
 		/* set outputs if the corresponding mask bit is set */
 		for_each_set_bit(i, mask, chip->ngpio)
-#ifdef		CONFIG_GPIO_KUNLUN
+#ifdef CONFIG_SEMIDRIVE_GPIO
 			chip->set(chip,
 				(i + chip->gpiodev->pin_offset), test_bit(i, bits));
 #else
@@ -2867,7 +2867,7 @@ int gpiochip_lock_as_irq(struct gpio_chip *chip, unsigned int offset)
 	 * behind our back
 	 */
 	if (!chip->can_sleep && chip->get_direction) {
-#ifdef	CONFIG_GPIO_KUNLUN
+#ifdef CONFIG_SEMIDRIVE_GPIO
 		int dir = chip->get_direction(chip,
 			(offset + desc->gdev->pin_offset));
 #else
@@ -3745,7 +3745,7 @@ static void gpiolib_dbg_show(struct seq_file *s, struct gpio_device *gdev)
 			gpio, gdesc->name ? gdesc->name : "", gdesc->label,
 			is_out ? "out" : "in ",
 			chip->get
-#ifdef	CONFIG_GPIO_KUNLUN
+#ifdef CONFIG_SEMIDRIVE_GPIO
 				? (chip->get(chip, (i + gdev->pin_offset)) ? "hi" : "lo")
 #else
 				? (chip->get(chip, i) ? "hi" : "lo")
