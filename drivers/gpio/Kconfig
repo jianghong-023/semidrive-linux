@@ -165,12 +165,12 @@ config GPIO_DWAPB
 	  Say Y or M here to build support for the Synopsys DesignWare APB
 	  GPIO block.
 
-config GPIO_KUNLUN
-        tristate "Semidrive KUNLUN GPIO driver"
+config SEMIDRIVE_GPIO
+        tristate "Semidrive GPIO driver"
         select GPIO_GENERIC
         select GENERIC_IRQ_CHIP
         help
-          Say Y or M here to build support for the Semidrive KUNLUN
+          Say Y or M here to build support for the Semidrive
           GPIO block.
 
 config GPIO_EM

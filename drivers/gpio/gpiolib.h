@@ -62,7 +62,7 @@ struct gpio_device {
 	void			*data;
 	struct list_head        list;
 
-#ifdef	CONFIG_GPIO_KUNLUN
+#ifdef CONFIG_SEMIDRIVE_GPIO
 	/* offset of the first pin in pinctrl port */
 	int			pin_offset;
 #endif

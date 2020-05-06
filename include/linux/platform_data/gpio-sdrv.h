@@ -4,10 +4,10 @@
 *
 */
 
-#ifndef GPIO_KUNLUN_H
-#define GPIO_KUNLUN_H
+#ifndef GPIO_SDRV_H
+#define GPIO_SDRV_H
 
-struct kunlun_port_property {
+struct sdrv_port_property {
 	struct fwnode_handle *fwnode;
 	unsigned int	idx;
 	unsigned int	ngpio;
@@ -17,8 +17,8 @@ struct kunlun_port_property {
 	unsigned int gpio_ranges[4];
 };
 
-struct kunlun_platform_data {
-	struct kunlun_port_property *properties;
+struct sdrv_platform_data {
+	struct sdrv_port_property *properties;
 	unsigned int nports;
 };
 
