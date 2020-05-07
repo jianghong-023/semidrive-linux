@@ -1774,9 +1774,9 @@ static void ov5640_reset(struct ov5640_dev *sensor)
 
 static int ov5640_set_power_on(struct ov5640_dev *sensor)
 {
-//	struct i2c_client *client = sensor->i2c_client;
+	struct i2c_client *client = sensor->i2c_client;
 	int ret;
-#if 0
+#if 1
 	ret = clk_prepare_enable(sensor->xclk);
 	if (ret) {
 		dev_err(&client->dev, "%s: failed to enable clock\n",
@@ -1804,7 +1804,7 @@ static int ov5640_set_power_on(struct ov5640_dev *sensor)
 power_off:
 	ov5640_power(sensor, false);
 	regulator_bulk_disable(OV5640_NUM_SUPPLIES, sensor->supplies);
-#if 0
+#if 1
 xclk_off:
 	clk_disable_unprepare(sensor->xclk);
 #endif
@@ -2723,6 +2723,7 @@ static int ov5640_probe(struct i2c_client *client,
 	struct ov5640_dev *sensor;
 	struct v4l2_mbus_framefmt *fmt;
 	u32 rotation;
+	u32 xclk_freq;
 	int ret;
 
 	sensor = devm_kzalloc(dev, sizeof(*sensor), GFP_KERNEL);
@@ -2736,7 +2737,7 @@ static int ov5640_probe(struct i2c_client *client,
 	 * YUV422 UYVY VGA@30fps
 	 */
 	fmt = &sensor->fmt;
-	fmt->code = MEDIA_BUS_FMT_UYVY8_2X8;
+	fmt->code = MEDIA_BUS_FMT_YUYV8_2X8;
 	fmt->colorspace = V4L2_COLORSPACE_SRGB;
 	fmt->ycbcr_enc = V4L2_MAP_YCBCR_ENC_DEFAULT(fmt->colorspace);
 	fmt->quantization = V4L2_QUANTIZATION_FULL_RANGE;
@@ -2790,30 +2791,42 @@ static int ov5640_probe(struct i2c_client *client,
 		dev_err(dev, "Could not parse endpoint\n");
 		return ret;
 	}
-#if 0
+#if 1
 	/* get system clock (xclk) */
-	sensor->xclk = devm_clk_get(dev, "xclk");
+	sensor->xclk = devm_clk_get(dev, "csi-mclk");
 	if (IS_ERR(sensor->xclk)) {
 		dev_err(dev, "failed to get xclk\n");
 		return PTR_ERR(sensor->xclk);
 	}
 
-	sensor->xclk_freq = clk_get_rate(sensor->xclk);
-	if (sensor->xclk_freq < OV5640_XCLK_MIN ||
-	    sensor->xclk_freq > OV5640_XCLK_MAX) {
+	ret = of_property_read_u32(dev->of_node, "clock-frequency", &xclk_freq);
+    if (ret) {
+        dev_err(dev, "Couldn't read clock-frequency\n");
+        return ret;
+    }
+	dev_info(dev, "xclk_freq=%d\n", xclk_freq);
+	if (xclk_freq < OV5640_XCLK_MIN ||
+	    xclk_freq > OV5640_XCLK_MAX) {
 		dev_err(dev, "xclk frequency out of range: %d Hz\n",
-			sensor->xclk_freq);
+			xclk_freq);
 		return -EINVAL;
 	}
+	//clk_disable_unprepare(sensor->xclk);
+	clk_set_rate(sensor->xclk, xclk_freq);
+	sensor->xclk_freq = clk_get_rate(sensor->xclk);
+	if(xclk_freq != sensor->xclk_freq)
+		dev_err(dev, "set xclk frequency fail\n");
+	dev_info(dev, "sensor->xclk_freq=%d\n", sensor->xclk_freq);
 #endif
+
 	/* request optional power down pin */
 	sensor->pwdn_gpio = devm_gpiod_get_optional(dev, "powerdown",
 						    GPIOD_OUT_HIGH);
 	/* request optional reset pin */
 	sensor->reset_gpio = devm_gpiod_get_optional(dev, "reset",
 						     GPIOD_OUT_HIGH);
-//#endif
-	sensor->xclk_freq = 24000000;
+
+	//sensor->xclk_freq = 24000000;
 	v4l2_i2c_subdev_init(&sensor->sd, client, &ov5640_subdev_ops);
 
 	sensor->sd.flags |= V4L2_SUBDEV_FL_HAS_DEVNODE;

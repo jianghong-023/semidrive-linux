@@ -866,8 +866,8 @@ int kunlun_stream_video_register(struct kstream_video *video,
 	vdev->vfl_dir = VFL_DIR_RX;
 	vdev->queue = q;
 	vdev->lock = &video->lock;
-	snprintf(vdev->name, ARRAY_SIZE(vdev->name), "%s-%d",
-			KUNLUN_IMG_NAME, kstream->id);
+	snprintf(vdev->name, ARRAY_SIZE(vdev->name), "%s-%d-%d",
+			KUNLUN_IMG_NAME, kstream->core->host_id, kstream->id);
 
 	ret = video_register_device(vdev, VFL_TYPE_GRABBER, -1);
 	if(ret < 0) {
