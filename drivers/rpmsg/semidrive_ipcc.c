@@ -108,6 +108,7 @@ static int rpmsg_ipcc_trysend_offchannel(struct rpmsg_endpoint *ept, u32 src,
 					   u32 dst, void *data, int len);
 static unsigned int rpmsg_ipcc_poll(struct rpmsg_endpoint *ept,
 				  struct file *filp, poll_table *wait);
+static ssize_t rpmsg_ipcc_get_mtu(struct rpmsg_endpoint *ept);
 
 static const struct rpmsg_endpoint_ops rpmsg_ipcc_endpoint_ops = {
 	.destroy_ept = rpmsg_ipcc_destroy_ept,
@@ -118,6 +119,7 @@ static const struct rpmsg_endpoint_ops rpmsg_ipcc_endpoint_ops = {
 	.trysendto = rpmsg_ipcc_trysendto,
 	.trysend_offchannel = rpmsg_ipcc_trysend_offchannel,
 	.poll = rpmsg_ipcc_poll,
+	.get_mtu = rpmsg_ipcc_get_mtu,
 };
 
 static int ipcc_has_feature(struct rpmsg_ipcc_device *vrp, int feature)
@@ -406,7 +408,7 @@ static void __downref_sleepers(struct rpmsg_ipcc_device *vrp)
 	mutex_unlock(&vrp->tx_lock);
 }
 
-static __send_offchannel_raw(struct rpmsg_ipcc_device *vrp,
+static int __send_offchannel_raw(struct rpmsg_ipcc_device *vrp,
                   u32 src, u32 dst, void *data, int len, bool wait)
 {
 	struct device *dev = vrp->dev;
@@ -568,6 +570,14 @@ static unsigned int rpmsg_ipcc_poll(struct rpmsg_endpoint *ept,
 	return mask;
 }
 
+
+static ssize_t rpmsg_ipcc_get_mtu(struct rpmsg_endpoint *ept)
+{
+	struct rpmsg_ipcc_channel *vch = to_rpmsg_ipcc_channel(ept->rpdev);
+	struct rpmsg_ipcc_device *vrp = vch->vrp;
+
+	return vrp->tx_buf_size - sizeof(struct rpmsg_ipcc_hdr);
+}
 static int rpmsg_ipcc_rx(struct rpmsg_ipcc_device *vrp,
 			     unsigned char *data, unsigned int len)
 {
@@ -804,7 +814,7 @@ static int rpmsg_ipcc_probe(struct platform_device *pdev)
 
 	vrp = kzalloc(sizeof(struct rpmsg_ipcc_device), GFP_KERNEL);
 	if (!vrp) {
-		dev_err(&pdev->dev, "no memory to probe: %ld\n");
+		dev_err(&pdev->dev, "no memory to probe\n");
 		return -ENOMEM;
 	}
 
