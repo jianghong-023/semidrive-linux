@@ -1,6 +1,6 @@
 
 /*
- * x9-i2s-mc.h
+ * sdrv-i2s-mc.h
  * Copyright (C) 2019 semidrive
  *
  * This program is free software; you can redistribute it and/or modify
@@ -19,8 +19,8 @@
  *
  */
 
-#ifndef X9_I2S_MC_H__
-#define X9_I2S_MC_H__
+#ifndef SDRV_I2S_MC_H__
+#define SDRV_I2S_MC_H__
 #include <linux/bitops.h>
 #define BIT_(nr) (1UL << (nr))
 #define I2S_MC_SAMPLE_RATE_CALC(fclk, fsample, chn_width)                      \
@@ -294,4 +294,4 @@ enum { I2S_CHAN_0 = 0,
 #define STAT_RX_AFULL_MASK BIT(5)
 #define STAT_RX_OVERRUN_MASK BIT(6)
 
-#endif /* X9_I2S_H__ */
+#endif /* SDRV_MC_I2S_H__ */

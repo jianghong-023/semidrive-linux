@@ -1,6 +1,6 @@
 
 /*
- * x9-mem.h
+ * sdrv-abuf.h
  * Copyright (C) 2019 semidrive
  *
  * This program is free software; you can redistribute it and/or modify
@@ -18,14 +18,15 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
  */
-#ifndef __X9_ABUF_H__
-#define __X9_ABUF_H__
+#ifndef __SDRV_ABUF_H__
+#define __SDRV_ABUF_H__
+
 enum audio_buff_type
 {
-	X9_ABUF_HIFI_UL,
-	X9_ABUF_HIFI_DL,
-	X9_ABUF_DAI,
-	X9_ABUF_NUMB,
+	SDRV_ABUF_HIFI_UL,
+	SDRV_ABUF_HIFI_DL,
+	SDRV_ABUF_DAI,
+	SDRV_ABUF_NUMB,
 };
 
 enum x9_i2s_id
@@ -35,8 +36,15 @@ enum x9_i2s_id
 	X9_I2S_NUMB,
 };
 
+enum g9_i2s_id
+{
+	G9_I2S_1,
+	G9_I2S_2,
+	G9_I2S_NUMB,
+};
+
 /* x9 audio buffer structure */
-struct x9_audio_buf
+struct sdrv_audio_buf
 {
 	int id;
 	const char *name;

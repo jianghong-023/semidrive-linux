@@ -1,5 +1,6 @@
+
 /*
- * x9-snd-debug.c
+ * sdrv-debug.h
  * Copyright (C) 2019 semidrive
  *
  * This program is free software; you can redistribute it and/or modify
@@ -17,11 +18,6 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
  */
-#include "sd-snd-debug.h"
-#ifdef CONFIG_DEBUG_FS
+#ifndef __SDRV_DEBUG_H__
+#define __SDRV_DEBUG_H__
 #endif
-MODULE_AUTHOR("Shao Yi <yi.shao@semidrive.com>");
-MODULE_DESCRIPTION("Semidrive ALSA SoC debug driver");
-MODULE_LICENSE("GPL");
-MODULE_ALIAS("platform:x9-afe-debug");
-//MODULE_SUPPORTED_DEVICE("{{ALSA,x9 dummy soundcard}}");

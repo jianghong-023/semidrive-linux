@@ -1,16 +1,20 @@
-config SND_X9_AFE_I2S_SC
+menu "SoC Audio for Semidrive Chips"
+
+comment "Common SoC Audio options for Semidrive Chips"
+
+config SND_SDRV_AFE_I2S_SC
 	tristate "ASoC Audio driver for x9 i2s sc"
 	select REGMAP_MMIO
 
-config SND_X9_AFE_I2S_MC
+config SND_SDRV_AFE_I2S_MC
 	tristate "ASoC Audio driver for x9 i2s mc"
 	select REGMAP_MMIO
 
 config SND_X9_FPGA_MACH
 	tristate "ASoC Audio driver for fpga platform x9 with cs24888 codec"
 	depends on ARCH_SEMIDRIVE_X9
-	select SND_X9_AFE_I2S_SC
-	select SND_X9_AFE_I2S_MC
+	select SND_SDRV_AFE_I2S_SC
+	select SND_SDRV_AFE_I2S_MC
 	select SND_SOC_GENERIC_DMAENGINE_PCM
 	help
 	  This adds support for ASoC machine driver for SEMI_DRIVE X9
@@ -19,9 +23,9 @@ config SND_X9_FPGA_MACH
 	  If unsure select "N".
 
 config SND_X9_EVB_MACH
-	tristate "ASoC Audio driver for evb platform x9 with cs24888 codec"
+	tristate "ASoC Audio driver for evb platform x9"
 	depends on ARCH_SEMIDRIVE_X9
-	select SND_X9_AFE_I2S_SC
+	select SND_SDRV_AFE_I2S_SC
 	select SND_SOC_GENERIC_DMAENGINE_PCM
 	help
 	  This adds support for ASoC machine driver for SEMI_DRIVE X9
@@ -29,13 +33,26 @@ config SND_X9_EVB_MACH
 	  Select Y if you have such device.
 	  If unsure select "N".
 
+config SND_G9_REF_MACH
+	tristate "ASoC Audio driver for g9 platform"
+	depends on ARCH_SEMIDRIVE_X9
+	select SND_SOC_GENERIC_DMAENGINE_PCM
+	help
+	  This adds support for ASoC machine driver for SEMI_DRIVE G9
+	  platforms with internal audio codec and speaker amplifier.
+	  Select Y if you have such device.
+	  If unsure select "N".
+
 config SND_X9_CS42888
 	tristate "ASoC Audio driver for x9 with cs24888 codec"
 	depends on ARCH_SEMIDRIVE_X9
-	select SND_X9_AFE_I2S_SC
+	select SND_SDRV_AFE_I2S_SC
 	select SND_SOC_GENERIC_DMAENGINE_PCM
 	help
 	  This adds support for ASoC machine driver for SEMI_DRIVE X9
 	  platforms with internal audio codec and speaker amplifier.
 	  Select Y if you have such device.
 	  If unsure select "N".
+
+endmenu
+

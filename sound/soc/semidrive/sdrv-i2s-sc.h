@@ -1,6 +1,6 @@
 
 /*
- * x9-i2s-sc.h
+ * sdrv-i2s-sc.h
  * Copyright (C) 2019 semidrive
  *
  * This program is free software; you can redistribute it and/or modify
@@ -18,8 +18,8 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
  */
-#ifndef X9_I2S_SC_H__
-#define X9_I2S_SC_H__
+#ifndef SDRV_I2S_SC_H__
+#define SDRV_I2S_SC_H__
 #include <linux/bitops.h>
 #define BIT_(nr) (1UL << (nr))
 
@@ -48,7 +48,7 @@ const static uint8_t ChnWidthTable[] = {8, 12, 16, 18, 20, 24, 28, 32};
 #define I2S_SC_SAMPLE_RATE_CALC(fclk, fsample, chn_num, chn_width)             \
 	(fclk / (fsample * chn_num * chn_width))
 
-/* Register offsets from X9_I2S*_BASE */
+/* Register offsets from SDRV_I2S*_BASE */
 #define I2S_SC_FIFO_OFFSET 0x040
 #define I2S_SC_TX_DEPTH 128
 #define I2S_SC_RX_DEPTH 128
@@ -548,4 +548,4 @@ const static uint8_t ChnWidthTable[] = {8, 12, 16, 18, 20, 24, 28, 32};
 #define BIT_TDM_FD_DIR_CH1_TXEN (BIT_(1))
 #define BIT_TDM_FD_DIR_CH0_TXEN (BIT_(0))
 
-#endif /* X9_I2S_SC_H__ */
+#endif /* SDRV_I2S_SC_H__ */

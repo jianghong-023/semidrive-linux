@@ -1,5 +1,5 @@
 /*
- * x9-i2s-mc.c
+ * sdrv-i2s-mc.c
  * Copyright (C) 2019 semidrive
  *
  * This program is free software; you can redistribute it and/or modify
@@ -17,8 +17,8 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
  */
-#include "x9-i2s-mc.h"
-#include "x9-common.h"
+#include "sdrv-i2s-mc.h"
+#include "sdrv-snd-common.h"
 #include <linux/clk.h>
 #include <linux/device.h>
 #include <linux/io.h>
@@ -43,7 +43,7 @@ MODULE_PARM_DESC(fake_buffer, "Fake buffer allocations.");
 
 /* misc operation */
 /*DAI start up config*/
-static void afe_i2s_mc_config(struct x9_afe_i2s_mc *afe)
+static void afe_i2s_mc_config(struct sdrv_afe_i2s_mc *afe)
 {
 	u32 ret, val;
 	/*Disable chn0~chn7*/
@@ -138,7 +138,7 @@ static void afe_i2s_mc_config(struct x9_afe_i2s_mc *afe)
 		MC_I2S_DEV_CONF, val);
 }
 
-static void afe_i2s_mc_start_capture(struct x9_afe_i2s_mc *afe)
+static void afe_i2s_mc_start_capture(struct sdrv_afe_i2s_mc *afe)
 {
 	u32 ret, val;
 	/*Firstly,Enable i2s channel*/
@@ -199,7 +199,7 @@ static void afe_i2s_mc_start_capture(struct x9_afe_i2s_mc *afe)
 		MC_I2S_CID_CTRL, val);
 }
 
-static void afe_i2s_mc_stop_capture(struct x9_afe_i2s_mc *afe)
+static void afe_i2s_mc_stop_capture(struct sdrv_afe_i2s_mc *afe)
 {
 	u32 ret, val;
 	/*Disable chn0~chn7*/
@@ -220,7 +220,7 @@ static void afe_i2s_mc_stop_capture(struct x9_afe_i2s_mc *afe)
 		MC_I2S_CID_CTRL, val);
 }
 
-static void afe_i2s_mc_start_playback(struct x9_afe_i2s_mc *afe)
+static void afe_i2s_mc_start_playback(struct sdrv_afe_i2s_mc *afe)
 {
 	u32 ret, val;
 	/*Firstly,Enable i2s channel*/
@@ -281,7 +281,7 @@ static void afe_i2s_mc_start_playback(struct x9_afe_i2s_mc *afe)
 		MC_I2S_CID_CTRL, val);
 }
 
-static void afe_i2s_mc_stop_playback(struct x9_afe_i2s_mc *afe)
+static void afe_i2s_mc_stop_playback(struct sdrv_afe_i2s_mc *afe)
 {
 	u32 ret, val;
 	/*Disable chn0~chn7*/
@@ -305,7 +305,7 @@ static void afe_i2s_mc_stop_playback(struct x9_afe_i2s_mc *afe)
  * system timer interface
  */
 
-static const struct snd_pcm_hardware x9_pcm_hardware = {
+static const struct snd_pcm_hardware sdrv_pcm_hardware = {
     .info = SNDRV_PCM_INFO_INTERLEAVED | SNDRV_PCM_INFO_MMAP_VALID |
 	    SNDRV_PCM_INFO_BLOCK_TRANSFER,
     .formats = SND_FORMATS,
@@ -322,7 +322,7 @@ static const struct snd_pcm_hardware x9_pcm_hardware = {
     .fifo_size = 0,
 };
 
-static const struct snd_pcm_hardware x9_pcm_hardware1 = {
+static const struct snd_pcm_hardware sdrv_pcm_hardware1 = {
     .info = (SNDRV_PCM_INFO_INTERLEAVED | SNDRV_PCM_INFO_BLOCK_TRANSFER |
 	     SNDRV_PCM_INFO_MMAP_VALID),
     .formats = SND_FORMATS,
@@ -339,7 +339,7 @@ static const struct snd_pcm_hardware x9_pcm_hardware1 = {
     .fifo_size = 0,
 };
 
-static int x9_snd_pcm_open(struct snd_pcm_substream *substream)
+static int sdrv_snd_pcm_open(struct snd_pcm_substream *substream)
 {
 
 	struct snd_pcm_runtime *runtime;
@@ -348,23 +348,23 @@ static int x9_snd_pcm_open(struct snd_pcm_substream *substream)
 	runtime = substream->runtime;
 	rtd = substream->private_data;
 
-	snd_soc_set_runtime_hwparams(substream, &x9_pcm_hardware);
+	snd_soc_set_runtime_hwparams(substream, &sdrv_pcm_hardware);
 
 	runtime->private_data = snd_soc_dai_get_drvdata(rtd->cpu_dai);
 	return 0;
 }
-static int x9_snd_pcm_close(struct snd_pcm_substream *substream)
+static int sdrv_snd_pcm_close(struct snd_pcm_substream *substream)
 {
 	DEBUG_FUNC_PRT;
 	synchronize_rcu();
 	return 0;
 }
-static int x9_snd_pcm_hw_params(struct snd_pcm_substream *substream,
+static int sdrv_snd_pcm_hw_params(struct snd_pcm_substream *substream,
 				struct snd_pcm_hw_params *hw_params)
 {
 
 	/* 	struct snd_pcm_runtime *runtime = substream->runtime;
-		struct x9_afe_i2s_mc *afe = runtime->private_data;
+		struct sdrv_afe_i2s_mc *afe = runtime->private_data;
 		unsigned channels = params_channels(hw_params); */
 	DEBUG_FUNC_PRT;
 
@@ -372,24 +372,24 @@ static int x9_snd_pcm_hw_params(struct snd_pcm_substream *substream,
 					params_buffer_bytes(hw_params));
 }
 
-static int x9_snd_pcm_hw_free(struct snd_pcm_substream *substream)
+static int sdrv_snd_pcm_hw_free(struct snd_pcm_substream *substream)
 {
 	DEBUG_FUNC_PRT;
 	return snd_pcm_lib_free_pages(substream);
 }
 
-static int x9_snd_pcm_prepare(struct snd_pcm_substream *substream)
+static int sdrv_snd_pcm_prepare(struct snd_pcm_substream *substream)
 {
 	DEBUG_FUNC_PRT;
 
 	return 0;
 }
 
-static int x9_snd_pcm_trigger(struct snd_pcm_substream *substream, int cmd)
+static int sdrv_snd_pcm_trigger(struct snd_pcm_substream *substream, int cmd)
 {
 
 	struct snd_pcm_runtime *runtime;
-	struct x9_afe_i2s_mc *afe;
+	struct sdrv_afe_i2s_mc *afe;
 	DEBUG_FUNC_PRT;
 	runtime = substream->runtime;
 	afe = runtime->private_data;
@@ -411,7 +411,7 @@ static int x9_snd_pcm_trigger(struct snd_pcm_substream *substream, int cmd)
 			afe_i2s_mc_start_capture(afe);
 		}
 		// rcu_assign_pointer(afe->tx_substream, substream);
-		// x9_pcm_refill_fifo(afe);
+		// sdrv_pcm_refill_fifo(afe);
 		return 0;
 
 	case SNDRV_PCM_TRIGGER_STOP:
@@ -426,11 +426,11 @@ static int x9_snd_pcm_trigger(struct snd_pcm_substream *substream, int cmd)
 	}
 	return -EINVAL;
 }
-static snd_pcm_uframes_t x9_snd_pcm_pointer(struct snd_pcm_substream *substream)
+static snd_pcm_uframes_t sdrv_snd_pcm_pointer(struct snd_pcm_substream *substream)
 {
 	// DEBUG_FUNC_PRT;
 	struct snd_pcm_runtime *runtime = substream->runtime;
-	struct x9_afe_i2s_mc *afe = runtime->private_data;
+	struct sdrv_afe_i2s_mc *afe = runtime->private_data;
 	snd_pcm_uframes_t pos = ACCESS_ONCE(afe->tx_ptr);
 	// printk(KERN_ERR "%s:%i ------frames(%ld)--------------\n", __func__,
 	// __LINE__, pos);
@@ -445,9 +445,9 @@ static snd_pcm_uframes_t x9_snd_pcm_pointer(struct snd_pcm_substream *substream)
 /* 	TODO: here setup dai */
 /* Set up irq handler
  * ------------------------------------------------------------ */
-static irqreturn_t x9_i2s_mc_irq_handler(int irq, void *dev_id)
+static irqreturn_t sdrv_i2s_mc_irq_handler(int irq, void *dev_id)
 {
-	struct x9_afe_i2s_mc *afe = dev_id;
+	struct sdrv_afe_i2s_mc *afe = dev_id;
 	unsigned int i2s_mc_status;
 	/* struct snd_pcm_runtime *runtime = afe->tx_substream->runtime; */
 
@@ -510,7 +510,7 @@ static irqreturn_t x9_i2s_mc_irq_handler(int irq, void *dev_id)
 
 /* -Set up dai regmap
  * here----------------------------------------------------------- */
-static bool x9_i2s_mc_wr_rd_reg(struct device *dev, unsigned int reg)
+static bool sdrv_i2s_mc_wr_rd_reg(struct device *dev, unsigned int reg)
 {
 	switch (reg) {
 	case MC_I2S_CTRL:
@@ -529,7 +529,7 @@ static bool x9_i2s_mc_wr_rd_reg(struct device *dev, unsigned int reg)
 	}
 }
 
-static bool x9_i2s_volatile_reg(struct device *dev, unsigned int reg)
+static bool sdrv_i2s_volatile_reg(struct device *dev, unsigned int reg)
 {
 	switch (reg) {
 	case MC_I2S_TFIFO_STAT:
@@ -540,14 +540,14 @@ static bool x9_i2s_volatile_reg(struct device *dev, unsigned int reg)
 	}
 }
 
-static const struct regmap_config x9_i2s_mc_regmap_config = {
+static const struct regmap_config sdrv_i2s_mc_regmap_config = {
     .reg_bits = 32,
     .reg_stride = 4,
     .val_bits = 32,
     .max_register = MC_I2S_POLL_STAT,
-    .writeable_reg = x9_i2s_mc_wr_rd_reg,
-    .readable_reg = x9_i2s_mc_wr_rd_reg,
-    .volatile_reg = x9_i2s_mc_wr_rd_reg,
+    .writeable_reg = sdrv_i2s_mc_wr_rd_reg,
+    .readable_reg = sdrv_i2s_mc_wr_rd_reg,
+    .volatile_reg = sdrv_i2s_mc_wr_rd_reg,
     .cache_type = REGCACHE_FLAT,
 };
 
@@ -556,7 +556,7 @@ int snd_afe_i2s_mc_dai_startup(struct snd_pcm_substream *substream,
 {
 	struct snd_soc_pcm_runtime *rtd;
 	struct snd_soc_dai *cpu_dai;
-	struct x9_afe_i2s_mc *afe;
+	struct sdrv_afe_i2s_mc *afe;
 
 	DEBUG_FUNC_PRT;
 	rtd = substream->private_data;
@@ -577,7 +577,7 @@ int snd_afe_i2s_mc_dai_hw_params(struct snd_pcm_substream *substream,
 	struct device *dev = dai->dev;
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
 	struct snd_soc_dai *cpu_dai = rtd->cpu_dai;
-	struct x9_afe_i2s_mc *afe = snd_soc_dai_get_drvdata(dai);
+	struct sdrv_afe_i2s_mc *afe = snd_soc_dai_get_drvdata(dai);
 
 	unsigned srate = params_rate(hwparam);
 	unsigned channels = params_channels(hwparam);
@@ -685,7 +685,7 @@ int snd_afe_i2s_mc_dai_prepare(struct snd_pcm_substream *substream,
 			       struct snd_soc_dai *dai)
 {
 	DEBUG_FUNC_PRT
-	struct x9_afe_i2s_mc *afe = snd_soc_dai_get_drvdata(dai);
+	struct sdrv_afe_i2s_mc *afe = snd_soc_dai_get_drvdata(dai);
 	// afe_i2s_mc_config(afe);
 	return 0;
 }
@@ -695,7 +695,7 @@ int snd_afe_i2s_mc_dai_trigger(struct snd_pcm_substream *substream, int cmd,
 			       struct snd_soc_dai *dai)
 {
 	DEBUG_FUNC_PRT
-	struct x9_afe_i2s_mc *afe = snd_soc_dai_get_drvdata(dai);
+	struct sdrv_afe_i2s_mc *afe = snd_soc_dai_get_drvdata(dai);
 	switch (cmd) {
 	case SNDRV_PCM_TRIGGER_START:
 	case SNDRV_PCM_TRIGGER_PAUSE_RELEASE:
@@ -736,7 +736,7 @@ void snd_afe_i2s_mc_dai_shutdown(struct snd_pcm_substream *substream,
 static int snd_afe_i2s_mc_dai_set_fmt(struct snd_soc_dai *dai, unsigned int fmt)
 {
 
-	struct x9_afe_i2s_mc *afe = snd_soc_dai_get_drvdata(dai);
+	struct sdrv_afe_i2s_mc *afe = snd_soc_dai_get_drvdata(dai);
 	unsigned int mask = 0, val = 0, ret;
 	DEBUG_FUNC_PRT
 	switch (fmt & SND_SOC_DAIFMT_INV_MASK) {
@@ -838,7 +838,7 @@ static struct snd_soc_dai_ops snd_afe_i2s_mc_dai_ops = {
 
 int snd_soc_i2s_mc_dai_probe(struct snd_soc_dai *dai)
 {
-	struct x9_afe_i2s_mc *d = snd_soc_dai_get_drvdata(dai);
+	struct sdrv_afe_i2s_mc *d = snd_soc_dai_get_drvdata(dai);
 	struct device *dev = d->dev;
 
 	dev_info(dev, "DAI probe.----------------------------\n");
@@ -855,7 +855,7 @@ int snd_soc_i2s_mc_dai_probe(struct snd_soc_dai *dai)
 
 int snd_soc_i2s_mc_dai_remove(struct snd_soc_dai *dai)
 {
-	struct x9_afe_i2s_mc *d = snd_soc_dai_get_drvdata(dai);
+	struct sdrv_afe_i2s_mc *d = snd_soc_dai_get_drvdata(dai);
 	struct device *dev = d->dev;
 
 	dev_info(dev, "DAI remove.\n");
@@ -896,12 +896,12 @@ static const struct snd_soc_component_driver snd_sample_soc_component = {
     .name = DRV_NAME "-i2s-component",
 };
 
-static int x9_pcm_prepare_slave_config(struct snd_pcm_substream *substream,
+static int sdrv_pcm_prepare_slave_config(struct snd_pcm_substream *substream,
 				       struct snd_pcm_hw_params *params,
 				       struct dma_slave_config *slave_config)
 {
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
-	struct x9_afe_i2s_mc *afe = snd_soc_dai_get_drvdata(rtd->cpu_dai);
+	struct sdrv_afe_i2s_mc *afe = snd_soc_dai_get_drvdata(rtd->cpu_dai);
 
 	struct snd_dmaengine_dai_dma_data *snd_dma_params;
 
@@ -927,16 +927,16 @@ static int x9_pcm_prepare_slave_config(struct snd_pcm_substream *substream,
 	return 0;
 }
 
-static const struct snd_dmaengine_pcm_config x9_dmaengine_pcm_config = {
-    .pcm_hardware = &x9_pcm_hardware,
-    .prepare_slave_config = x9_pcm_prepare_slave_config,
+static const struct snd_dmaengine_pcm_config sdrv_dmaengine_pcm_config = {
+    .pcm_hardware = &sdrv_pcm_hardware,
+    .prepare_slave_config = sdrv_pcm_prepare_slave_config,
     .prealloc_buffer_size = X9_I2S_MC_FIFO_SIZE * 8,
 };
 
 static int snd_i2s_mc_soc_platform_probe(struct snd_soc_component *pdev)
 {
 	struct device *dev = pdev->dev;
-	struct x9_afe_i2s_mc *afe;
+	struct sdrv_afe_i2s_mc *afe;
 	int ret;
 	dev_info(dev, "Added-----------%s:%i \n", __func__, __LINE__);
 
@@ -965,13 +965,13 @@ static struct snd_soc_component_driver snd_afe_soc_component = {
 static int snd_afe_i2s_mc_probe(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
-	struct x9_afe_i2s_mc *afe;
+	struct sdrv_afe_i2s_mc *afe;
 	int ret;
 	struct resource *res;
 	unsigned int irq_id;
 	dev_info(dev, "Probed.\n");
 
-	afe = devm_kzalloc(dev, sizeof(struct x9_afe_i2s_mc), GFP_KERNEL);
+	afe = devm_kzalloc(dev, sizeof(struct sdrv_afe_i2s_mc), GFP_KERNEL);
 	if (afe == NULL)
 		return -ENOMEM;
 
@@ -994,10 +994,10 @@ static int snd_afe_i2s_mc_probe(struct platform_device *pdev)
 	}
 	DEBUG_ITEM_PRT(irq_id);
 
-	ret = devm_request_irq(afe->dev, irq_id, x9_i2s_mc_irq_handler, 0,
+	ret = devm_request_irq(afe->dev, irq_id, sdrv_i2s_mc_irq_handler, 0,
 			       pdev->name, (void *)afe);
 	/*  ret = devm_request_threaded_irq(&pdev->dev, irq_id, NULL,
-									x9_i2s_mc_irq_handler,
+									sdrv_i2s_mc_irq_handler,
 									IRQF_SHARED
 	| IRQF_ONESHOT, pdev->name, afe); if (ret < 0)
 	{
@@ -1016,7 +1016,7 @@ static int snd_afe_i2s_mc_probe(struct platform_device *pdev)
 			" irq(%d) num(%d) vaddr(0x%llx) paddr(0x%llx) \n",
 	       irq_id, pdev->num_resources, afe->regs, res->start);
 	afe->regmap = devm_regmap_init_mmio(&pdev->dev, afe->regs,
-					    &x9_i2s_mc_regmap_config);
+					    &sdrv_i2s_mc_regmap_config);
 
 	if (IS_ERR(afe->regmap)) {
 		ret = PTR_ERR(afe->regmap);
@@ -1034,7 +1034,7 @@ static int snd_afe_i2s_mc_probe(struct platform_device *pdev)
 	afe->capture_dma_data.addr_width = DMA_SLAVE_BUSWIDTH_2_BYTES;
 	afe->capture_dma_data.maxburst = 4;
 
-	ret = devm_snd_dmaengine_pcm_register(dev, &x9_dmaengine_pcm_config, 0);
+	ret = devm_snd_dmaengine_pcm_register(dev, &sdrv_dmaengine_pcm_config, 0);
 	if (ret)
 		goto err_disable;
 
@@ -1055,13 +1055,13 @@ err_disable:
 static int snd_afe_i2s_mc_remove(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
-	struct x9_afe_i2s_mc *afe = platform_get_drvdata(dev);
+	struct sdrv_afe_i2s_mc *afe = platform_get_drvdata(dev);
 	dev_info(dev, "Removed.\n");
 	regmap_exit(afe->regmap);
 	snd_soc_unregister_platform(&pdev->dev);
 	return 0;
 }
-static const struct of_device_id x9_i2s_mc_of_match[] = {
+static const struct of_device_id sdrv_i2s_mc_of_match[] = {
     {
 	.compatible = "semidrive,x9-i2s-mc",
     },
@@ -1070,7 +1070,7 @@ static struct platform_driver snd_afe_i2s_mc_driver = {
     .driver =
 	{
 	    .name = DRV_NAME "-i2s",
-	    .of_match_table = x9_i2s_mc_of_match,
+	    .of_match_table = sdrv_i2s_mc_of_match,
 	},
     .probe = snd_afe_i2s_mc_probe,
     .remove = snd_afe_i2s_mc_remove,

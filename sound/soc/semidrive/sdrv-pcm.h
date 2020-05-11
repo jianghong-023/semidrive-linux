@@ -1,6 +1,6 @@
 
 /*
- * x9-pcm.h
+ * sdrv-pcm.h
  * Copyright (C) 2019 semidrive
  *
  * This program is free software; you can redistribute it and/or modify
