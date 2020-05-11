@@ -483,6 +483,14 @@ config FUJITSU_ES
 	  This driver provides support for Extended Socket network device
           on Extended Partitioning of FUJITSU PRIMEQUEST 2000 E2 series.
 
+config RPMSG_NET
+	tristate "RPMSG based Virtual Network Device Driver"
+	depends on RPMSG
+	depends on RPMSG_VIRTIO
+	help
+	  This driver provides a virtual network device based on RPMSG protocol
+	  to communicate with remote processors.
+
 source "drivers/net/hyperv/Kconfig"
 
 endif # NETDEVICES
