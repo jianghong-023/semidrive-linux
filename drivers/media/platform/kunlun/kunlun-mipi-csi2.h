@@ -276,10 +276,14 @@ struct kunlun_csi_mipi_csi2 {
     /** Device Tree Information */
     void __iomem *base_address;
     void __iomem *dispmux_address;
+    struct resource *dispmux_res;
+
     uint32_t ctrl_irq_number;
 
     uint32_t lanerate;
     uint32_t lane_count;
+
+	u32 active_stream_num;
 
     struct csi_hw hw;
 

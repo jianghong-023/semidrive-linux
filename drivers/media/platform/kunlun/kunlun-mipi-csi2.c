@@ -11,6 +11,7 @@
 
 #include "kunlun-mipi-csi2.h"
 #include <linux/delay.h>
+#include <linux/io.h>
 
 /**
  * @short Video formats supported by the MIPI CSI-2
@@ -438,14 +439,30 @@ static int mipi_csi2_set_phy_freq(struct kunlun_csi_mipi_csi2 *kcmc,
             break;
     }
 
-	if(kcmc->id == 0){
-		iowrite32(g_phy_freqs[i].index, kcmc->dispmux_address+0x60);
-	} else if(kcmc->id == 1){
-		iowrite32(g_phy_freqs[i].index, kcmc->dispmux_address+0x68);
-	} else {
-		printk("wrong host id\n");
-	}
+#if 1
+    kcmc->dispmux_address = devm_ioremap_resource(&kcmc->pdev->dev,
+                            kcmc->dispmux_res);
 
+    if (IS_ERR(kcmc->dispmux_address)) {
+        dev_err(&kcmc->pdev->dev, "dispmux address not right.\n");
+        return PTR_ERR(kcmc->dispmux_address);
+    }
+
+#endif
+
+    if (kcmc->id == 0) {
+        iowrite32(g_phy_freqs[i].index, kcmc->dispmux_address + 0x60);
+    }
+    else if (kcmc->id == 1) {
+        iowrite32(g_phy_freqs[i].index, kcmc->dispmux_address + 0x68);
+    }
+    else {
+        printk("wrong host id\n");
+    }
+
+#if 1
+    devm_iounmap(&kcmc->pdev->dev, kcmc->dispmux_address);
+#endif
     msleep(1);
     return 0;
 }
@@ -488,13 +505,26 @@ static int mipi_csi2_s_stream(struct v4l2_subdev *sd, int enable)
     if (!kcmc)
         return -EINVAL;
 
+    if (enable == 1) {
+        if (kcmc->active_stream_num == 0) {
+            mipi_csi2_set_phy_freq(kcmc, kcmc->lanerate / 1000 / 1000,
+                                   kcmc->lane_count);
+            mipi_csi2_enable(kcmc, enable);
+            v4l2_subdev_call(sensor_sd, video, s_stream, enable);
+        }
 
-    mipi_csi2_set_phy_freq(kcmc, kcmc->lanerate / 1000 / 1000,
-                           kcmc->lane_count);
+        kcmc->active_stream_num++;
+    }
+    else {
+        kcmc->active_stream_num--;
 
-    mipi_csi2_enable(kcmc, enable);
+        if (kcmc->active_stream_num == 0) {
+            mipi_csi2_enable(kcmc, enable);
+            v4l2_subdev_call(sensor_sd, video, s_stream, enable);
+        }
+    }
 
-    return v4l2_subdev_call(sensor_sd, video, s_stream, enable);
+    return 0;
 }
 
 
@@ -669,11 +699,12 @@ dw_mipi_csi_parse_dt(struct platform_device *pdev,
     int reg;
     int ret = 0;
 
-	ret = of_property_read_u32(node, "host_id", &kcmc->id);
-	if(ret < 0) {
-		dev_err(&pdev->dev, "Missing host id\n");
-		return -EINVAL;
-	}
+    ret = of_property_read_u32(node, "host_id", &kcmc->id);
+
+    if (ret < 0) {
+        dev_err(&pdev->dev, "Missing host id\n");
+        return -EINVAL;
+    }
 
     /* Device tree information */
     ret = of_property_read_u32(node, "data-lanes", &kcmc->hw.num_lanes);
@@ -821,6 +852,7 @@ static int kunlun_mipi_csi2_probe(struct platform_device *pdev)
     mutex_init(&kcmc->lock);
     spin_lock_init(&kcmc->slock);
     kcmc->pdev = pdev;
+    kcmc->active_stream_num = 0;
 
     of_id = of_match_node(kunlun_mipi_csi2_dt_match, dev->of_node);
 
@@ -845,6 +877,7 @@ static int kunlun_mipi_csi2_probe(struct platform_device *pdev)
     }
 
     res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
+#if 0
     kcmc->dispmux_address = devm_ioremap_resource(dev, res);
 
     if (IS_ERR(kcmc->dispmux_address)) {
@@ -852,6 +885,9 @@ static int kunlun_mipi_csi2_probe(struct platform_device *pdev)
         return PTR_ERR(kcmc->dispmux_address);
     }
 
+#else
+    kcmc->dispmux_res = res;
+#endif
     kcmc->ctrl_irq_number = platform_get_irq(pdev, 0);
 
     if (kcmc->ctrl_irq_number <= 0) {
@@ -876,8 +912,6 @@ static int kunlun_mipi_csi2_probe(struct platform_device *pdev)
     kcmc->fmt = &dw_mipi_csi_formats[0];
 
     kcmc->format.code = dw_mipi_csi_formats[0].code;
-    //kcmc->format.width = 640;  // FIXME: hardcode, zhuming, 190917
-    //kcmc->format.height = 480;
 
     v4l2_set_subdevdata(sd, kcmc);
 
@@ -913,9 +947,6 @@ static int kunlun_mipi_csi2_probe(struct platform_device *pdev)
         dev_err(dev, "Failed to register async subdev");
         goto error_entity_cleanup;
     }
-
-    // call DPHY probe here, zhuming, 190929
-    //snps_dphy_probe(kcmc);
 
     return 0;
 

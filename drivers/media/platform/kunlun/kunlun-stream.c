@@ -43,7 +43,8 @@
 #define IMG_MIMG_YUV420_LEGACY		BIT(4)
 #define IMG_INTERFACE_MASK			0x07
 #define IMG_MIMG_CSI2_SEL			0x00
-#define IMG_PARALLEL_SEL			0x04
+#define IMG_PARALLEL_SEL			0x02
+#define IMG_PARALLEL_SEL_OTHER		0x04
 #define IMG_BT656_SEL				0x05
 #define IMG_PIXEL_CTRL_MASK			0x3FF8
 #define IMG_PIXEL_VLD_EVEN_SHIFT	11
@@ -446,8 +447,13 @@ static int kstream_set_channel(struct kstream_device *kstream)
 			kcsi_writel(kstream->base, IMG_CHN_SPLIT_(n), 0x13);
 			kcsi_writel(kstream->base, IMG_CHN_PACK_(n), 0x108);
 		} else {
-			kcsi_writel(kstream->base, IMG_CHN_SPLIT_(n), pix_fmts[pos].split[n]);
+			if(kstream->id==0){
+				kcsi_writel(kstream->base, IMG_CHN_SPLIT_(n), 0x21a);
+			} else {
+				kcsi_writel(kstream->base, IMG_CHN_SPLIT_(n), pix_fmts[pos].split[n]);
+			}
 			kcsi_writel(kstream->base, IMG_CHN_PACK_(n), pix_fmts[pos].pack[n]);
+			dev_err(kstream->dev, "%s: pix_fmts[pos=%d]\n", __func__, pos);
 		}
 		if(n < pix_fmt->num_planes)
 			ctrl |= ((1 << n) << IMG_PIXEL_STREAM_EN_SHIFT);
@@ -1390,8 +1396,7 @@ static void kunlun_stream_init_interface(struct kstream_device *kstream)
 	switch(kstream->interface.mbus_type) {
 	case V4L2_MBUS_PARALLEL:
 	case KUNLUN_MBUS_DC2CSI1:
-		//val |= IMG_PARALLEL_SEL;
-		val |= 2;
+		val |= IMG_PARALLEL_SEL;
 		break;
 	case V4L2_MBUS_CSI2:
 	case KUNLUN_MBUS_DC2CSI2:
@@ -1401,7 +1406,7 @@ static void kunlun_stream_init_interface(struct kstream_device *kstream)
 		val |= IMG_BT656_SEL;
 		break;
 	default:
-		val |= IMG_PARALLEL_SEL;
+		val |= IMG_PARALLEL_SEL_OTHER;
 		break;
 	}
 

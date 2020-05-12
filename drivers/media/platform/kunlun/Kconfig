@@ -17,6 +17,10 @@ config VIDEO_SEMIDRIVE_OV5640
 	tristate "Ov5640 for Semidrive"
 	depends on VIDEO_SEMIDRIVE
 
-config VIDEO_SEMIDRIVE_MAX9286
+config VIDEO_SEMIDRIVE_MAX9286_MAX96705
 	tristate "MAX9286 for Semidrive"
+	depends on VIDEO_SEMIDRIVE
+
+config VIDEO_SEMIDRIVE_MAX96706_MAX96705
+	tristate "MAX96706 for Semidrive"
 	depends on VIDEO_SEMIDRIVE
