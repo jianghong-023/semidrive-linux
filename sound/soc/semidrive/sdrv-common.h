@@ -1,38 +1,57 @@
+/* sdrv-common.h
+ * Copyright (C) 2020 semidrive
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ *
+ */
 
-#ifndef X9_COMMON_H__
-#define X9_COMMON_H__
-#include "x9-abuf.h"
+#ifndef SDRV_COMMON_H__
+#define SDRV_COMMON_H__
+#include "sdrv-abuf.h"
 #include <sound/dmaengine_pcm.h>
 
 /* scr physical address */
 #define APB_SCR_SEC_BASE (0x38200000u)
 
 #define DEBUG_FUNC_PRT                                                         \
-	printk(KERN_INFO "X9_ALSA: %s:%i --------------------\n", __func__,    \
+	printk(KERN_INFO "SDRV_ALSA: %s:%-120i\n", __func__,    \
 	       __LINE__);
 
 #define DEBUG_FUNC_PRT_INFO(str)                                               \
-	printk(KERN_INFO "X9_ALSA: %s:%i ------%s\n", __func__, __LINE__, str);
+	printk(KERN_INFO "SDRV_ALSA: %s:%-120i %s\n", __func__, __LINE__, str);
 
 #define DEBUG_DEV_PRT(dev)                                                     \
-	dev_info(dev, "X9_ALSA: %s:%i --------------------\n", __func__,       \
+	dev_info(dev, "SDRV_ALSA: %s:%-120i \n", __func__,       \
 		 __LINE__);
+
 #define DEBUG_ITEM_PRT(item)                                                   \
-	printk(KERN_INFO "X9_ALSA: %s:%i [%s]:0x%x(%d)--------\n", __func__,   \
+	printk(KERN_INFO "SDRV_ALSA: %s:%-120i [%s]:0x%x(%d)\n", __func__,   \
 	       __LINE__, #item, (unsigned int)item, (int)item);
 
 #define DEBUG_ITEM_PTR_PRT(item)                                                   \
-	printk(KERN_INFO "X9_ALSA: %s:%i [%s]:0x%llx(%p)--------\n", __func__,   \
+	printk(KERN_INFO "SDRV_ALSA: %s:%-120i [%s]:0x%llx(%p)\n", __func__,   \
 	       __LINE__, #item, (long long unsigned int)item, item);
 
-#define X9_I2S_SC_FIFO_SIZE (2048)
+#define SDRV_I2S_SC_FIFO_SIZE (2048)
 
 /* defaults x9 sound card setting*/
-#define MAX_ABUF_SIZE (8 * X9_I2S_SC_FIFO_SIZE)
+#define MAX_ABUF_SIZE (8 * SDRV_I2S_SC_FIFO_SIZE)
 #define MIN_ABUF_SIZE (256)
-#define MAX_PERIOD_SIZE (4 * X9_I2S_SC_FIFO_SIZE)
+#define MAX_PERIOD_SIZE (4 * SDRV_I2S_SC_FIFO_SIZE)
 #define MIN_PERIOD_SIZE (2 * 8)
-#define MAX_PERIODS (4 * X9_I2S_SC_FIFO_SIZE)
+#define MAX_PERIODS (4 * SDRV_I2S_SC_FIFO_SIZE)
 #define MIN_PERIODS (2)
 #define MAX_ABUF
 
@@ -44,11 +63,12 @@
 #define SND_CHANNELS_MIN 1
 #define SND_CHANNELS_MAX 2
 
-enum { X9_I2S_SCLK_MCLK,
+enum {
+	I2S_SCLK_MCLK,
 };
 
 /* x9 afe common structure */
-struct x9_afe {
+struct sdrv_afe {
 	struct platform_device *pdev;
 	struct device *dev;
 
@@ -58,16 +78,19 @@ struct x9_afe {
 };
 
 /* x9 i2s sc audio front end structure */
-struct x9_afe_i2s_sc {
+struct sdrv_afe_i2s_sc {
 	struct platform_device *pdev;
 	struct device *dev;
 
 	/* address for ioremap audio hardware register */
 	void __iomem *regs;
+
 	/* TODO: Alloc a sram address, use this to for dma transfer  */
 	void __iomem *sram_address;
+
 	/* this is clk for i2s clock */
 	struct clk *clk_i2s;
+
 	/* mclk for output  */
 	struct clk *mclk;
 	struct snd_dmaengine_dai_dma_data capture_dma_data;
@@ -80,6 +103,7 @@ struct x9_afe_i2s_sc {
 	struct snd_pcm_substream __rcu *rx_substream;
 
 	unsigned int tx_ptr; /* next frame index in the sample buffer */
+	
 	unsigned int periods;
 	/* current fifo level estimate.
 	 * Doesn't have to be perfectly accurate, but must be not less than
@@ -95,13 +119,14 @@ struct x9_afe_i2s_sc {
 
 	/* Full Duplex mode true is full duplex*/
 	bool is_full_duplex;
+
 	/* In full-duplex playing and capturing flag */
 	atomic_t playing;
 	atomic_t capturing;
 };
 
 /* x9 i2s mc audio front end structure */
-struct x9_afe_i2s_mc {
+struct sdrv_afe_i2s_mc {
 	struct platform_device *pdev;
 	struct device *dev;
 
@@ -144,7 +169,7 @@ struct x9_afe_i2s_mc {
 };
 
 /* Define audio front end model */
-struct x9_afe_pcm {
+struct sdrv_afe_pcm {
 	struct platform_device *pdev;
 	struct device *dev;
 
@@ -153,7 +178,7 @@ struct x9_afe_pcm {
 	/* TODO: Alloc a sram address, use this to for dma transfer  */
 	// void __iomem *sram_address;
 	// struct regmap *regmap;
-	struct x9_audio_buf abuf[X9_ABUF_NUMB];
+	struct sdrv_audio_buf abuf[SDRV_ABUF_NUMB];
 	/*Back end Data status*/
 	/*Audio front end*/
 	bool suspended;
@@ -163,30 +188,9 @@ struct x9_afe_pcm {
 	int i2s_out_on_ref_cnt;
 };
 
-/* definition of the chip-specific record  dma related ops*/
-struct snd_x9_chip {
-	struct snd_soc_card *card;
-	struct x9_dummy_model *model;
-	struct snd_pcm *pcm;
-	struct snd_pcm *pcm_spdif;
-	struct snd_pcm_hardware pcm_hw;
-	/* Bitmat for valid reg_base and irq numbers
-	unsigned int avail_substreams;*/
-	struct device *dev;
-
-	int volume;
-	int old_volume; /* stores the volume value whist muted */
-	int dest;
-	int mute;
-	int jack_gpio;
-
-	unsigned int opened;
-	unsigned int spdif_status;
-	struct mutex audio_mutex;
-};
 
 /* x9 dummy model for debug*/
-struct x9_dummy_model {
+struct sdrv_dummy_model {
 	const char *name;
 	int (*playback_constraints)(struct snd_pcm_runtime *runtime);
 	int (*capture_constraints)(struct snd_pcm_runtime *runtime);
@@ -203,4 +207,4 @@ struct x9_dummy_model {
 	unsigned int channels_max;
 };
 
-#endif /* X9_COMMON_H__ */
+#endif /* SDRV_COMMON_H__ */

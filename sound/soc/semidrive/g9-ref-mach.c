@@ -1,5 +1,5 @@
 /*
- * x9-evb-mach
+ * g9-evb-mach
  * Copyright (C) 2019 semidrive
  *
  * This program is free software; you can redistribute it and/or modify
@@ -42,14 +42,12 @@
 
 /* -------------------------------- */
 /* definition of the chip-specific record  dma related ops*/
-struct snd_x9_chip {
+struct snd_g9_chip {
 	struct snd_soc_card *card;
 	struct x9_dummy_model *model;
 	struct snd_pcm *pcm;
 	struct snd_pcm *pcm_spdif;
 	struct snd_pcm_hardware pcm_hw;
-	/* Bitmat for valid reg_base and irq numbers
-	unsigned int avail_substreams;*/
 	struct device *dev;
 
 	int volume;
@@ -66,33 +64,27 @@ struct snd_x9_chip {
 
 /*Controls
  * ------------------------------------------------------------------------------*/
-enum snd_x9_ctrl {
+enum snd_g9_ctrl {
 	PCM_PLAYBACK_VOLUME,
 	PCM_PLAYBACK_MUTE,
 	PCM_PLAYBACK_DEVICE,
 };
-static int snd_x9_evb_controls_get(struct snd_kcontrol *kcontrol,
+
+static int snd_g9_ref_controls_get(struct snd_kcontrol *kcontrol,
 				   struct snd_ctl_elem_value *ucontrol)
 {
-	/* struct snd_soc_card *card = snd_kcontrol_chip(kcontrol); */
-	/*Set value here*/
-	/* 	struct evb_priv *card_data = snd_soc_card_get_drvdata(card);
-
-	ucontrol->value.integer.value[0] = card_data->ext_spk_amp_en; */
-
+	/*Add machine driver controller here */
 	return 0;
 }
-static int snd_x9_evb_controls_put(struct snd_kcontrol *kcontrol,
+
+static int snd_g9_ref_controls_put(struct snd_kcontrol *kcontrol,
 				   struct snd_ctl_elem_value *ucontrol)
 {
-	/* struct snd_soc_card *card = snd_kcontrol_chip(kcontrol); */
-	/* 	struct evb_priv *card_data = snd_soc_card_get_drvdata(card);
-
-	ucontrol->value.integer.value[0] = card_data->ext_spk_amp_en; */
-
+	/*Add machine driver controller here */
 	return 0;
 }
-static int snd_x9_ctl_info(struct snd_kcontrol *kcontrol,
+
+static int snd_g9_ctl_info(struct snd_kcontrol *kcontrol,
 			   struct snd_ctl_elem_info *uinfo)
 {
 	if (kcontrol->private_value == PCM_PLAYBACK_VOLUME) {
@@ -104,10 +96,10 @@ static int snd_x9_ctl_info(struct snd_kcontrol *kcontrol,
 	return 0;
 }
 
-static int snd_x9_ctl_get(struct snd_kcontrol *kcontrol,
+static int snd_g9_ctl_get(struct snd_kcontrol *kcontrol,
 			  struct snd_ctl_elem_value *ucontrol)
 {
-	struct snd_x9_chip *chip = snd_kcontrol_chip(kcontrol);
+	struct snd_g9_chip *chip = snd_kcontrol_chip(kcontrol);
 
 	mutex_lock(&chip->audio_mutex);
 
@@ -122,24 +114,25 @@ static int snd_x9_ctl_get(struct snd_kcontrol *kcontrol,
 	return 0;
 }
 
-static int snd_x9_ctl_put(struct snd_kcontrol *kcontrol,
+static int snd_g9_ctl_put(struct snd_kcontrol *kcontrol,
 			  struct snd_ctl_elem_value *ucontrol)
 {
 	int changed = 0;
 	return changed;
 }
+
 SNDRV_CTL_TLVD_DECLARE_DB_SCALE(snd_codec_db_scale, -10239, 1, 1);
 
-static const struct snd_kcontrol_new snd_x9_cs42888_controls[] = {
-    SOC_SINGLE_BOOL_EXT("X9 Switch", 0, snd_x9_evb_controls_get,
-			snd_x9_evb_controls_put),
+static const struct snd_kcontrol_new snd_g9_mach_controls[] = {
+    SOC_SINGLE_BOOL_EXT("g9 Switch", 0, snd_g9_ref_controls_get,
+			snd_g9_ref_controls_put),
     {.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
      .name = "PCM Playback Volume",
      .access = SNDRV_CTL_ELEM_ACCESS_READWRITE | SNDRV_CTL_ELEM_ACCESS_TLV_READ,
      .private_value = PCM_PLAYBACK_VOLUME,
-     .info = snd_x9_ctl_info,
-     .get = snd_x9_ctl_get,
-     .put = snd_x9_ctl_put,
+     .info = snd_g9_ctl_info,
+     .get = snd_g9_ctl_get,
+     .put = snd_g9_ctl_put,
      .tlv = {.p = snd_codec_db_scale}},
 };
 
@@ -170,9 +163,9 @@ static struct snd_soc_jack_pin hs_jack_pin[] = {
 };
 
 /*
- * Logic for a tlv320aic23 as connected on a x9_evb
+ * Logic for a tlv320aic3104 as connected on a g9_evb
  */
-static int x9_evb_tlv320aic23_init(struct snd_soc_pcm_runtime *rtd)
+static int g9_evb_tlv320aic3104_init(struct snd_soc_pcm_runtime *rtd)
 {
 	int err;
 	DEBUG_FUNC_PRT;
@@ -194,28 +187,31 @@ static int x9_evb_tlv320aic23_init(struct snd_soc_pcm_runtime *rtd)
 }
 
 /*Dapm widtets*/
-static const struct snd_soc_dapm_widget sd_x9_evb_dapm_widgets[] = {
+static const struct snd_soc_dapm_widget sd_g9_evb_dapm_widgets[] = {
     /* Outputs */
-    SND_SOC_DAPM_HP("Headphone Jack", NULL),
+	SND_SOC_DAPM_SPK("HS L", NULL),
+	SND_SOC_DAPM_SPK("HS R", NULL),
 
     /* Inputs */
     SND_SOC_DAPM_LINE("Line In", NULL),
     SND_SOC_DAPM_MIC("Mic In", NULL),
 };
 
-static const struct snd_soc_dapm_route sd_x9_evb_dapm_map[] = {
+static const struct snd_soc_dapm_route sd_g9_evb_dapm_map[] = {
     /* Line Out connected to LLOUT, RLOUT */
-    {"Headphone Jack", NULL, "LOUT"},
-    {"Headphone Jack", NULL, "ROUT"},
-    /* Line in connected to LLINEIN, RLINEIN */
-    {"LLINEIN", NULL, "Line In"},
-    {"RLINEIN", NULL, "Line In"},
+    {"HS L", NULL, "HPLOUT"},
+    {"HS R", NULL, "HPROUT"},
+
     /*  Mic in*/
-    {"MICIN", NULL, "Mic In"},
+
+    {"LINE1R", NULL, "Mic Bias"},
+	{"LINE1L", NULL, "Mic Bias"},
+	{"Mic Bias", NULL, "Mic In"},
+
 };
 /*DAI
  * Link-------------------------------------------------------------------------------*/
-static int x9_tlv320ai23_soc_hw_params(struct snd_pcm_substream *substream,
+static int g9_tlv320ai3x_soc_hw_params(struct snd_pcm_substream *substream,
 				       struct snd_pcm_hw_params *params)
 {
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
@@ -225,11 +221,10 @@ static int x9_tlv320ai23_soc_hw_params(struct snd_pcm_substream *substream,
 	int srate, mclk, err;
 
 	srate = params_rate(params);
-	mclk = 256 * srate;
-	/*TODO: need rearch mclk already be set to 12288000
+	/*TODO: need rearch mclk already be set to 12000000
 	Configure clk here.
 	*/
-
+	mclk = 12000000;
 	DEBUG_ITEM_PRT(mclk);
 	err = snd_soc_dai_set_sysclk(codec_dai, I2S_SCLK_MCLK, mclk,
 				     SND_SOC_CLOCK_IN);
@@ -241,77 +236,40 @@ static int x9_tlv320ai23_soc_hw_params(struct snd_pcm_substream *substream,
 	return 0;
 }
 
-static const struct snd_soc_ops x9_tlv320ai23_ops = {
-    .hw_params = x9_tlv320ai23_soc_hw_params,
+static const struct snd_soc_ops g9_tlv320ai3x_ops = {
+    .hw_params = g9_tlv320ai3x_soc_hw_params,
 };
 
-static struct snd_soc_dai_link snd_x9_evb_soc_dai_links[] = {
+static struct snd_soc_dai_link snd_g9_evb_soc_dai_links[] = {
     {
-	.name = "x9_tlv320ai23 hifi",
-	.stream_name = "x9 hifi",
-	/*
-     * You MAY specify the link's CPU-side device, either by device name,
-     * or by DT/OF node, but not both. If this information is omitted,
-     * the CPU-side DAI is matched using .cpu_dai_name only, which hence
-     * must be globally unique. These fields are currently typically used
-     * only for codec to codec links, or systems using device tree.
-     * You MAY specify the DAI name of the CPU DAI. If this information is
-     * omitted, the CPU-side DAI is matched using .cpu_name/.cpu_of_node
-     * only, which only works well when that device exposes a single DAI.
-     */
+	.name = "g9_tlv320ai23 hifi",
+	.stream_name = "g9 hifi",
 	.cpu_dai_name = "snd-afe-sc-i2s-dai0",
-	.platform_name = "30650000.i2s",
-	.codec_dai_name = "tlv320aic23-hifi",
-	.ops = &x9_tlv320ai23_ops,
-	//.codec_dai_name = "snd-soc-dummy-dai",//"tlv320aic23-hifi",
-	.codec_name = "tlv320aic23-codec.0-001a",
-	.init = x9_evb_tlv320aic23_init,
+	.platform_name = "30610000.i2s",
+	.codec_dai_name = "tlv320aic3x-hifi",
+	.ops = &g9_tlv320ai3x_ops,
+	.codec_name = "tlv320aic3x-codec.4-0018",
+	.init = g9_evb_tlv320aic3104_init,
 	.dai_fmt = SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_CBS_CFS,
     },
-    {
-	.name = "x9_tlv320ai23 Playback",
-	.stream_name = "x9 Playback",
-	.cpu_dai_name = "snd-afe-sc-i2s-dai1",
-	.platform_name = "30650000.i2s",
-	.codec_dai_name = "tlv320aic23-hifi",
-	.ops = &x9_tlv320ai23_ops,
-	//.codec_dai_name = "snd-soc-dummy-dai",//"tlv320aic23-hifi",
-	.codec_name = "tlv320aic23-codec.0-001a",
-	.init = x9_evb_tlv320aic23_init,
-	.dai_fmt = SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_CBS_CFS,
-    },
-    {
-	.name = "x9_tlv320ai23 Capture",
-	.stream_name = "x9 Capture",
-	.cpu_dai_name = "snd-afe-sc-i2s-dai2",
-	.platform_name = "30650000.i2s",
-	.codec_dai_name = "tlv320aic23-hifi",
-	//.codec_dai_name = "snd-soc-dummy-dai",//"tlv320aic23-hifi",
-	//.codec_name = "snd-soc-dummy",
-	.ops = &x9_tlv320ai23_ops,
-	.codec_name = "tlv320aic23-codec.0-001a",
-	.init = x9_evb_tlv320aic23_init,
-	.dai_fmt = SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_CBS_CFS,
-    }};
+};
 
 /*Sound Card Driver
  * ------------------------------------------------------------------------*/
-static struct snd_soc_card x9_evb_card = {
-    .name = "sd-x9-snd-card",
+static struct snd_soc_card g9_ref_card = {
+    .name = "sdrv-g9-snd-card",
 
-    .dai_link = snd_x9_evb_soc_dai_links,
-    .num_links = ARRAY_SIZE(snd_x9_evb_soc_dai_links),
-    /*.controls = snd_x9_evb_controls,
-    .num_controls = ARRAY_SIZE(snd_x9_evb_controls),*/
-    .dapm_widgets = sd_x9_evb_dapm_widgets,
-    .num_dapm_widgets = ARRAY_SIZE(sd_x9_evb_dapm_widgets),
-    .dapm_routes = sd_x9_evb_dapm_map,
-    .num_dapm_routes = ARRAY_SIZE(sd_x9_evb_dapm_map),
+    .dai_link = snd_g9_evb_soc_dai_links,
+    .num_links = ARRAY_SIZE(snd_g9_evb_soc_dai_links),
+    .dapm_widgets = sd_g9_evb_dapm_widgets,
+    .num_dapm_widgets = ARRAY_SIZE(sd_g9_evb_dapm_widgets),
+    .dapm_routes = sd_g9_evb_dapm_map,
+    .num_dapm_routes = ARRAY_SIZE(sd_g9_evb_dapm_map),
 
 };
 
 /*GPIO probe use this function to set gpio. */
-static int x9_gpio_probe(struct snd_soc_card *card)
+static int g9_gpio_probe(struct snd_soc_card *card)
 {
 	int ret = 0;
 	return ret;
@@ -319,30 +277,19 @@ static int x9_gpio_probe(struct snd_soc_card *card)
 
 /*-Init Machine Driver
  * ---------------------------------------------------------------------*/
-#define SND_X9_MACH_DRIVER "x9-tlv320-evb"
+#define SND_G9_MACH_DRIVER "g9-tlv320-ref"
 
 /*ALSA machine driver probe functions.*/
-static int x9_evb_probe(struct platform_device *pdev)
+static int g9_ref_probe(struct platform_device *pdev)
 {
-	struct snd_soc_card *card = &x9_evb_card;
+	struct snd_soc_card *card = &g9_ref_card;
 	struct device *dev = &pdev->dev;
 
 	int ret;
-	struct snd_x9_chip *chip;
+	struct snd_g9_chip *chip;
 
 	dev_info(&pdev->dev, ": dev name =%s %s\n", pdev->name, __func__);
-	/*
-	struct device_node *codec_node;
-	codec_node =
-	    of_parse_phandle(pdev->dev.of_node, "semidrive,audio-codec", 0);
-	if (!codec_node) {
-		dev_err(&pdev->dev,
-			"Property 'audio-codec' missing or invalid\n");
-		DEBUG_FUNC_PRT;
-		return -EINVAL;
-	}
-	snd_x9_evb_soc_dai_links[0].codec_of_node = codec_node;
-	snd_x9_evb_soc_dai_links[1].codec_of_node = codec_node; */
+
 	DEBUG_FUNC_PRT;
 	card->dev = dev;
 
@@ -365,55 +312,55 @@ static int x9_evb_probe(struct platform_device *pdev)
 	return ret;
 }
 
-static int x9_evb_remove(struct platform_device *pdev)
+static int g9_ref_remove(struct platform_device *pdev)
 {
 	snd_card_free(platform_get_drvdata(pdev));
-	dev_info(&pdev->dev, "%s x9_evb_removed\n", __func__);
+	dev_info(&pdev->dev, "%s g9_evb_removed\n", __func__);
 	return 0;
 }
 #ifdef CONFIG_PM
 /*pm suspend operation */
-static int snd_x9_suspend(struct platform_device *pdev, pm_message_t state)
+static int snd_g9_suspend(struct platform_device *pdev, pm_message_t state)
 {
-	dev_info(&pdev->dev, "%s snd_x9_suspend\n", __func__);
+	dev_info(&pdev->dev, "%s snd_g9_suspend\n", __func__);
 	return 0;
 }
 /*pm resume operation */
-static int snd_x9_resume(struct platform_device *pdev)
+static int snd_g9_resume(struct platform_device *pdev)
 {
-	dev_info(&pdev->dev, "%s snd_x9_resume\n", __func__);
+	dev_info(&pdev->dev, "%s snd_g9_resume\n", __func__);
 	return 0;
 }
 #endif
 
-static const struct of_device_id x9_evb_dt_match[] = {
+static const struct of_device_id g9_evb_dt_match[] = {
     {
-	.compatible = "semidrive,x9-tlv320aic23",
+	.compatible = "semidrive,g9-tlv320aic3104",
     },
 };
-MODULE_DEVICE_TABLE(of, x9_evb_dt_match);
+MODULE_DEVICE_TABLE(of, g9_evb_dt_match);
 
-static struct platform_driver x9_evb_mach_driver = {
+static struct platform_driver g9_evb_mach_driver = {
     .driver =
 	{
-	    .name = SND_X9_MACH_DRIVER,
-	    .of_match_table = x9_evb_dt_match,
+	    .name = SND_G9_MACH_DRIVER,
+	    .of_match_table = g9_evb_dt_match,
 #ifdef CONFIG_PM
 	    .pm = &snd_soc_pm_ops,
 #endif
 	},
-	.probe = x9_evb_probe,
-	.remove = x9_evb_remove,
+	.probe = g9_ref_probe,
+	.remove = g9_ref_remove,
 #ifdef CONFIG_PM
-	.suspend = snd_x9_suspend,
-	.resume = snd_x9_resume,
+	.suspend = snd_g9_suspend,
+	.resume = snd_g9_resume,
 #endif
 
 };
 
-module_platform_driver(x9_evb_mach_driver);
+module_platform_driver(g9_evb_mach_driver);
 
 MODULE_AUTHOR("Shao Yi <yi.shao@semidrive.com>");
-MODULE_DESCRIPTION("X9 ALSA SoC machine driver");
+MODULE_DESCRIPTION("g9 ALSA SoC machine driver");
 MODULE_LICENSE("GPL");
-MODULE_ALIAS("platform:x9 alsa mach");
+MODULE_ALIAS("platform:g9 alsa mach");

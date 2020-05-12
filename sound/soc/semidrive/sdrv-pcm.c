@@ -1,6 +1,6 @@
 
 /*
- * x9-pcm.c
+ * sdrv-pcm.c
  * Copyright (C) 2019 semidrive
  *
  * This program is free software; you can redistribute it and/or modify
@@ -27,15 +27,15 @@
 #include <sound/pxa2xx-lib.h>
 #include <sound/dmaengine_pcm.h>
 
-#include "x9-common.h"
+#include "sdrv-snd-common.h"
 /* X9 Audio Front End PCM probe function */
 static int snd_afe_pcm_probe(struct platform_device *pdev)
 {
     struct device *dev = &pdev->dev;
-    struct x9_afe_pcm *afe;
+    struct sdrv_afe_pcm *afe;
     struct resource *res;
     dev_info(dev, "Probed.\n");
-    afe = devm_kzalloc(dev, sizeof(struct x9_afe_pcm),
+    afe = devm_kzalloc(dev, sizeof(struct sdrv_afe_pcm),
                        GFP_KERNEL);
     if (afe == NULL)
         return -ENOMEM;
@@ -45,14 +45,14 @@ static int snd_afe_pcm_probe(struct platform_device *pdev)
 static int snd_afe_pcm_remove(struct platform_device *pdev)
 {
     struct device *dev = &pdev->dev;
-    struct x9_afe_pcm *afe = platform_get_drvdata(dev);
+    struct sdrv_afe_pcm *afe = platform_get_drvdata(dev);
     dev_info(dev, "Removed.\n");
     /* regmap_exit(afe->regmap); */
     snd_soc_unregister_platform(&pdev->dev);
     return 0;
 }
 
-static const struct of_device_id x9_i2s_sc_of_match[] = {
+static const struct of_device_id sdrv_i2s_sc_of_match[] = {
     {
         .compatible = "semidrive,x9-afe-pcm",
     },
@@ -61,7 +61,7 @@ static const struct of_device_id x9_i2s_sc_of_match[] = {
 static struct platform_driver snd_afe_i2s_sc_driver = {
     .driver = {
         .name = "x9-afe-pcm",
-        .of_match_table = x9_afe_pcm_of_match,
+        .of_match_table = sdrv_afe_pcm_of_match,
     },
     .probe = snd_afe_pcm_probe,
     .remove = snd_afe_pcm_remove,
