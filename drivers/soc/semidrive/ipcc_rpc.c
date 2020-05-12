@@ -22,15 +22,15 @@
 #define RPMSG_RPC_MAX_RESULT     (4)
 
 struct rpc_req_msg {
-    u32 cmd;
-    u32 cksum;
-    u32 param[RPMSG_RPC_MAX_PARAMS];
+	u32 cmd;
+	u32 cksum;
+	u32 param[RPMSG_RPC_MAX_PARAMS];
 } ;
 
 struct rpc_ret_msg {
-    u32 ack;
-    u32 retcode;
-    u32 result[RPMSG_RPC_MAX_RESULT];
+	u32 ack;
+	u32 retcode;
+	u32 result[RPMSG_RPC_MAX_RESULT];
 };
 
 struct rpmsg_rpc_device {
@@ -85,56 +85,59 @@ int rpmsg_rpc_call(struct rpmsg_rpc_device *rpcdev, struct rpc_req_msg *req, str
 	if (result)
 		memcpy(result, &rpcdev->result, sizeof(*result));
 
-    dev_info(rpcdev->dev, "succeed to call RPC %d\n", req->cmd);
+	dev_info(rpcdev->dev, "succeed to call RPC %d\n", req->cmd);
 
 err:
-    return ret;
+	return ret;
 }
 
 int rpmsg_rpc_ping(struct rpmsg_rpc_device *rpcdev)
 {
-    struct rpc_ret_msg result = {0,};
-    struct rpc_req_msg request = {0,};
-    int ret;
+	struct rpc_ret_msg result = {0,};
+	struct rpc_req_msg request = {0,};
+	int ret;
 
-    request.cmd = RPMSG_RPC_REQ_PING;
-    request.cksum = RPMSG_SANITY_TAG;
-    ret = rpmsg_rpc_call(rpcdev, &request, &result, RPMSG_TEST_TIMEOUT);
-    if (ret < 0) {
-        dev_err(rpcdev->dev, "rpc: call_func:%x fail ret: %d\n", request.cmd, ret);
-        return ret;
-    }
+	request.cmd = RPMSG_RPC_REQ_PING;
+	request.cksum = RPMSG_SANITY_TAG;
+	ret = rpmsg_rpc_call(rpcdev, &request, &result, RPMSG_TEST_TIMEOUT);
+	if (ret < 0) {
+		dev_err(rpcdev->dev, "rpc: call_func:%x fail ret: %d\n", request.cmd, ret);
+		return ret;
+	}
 
-    ret = result.retcode;
-    dev_dbg(rpcdev->dev, "rpc: get result: %x %d %x %x %x\n", result.ack, ret,
-                result.result[0], result.result[1], result.result[2]);
-    WARN_ON(result.ack != RPMSG_RPC_ACK_PING);
-    WARN_ON(ret);
+	ret = result.retcode;
+	dev_dbg(rpcdev->dev, "rpc: get result: %x %d %x %x %x\n", result.ack, ret,
+				result.result[0], result.result[1], result.result[2]);
 
-    if (memcmp((char*)request.param, (char*)result.result, sizeof(result.result)))
-        dev_warn(rpcdev->dev, "rpc: echo not match\n");
+	if ((result.ack != RPMSG_RPC_ACK_PING) || ret)
+		dev_warn(rpcdev->dev, "rpc: exec bad result %d %d\n", result.ack, ret);
 
-    return ret;
+	if (memcmp((char*)request.param, (char*)result.result, sizeof(result.result)))
+		dev_warn(rpcdev->dev, "rpc: echo not match\n");
+
+	return ret;
 }
 
 int rpmsg_rpc_gettimeofday(struct rpmsg_rpc_device *rpcdev)
 {
-    struct rpc_ret_msg result;
-    struct rpc_req_msg request;
-    int ret;
+	struct rpc_ret_msg result;
+	struct rpc_req_msg request;
+	int ret;
 
-    request.cmd = RPMSG_RPC_REQ_GETTIMEOFDAY;
-    request.cksum = RPMSG_SANITY_TAG;
-    ret = rpmsg_rpc_call(rpcdev, &request, &result, RPMSG_TEST_TIMEOUT);
-    if (ret < 0) {
-        dev_err(rpcdev->dev, "rpc: call-func:%x fail ret: %d\n", request.cmd, ret);
-        return ret;
-    }
-    ret = result.retcode;
-    dev_dbg(rpcdev->dev, "rpc: get result: %x %d %x %x %x\n", result.ack, ret,
-                result.result[0], result.result[1], result.result[2]);
-    WARN_ON(result.ack != RPMSG_RPC_ACK_GETTIMEOFDAY);
-    WARN_ON(ret);
+	request.cmd = RPMSG_RPC_REQ_GETTIMEOFDAY;
+	request.cksum = RPMSG_SANITY_TAG;
+	ret = rpmsg_rpc_call(rpcdev, &request, &result, RPMSG_TEST_TIMEOUT);
+	if (ret < 0) {
+		dev_err(rpcdev->dev, "rpc: call-func:%x fail ret: %d\n", request.cmd, ret);
+		return ret;
+	}
+	ret = result.retcode;
+	dev_dbg(rpcdev->dev, "rpc: get result: %x %d %x %x %x\n", result.ack, ret,
+				result.result[0], result.result[1], result.result[2]);
+
+	if ((result.ack != RPMSG_RPC_ACK_GETTIMEOFDAY) || ret)
+		dev_warn(rpcdev->dev, "rpc: exec bad result %d %d\n", result.ack, ret);
+
     return ret;
 }
 
@@ -181,7 +184,6 @@ static void rpc_work_handler(struct work_struct *work)
 
 	rpmsg_rpc_ping(rpcdev);
 	rpmsg_rpc_gettimeofday(rpcdev);
-
 }
 
 static int rpmsg_rpcdev_probe(struct rpmsg_device *rpdev)
@@ -200,7 +202,7 @@ static int rpmsg_rpcdev_probe(struct rpmsg_device *rpdev)
 
 	/* just async call RPC */
 	INIT_DELAYED_WORK(&rpcdev->delay_work, rpc_work_handler);
-	schedule_delayed_work(&rpcdev->delay_work, msecs_to_jiffies(1000));
+	schedule_delayed_work(&rpcdev->delay_work, msecs_to_jiffies(500));
 
 	/* TODO: add kthread to serve RPC request */
 	dev_info(&rpdev->dev, "Semidrive Rpmsg RPC device probe!\n");
