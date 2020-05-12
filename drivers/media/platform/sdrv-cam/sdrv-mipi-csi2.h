@@ -1,15 +1,15 @@
 /*
- * kunlun-mipi-csi2.h
+ * sdrv-mipi-csi2.h
  *
- * Semidrive kunlun platform mipi csi2 header file
+ * Semidrive platform mipi csi2 header file
  *
  * Copyright (C) 2019, Semidrive  Communications Inc.
  *
  * This file is licensed under a dual GPLv2 or X11 license.
  */
 
-#ifndef SD_KUNLUN_MIPI_CSI2_H
-#define SD_KUNLUN_MIPI_CSI2_H
+#ifndef SDRV_MIPI_CSI2_H
+#define SDRV_MIPI_CSI2_H
 
 #include <linux/clk.h>
 #include <linux/media-bus-format.h>
@@ -31,23 +31,23 @@
 //#include <linux/io.h>
 #include <linux/irqreturn.h>
 #include <linux/interrupt.h>
-#include "kunlun-csi.h"
-#define KUNLUN_MIPI_CSI2_NAME           "kunlun-mipi-csi2"
+#include "sdrv-csi.h"
+#define SDRV_MIPI_CSI2_NAME           "sdrv-mipi-csi2"
 
-#define KUNLUN_MIPI_CSI2_VC0_PAD_SINK       0
-#define KUNLUN_MIPI_CSI2_VC1_PAD_SINK       1
-#define KUNLUN_MIPI_CSI2_VC2_PAD_SINK       2
-#define KUNLUN_MIPI_CSI2_VC3_PAD_SINK       3
-#define KUNLUN_MIPI_CSI2_VC0_PAD_SRC        4
-#define KUNLUN_MIPI_CSI2_VC1_PAD_SRC        5
-#define KUNLUN_MIPI_CSI2_VC2_PAD_SRC        6
-#define KUNLUN_MIPI_CSI2_VC3_PAD_SRC        7
-#define KUNLUN_MIPI_CSI2_PAD_NUM        8
+#define SDRV_MIPI_CSI2_VC0_PAD_SINK       0
+#define SDRV_MIPI_CSI2_VC1_PAD_SINK       1
+#define SDRV_MIPI_CSI2_VC2_PAD_SINK       2
+#define SDRV_MIPI_CSI2_VC3_PAD_SINK       3
+#define SDRV_MIPI_CSI2_VC0_PAD_SRC        4
+#define SDRV_MIPI_CSI2_VC1_PAD_SRC        5
+#define SDRV_MIPI_CSI2_VC2_PAD_SRC        6
+#define SDRV_MIPI_CSI2_VC3_PAD_SRC        7
+#define SDRV_MIPI_CSI2_PAD_NUM        8
 
 
 #define CSI_MAX_ENTITIES    2
 
-#define KUNLUN_MIPI_CSI2_IPI_NUM        4
+#define SDRV_MIPI_CSI2_IPI_NUM        4
 
 
 /* data type */
@@ -255,7 +255,7 @@ struct csi_hw {
     uint32_t adv_feature;
 };
 
-struct kunlun_csi_mipi_csi2 {
+struct sdrv_csi_mipi_csi2 {
     u32 id;
     //void __iomem *base;
     struct device *dev;
@@ -264,7 +264,7 @@ struct kunlun_csi_mipi_csi2 {
     struct mutex lock;
     spinlock_t slock;
 
-    struct media_pad pads[KUNLUN_MIPI_CSI2_PAD_NUM];
+    struct media_pad pads[SDRV_MIPI_CSI2_PAD_NUM];
     struct platform_device *pdev;
     u8 index;
 

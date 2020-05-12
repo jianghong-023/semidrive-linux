@@ -1,7 +1,7 @@
 /*
- * kunlun-parallel.c
+ * sdrv-parallel.c
  *
- * Semidrive kunlun platform kstream subdev operation
+ * Semidrive platform kstream subdev operation
  *
  * Copyright (C) 2019, Semidrive  Communications Inc.
  *
@@ -24,18 +24,18 @@
 #include <media/v4l2-mc.h>
 #include <media/v4l2-fwnode.h>
 
-#include "kunlun-csi.h"
+#include "sdrv-csi.h"
 
-#define KUNLUN_PARALLEL_NAME			"kunlun-csi-parallel"
+#define SDRV_PARALLEL_NAME			"sdrv-csi-parallel"
 
-#define KUNLUN_PARALLEL_PAD_SINK		0
-#define KUNLUN_PARALLEL_PAD_SRC			1
-#define KUNLUN_PARALLEL_PAD_NUM			2
+#define SDRV_PARALLEL_PAD_SINK		0
+#define SDRV_PARALLEL_PAD_SRC			1
+#define SDRV_PARALLEL_PAD_NUM			2
 
-struct kunlun_csi_parallel {
+struct sdrv_csi_parallel {
 	struct device *dev;
 	struct v4l2_subdev subdev;
-	struct media_pad pads[KUNLUN_PARALLEL_PAD_NUM];
+	struct media_pad pads[SDRV_PARALLEL_PAD_NUM];
 };
 
 static struct v4l2_subdev *parallel_get_sensor_subdev(struct v4l2_subdev *sd)
@@ -43,7 +43,7 @@ static struct v4l2_subdev *parallel_get_sensor_subdev(struct v4l2_subdev *sd)
 	struct media_pad *sink_pad, *remote_pad;
 	int ret;
 
-	ret = kunlun_find_pad(sd, MEDIA_PAD_FL_SINK);
+	ret = sdrv_find_pad(sd, MEDIA_PAD_FL_SINK);
 	if(ret < 0)
 		return NULL;
 	sink_pad = &sd->entity.pads[ret];
@@ -148,17 +148,17 @@ static int parallel_get_fmt(struct v4l2_subdev *sd,
 	return v4l2_subdev_call(sensor_sd, pad, get_fmt, cfg, format);
 }
 
-static const struct v4l2_subdev_core_ops kunlun_parallel_core_ops = {
+static const struct v4l2_subdev_core_ops sdrv_parallel_core_ops = {
 	.s_power = parallel_s_power,
 };
 
-static const struct v4l2_subdev_video_ops kunlun_parallel_video_ops = {
+static const struct v4l2_subdev_video_ops sdrv_parallel_video_ops = {
 	.g_frame_interval = parallel_g_frame_interval,
 	.s_frame_interval = parallel_s_frame_interval,
 	.s_stream = parallel_s_stream,
 };
 
-static const struct v4l2_subdev_pad_ops kunlun_parallel_pad_ops = {
+static const struct v4l2_subdev_pad_ops sdrv_parallel_pad_ops = {
 	.enum_mbus_code = parallel_enum_mbus_code,
 	.get_fmt = parallel_get_fmt,
 	.set_fmt = parallel_set_fmt,
@@ -166,10 +166,10 @@ static const struct v4l2_subdev_pad_ops kunlun_parallel_pad_ops = {
 	.enum_frame_interval = parallel_enum_frame_interval,
 };
 
-static const struct v4l2_subdev_ops kunlun_parallel_v4l2_ops = {
-	.core = &kunlun_parallel_core_ops,
-	.video = &kunlun_parallel_video_ops,
-	.pad = &kunlun_parallel_pad_ops,
+static const struct v4l2_subdev_ops sdrv_parallel_v4l2_ops = {
+	.core = &sdrv_parallel_core_ops,
+	.video = &sdrv_parallel_video_ops,
+	.pad = &sdrv_parallel_pad_ops,
 };
 
 static int parallel_link_setup(struct media_entity *entity,
@@ -183,14 +183,14 @@ static int parallel_link_setup(struct media_entity *entity,
 	return 0;
 }
 
-static const struct media_entity_operations kunlun_parallel_media_ops = {
+static const struct media_entity_operations sdrv_parallel_media_ops = {
 	.link_setup = parallel_link_setup,
 };
 
-static int kunlun_parallel_probe(struct platform_device *pdev)
+static int sdrv_parallel_probe(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
-	struct kunlun_csi_parallel *kcp;
+	struct sdrv_csi_parallel *kcp;
 	struct v4l2_subdev *sd;
 	int ret;
 
@@ -201,20 +201,20 @@ static int kunlun_parallel_probe(struct platform_device *pdev)
 	kcp->dev = dev;
 	sd = &kcp->subdev;
 
-	v4l2_subdev_init(sd, &kunlun_parallel_v4l2_ops);
+	v4l2_subdev_init(sd, &sdrv_parallel_v4l2_ops);
 
 	sd->flags |= V4L2_SUBDEV_FL_HAS_DEVNODE;
-	sprintf(sd->name, "%s", KUNLUN_PARALLEL_NAME);
+	sprintf(sd->name, "%s", SDRV_PARALLEL_NAME);
 	v4l2_set_subdevdata(sd, kcp);
 
-	kcp->pads[KUNLUN_PARALLEL_PAD_SINK].flags = MEDIA_PAD_FL_SINK;
-	kcp->pads[KUNLUN_PARALLEL_PAD_SRC].flags = MEDIA_PAD_FL_SOURCE;
+	kcp->pads[SDRV_PARALLEL_PAD_SINK].flags = MEDIA_PAD_FL_SINK;
+	kcp->pads[SDRV_PARALLEL_PAD_SRC].flags = MEDIA_PAD_FL_SOURCE;
 
 	sd->dev = dev;
 	sd->entity.function = MEDIA_ENT_F_IO_V4L;
-	sd->entity.ops = &kunlun_parallel_media_ops;
+	sd->entity.ops = &sdrv_parallel_media_ops;
 	ret = media_entity_pads_init(&sd->entity,
-			KUNLUN_PARALLEL_PAD_NUM, kcp->pads);
+			SDRV_PARALLEL_PAD_NUM, kcp->pads);
 	if(ret < 0) {
 		dev_err(dev, "Failed to init media entity:%d\n", ret);
 		return ret;
@@ -236,31 +236,31 @@ error_entity_cleanup:
 	return ret;
 }
 
-static int kunlun_parallel_remove(struct platform_device *pdev)
+static int sdrv_parallel_remove(struct platform_device *pdev)
 {
-	struct kunlun_csi_parallel *kcp = platform_get_drvdata(pdev);
+	struct sdrv_csi_parallel *kcp = platform_get_drvdata(pdev);
 	struct v4l2_subdev *sd = &kcp->subdev;
 
 	media_entity_cleanup(&sd->entity);
 	return 0;
 }
 
-static const struct of_device_id kunlun_parallel_dt_match[] = {
-	{.compatible = "semidrive,kunlun-csi-parallel"},
+static const struct of_device_id sdrv_parallel_dt_match[] = {
+	{.compatible = "semidrive,sdrv-csi-parallel"},
 	{},
 };
 
-static struct platform_driver kunlun_parallel_driver = {
-	.probe = kunlun_parallel_probe,
-	.remove = kunlun_parallel_remove,
+static struct platform_driver sdrv_parallel_driver = {
+	.probe = sdrv_parallel_probe,
+	.remove = sdrv_parallel_remove,
 	.driver = {
-		.name = KUNLUN_PARALLEL_NAME,
-		.of_match_table = kunlun_parallel_dt_match,
+		.name = SDRV_PARALLEL_NAME,
+		.of_match_table = sdrv_parallel_dt_match,
 	},
 };
 
-module_platform_driver(kunlun_parallel_driver);
+module_platform_driver(sdrv_parallel_driver);
 
 MODULE_AUTHOR("Semidrive Semiconductor");
-MODULE_DESCRIPTION("Semidrive Kunlun CSI parallel driver");
+MODULE_DESCRIPTION("Semidrive CSI parallel driver");
 MODULE_LICENSE("GPL v2");

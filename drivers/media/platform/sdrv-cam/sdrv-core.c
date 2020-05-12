@@ -1,7 +1,7 @@
 /*
- * kunlun-core-kstream.h
+ * sdrv-core.c
  *
- * Semidrive kunlun platform v4l2 core file
+ * Semidrive platform v4l2 core file
  *
  * Copyright (C) 2019, Semidrive  Communications Inc.
  *
@@ -25,10 +25,10 @@
 #include <media/v4l2-mc.h>
 #include <media/v4l2-fwnode.h>
 
-#include "kunlun-csi.h"
+#include "sdrv-csi.h"
 
-#define KUNLUN_IMG_OFFSET			0x100
-#define KUNLUN_IMG_REG_LEN			0x80
+#define SDRV_IMG_OFFSET			0x100
+#define SDRV_IMG_REG_LEN			0x80
 
 #define CSI_CORE_ENABLE		0x00
 #define CSI_RESET	BIT(8)
@@ -51,8 +51,8 @@
 #define CSI_BT_FATAL_MASK			0x200
 #define CSI_BT_COF_MASK				0x400
 
-#define KUNLUN_IMG_REG_BASE(i)		\
-	(KUNLUN_IMG_OFFSET + (i) * (KUNLUN_IMG_REG_LEN))
+#define SDRV_IMG_REG_BASE(i)		\
+	(SDRV_IMG_OFFSET + (i) * (SDRV_IMG_REG_LEN))
 
 
 static int kstream_subdev_notifier_complete(struct v4l2_async_notifier *async)
@@ -75,7 +75,7 @@ static int kstream_subdev_notifier_complete(struct v4l2_async_notifier *async)
 		source = &source_sd->entity;
 		sink = &sd->entity;
 
-		ret = kunlun_find_pad(sd, MEDIA_PAD_FL_SINK);
+		ret = sdrv_find_pad(sd, MEDIA_PAD_FL_SINK);
 		kstream_sink_pad = ret < 0 ? 0 : ret;
 
 		kstream->ops->init_interface(kstream);
@@ -128,12 +128,12 @@ static int kstream_interface_subdev_bound(struct v4l2_subdev *subdev,
 		list_for_each_entry(kstream, &csi->kstreams, csi_entry){
 			kstream->interface.subdev = subdev;
 			kstream->interface.mbus_type = kstream->core->mbus_type;
-			ret = kunlun_find_pad(subdev, MEDIA_PAD_FL_SOURCE);
+			ret = sdrv_find_pad(subdev, MEDIA_PAD_FL_SOURCE);
 			if(ret < 0)
 				return ret;
 			kstream->interface.source_pad = ret+kstream->id;
 
-			ret = kunlun_find_pad(subdev, MEDIA_PAD_FL_SINK);
+			ret = sdrv_find_pad(subdev, MEDIA_PAD_FL_SINK);
 			kstream->interface.sink_pad = (ret < 0 ? 0 : ret) + kstream->id;
 
 			dev_info(kstream->dev, "Bound subdev %s source pad: %u sink pad: %u\n",
@@ -143,12 +143,12 @@ static int kstream_interface_subdev_bound(struct v4l2_subdev *subdev,
 	else{
 		kstream->interface.subdev = subdev;
 		kstream->interface.mbus_type = kstream->core->mbus_type;
-		ret = kunlun_find_pad(subdev, MEDIA_PAD_FL_SOURCE);
+		ret = sdrv_find_pad(subdev, MEDIA_PAD_FL_SOURCE);
 		if(ret < 0)
 			return ret;
 		kstream->interface.source_pad = ret;
 
-		ret = kunlun_find_pad(subdev, MEDIA_PAD_FL_SINK);
+		ret = sdrv_find_pad(subdev, MEDIA_PAD_FL_SINK);
 		kstream->interface.sink_pad = ret < 0 ? 0 : ret;
 
 		dev_dbg(kstream->dev, "Bound subdev %s source pad: %u sink pad: %u\n",
@@ -170,7 +170,7 @@ static int kstream_sensor_subdev_bound(struct v4l2_subdev *subdev,
 		list_for_each_entry(kstream, &csi->kstreams, csi_entry){
 
 			kstream->sensor.subdev = subdev;
-			ret = kunlun_find_pad(subdev, MEDIA_PAD_FL_SOURCE);
+			ret = sdrv_find_pad(subdev, MEDIA_PAD_FL_SOURCE);
 			if(ret < 0)
 				return ret;
 			kstream->sensor.source_pad = ret;
@@ -180,7 +180,7 @@ static int kstream_sensor_subdev_bound(struct v4l2_subdev *subdev,
 		}
 	} else {
 		kstream->sensor.subdev = subdev;
-		ret = kunlun_find_pad(subdev, MEDIA_PAD_FL_SOURCE);
+		ret = sdrv_find_pad(subdev, MEDIA_PAD_FL_SOURCE);
 		if(ret < 0)
 			return ret;
 		kstream->sensor.source_pad = ret;
@@ -209,31 +209,31 @@ static int kstream_subdev_notifier_bound(struct v4l2_async_notifier *async,
 	return 0;
 }
 
-static int kunlun_stream_register_device(struct csi_core *csi)
+static int sdrv_stream_register_device(struct csi_core *csi)
 {
 	struct kstream_device *kstream;
 	int ret = 0;
 
 	list_for_each_entry(kstream, &csi->kstreams, csi_entry) {
-		ret = kunlun_stream_register_entities(kstream, &csi->v4l2_dev);
+		ret = sdrv_stream_register_entities(kstream, &csi->v4l2_dev);
 		if(ret < 0)
 			return ret;
 	}
 	return ret;
 }
 
-static int kunlun_stream_unregister_device(struct csi_core *csi)
+static int sdrv_stream_unregister_device(struct csi_core *csi)
 {
 	struct kstream_device *kstream;
 
 	list_for_each_entry(kstream, &csi->kstreams, csi_entry) {
-		kunlun_stream_unregister_entities(kstream);
+		sdrv_stream_unregister_entities(kstream);
 	}
 
 	return 0;
 }
 
-static int kunlun_of_parse_ports(struct csi_core *csi)
+static int sdrv_of_parse_ports(struct csi_core *csi)
 {
 	struct device_node *img_ep, *interface, *sensor, *intf_ep;
 	struct device *dev = csi->dev;
@@ -244,8 +244,8 @@ static int kunlun_of_parse_ports(struct csi_core *csi)
 	int ret;
 
 	for_each_endpoint_of_node(dev->of_node, img_ep) {
-		if(csi->kstream_nums > KUNLUN_IMG_NUM) {
-			dev_warn(dev, "Max support %d ips\n", KUNLUN_IMG_NUM);
+		if(csi->kstream_nums > SDRV_IMG_NUM) {
+			dev_warn(dev, "Max support %d ips\n", SDRV_IMG_NUM);
 			break;
 		}
 
@@ -257,7 +257,7 @@ static int kunlun_of_parse_ports(struct csi_core *csi)
 
 		ret = of_graph_parse_endpoint(img_ep, &ep);
 
-		if((ret < 0) || (ep.port >= KUNLUN_IMG_NUM)) {
+		if((ret < 0) || (ep.port >= SDRV_IMG_NUM)) {
 			dev_err(dev, "Can't get port id\n");
 			return ret;
 		}
@@ -266,7 +266,7 @@ static int kunlun_of_parse_ports(struct csi_core *csi)
 		kstream->dev = csi->dev;
 		kstream->core = csi;
 		kstream->iommu_enable = false;
-		kstream->base = csi->base + KUNLUN_IMG_REG_BASE(kstream->id);
+		kstream->base = csi->base + SDRV_IMG_REG_BASE(kstream->id);
 		csi->kstream_nums++;
 
 		interface = of_graph_get_remote_port_parent(img_ep);
@@ -289,7 +289,7 @@ static int kunlun_of_parse_ports(struct csi_core *csi)
 		for_each_endpoint_of_node(interface, intf_ep) {
 
 			ret = of_graph_parse_endpoint(intf_ep, &ep);
-			if((ret < 0) || (ep.port >= KUNLUN_IMG_NUM)) {
+			if((ret < 0) || (ep.port >= SDRV_IMG_NUM)) {
 				dev_err(dev, "Can't get port id\n");
 				return ret;
 			}
@@ -344,7 +344,7 @@ static int kunlun_of_parse_ports(struct csi_core *csi)
 	return notifier->num_subdevs;
 }
 
-static int kunlun_of_parse_core(struct platform_device *pdev,
+static int sdrv_of_parse_core(struct platform_device *pdev,
 		struct csi_core *csi)
 {
 	struct resource *res;
@@ -382,9 +382,9 @@ static int kunlun_of_parse_core(struct platform_device *pdev,
 	else if(strcmp(mbus, "mipi-csi2") == 0)
 		csi->mbus_type = V4L2_MBUS_CSI2;
 	else if(strcmp(mbus, "dc2csi-1") == 0)
-		csi->mbus_type = KUNLUN_MBUS_DC2CSI1;
+		csi->mbus_type = SDRV_MBUS_DC2CSI1;
 	else if(strcmp(mbus, "dc2csi-2") == 0)
-		csi->mbus_type = KUNLUN_MBUS_DC2CSI2;
+		csi->mbus_type = SDRV_MBUS_DC2CSI2;
 	else
 		dev_err(dev, "Unknow mbus-type\n");
 
@@ -409,18 +409,18 @@ static int kunlun_of_parse_core(struct platform_device *pdev,
 	return ret;
 }
 
-static void kunlun_init_core(struct csi_core *csi)
+static void sdrv_init_core(struct csi_core *csi)
 {
 	kcsi_writel(csi->base, CSI_CORE_ENABLE, CSI_RESET);
 	usleep_range(2, 10);
 	kcsi_clr(csi->base, CSI_CORE_ENABLE, CSI_RESET);
 }
 
-static const struct media_device_ops kunlun_media_ops = {
+static const struct media_device_ops sdrv_media_ops = {
 	.link_notify = v4l2_pipeline_link_notify,
 };
 
-static void kunlun_csi_frm_done_isr(struct csi_core *csi, u32 val)
+static void sdrv_csi_frm_done_isr(struct csi_core *csi, u32 val)
 {
 	struct kstream_device *kstream;
 	unsigned int ids = (val & CSI_STORE_DONE_MASK) >> CSI_STORE_DONE_SHIFT;
@@ -436,7 +436,7 @@ static void kunlun_csi_frm_done_isr(struct csi_core *csi, u32 val)
 	}
 }
 
-static void kunlun_csi_img_update_isr(struct csi_core *csi, u32 val)
+static void sdrv_csi_img_update_isr(struct csi_core *csi, u32 val)
 {
 	struct kstream_device *kstream;
 	unsigned int ids = (val & CSI_SDW_SET_MASK) >> CSI_SDW_SET_SHIFT;
@@ -451,7 +451,7 @@ static void kunlun_csi_img_update_isr(struct csi_core *csi, u32 val)
 	}
 }
 
-static void kunlun_csi_bt_err_isr(struct csi_core *csi, u32 val)
+static void sdrv_csi_bt_err_isr(struct csi_core *csi, u32 val)
 {
 	if(csi->mbus_type != V4L2_MBUS_BT656)
 		return;
@@ -466,7 +466,7 @@ static void kunlun_csi_bt_err_isr(struct csi_core *csi, u32 val)
 		csi->ints.bt_cof++;
 }
 
-static void kunlun_csi_int1_isr(struct csi_core *csi, u32 val)
+static void sdrv_csi_int1_isr(struct csi_core *csi, u32 val)
 {
 	struct kstream_device *kstream;
 
@@ -492,7 +492,7 @@ static void kunlun_csi_int1_isr(struct csi_core *csi, u32 val)
 	}
 }
 
-static irqreturn_t kunlun_csi_isr(int irq, void *dev)
+static irqreturn_t sdrv_csi_isr(int irq, void *dev)
 {
 	struct csi_core *csi = dev;
 	u32 value0, value1;
@@ -504,21 +504,21 @@ static irqreturn_t kunlun_csi_isr(int irq, void *dev)
 	kcsi_writel(csi->base, CSI_INT_1, value1);
 
 	if(value0 & CSI_STORE_DONE_MASK)
-		kunlun_csi_frm_done_isr(csi, value0);
+		sdrv_csi_frm_done_isr(csi, value0);
 
 	if(value0 & CSI_SDW_SET_MASK)
-		kunlun_csi_img_update_isr(csi, value0);
+		sdrv_csi_img_update_isr(csi, value0);
 
 	if(value0 & (CSI_BT_ERR_MASK | CSI_BT_FATAL_MASK | CSI_BT_COF_MASK))
-		kunlun_csi_bt_err_isr(csi, value0);
+		sdrv_csi_bt_err_isr(csi, value0);
 
 	if(value1)
-		kunlun_csi_int1_isr(csi, value1);
+		sdrv_csi_int1_isr(csi, value1);
 
 	return IRQ_HANDLED;
 }
 
-static int kunlun_csi_probe(struct platform_device *pdev)
+static int sdrv_csi_probe(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
 	struct csi_core *csi;
@@ -533,20 +533,20 @@ static int kunlun_csi_probe(struct platform_device *pdev)
 	platform_set_drvdata(pdev, csi);
 	INIT_LIST_HEAD(&csi->kstreams);
 
-	ret = kunlun_of_parse_core(pdev, csi);
+	ret = sdrv_of_parse_core(pdev, csi);
 	if(ret < 0)
 		return ret;
 
-	kunlun_init_core(csi);
+	sdrv_init_core(csi);
 
-	ret = kunlun_of_parse_ports(csi);
+	ret = sdrv_of_parse_ports(csi);
 	if(ret < 0)
 		return ret;
 
 	csi->media_dev.dev = csi->dev;
 	strlcpy(csi->media_dev.model, "Kunlun camera module",
 			sizeof(csi->media_dev.model));
-	csi->media_dev.ops = &kunlun_media_ops;
+	csi->media_dev.ops = &sdrv_media_ops;
 	media_device_init(&csi->media_dev);
 
 	csi->v4l2_dev.mdev = &csi->media_dev;
@@ -556,7 +556,7 @@ static int kunlun_csi_probe(struct platform_device *pdev)
 		return ret;
 	}
 
-	ret = kunlun_stream_register_device(csi);
+	ret = sdrv_stream_register_device(csi);
 	if(ret < 0)
 		goto err_register_entities;
 
@@ -568,7 +568,7 @@ static int kunlun_csi_probe(struct platform_device *pdev)
 		goto err_register_subdevs;
 	}
 
-	ret = devm_request_irq(dev, csi->irq, kunlun_csi_isr,
+	ret = devm_request_irq(dev, csi->irq, sdrv_csi_isr,
 			0, dev_name(dev), csi);
 	if(ret < 0) {
 		dev_err(dev, "Request IRQ failed: %d\n", ret);
@@ -583,14 +583,14 @@ static int kunlun_csi_probe(struct platform_device *pdev)
 	return 0;
 
 err_register_subdevs:
-	kunlun_stream_unregister_device(csi);
+	sdrv_stream_unregister_device(csi);
 err_register_entities:
 	v4l2_device_unregister(&csi->v4l2_dev);
 
 	return ret;
 }
 
-static int kunlun_csi_remove(struct platform_device *pdev)
+static int sdrv_csi_remove(struct platform_device *pdev)
 {
 	struct csi_core *csi;
 
@@ -598,7 +598,7 @@ static int kunlun_csi_remove(struct platform_device *pdev)
 
 	v4l2_async_notifier_unregister(&csi->notifier);
 
-	kunlun_stream_unregister_device(csi);
+	sdrv_stream_unregister_device(csi);
 
 	WARN_ON(atomic_read(&csi->ref_count));
 
@@ -611,23 +611,23 @@ static int kunlun_csi_remove(struct platform_device *pdev)
 	return 0;
 }
 
-static const struct of_device_id kunlun_csi_dt_match[] = {
-	{ .compatible = "semdrive,kunlun-csi"},
+static const struct of_device_id sdrv_csi_dt_match[] = {
+	{ .compatible = "semidrive,sdrv-csi"},
 	{  },
 };
 
-static struct platform_driver kunlun_csi_driver = {
-	.probe = kunlun_csi_probe,
-	.remove = kunlun_csi_remove,
+static struct platform_driver sdrv_csi_driver = {
+	.probe = sdrv_csi_probe,
+	.remove = sdrv_csi_remove,
 	.driver = {
-		.name = "kunlun-csi",
-		.of_match_table = kunlun_csi_dt_match,
+		.name = "sdrv-csi",
+		.of_match_table = sdrv_csi_dt_match,
 	},
 };
 
-module_platform_driver(kunlun_csi_driver);
+module_platform_driver(sdrv_csi_driver);
 
-MODULE_ALIAS("platform:kunlun-csi");
+MODULE_ALIAS("platform:sdrv-csi");
 MODULE_DESCRIPTION("Semidrive Camera driver");
 MODULE_AUTHOR("Semidrive Semiconductor");
 MODULE_LICENSE("GPL v2");
