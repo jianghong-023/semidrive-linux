@@ -848,9 +848,9 @@ int __video_register_device(struct video_device *vdev, int type, int nr,
 	/* Part 1: check device type */
 	switch (type) {
 	case VFL_TYPE_GRABBER:
-		if(!strncmp(vdev->name, "kunlun-kstream-0", 16))
+		if(!strncmp(vdev->name, "sdrv-kstream-0", 14))
 			name_base = "video-evs";
-		else if(!strncmp(vdev->name, "kunlun-kstream-1", 16))
+		else if(!strncmp(vdev->name, "sdrv-kstream-1", 14))
 			name_base = "video-dvr";
 		else
 		name_base = "video";

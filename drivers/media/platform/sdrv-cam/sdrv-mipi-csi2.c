@@ -1,7 +1,7 @@
 /*
- * kunlun-mipi-csi2.c
+ * sdrv-mipi-csi2.c
  *
- * Semidrive kunlun platform kstream subdev operation
+ * Semidrive platform kstream subdev operation
  *
  * Copyright (C) 2019, Semidrive  Communications Inc.
  *
@@ -9,7 +9,7 @@
  */
 
 
-#include "kunlun-mipi-csi2.h"
+#include "sdrv-mipi-csi2.h"
 #include <linux/delay.h>
 #include <linux/io.h>
 
@@ -122,7 +122,7 @@ static struct v4l2_subdev *mipi_csi2_get_sensor_subdev(
     struct media_pad *sink_pad, *remote_pad;
     int ret;
 
-    ret = kunlun_find_pad(sd, MEDIA_PAD_FL_SINK);
+    ret = sdrv_find_pad(sd, MEDIA_PAD_FL_SINK);
 
     if (ret < 0)
         return NULL;
@@ -139,20 +139,20 @@ static struct v4l2_subdev *mipi_csi2_get_sensor_subdev(
 
 
 void
-dw_mipi_csi_write(struct kunlun_csi_mipi_csi2 *kcmc,
+dw_mipi_csi_write(struct sdrv_csi_mipi_csi2 *kcmc,
                   unsigned int address, unsigned int data)
 {
     iowrite32(data, kcmc->base_address + address);
 }
 
 u32
-dw_mipi_csi_read(struct kunlun_csi_mipi_csi2 *kcmc, unsigned long address)
+dw_mipi_csi_read(struct sdrv_csi_mipi_csi2 *kcmc, unsigned long address)
 {
     return ioread32(kcmc->base_address + address);
 }
 
 
-static bool check_version(struct kunlun_csi_mipi_csi2 *kcmc)
+static bool check_version(struct sdrv_csi_mipi_csi2 *kcmc)
 {
     u32 version;
     version = dw_mipi_csi_read(kcmc, R_CSI2_VERSION);
@@ -165,7 +165,7 @@ static bool check_version(struct kunlun_csi_mipi_csi2 *kcmc)
         return true;
 }
 
-static void mipi_csi2_enable(struct kunlun_csi_mipi_csi2 *kcmc,
+static void mipi_csi2_enable(struct sdrv_csi_mipi_csi2 *kcmc,
                              bool enable)
 {
     if (enable) {
@@ -187,7 +187,7 @@ static void mipi_csi2_enable(struct kunlun_csi_mipi_csi2 *kcmc,
 }
 
 
-static void set_lane_number(struct kunlun_csi_mipi_csi2 *kcmc, int cnt)
+static void set_lane_number(struct sdrv_csi_mipi_csi2 *kcmc, int cnt)
 {
     switch (cnt) {
         case 1:
@@ -209,7 +209,7 @@ static void set_lane_number(struct kunlun_csi_mipi_csi2 *kcmc, int cnt)
     }
 }
 
-static void set_ipi_mode(struct kunlun_csi_mipi_csi2 *kcmc, int index,
+static void set_ipi_mode(struct sdrv_csi_mipi_csi2 *kcmc, int index,
                          int val)
 {
     switch (index) {
@@ -234,7 +234,7 @@ static void set_ipi_mode(struct kunlun_csi_mipi_csi2 *kcmc, int index,
     }
 }
 
-static void set_ipi_vcid(struct kunlun_csi_mipi_csi2 *kcmc, int index)
+static void set_ipi_vcid(struct sdrv_csi_mipi_csi2 *kcmc, int index)
 {
     switch (index) {
         case 1:
@@ -258,7 +258,7 @@ static void set_ipi_vcid(struct kunlun_csi_mipi_csi2 *kcmc, int index)
     }
 }
 
-static void set_ipi_data_type(struct kunlun_csi_mipi_csi2 *kcmc, int index,
+static void set_ipi_data_type(struct sdrv_csi_mipi_csi2 *kcmc, int index,
                               uint8_t type)
 {
     switch (index) {
@@ -282,7 +282,7 @@ static void set_ipi_data_type(struct kunlun_csi_mipi_csi2 *kcmc, int index,
     }
 }
 
-static void set_ipi_hsa(struct kunlun_csi_mipi_csi2 *kcmc, int index,
+static void set_ipi_hsa(struct sdrv_csi_mipi_csi2 *kcmc, int index,
                         uint32_t val)
 {
     switch (index) {
@@ -306,7 +306,7 @@ static void set_ipi_hsa(struct kunlun_csi_mipi_csi2 *kcmc, int index,
     }
 }
 
-static void set_ipi_hbp(struct kunlun_csi_mipi_csi2 *kcmc, int index,
+static void set_ipi_hbp(struct sdrv_csi_mipi_csi2 *kcmc, int index,
                         uint32_t val)
 {
     switch (index) {
@@ -330,7 +330,7 @@ static void set_ipi_hbp(struct kunlun_csi_mipi_csi2 *kcmc, int index,
     }
 }
 
-static void set_ipi_hsd(struct kunlun_csi_mipi_csi2 *kcmc, int index,
+static void set_ipi_hsd(struct sdrv_csi_mipi_csi2 *kcmc, int index,
                         uint32_t val)
 {
     switch (index) {
@@ -353,7 +353,7 @@ static void set_ipi_hsd(struct kunlun_csi_mipi_csi2 *kcmc, int index,
             break;
     }
 }
-static void set_ipi_adv_features(struct kunlun_csi_mipi_csi2 *kcmc,
+static void set_ipi_adv_features(struct sdrv_csi_mipi_csi2 *kcmc,
                                  int index, uint32_t val)
 {
     switch (index) {
@@ -378,13 +378,13 @@ static void set_ipi_adv_features(struct kunlun_csi_mipi_csi2 *kcmc,
 }
 
 
-static void mipi_csi2_initialization(struct kunlun_csi_mipi_csi2 *kcmc)
+static void mipi_csi2_initialization(struct sdrv_csi_mipi_csi2 *kcmc)
 {
     int i;
     check_version(kcmc);
     set_lane_number(kcmc, 4);
 
-    for (i = 1; i <= KUNLUN_MIPI_CSI2_IPI_NUM; i++) {
+    for (i = 1; i <= SDRV_MIPI_CSI2_IPI_NUM; i++) {
         set_ipi_mode(kcmc, i, kcmc->hw.ipi_mode);
         set_ipi_vcid(kcmc, i);
 
@@ -400,14 +400,14 @@ static void mipi_csi2_initialization(struct kunlun_csi_mipi_csi2 *kcmc)
 
 static int mipi_csi2_s_power(struct v4l2_subdev *sd, int on)
 {
-    struct kunlun_csi_mipi_csi2 *kcmc;
+    struct sdrv_csi_mipi_csi2 *kcmc;
 
     struct v4l2_subdev *sensor_sd = mipi_csi2_get_sensor_subdev(sd);
 
     if (!sensor_sd)
         return -EINVAL;
 
-    kcmc = container_of(sd, struct kunlun_csi_mipi_csi2, subdev);
+    kcmc = container_of(sd, struct sdrv_csi_mipi_csi2, subdev);
 
     if (!kcmc)
         return -EINVAL;
@@ -418,7 +418,7 @@ static int mipi_csi2_s_power(struct v4l2_subdev *sd, int on)
 }
 
 
-static int mipi_csi2_set_phy_freq(struct kunlun_csi_mipi_csi2 *kcmc,
+static int mipi_csi2_set_phy_freq(struct sdrv_csi_mipi_csi2 *kcmc,
                                   uint32_t freq,
                                   uint32_t lanes)
 {
@@ -493,14 +493,14 @@ static int mipi_csi2_s_frame_interval(struct v4l2_subdev *sd,
 
 static int mipi_csi2_s_stream(struct v4l2_subdev *sd, int enable)
 {
-    struct kunlun_csi_mipi_csi2 *kcmc;
+    struct sdrv_csi_mipi_csi2 *kcmc;
 
     struct v4l2_subdev *sensor_sd = mipi_csi2_get_sensor_subdev(sd);
 
     if (!sensor_sd)
         return -EINVAL;
 
-    kcmc = container_of(sd, struct kunlun_csi_mipi_csi2, subdev);
+    kcmc = container_of(sd, struct sdrv_csi_mipi_csi2, subdev);
 
     if (!kcmc)
         return -EINVAL;
@@ -594,17 +594,17 @@ static int mipi_csi2_enum_frame_interval(struct v4l2_subdev *sd,
 
 
 
-static const struct v4l2_subdev_core_ops kunlun_mipi_csi2_core_ops = {
+static const struct v4l2_subdev_core_ops sdrv_mipi_csi2_core_ops = {
     .s_power = mipi_csi2_s_power,
 };
 
-static const struct v4l2_subdev_video_ops kunlun_mipi_csi2_video_ops = {
+static const struct v4l2_subdev_video_ops sdrv_mipi_csi2_video_ops = {
     .g_frame_interval = mipi_csi2_g_frame_interval,
     .s_frame_interval = mipi_csi2_s_frame_interval,
     .s_stream = mipi_csi2_s_stream,
 };
 
-static const struct v4l2_subdev_pad_ops kunlun_mipi_csi2_pad_ops = {
+static const struct v4l2_subdev_pad_ops sdrv_mipi_csi2_pad_ops = {
     .enum_mbus_code = mipi_csi2_enum_mbus_code,
     .get_fmt = mipi_csi2_get_fmt,
     .set_fmt = mipi_csi2_set_fmt,
@@ -612,10 +612,10 @@ static const struct v4l2_subdev_pad_ops kunlun_mipi_csi2_pad_ops = {
     .enum_frame_interval = mipi_csi2_enum_frame_interval,
 };
 
-static const struct v4l2_subdev_ops kunlun_mipi_csi2_v4l2_ops = {
-    .core = &kunlun_mipi_csi2_core_ops,
-    .video = &kunlun_mipi_csi2_video_ops,
-    .pad = &kunlun_mipi_csi2_pad_ops,
+static const struct v4l2_subdev_ops sdrv_mipi_csi2_v4l2_ops = {
+    .core = &sdrv_mipi_csi2_core_ops,
+    .video = &sdrv_mipi_csi2_video_ops,
+    .pad = &sdrv_mipi_csi2_pad_ops,
 };
 
 static int mipi_csi2_link_setup(struct media_entity *entity,
@@ -629,7 +629,7 @@ static int mipi_csi2_link_setup(struct media_entity *entity,
     return 0;
 }
 
-static const struct media_entity_operations kunlun_mipi_csi2_media_ops = {
+static const struct media_entity_operations sdrv_mipi_csi2_media_ops = {
     .link_setup = mipi_csi2_link_setup,
 };
 
@@ -637,7 +637,7 @@ static irqreturn_t
 dw_mipi_csi_irq(int irq, void *dev_id)
 {
 
-    struct kunlun_csi_mipi_csi2 *kcmc = dev_id;
+    struct sdrv_csi_mipi_csi2 *kcmc = dev_id;
     u32 int_status, ind_status;
     unsigned long flags;
 
@@ -693,7 +693,7 @@ dw_mipi_csi_irq(int irq, void *dev_id)
 
 static int
 dw_mipi_csi_parse_dt(struct platform_device *pdev,
-                     struct kunlun_csi_mipi_csi2 *kcmc)
+                     struct sdrv_csi_mipi_csi2 *kcmc)
 {
     struct device_node *node = pdev->dev.of_node;
     int reg;
@@ -828,15 +828,15 @@ dw_mipi_csi_parse_dt(struct platform_device *pdev,
 
     return 0;
 }
-static const struct of_device_id kunlun_mipi_csi2_dt_match[] = {
-    {.compatible = "semidrive,kunlun-csi-mipi"},
+static const struct of_device_id sdrv_mipi_csi2_dt_match[] = {
+    {.compatible = "semidrive,sdrv-csi-mipi"},
     {},
 };
-static int kunlun_mipi_csi2_probe(struct platform_device *pdev)
+static int sdrv_mipi_csi2_probe(struct platform_device *pdev)
 {
     const struct of_device_id *of_id;
     struct device *dev = &pdev->dev;
-    struct kunlun_csi_mipi_csi2 *kcmc;
+    struct sdrv_csi_mipi_csi2 *kcmc;
     struct v4l2_subdev *sd;
     int ret;
     struct resource *res = NULL;
@@ -854,7 +854,7 @@ static int kunlun_mipi_csi2_probe(struct platform_device *pdev)
     kcmc->pdev = pdev;
     kcmc->active_stream_num = 0;
 
-    of_id = of_match_node(kunlun_mipi_csi2_dt_match, dev->of_node);
+    of_id = of_match_node(sdrv_mipi_csi2_dt_match, dev->of_node);
 
     if (WARN_ON(of_id == NULL))
         return -EINVAL;
@@ -904,11 +904,11 @@ static int kunlun_mipi_csi2_probe(struct platform_device *pdev)
         goto error_entity_cleanup;
     }
 
-    v4l2_subdev_init(sd, &kunlun_mipi_csi2_v4l2_ops);
+    v4l2_subdev_init(sd, &sdrv_mipi_csi2_v4l2_ops);
 
     sd->owner = THIS_MODULE;
     sd->flags |= V4L2_SUBDEV_FL_HAS_DEVNODE;
-    sprintf(sd->name, "%s", KUNLUN_MIPI_CSI2_NAME);
+    sprintf(sd->name, "%s", SDRV_MIPI_CSI2_NAME);
     kcmc->fmt = &dw_mipi_csi_formats[0];
 
     kcmc->format.code = dw_mipi_csi_formats[0].code;
@@ -916,23 +916,23 @@ static int kunlun_mipi_csi2_probe(struct platform_device *pdev)
     v4l2_set_subdevdata(sd, kcmc);
 
 #if 1
-    kcmc->pads[KUNLUN_MIPI_CSI2_VC0_PAD_SINK].flags = MEDIA_PAD_FL_SINK;
-    kcmc->pads[KUNLUN_MIPI_CSI2_VC1_PAD_SINK].flags = MEDIA_PAD_FL_SINK;
-    kcmc->pads[KUNLUN_MIPI_CSI2_VC2_PAD_SINK].flags = MEDIA_PAD_FL_SINK;
-    kcmc->pads[KUNLUN_MIPI_CSI2_VC3_PAD_SINK].flags = MEDIA_PAD_FL_SINK;
-    kcmc->pads[KUNLUN_MIPI_CSI2_VC0_PAD_SRC].flags = MEDIA_PAD_FL_SOURCE;
-    kcmc->pads[KUNLUN_MIPI_CSI2_VC1_PAD_SRC].flags = MEDIA_PAD_FL_SOURCE;
-    kcmc->pads[KUNLUN_MIPI_CSI2_VC2_PAD_SRC].flags = MEDIA_PAD_FL_SOURCE;
-    kcmc->pads[KUNLUN_MIPI_CSI2_VC3_PAD_SRC].flags = MEDIA_PAD_FL_SOURCE;
+    kcmc->pads[SDRV_MIPI_CSI2_VC0_PAD_SINK].flags = MEDIA_PAD_FL_SINK;
+    kcmc->pads[SDRV_MIPI_CSI2_VC1_PAD_SINK].flags = MEDIA_PAD_FL_SINK;
+    kcmc->pads[SDRV_MIPI_CSI2_VC2_PAD_SINK].flags = MEDIA_PAD_FL_SINK;
+    kcmc->pads[SDRV_MIPI_CSI2_VC3_PAD_SINK].flags = MEDIA_PAD_FL_SINK;
+    kcmc->pads[SDRV_MIPI_CSI2_VC0_PAD_SRC].flags = MEDIA_PAD_FL_SOURCE;
+    kcmc->pads[SDRV_MIPI_CSI2_VC1_PAD_SRC].flags = MEDIA_PAD_FL_SOURCE;
+    kcmc->pads[SDRV_MIPI_CSI2_VC2_PAD_SRC].flags = MEDIA_PAD_FL_SOURCE;
+    kcmc->pads[SDRV_MIPI_CSI2_VC3_PAD_SRC].flags = MEDIA_PAD_FL_SOURCE;
 #else
-    kcmc->pads[KUNLUN_MIPI_CSI2_PAD_SINK].flags = MEDIA_PAD_FL_SINK;
-    kcmc->pads[KUNLUN_MIPI_CSI2_PAD_SRC].flags = MEDIA_PAD_FL_SOURCE;
+    kcmc->pads[SDRV_MIPI_CSI2_PAD_SINK].flags = MEDIA_PAD_FL_SINK;
+    kcmc->pads[SDRV_MIPI_CSI2_PAD_SRC].flags = MEDIA_PAD_FL_SOURCE;
 #endif
     sd->dev = dev;
     sd->entity.function = MEDIA_ENT_F_IO_V4L;
-    sd->entity.ops = &kunlun_mipi_csi2_media_ops;
+    sd->entity.ops = &sdrv_mipi_csi2_media_ops;
     ret = media_entity_pads_init(&sd->entity,
-                                 KUNLUN_MIPI_CSI2_PAD_NUM, kcmc->pads);
+                                 SDRV_MIPI_CSI2_PAD_NUM, kcmc->pads);
 
     if (ret < 0) {
         dev_err(dev, "Failed to init media entity:%d\n", ret);
@@ -955,10 +955,10 @@ error_entity_cleanup:
     return ret;
 }
 
-static int kunlun_mipi_csi2_remove(struct platform_device *pdev)
+static int sdrv_mipi_csi2_remove(struct platform_device *pdev)
 {
 #if 1
-    struct kunlun_csi_mipi_csi2 *kcmc = platform_get_drvdata(pdev);
+    struct sdrv_csi_mipi_csi2 *kcmc = platform_get_drvdata(pdev);
     struct v4l2_subdev *sd = &kcmc->subdev;
 
     media_entity_cleanup(&sd->entity);
@@ -966,19 +966,19 @@ static int kunlun_mipi_csi2_remove(struct platform_device *pdev)
     return 0;
 }
 
-MODULE_DEVICE_TABLE(of, kunlun_mipi_csi2_dt_match);
+MODULE_DEVICE_TABLE(of, sdrv_mipi_csi2_dt_match);
 
-static struct platform_driver kunlun_mipi_csi2_driver = {
-    .probe = kunlun_mipi_csi2_probe,
-    .remove = kunlun_mipi_csi2_remove,
+static struct platform_driver sdrv_mipi_csi2_driver = {
+    .probe = sdrv_mipi_csi2_probe,
+    .remove = sdrv_mipi_csi2_remove,
     .driver = {
-        .name = KUNLUN_MIPI_CSI2_NAME,
-        .of_match_table = kunlun_mipi_csi2_dt_match,
+        .name = SDRV_MIPI_CSI2_NAME,
+        .of_match_table = sdrv_mipi_csi2_dt_match,
     },
 };
 
-module_platform_driver(kunlun_mipi_csi2_driver);
+module_platform_driver(sdrv_mipi_csi2_driver);
 
 MODULE_AUTHOR("Semidrive Semiconductor");
-MODULE_DESCRIPTION("Semidrive Kunlun mipi-csi2 driver");
+MODULE_DESCRIPTION("Semidrive mipi-csi2 driver");
 MODULE_LICENSE("GPL v2");

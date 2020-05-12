@@ -1,15 +1,15 @@
 /*
- * kunlun-csi.h
+ * sdrv-csi.h
  *
- * Semidrive kunlun platform csi header file
+ * Semidrive platform csi header file
  *
  * Copyright (C) 2019, Semidrive  Communications Inc.
  *
  * This file is licensed under a dual GPLv2 or X11 license.
  */
 
-#ifndef SD_KUNLUN_CSI_H
-#define SD_KUNLUN_CSI_H
+#ifndef SDRV_CSI_H
+#define SDRV_CSI_H
 
 #include <linux/types.h>
 #include <media/v4l2-async.h>
@@ -21,22 +21,22 @@
 #include <media/v4l2-fwnode.h>
 #include <linux/device.h>
 
-#define KUNLUN_IMG_NUM	4
+#define SDRV_IMG_NUM	4
 
-#define KUNLUN_IMG_PAD_SINK		0
-#define KUNLUN_IMG_PAD_SRC		1
-#define KUNLUN_IMG_PAD_NUM		2
+#define SDRV_IMG_PAD_SINK		0
+#define SDRV_IMG_PAD_SRC		1
+#define SDRV_IMG_PAD_NUM		2
 
-#define KUNLUN_IMG_NAME "kunlun-kstream"
+#define SDRV_IMG_NAME "sdrv-kstream"
 
-#define KUNLUN_IMG_X_MAX		4096
-#define KUNLUN_IMG_Y_MAX		4096
+#define SDRV_IMG_X_MAX		4096
+#define SDRV_IMG_Y_MAX		4096
 
 #define IMG_MAX_NUM_PLANES		3
 #define IMG_HW_NUM_PLANES		(IMG_MAX_NUM_PLANES - 1)
 
-#define KUNLUN_MBUS_DC2CSI1		0x101
-#define KUNLUN_MBUS_DC2CSI2		0x102
+#define SDRV_MBUS_DC2CSI1		0x101
+#define SDRV_MBUS_DC2CSI2		0x102
 
 struct csi_core;
 struct kstream_device;
@@ -121,9 +121,9 @@ struct kstream_device {
 	struct list_head csi_entry;
 	struct csi_core *core;
 	struct v4l2_subdev subdev;
-	struct media_pad pads[KUNLUN_IMG_PAD_NUM];
+	struct media_pad pads[SDRV_IMG_PAD_NUM];
 
-	struct v4l2_mbus_framefmt mbus_fmt[KUNLUN_IMG_PAD_NUM];
+	struct v4l2_mbus_framefmt mbus_fmt[SDRV_IMG_PAD_NUM];
 	struct v4l2_ctrl_handler ctrls;
 	struct v4l2_rect crop;
 
@@ -170,14 +170,14 @@ struct csi_core {
 	atomic_t ref_count;
 };
 
-int kunlun_stream_register_entities(struct kstream_device *kstream,
+int sdrv_stream_register_entities(struct kstream_device *kstream,
 		struct v4l2_device *v4l2_dev);
-int kunlun_stream_unregister_entities(struct kstream_device *kstream);
+int sdrv_stream_unregister_entities(struct kstream_device *kstream);
 
-int kunlun_stream_video_register(struct kstream_video *video,
+int sdrv_stream_video_register(struct kstream_video *video,
 		struct v4l2_device *v4l2_dev);
 
-void kunlun_stream_video_unregister(struct kstream_video *video);
+void sdrv_stream_video_unregister(struct kstream_video *video);
 
 const struct kstream_pix_format *
 kstream_get_kpfmt_by_mbus_code(unsigned int mbus_code);
@@ -219,7 +219,7 @@ static inline void kcsi_clr_and_set(void __iomem *base, u32 addr,
 	kcsi_writel(base, addr, reg);
 }
 
-static inline int kunlun_find_pad(struct v4l2_subdev *sd, int direction)
+static inline int sdrv_find_pad(struct v4l2_subdev *sd, int direction)
 {
 	unsigned int pad;
 

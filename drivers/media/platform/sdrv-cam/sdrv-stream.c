@@ -1,7 +1,7 @@
 /*
- * kunlun-kstream.c
+ * sdrv-kstream.c
  *
- * Semidrive kunlun platform kstream subdev operation
+ * Semidrive platform kstream subdev operation
  *
  * Copyright (C) 2019, Semidrive  Communications Inc.
  *
@@ -24,7 +24,7 @@
 #include <media/v4l2-mc.h>
 #include <media/v4l2-fwnode.h>
 
-#include "kunlun-csi.h"
+#include "sdrv-csi.h"
 
 #define IMG_ENABLE					0x0
 #define IMG_RST_(i)					BIT(i + 4)
@@ -306,8 +306,8 @@ static int kstream_set_stride(struct kstream_device *kstream)
 	if(pos_o < 0)
 		return pos_o;
 
-	in_fmt = &kstream->mbus_fmt[KUNLUN_IMG_PAD_SINK];
-	out_fmt = &kstream->mbus_fmt[KUNLUN_IMG_PAD_SRC];
+	in_fmt = &kstream->mbus_fmt[SDRV_IMG_PAD_SINK];
+	out_fmt = &kstream->mbus_fmt[SDRV_IMG_PAD_SRC];
 
 	for(pos_i = 0; pos_i < ARRAY_SIZE(mbus_fmts); pos_i++)
 		if(mbus_fmts[pos_i].code == in_fmt->code)
@@ -382,12 +382,12 @@ static int kstream_set_para_bt(struct kstream_device *kstream)
 
 	switch(kstream->interface.mbus_type) {
 		case V4L2_MBUS_CSI2:
-		case KUNLUN_MBUS_DC2CSI2:
+		case SDRV_MBUS_DC2CSI2:
 			value0 |= 0 << PARA_EXIT_SHIFT;
 			break;
 		case V4L2_MBUS_BT656:
 		case V4L2_MBUS_PARALLEL:
-		case KUNLUN_MBUS_DC2CSI1:
+		case SDRV_MBUS_DC2CSI1:
 			bus = &kstream->core->vep.bus.parallel;
 			value0 |= (1 << PARA_EXIT_SHIFT) |
 				(pix_fmts[pos].pack_uv_odd << PARA_UV_ODD_SHIFT) |
@@ -474,7 +474,7 @@ static int kstream_set_crop(struct kstream_device *kstream)
 	u32 val = 0, chnl_ctrl = 0, div;
 	s32 width, left;
 
-	mbus_fmt = &kstream->mbus_fmt[KUNLUN_IMG_PAD_SINK];
+	mbus_fmt = &kstream->mbus_fmt[SDRV_IMG_PAD_SINK];
 	pix_fmt = &kstream->video.active_fmt.fmt.pix_mp;
 
 	if(rect->width >= mbus_fmt->width)
@@ -513,7 +513,7 @@ static int kstream_set_crop(struct kstream_device *kstream)
 static int kstream_set_pixel_ctrl(struct kstream_device *kstream)
 {
 	struct kstream_interface *interface = &kstream->interface;
-	struct v4l2_mbus_framefmt *fmt = &kstream->mbus_fmt[KUNLUN_IMG_PAD_SINK];
+	struct v4l2_mbus_framefmt *fmt = &kstream->mbus_fmt[SDRV_IMG_PAD_SINK];
 	u32 val = 0;
 	int i;
 
@@ -884,7 +884,7 @@ static struct v4l2_rect *__kstream_get_crop(struct kstream_device *kstream,
 {
 	if(which == V4L2_SUBDEV_FORMAT_TRY)
 		return v4l2_subdev_get_try_crop(&kstream->subdev, cfg,
-				KUNLUN_IMG_PAD_SRC);
+				SDRV_IMG_PAD_SRC);
 
 	return &kstream->crop;
 }
@@ -898,7 +898,7 @@ static int kstream_try_format(struct kstream_device *kstream,
 	unsigned int i;
 
 	switch(pad) {
-	case KUNLUN_IMG_PAD_SINK:
+	case SDRV_IMG_PAD_SINK:
 		for (i = 0; i < ARRAY_SIZE(mbus_fmts); i++)
 			if(fmt->code == mbus_fmts[i].code)
 				break;
@@ -906,15 +906,15 @@ static int kstream_try_format(struct kstream_device *kstream,
 		if(i >= ARRAY_SIZE(mbus_fmts))
 			fmt->code = MEDIA_BUS_FMT_UYVY8_2X8;
 
-		fmt->width = clamp_t(u32, fmt->width, 1, KUNLUN_IMG_X_MAX);
-		fmt->height = clamp_t(u32, fmt->height, 1, KUNLUN_IMG_Y_MAX);
+		fmt->width = clamp_t(u32, fmt->width, 1, SDRV_IMG_X_MAX);
+		fmt->height = clamp_t(u32, fmt->height, 1, SDRV_IMG_Y_MAX);
 
 		fmt->field = fmt->field;
 
 		break;
 
-	case KUNLUN_IMG_PAD_SRC:
-		*fmt = *__kstream_get_format(kstream, cfg, KUNLUN_IMG_PAD_SINK, which);
+	case SDRV_IMG_PAD_SRC:
+		*fmt = *__kstream_get_format(kstream, cfg, SDRV_IMG_PAD_SINK, which);
 
 		rect = __kstream_get_crop(kstream, cfg, which);
 
@@ -933,7 +933,7 @@ static void kstream_try_crop(struct kstream_device *kstream,
 {
 	struct v4l2_mbus_framefmt *fmt;
 
-	fmt = __kstream_get_format(kstream, cfg, KUNLUN_IMG_PAD_SINK, which);
+	fmt = __kstream_get_format(kstream, cfg, SDRV_IMG_PAD_SINK, which);
 	if(!fmt)
 		return;
 
@@ -964,7 +964,7 @@ static int kstream_enum_mbus_code(struct v4l2_subdev *sd,
 		return -EINVAL;
 	}
 
-	if(code->pad == KUNLUN_IMG_PAD_SINK) {
+	if(code->pad == SDRV_IMG_PAD_SINK) {
 		if(code->index >= ARRAY_SIZE(mbus_fmts))
 			return -EINVAL;
 
@@ -973,7 +973,7 @@ static int kstream_enum_mbus_code(struct v4l2_subdev *sd,
 		if(code->index > 0)
 			return -EINVAL;
 
-		format = __kstream_get_format(kstream, cfg, KUNLUN_IMG_PAD_SINK,
+		format = __kstream_get_format(kstream, cfg, SDRV_IMG_PAD_SINK,
 				code->which);
 
 		code->code = format->code;
@@ -1025,7 +1025,7 @@ static int kstream_set_selection(struct v4l2_subdev *sd,
 	int ret = 0;
 
 	if(sel->target == V4L2_SEL_TGT_CROP &&
-			sel->pad == KUNLUN_IMG_PAD_SRC) {
+			sel->pad == SDRV_IMG_PAD_SRC) {
 		rect = __kstream_get_crop(kstream, cfg, sel->which);
 		if(!rect)
 			return -EINVAL;
@@ -1034,7 +1034,7 @@ static int kstream_set_selection(struct v4l2_subdev *sd,
 		*rect = sel->r;
 
 		fmt.which = sel->which;
-		fmt.pad = KUNLUN_IMG_PAD_SRC;
+		fmt.pad = SDRV_IMG_PAD_SRC;
 		ret = kstream_get_format(sd, cfg, &fmt);
 		if(ret < 0)
 			return ret;
@@ -1056,7 +1056,7 @@ static int kstream_get_selection(struct v4l2_subdev *sd,
 	struct v4l2_mbus_framefmt *fmt;
 	struct v4l2_rect *rect;
 
-	if(sel->pad == KUNLUN_IMG_PAD_SRC) {
+	if(sel->pad == SDRV_IMG_PAD_SRC) {
 		switch(sel->target) {
 		case V4L2_SEL_TGT_CROP_BOUNDS:
 			fmt = __kstream_get_format(kstream, cfg, sel->pad, sel->which);
@@ -1100,7 +1100,7 @@ static int kstream_get_format(struct v4l2_subdev *sd,
 	if(kstream->state == INITING)
 		return 0;
 
-	if(fmt->pad == KUNLUN_IMG_PAD_SRC) {
+	if(fmt->pad == SDRV_IMG_PAD_SRC) {
 		fmt->format = *mbus_fmt;
 		return 0;
 	}
@@ -1136,7 +1136,7 @@ static int kstream_set_format(struct v4l2_subdev *sd,
 	if(ret < 0)
 		return ret;
 
-	if(fmt->pad == KUNLUN_IMG_PAD_SINK && kstream->state != INITING) {
+	if(fmt->pad == SDRV_IMG_PAD_SINK && kstream->state != INITING) {
 		if(v4l2_subdev_call(if_sd, pad, set_fmt, cfg, fmt))
 			return -EINVAL;
 	}
@@ -1160,16 +1160,16 @@ static int kstream_set_format(struct v4l2_subdev *sd,
 
 	*mbus_fmt = fmt->format;
 
-	if(fmt->pad == KUNLUN_IMG_PAD_SINK) {
-		mbus_fmt = __kstream_get_format(kstream, cfg, KUNLUN_IMG_PAD_SRC,
+	if(fmt->pad == SDRV_IMG_PAD_SINK) {
+		mbus_fmt = __kstream_get_format(kstream, cfg, SDRV_IMG_PAD_SRC,
 				fmt->which);
 
 		*mbus_fmt = fmt->format;
-		kstream_try_format(kstream, cfg, KUNLUN_IMG_PAD_SRC, mbus_fmt,
+		kstream_try_format(kstream, cfg, SDRV_IMG_PAD_SRC, mbus_fmt,
 				fmt->which);
 
 		sel.which = fmt->which;
-		sel.pad = KUNLUN_IMG_PAD_SRC;
+		sel.pad = SDRV_IMG_PAD_SRC;
 		sel.target = V4L2_SEL_TGT_CROP;
 		sel.r.width = fmt->format.width;
 		sel.r.height = fmt->format.height;
@@ -1300,7 +1300,7 @@ static int kstream_init_formats(struct v4l2_subdev *sd,
 		struct v4l2_subdev_fh *fh)
 {
 	struct v4l2_subdev_format format = {
-		.pad = KUNLUN_IMG_PAD_SINK,
+		.pad = SDRV_IMG_PAD_SINK,
 		.which = fh ? V4L2_SUBDEV_FORMAT_TRY :
 			V4L2_SUBDEV_FORMAT_ACTIVE,
 		.format = {
@@ -1340,22 +1340,22 @@ static const struct v4l2_subdev_pad_ops kstream_pad_ops = {
 	.enum_frame_interval = kstream_enum_frame_interval,
 };
 
-static const struct v4l2_subdev_ops kunlun_stream_v4l2_ops = {
+static const struct v4l2_subdev_ops sdrv_stream_v4l2_ops = {
 	.core = &kstream_core_ops,
 	.video = &kstream_video_ops,
 	.pad = &kstream_pad_ops,
 };
 
-static const struct v4l2_subdev_internal_ops kunlun_stream_internal_ops = {
+static const struct v4l2_subdev_internal_ops sdrv_stream_internal_ops = {
 	.open = kstream_init_formats,
 };
 
-static const struct media_entity_operations kunlun_stream_media_ops = {
+static const struct media_entity_operations sdrv_stream_media_ops = {
 	.link_setup = kstream_link_setup,
 	.link_validate = v4l2_subdev_link_validate,
 };
 
-static void kunlun_stream_frm_done_isr(struct kstream_device *kstream)
+static void sdrv_stream_frm_done_isr(struct kstream_device *kstream)
 {
 	struct kstream_video *video = &kstream->video;
 	struct vb2_v4l2_buffer *vbuf;
@@ -1377,7 +1377,7 @@ static void kunlun_stream_frm_done_isr(struct kstream_device *kstream)
 	spin_unlock_irqrestore(&video->buf_lock, flags);
 }
 
-static void kunlun_stream_img_update_isr(struct kstream_device *kstream)
+static void sdrv_stream_img_update_isr(struct kstream_device *kstream)
 {
 	struct kstream_video *video = &kstream->video;
 
@@ -1386,7 +1386,7 @@ static void kunlun_stream_img_update_isr(struct kstream_device *kstream)
 	kstream_set_baddr(kstream);
 }
 
-static void kunlun_stream_init_interface(struct kstream_device *kstream)
+static void sdrv_stream_init_interface(struct kstream_device *kstream)
 {
 	u32 val;
 
@@ -1395,11 +1395,11 @@ static void kunlun_stream_init_interface(struct kstream_device *kstream)
 
 	switch(kstream->interface.mbus_type) {
 	case V4L2_MBUS_PARALLEL:
-	case KUNLUN_MBUS_DC2CSI1:
+	case SDRV_MBUS_DC2CSI1:
 		val |= IMG_PARALLEL_SEL;
 		break;
 	case V4L2_MBUS_CSI2:
-	case KUNLUN_MBUS_DC2CSI2:
+	case SDRV_MBUS_DC2CSI2:
 		val |= IMG_MIMG_CSI2_SEL;
 		break;
 	case V4L2_MBUS_BT656:
@@ -1414,21 +1414,21 @@ static void kunlun_stream_init_interface(struct kstream_device *kstream)
 
 }
 
-static struct kstream_ops kunlun_stream_ops = {
-	.init_interface = kunlun_stream_init_interface,
-	.frm_done_isr = kunlun_stream_frm_done_isr,
-	.img_update_isr = kunlun_stream_img_update_isr,
+static struct kstream_ops sdrv_stream_ops = {
+	.init_interface = sdrv_stream_init_interface,
+	.frm_done_isr = sdrv_stream_frm_done_isr,
+	.img_update_isr = sdrv_stream_img_update_isr,
 };
 
 static int kstream_init_device(struct kstream_device *kstream)
 {
-	kstream->ops = &kunlun_stream_ops;
+	kstream->ops = &sdrv_stream_ops;
 	kstream->state = INITING;
 
 	return kstream_init_formats(&kstream->subdev, NULL);
 }
 
-int kunlun_stream_register_entities(struct kstream_device *kstream,
+int sdrv_stream_register_entities(struct kstream_device *kstream,
 		struct v4l2_device *v4l2_dev)
 {
 	struct v4l2_subdev *sd = &kstream->subdev;
@@ -1437,11 +1437,11 @@ int kunlun_stream_register_entities(struct kstream_device *kstream,
 	struct kstream_video *video = &kstream->video;
 	int ret;
 
-	v4l2_subdev_init(sd, &kunlun_stream_v4l2_ops);
-	sd->internal_ops = &kunlun_stream_internal_ops;
+	v4l2_subdev_init(sd, &sdrv_stream_v4l2_ops);
+	sd->internal_ops = &sdrv_stream_internal_ops;
 	sd->flags |= V4L2_SUBDEV_FL_HAS_DEVNODE;
 	snprintf(sd->name, ARRAY_SIZE(sd->name), "%s%d",
-			KUNLUN_IMG_NAME, kstream->id);
+			SDRV_IMG_NAME, kstream->id);
 	v4l2_set_subdevdata(sd, kstream);
 
 	ret = kstream_init_device(kstream);
@@ -1451,12 +1451,12 @@ int kunlun_stream_register_entities(struct kstream_device *kstream,
 		return ret;
 	}
 
-	pads[KUNLUN_IMG_PAD_SINK].flags = MEDIA_PAD_FL_SINK;
-	pads[KUNLUN_IMG_PAD_SRC].flags = MEDIA_PAD_FL_SOURCE;
+	pads[SDRV_IMG_PAD_SINK].flags = MEDIA_PAD_FL_SINK;
+	pads[SDRV_IMG_PAD_SRC].flags = MEDIA_PAD_FL_SOURCE;
 
 	sd->entity.function = MEDIA_ENT_F_IO_V4L;
-	sd->entity.ops = &kunlun_stream_media_ops;
-	ret = media_entity_pads_init(&sd->entity, KUNLUN_IMG_PAD_NUM, pads);
+	sd->entity.ops = &sdrv_stream_media_ops;
+	ret = media_entity_pads_init(&sd->entity, SDRV_IMG_PAD_NUM, pads);
 	if(ret < 0) {
 		dev_err(dev, "Failed to init media entity: %d\n", ret);
 		return ret;
@@ -1471,13 +1471,13 @@ int kunlun_stream_register_entities(struct kstream_device *kstream,
 	video->core = kstream->core;
 	video->dev = kstream->dev;
 	video->id = kstream->id;
-	ret = kunlun_stream_video_register(video, v4l2_dev);
+	ret = sdrv_stream_video_register(video, v4l2_dev);
 	if(ret < 0) {
 		dev_err(dev, "Failed to register video device: %d\n", ret);
 		goto err_reg_video;
 	}
 
-	ret = media_create_pad_link(&sd->entity, KUNLUN_IMG_PAD_SRC,
+	ret = media_create_pad_link(&sd->entity, SDRV_IMG_PAD_SRC,
 			&video->vdev.entity, 0,
 			MEDIA_LNK_FL_IMMUTABLE | MEDIA_LNK_FL_ENABLED);
 	if(ret < 0) {
@@ -1490,7 +1490,7 @@ int kunlun_stream_register_entities(struct kstream_device *kstream,
 
 	return 0;
 err_link:
-	kunlun_stream_video_unregister(video);
+	sdrv_stream_video_unregister(video);
 err_reg_video:
 	v4l2_device_unregister_subdev(sd);
 err_reg_subdev:
@@ -1498,13 +1498,13 @@ err_reg_subdev:
 	return ret;
 }
 
-int kunlun_stream_unregister_entities(struct kstream_device *kstream)
+int sdrv_stream_unregister_entities(struct kstream_device *kstream)
 {
 	struct v4l2_subdev *sd = &kstream->subdev;
 
 	kstream_disable(kstream);
 
-	kunlun_stream_video_unregister(&kstream->video);
+	sdrv_stream_video_unregister(&kstream->video);
 
 	v4l2_device_unregister_subdev(sd);
 

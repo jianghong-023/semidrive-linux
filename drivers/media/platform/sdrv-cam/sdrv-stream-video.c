@@ -1,7 +1,7 @@
 /*
- * kunlun-video.c
+ * sdrv-stream-video.c
  *
- * Semidrive kunlun platform v4l2 video operation
+ * Semidrive platform v4l2 video operation
  *
  * Copyright (C) 2019, Semidrive  Communications Inc.
  *
@@ -26,7 +26,7 @@
 #include <media/videobuf2-dma-sg.h>
 #include <media/videobuf2-dma-contig.h>
 
-#include "kunlun-csi.h"
+#include "sdrv-csi.h"
 
 static inline struct v4l2_subdev *video_remote_subdev(
 		struct kstream_video *video, u32 *pad)
@@ -49,8 +49,8 @@ static int kstream_video_querycap(struct file *file, void *fh,
 {
 	struct kstream_video *video = video_drvdata(file);
 
-	strlcpy(cap->driver, KUNLUN_IMG_NAME, sizeof(cap->driver));
-	strlcpy(cap->card, KUNLUN_IMG_NAME, sizeof(cap->card));
+	strlcpy(cap->driver, SDRV_IMG_NAME, sizeof(cap->driver));
+	strlcpy(cap->card, SDRV_IMG_NAME, sizeof(cap->card));
 	snprintf(cap->bus_info, sizeof(cap->bus_info), "platform:%s-%d",
 			dev_name(video->dev), video->id);
 
@@ -139,7 +139,7 @@ static int __kstream_video_try_format_source(struct kstream_video *video,
 	if(sd == NULL)
 		return -EINVAL;
 
-	ret = kunlun_find_pad(sd, MEDIA_PAD_FL_SINK);
+	ret = sdrv_find_pad(sd, MEDIA_PAD_FL_SINK);
 	if(ret < 0)
 		return ret;
 
@@ -193,8 +193,8 @@ static int __kstream_video_try_format(struct kstream_video *video,
 	memset(pix_mp, 0, sizeof(*pix_mp));
 
 	pix_mp->pixelformat = kpf->pixfmt;
-	pix_mp->width = clamp_t(u32, width, 1, KUNLUN_IMG_X_MAX);
-	pix_mp->height = clamp_t(u32, height, 1, KUNLUN_IMG_Y_MAX);
+	pix_mp->width = clamp_t(u32, width, 1, SDRV_IMG_X_MAX);
+	pix_mp->height = clamp_t(u32, height, 1, SDRV_IMG_Y_MAX);
 	pix_mp->num_planes =
 		strlen(kpf->bpp) / sizeof(kpf->bpp[0]);
 
@@ -582,7 +582,7 @@ static long kstream_vidioc_default(struct file *file, void *fh,
 	return 0;
 }
 
-static const struct v4l2_ioctl_ops kunlun_stream_vid_ioctl_ops = {
+static const struct v4l2_ioctl_ops sdrv_stream_vid_ioctl_ops = {
 	.vidioc_querycap = kstream_video_querycap,
 	.vidioc_enum_fmt_vid_cap_mplane = kstream_video_enum_fmt,
 	.vidioc_g_fmt_vid_cap_mplane = kstream_video_g_fmt,
@@ -671,7 +671,7 @@ static int kstream_video_release(struct file *file)
 	return 0;
 }
 
-static const struct v4l2_file_operations kunlun_stream_vid_ops = {
+static const struct v4l2_file_operations sdrv_stream_vid_ops = {
 	.owner = THIS_MODULE,
 	.unlocked_ioctl = video_ioctl2,
 	.open = kstream_video_open,
@@ -801,7 +801,7 @@ static void kstream_stop_streaming(struct vb2_queue *vq)
 	v4l2_subdev_call(sd, video, s_stream, 0);
 }
 
-static const struct vb2_ops kunlun_video_vb2_q_ops = {
+static const struct vb2_ops sdrv_video_vb2_q_ops = {
 	.queue_setup = kstream_queue_setup,
 	.wait_prepare = vb2_ops_wait_prepare,
 	.wait_finish = vb2_ops_wait_finish,
@@ -812,8 +812,8 @@ static const struct vb2_ops kunlun_video_vb2_q_ops = {
 	.stop_streaming = kstream_stop_streaming,
 };
 
-static void kunlun_stream_video_release(struct video_device *vdev);
-int kunlun_stream_video_register(struct kstream_video *video,
+static void sdrv_stream_video_release(struct video_device *vdev);
+int sdrv_stream_video_register(struct kstream_video *video,
 		struct v4l2_device *v4l2_dev)
 {
 	struct kstream_device *kstream = container_of(video,
@@ -837,7 +837,7 @@ int kunlun_stream_video_register(struct kstream_video *video,
 		q->mem_ops = &vb2_dma_sg_memops;
 	else
 		q->mem_ops = &vb2_dma_contig_memops;
-	q->ops = &kunlun_video_vb2_q_ops;
+	q->ops = &sdrv_video_vb2_q_ops;
 	q->type = V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE;
 	q->io_modes = VB2_DMABUF | VB2_MMAP | VB2_READ;
 	q->timestamp_flags = V4L2_BUF_FLAG_TIMESTAMP_MONOTONIC;
@@ -857,17 +857,17 @@ int kunlun_stream_video_register(struct kstream_video *video,
 		goto error_media_init;
 	}
 
-	vdev->fops = &kunlun_stream_vid_ops;
+	vdev->fops = &sdrv_stream_vid_ops;
 	vdev->device_caps = V4L2_CAP_VIDEO_CAPTURE_MPLANE | V4L2_CAP_STREAMING |
 		V4L2_CAP_READWRITE;
-	vdev->ioctl_ops = &kunlun_stream_vid_ioctl_ops;
-	vdev->release = kunlun_stream_video_release;
+	vdev->ioctl_ops = &sdrv_stream_vid_ioctl_ops;
+	vdev->release = sdrv_stream_video_release;
 	vdev->v4l2_dev = v4l2_dev;
 	vdev->vfl_dir = VFL_DIR_RX;
 	vdev->queue = q;
 	vdev->lock = &video->lock;
 	snprintf(vdev->name, ARRAY_SIZE(vdev->name), "%s-%d-%d",
-			KUNLUN_IMG_NAME, kstream->core->host_id, kstream->id);
+			SDRV_IMG_NAME, kstream->core->host_id, kstream->id);
 
 	ret = video_register_device(vdev, VFL_TYPE_GRABBER, -1);
 	if(ret < 0) {
@@ -890,7 +890,7 @@ error_vb2_init:
 	return ret;
 }
 
-static void kunlun_stream_video_release(struct video_device *vdev)
+static void sdrv_stream_video_release(struct video_device *vdev)
 {
 	struct kstream_video *video = video_get_drvdata(vdev);
 
@@ -900,7 +900,7 @@ static void kunlun_stream_video_release(struct video_device *vdev)
 	atomic_dec(&video->core->ref_count);
 }
 
-void kunlun_stream_video_unregister(struct kstream_video *video)
+void sdrv_stream_video_unregister(struct kstream_video *video)
 {
 	atomic_inc(&video->core->ref_count);
 	video_unregister_device(&video->vdev);
