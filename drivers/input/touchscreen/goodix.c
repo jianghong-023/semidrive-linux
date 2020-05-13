@@ -274,7 +274,7 @@ static void goodix_ts_report_touch(struct goodix_ts_data *ts, u8 *coor_data)
 	input_report_abs(ts->input_dev, ABS_MT_TOUCH_MAJOR, input_w);
 	input_report_abs(ts->input_dev, ABS_MT_WIDTH_MAJOR, input_w);
 	//printk("point: (%d, %d)\n", input_x, input_y);
-	dev_info(&ts->client->dev, "point: (%d, %d)\n", input_x, input_y);
+	//dev_info(&ts->client->dev, "point: (%d, %d)\n", input_x, input_y);
 }
 
 /**
@@ -318,7 +318,7 @@ static void goodix_process_events(struct goodix_ts_data *ts)
 static irqreturn_t goodix_ts_irq_handler(int irq, void *dev_id)
 {
 	struct goodix_ts_data *ts = dev_id;
-    dev_info(&ts->client->dev, "%s\n", __func__);
+    //dev_info(&ts->client->dev, "%s\n", __func__);
 	goodix_process_events(ts);
 
 	if (goodix_i2c_write_u8(ts->client, GOODIX_READ_COOR_ADDR, 0) < 0)
