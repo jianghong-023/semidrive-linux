@@ -37,6 +37,8 @@ obj-$(CONFIG_PNP)		+= pnp/
 obj-y				+= amba/
 
 obj-y				+= clk/
+# iommu/ comes before gpu as gpu are using iommu controllers
+obj-$(CONFIG_IOMMU_SUPPORT)	+= iommu/
 # Many drivers will want to use DMA so this has to be made available
 # really early.
 obj-$(CONFIG_DMADEVICES)	+= dma/
@@ -58,8 +60,6 @@ obj-$(CONFIG_RESET_CONTROLLER)	+= reset/
 obj-y				+= tty/
 obj-y				+= char/
 
-# iommu/ comes before gpu as gpu are using iommu controllers
-obj-$(CONFIG_IOMMU_SUPPORT)	+= iommu/
 
 # gpu/ comes after char for AGP vs DRM startup and after iommu
 obj-y				+= gpu/
