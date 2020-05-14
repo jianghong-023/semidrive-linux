@@ -88,30 +88,6 @@ static void sdrv_pcm_refill_fifo(struct sdrv_afe_i2s_sc *afe)
 	rcu_read_unlock();
 }
 
-/* config scr for full duplex mode.  */
-static void config_duplex_mode(bool is_full_duplex, int offset)
-{
-	unsigned int value;
-	void __iomem *iobase = ioremap(APB_SCR_SEC_BASE, 0x100000);
-	value = readl(iobase + ((0xC) << 10));
-	/* check base address. calculate offset 0: i2s3 1: i2s4*/
-
-	if (true == is_full_duplex) {
-		/* set to full duplex value, set related bit */
-		value = value | (0x1 << offset);
-	} else {
-		/* set to half duplex value, clear related bit */
-		value = value & (~(0x1 << offset));
-	}
-	/* sc 3~8  bus id 2~7 bit 96~101 */
-	writel(value, iobase + ((0xC) << 10));
-	printk(KERN_INFO "ALSA SDRV"
-			 " Config full duplex mode val(0x%x) offset(%d)\n",
-	       value, offset);
-
-	udelay(1);
-	iounmap(iobase);
-}
 
 /* misc operation */
 
@@ -1265,40 +1241,11 @@ static int snd_afe_i2s_sc_probe(struct platform_device *pdev)
 	if (!ret) {
 		/* semidrive,full-duplex is 0 set to half duplex mode.  */
 		if (value == 0) {
-			dev_err(&pdev->dev, "Set to half duplex mode. \n");
-			afe->is_full_duplex = false;
-		}
-	}
-
-	if (false == afe->is_full_duplex) {
-		if (res->start == APB_I2S_SC3_BASE) {
-			config_duplex_mode(false, 0);
-
-		} else if (res->start == APB_I2S_SC4_BASE) {
-			config_duplex_mode(false, 1);
-
-		} else if (res->start == APB_I2S_SC5_BASE) {
-			config_duplex_mode(false, 2);
-
-		} else if (res->start == APB_I2S_SC6_BASE) {
-			config_duplex_mode(false, 3);
-
-		} else if (res->start == APB_I2S_SC7_BASE) {
-			config_duplex_mode(false, 4);
-
-		} else if (res->start == APB_I2S_SC8_BASE) {
-			config_duplex_mode(false, 5);
-
-		} else {
-			/* can not find i2s address */
-			dev_err(&pdev->dev,
-				"Can't set full duplex mode for i2s "
-				"paddr(0x%llx) \n",
-				res->start);
-			afe->is_full_duplex = false;
+			dev_err(&pdev->dev, "Don't suppport set to half duplex mode. Please set scr register in ssystem \n");
 			goto err_disable;
 		}
 	}
+
 	/* 	Set register map to cache bypass mode. */
 	//	regcache_cache_bypass(afe->regmap, true);
 
