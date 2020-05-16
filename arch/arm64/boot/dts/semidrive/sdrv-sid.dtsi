@@ -12,7 +12,7 @@
  * unless you know what you are doing!
  */
 
-#include "chipcfg/generate/smmu-sid.h"
+#include <dt-bindings/memory/sdrv-sid.h>
 
 &display {
 	/* DRM domain has multiple master IDs for DC/DP in the IOMMU */
