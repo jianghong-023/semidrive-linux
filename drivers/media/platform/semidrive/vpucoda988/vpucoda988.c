@@ -41,13 +41,6 @@
 #include "coda_config.h"
 #include "vpu.h"
 
-#define ENABLE_DEBUG_MSG
-#ifdef ENABLE_DEBUG_MSG
-#define DPRINTK(args...)        printk(KERN_INFO args);
-#else
-#define DPRINTK(args...)
-#endif
-
 /* if you want to have clock gating scheme frame by frame */
 #define VPU_SUPPORT_CLOCK_CONTROL
 
@@ -241,7 +234,7 @@ static int vpu_alloc_common_buffer(vpudrv_buffer_t *vb)
 
 #endif
 
-    DPRINTK("[VPUDRV] common buffer allocate info :vpucoda_device %p, handle %d , virt %p,  phy %p, dma addr %p, size %d\n",
+    pr_info("[VPUDRV] common buffer allocate info :vpucoda_device %p, handle %d , virt %p,  phy %p, dma addr %p, size %d\n",
             vpucoda_device,
             vb->buf_handle,
             (void *)vb->base,
@@ -299,7 +292,7 @@ static void vpu_free_dma_buffer(vpudrv_buffer_t *vb)
     if (vb->base)
         dma_free_coherent(vpucoda_device, PAGE_ALIGN(vb->size), (void *) vb->base,
                           vb->dma_addr   /*, DMA_ATTR_WRITE_COMBINE*/);
-    DPRINTK("[VPUDRV] free memory coda988 device %p \n", vpucoda_device);
+    pr_info("[VPUDRV] free memory coda988 device %p \n", vpucoda_device);
 
 #endif
 }
@@ -313,8 +306,6 @@ static int vpu_free_instances(struct file *filp)
     void *vdi_mutexes_base;
     const int PTHREAD_MUTEX_T_DESTROY_VALUE = 0xdead10cc;
 
-    DPRINTK("[VPUDRV] vpu_free_instances\n");
-
     instance_pool_size_per_core = (s_instance_pool.size /
                                    MAX_NUM_VPU_CORE); /* s_instance_pool.size  assigned to the size of all core once call VDI_IOCTL_GET_INSTANCE_POOL by user. */
 
@@ -323,7 +314,7 @@ static int vpu_free_instances(struct file *filp)
             vip_base = (void *)(s_instance_pool.base +
                                 (instance_pool_size_per_core *
                                  vil->core_idx));
-            DPRINTK("[VPUDRV] vpu_free_instances detect instance crash instIdx=%d, coreIdx=%d, vip_base=%p, instance_pool_size_per_core=%d\n",
+            pr_info("[VPUDRV] vpu_free_instances detect instance crash instIdx=%d, coreIdx=%d, vip_base=%p, instance_pool_size_per_core=%d\n",
                     (int) vil->inst_idx, (int) vil->core_idx, vip_base,
                     (int) instance_pool_size_per_core);
             vip = (vpudrv_instance_pool_t *) vip_base;
@@ -334,7 +325,7 @@ static int vpu_free_instances(struct file *filp)
 #define PTHREAD_MUTEX_T_HANDLE_SIZE 4
                 vdi_mutexes_base = (vip_base + (instance_pool_size_per_core -
                                                 PTHREAD_MUTEX_T_HANDLE_SIZE * 4));
-                DPRINTK("[VPUDRV] vpu_free_instances : force to destroy vdi_mutexes_base=%p in userspace \n",
+                pr_info("[VPUDRV] vpu_free_instances : force to destroy vdi_mutexes_base=%p in userspace \n",
                         vdi_mutexes_base);
 
                 if (vdi_mutexes_base) {
@@ -360,8 +351,6 @@ static int vpu_free_buffers(struct file *filp)
 {
     vpudrv_buffer_pool_t *pool, *n;
     vpudrv_buffer_t vb;
-
-    DPRINTK("[VPUDRV] vpu_free_buffers\n");
 
     list_for_each_entry_safe(pool, n, &s_vbp_head, list) {
         if (pool->filp == filp) {
@@ -389,7 +378,7 @@ static irqreturn_t vpu_irq_handler(int irq, void *dev_id)
     for (core = 0; core < MAX_NUM_VPU_CORE; core++) {
         if (s_bit_firmware_info[core].size ==
                 0) { /* it means that we didn't get an information the current core from API layer. No core activated.*/
-            DPRINTK("[VPUDRV] :  s_bit_firmware_info[core].size is zero\n");
+            pr_info("[VPUDRV] :  s_bit_firmware_info[core].size is zero\n");
             continue;
         }
 
@@ -422,14 +411,13 @@ static irqreturn_t vpu_irq_handler(int irq, void *dev_id)
 
 static int vpu_open(struct inode *inode, struct file *filp)
 {
-    DPRINTK("[VPUDRV][+] %s  vpucoda_device %p \n", __func__,
+    pr_info("[VPUDRV] %s  vpucoda_device %p \n", __func__,
             vpucoda_device);
     spin_lock(&s_vpu_lock);
 
     s_vpu_drv_context.open_count++;
     filp->private_data = (void *)(&s_vpu_drv_context);
     spin_unlock(&s_vpu_lock);
-    DPRINTK("[VPUDRV][-] %s\n", __func__);
 
     return 0;
 }
@@ -443,8 +431,6 @@ static long vpu_ioctl(struct file *filp, u_int cmd, u_long arg)
     switch (cmd) {
         case VDI_IOCTL_ALLOCATE_PHYSICAL_MEMORY: {
             vpudrv_buffer_pool_t *vbp;
-
-            DPRINTK("[VPUDRV][+]VDI_IOCTL_ALLOCATE_PHYSICAL_MEMORY\n");
 
             if ((ret = down_interruptible(&s_vpu_sem)) == 0) {
                 vbp = kzalloc(sizeof(*vbp), GFP_KERNEL);
@@ -490,14 +476,13 @@ static long vpu_ioctl(struct file *filp, u_int cmd, u_long arg)
                 up(&s_vpu_sem);
             }
 
-            DPRINTK("[VPUDRV][-]VDI_IOCTL_ALLOCATE_PHYSICAL_MEMORY\n");
+            pr_info("[VPUDRV] VDI_IOCTL_ALLOCATE_PHYSICAL_MEMORY\n");
         }
         break;
 
         case VDI_IOCTL_FREE_PHYSICALMEMORY: {
             vpudrv_buffer_pool_t *vbp, *n;
             vpudrv_buffer_t vb;
-            DPRINTK("[VPUDRV][+]VDI_IOCTL_FREE_PHYSICALMEMORY\n");
 
             if ((ret = down_interruptible(&s_vpu_sem)) == 0) {
 
@@ -525,14 +510,14 @@ static long vpu_ioctl(struct file *filp, u_int cmd, u_long arg)
                 up(&s_vpu_sem);
             }
 
-            DPRINTK("[VPUDRV][-]VDI_IOCTL_FREE_PHYSICALMEMORY\n");
+            pr_info("[VPUDRV] VDI_IOCTL_FREE_PHYSICALMEMORY\n");
 
         }
         break;
 
         case VDI_IOCTL_GET_RESERVED_VIDEO_MEMORY_INFO: {
 #ifdef VPU_SUPPORT_RESERVED_VIDEO_MEMORY
-            DPRINTK("[VPUDRV][+]VDI_IOCTL_GET_RESERVED_VIDEO_MEMORY_INFO\n");
+            pr_info("[VPUDRV][+]VDI_IOCTL_GET_RESERVED_VIDEO_MEMORY_INFO\n");
 
             if (s_video_memory.base != 0) {
                 ret = copy_to_user((void __user *) arg, &s_video_memory,
@@ -545,7 +530,7 @@ static long vpu_ioctl(struct file *filp, u_int cmd, u_long arg)
                 ret = -EFAULT;
             }
 
-            DPRINTK("[VPUDRV][-]VDI_IOCTL_GET_RESERVED_VIDEO_MEMORY_INFO\n");
+            pr_info("[VPUDRV][-]VDI_IOCTL_GET_RESERVED_VIDEO_MEMORY_INFO\n");
 #endif
         }
         break;
@@ -587,7 +572,6 @@ static long vpu_ioctl(struct file *filp, u_int cmd, u_long arg)
 
 #ifdef VPU_SUPPORT_CLOCK_CONTROL
             u32 clkgate;
-            DPRINTK("[VPUDRV][+]VDI_IOCTL_SET_CLOCK_GATE\n");
 
             if (get_user(clkgate, (u32 __user *) arg))
                 return -EFAULT;
@@ -597,13 +581,12 @@ static long vpu_ioctl(struct file *filp, u_int cmd, u_long arg)
             else
                 vpu_clk_disable(s_vpu_clk);
 
-            DPRINTK("[VPUDRV][-]VDI_IOCTL_SET_CLOCK_GATE\n");
 #endif
         }
         break;
 
         case VDI_IOCTL_GET_INSTANCE_POOL: {
-            DPRINTK("[VPUDRV][+]VDI_IOCTL_GET_INSTANCE_POOL\n");
+            pr_info("[VPUDRV] VDI_IOCTL_GET_INSTANCE_POOL\n");
 
             if ((ret = down_interruptible(&s_vpu_sem)) == 0) {
                 if (s_instance_pool.base != 0) {
@@ -646,12 +629,10 @@ static long vpu_ioctl(struct file *filp, u_int cmd, u_long arg)
                 up(&s_vpu_sem);
             }
 
-            DPRINTK("[VPUDRV][-]VDI_IOCTL_GET_INSTANCE_POOL\n");
         }
         break;
 
         case VDI_IOCTL_GET_COMMON_MEMORY: {
-            DPRINTK("[VPUDRV][+]VDI_IOCTL_GET_COMMON_MEMORY\n");
 
             if (s_common_memory.base != 0) {
                 ret = copy_to_user((void __user *) arg, &s_common_memory,
@@ -675,7 +656,6 @@ static long vpu_ioctl(struct file *filp, u_int cmd, u_long arg)
                 ret = -EFAULT;
             }
 
-            DPRINTK("[VPUDRV][-]VDI_IOCTL_GET_COMMON_MEMORY\n");
         }
         break;
 
@@ -713,7 +693,7 @@ static long vpu_ioctl(struct file *filp, u_int cmd, u_long arg)
                 return -EFAULT;
             }
 
-            DPRINTK("[VPUDRV] VDI_IOCTL_OPEN_INSTANCE core_idx=%d, inst_idx=%d, s_vpu_open_ref_count=%d, inst_open_count=%d\n",
+            pr_info("[VPUDRV] VDI_IOCTL_OPEN_INSTANCE core_idx=%d, inst_idx=%d, s_vpu_open_ref_count=%d, inst_open_count=%d\n",
                     (int) inst_info.core_idx, (int) inst_info.inst_idx,
                     s_vpu_open_ref_count,
                     inst_info.inst_open_count);
@@ -723,7 +703,6 @@ static long vpu_ioctl(struct file *filp, u_int cmd, u_long arg)
         case VDI_IOCTL_CLOSE_INSTANCE: {
             vpudrv_inst_info_t inst_info;
             vpudrv_instanace_list_t *vil, *n;
-            DPRINTK("[VPUDRV][+]VDI_IOCTL_CLOSE_INSTANCE\n");
 
             if (copy_from_user(&inst_info, (vpudrv_inst_info_t *) arg,
                                sizeof(vpudrv_inst_info_t)))
@@ -752,7 +731,7 @@ static long vpu_ioctl(struct file *filp, u_int cmd, u_long arg)
                              sizeof(vpudrv_inst_info_t)))
                 return -EFAULT;
 
-            DPRINTK("[VPUDRV] VDI_IOCTL_CLOSE_INSTANCE core_idx=%d, inst_idx=%d, s_vpu_open_ref_count=%d, inst_open_count=%d\n",
+            pr_info("[VPUDRV] VDI_IOCTL_CLOSE_INSTANCE core_idx=%d, inst_idx=%d, s_vpu_open_ref_count=%d, inst_open_count=%d\n",
                     (int) inst_info.core_idx, (int) inst_info.inst_idx,
                     s_vpu_open_ref_count,
                     inst_info.inst_open_count);
@@ -762,8 +741,6 @@ static long vpu_ioctl(struct file *filp, u_int cmd, u_long arg)
         case VDI_IOCTL_GET_INSTANCE_NUM: {
             vpudrv_inst_info_t inst_info;
             vpudrv_instanace_list_t *vil, *n;
-            DPRINTK("[VPUDRV][+]VDI_IOCTL_GET_INSTANCE_NUM\n");
-
             ret = copy_from_user(&inst_info, (vpudrv_inst_info_t *) arg,
                                  sizeof(vpudrv_inst_info_t));
 
@@ -781,7 +758,7 @@ static long vpu_ioctl(struct file *filp, u_int cmd, u_long arg)
             ret = copy_to_user((void __user *) arg, &inst_info,
                                sizeof(vpudrv_inst_info_t));
 
-            DPRINTK("[VPUDRV] VDI_IOCTL_GET_INSTANCE_NUM core_idx=%d, inst_idx=%d, open_count=%d\n",
+            pr_info("[VPUDRV] VDI_IOCTL_GET_INSTANCE_NUM core_idx=%d, inst_idx=%d, open_count=%d\n",
                     (int) inst_info.core_idx, (int) inst_info.inst_idx,
                     inst_info.inst_open_count);
         }
@@ -793,14 +770,13 @@ static long vpu_ioctl(struct file *filp, u_int cmd, u_long arg)
         break;
 
         case VDI_IOCTL_GET_REGISTER_INFO: {
-            DPRINTK("[VPUDRV][+]VDI_IOCTL_GET_REGISTER_INFO\n");
             ret = copy_to_user((void __user *) arg, &s_vpu_register,
                                sizeof(vpudrv_buffer_t));
 
             if (ret != 0)
                 ret = -EFAULT;
 
-            DPRINTK("[VPUDRV][-]VDI_IOCTL_GET_REGISTER_INFO s_vpu_register.phys_addr %llx, s_vpu_register.virt_addr %llx, s_vpu_register.size %d\n",
+            pr_info("[VPUDRV] VDI_IOCTL_GET_REGISTER_INFO s_vpu_register.phys_addr %llx, s_vpu_register.virt_addr %llx, s_vpu_register.size %d\n",
                     s_vpu_register.phys_addr, s_vpu_register.virt_addr,
                     s_vpu_register.size);
         }
@@ -843,7 +819,7 @@ static long vpu_ioctl(struct file *filp, u_int cmd, u_long arg)
 
             dma_buf_put(temp);
 
-            DPRINTK("get dma handle %d, dma buf addr %p, attachment %p, sgt %p\n",
+            pr_info("get dma handle %d, dma buf addr %p, attachment %p, sgt %p\n",
                     buf.buf_handle,
                     (void *)buf.dma_addr,
                     (void *)buf.attachment,
@@ -879,7 +855,7 @@ static long vpu_ioctl(struct file *filp, u_int cmd, u_long arg)
             dma_buf_put(temp);
             temp = NULL;
 
-            DPRINTK("dma unmap attachment success now \n" );
+            pr_info("dma unmap attachment success now \n" );
         }
         break;
 
@@ -891,15 +867,15 @@ static long vpu_ioctl(struct file *filp, u_int cmd, u_long arg)
             volatile void __iomem *io_adress = NULL;
 
             if (get_user(mode, (u32 __user *) arg)) {
-                DPRINTK("[VPUDRV]  sram cfg error get_user\n");
+                pr_info("[VPUDRV]  sram cfg error get_user\n");
                 return -EFAULT;
             }
 
             io_adress = ioremap((APB_SCR_SEC_BASE + (0x48 << 10)), 32);
             tmp_reg = readl(io_adress);
-			DPRINTK("[VPUDRV] sram default cfg:%d\n", tmp_reg);
+			pr_info("[VPUDRV] sram default cfg:%d\n", tmp_reg);
             writel(((tmp_reg & 0xFC) | mode), io_adress); //[1:0] available
-            DPRINTK("[VPUDRV] sram cfg:%ud, apb addr:%p data:%ud, tmp_reg %ux\n",mode,io_adress,readl(io_adress), tmp_reg);
+            pr_info("[VPUDRV] sram cfg:%ud, apb addr:%p data:%ud, tmp_reg %ux\n",mode,io_adress,readl(io_adress), tmp_reg);
         #else  /* will del  when the scr module is ready */
             uint32_t mode = 0;
             volatile unsigned int tmp_reg = 0;
@@ -916,9 +892,9 @@ static long vpu_ioctl(struct file *filp, u_int cmd, u_long arg)
             io_adress = ioremap(scr_info.phy_addr, 32);
             tmp_reg = readl(io_adress);
 
-            DPRINTK("[VPUDRV] sram default cfg:%d\n", tmp_reg);
+            pr_info("[VPUDRV] sram default cfg:%d\n", tmp_reg);
             writel(((tmp_reg & 0xFC) | mode), io_adress); //[1:0] available
-            DPRINTK("[VPUDRV] sram cfg:%ud, apb addr:%p data:%ud, tmp_reg %ux\n",mode,io_adress,readl(io_adress), tmp_reg);
+            pr_info("[VPUDRV] sram cfg:%ud, apb addr:%p data:%ud, tmp_reg %ux\n",mode,io_adress,readl(io_adress), tmp_reg);
         #endif
         }
         break;
@@ -933,7 +909,7 @@ static long vpu_ioctl(struct file *filp, u_int cmd, u_long arg)
         break;
 
         default: {
-            DPRINTK("[VPUDRV] No such IOCTL, cmd is %d\n", cmd);
+            pr_err("[VPUDRV] No such IOCTL, cmd is %d\n", cmd);
         }
         break;
     }
@@ -951,11 +927,8 @@ static ssize_t vpu_read(struct file *filp, char __user *buf,
 static ssize_t vpu_write(struct file *filp, const char __user *buf,
                          size_t len, loff_t *ppos)
 {
-
-    DPRINTK("[VPUDRV] coda vpu_write len=%d\n", (int)len);
-
     if (!buf) {
-        DPRINTK("[VPUDRV] vpu_write buf = NULL error \n");
+        pr_err("[VPUDRV] vpu_write buf = NULL error \n");
         return -EFAULT;
     }
 
@@ -976,7 +949,7 @@ static ssize_t vpu_write(struct file *filp, const char __user *buf,
         }
 
         if (bit_firmware_info->size == sizeof(vpu_bit_firmware_info_t)) {
-            DPRINTK("[VPUDRV] vpu_write set bit_firmware_info coreIdx=0x%x, reg_base_offset=0x%x size=0x%x, bit_code[0]=0x%x\n",
+            pr_info("[VPUDRV] vpu_write set bit_firmware_info coreIdx=0x%x, reg_base_offset=0x%x size=0x%x, bit_code[0]=0x%x\n",
                     bit_firmware_info->core_idx, (int) bit_firmware_info->reg_base_offset,
                     bit_firmware_info->size, bit_firmware_info->bit_code[0]);
 
@@ -1002,7 +975,7 @@ static ssize_t vpu_write(struct file *filp, const char __user *buf,
 static int vpu_release(struct inode *inode, struct file *filp)
 {
     int ret = 0;
-    DPRINTK("[VPUDRV] vpu_release\n");
+    pr_info("[VPUDRV] vpu_release\n");
 
     if ((ret = down_interruptible(&s_vpu_sem)) == 0) {
 
@@ -1015,7 +988,7 @@ static int vpu_release(struct inode *inode, struct file *filp)
 
         if (s_vpu_drv_context.open_count == 0) {
             if (s_instance_pool.base) {
-                DPRINTK("[VPUDRV] free instance pool\n");
+                pr_info("[VPUDRV] free instance pool\n");
 #ifdef USE_VMALLOC_FOR_INSTANCE_POOL_MEMORY
                 vfree((const void *) s_instance_pool.base);
 #else
@@ -1027,7 +1000,7 @@ static int vpu_release(struct inode *inode, struct file *filp)
 #ifndef COMMON_MEMORY_USING_ION
 #if 0  // common memory buffer can not free unitl system power off
             if (s_common_memory.base) {
-                DPRINTK("[VPUDRV] free common memory\n");
+                pr_info("[VPUDRV] free common memory\n");
                 vpu_free_dma_buffer(&s_common_memory);
                 s_common_memory.base = 0;
             }
@@ -1118,7 +1091,7 @@ static int vpu_mmap(struct file *fp, struct vm_area_struct *vm)
         return vpu_map_to_instance_pool_memory(fp, vm);
 
     if (vm->vm_pgoff == (s_vpu_register.phys_addr >> PAGE_SHIFT)) {
-        DPRINTK("[VPUDRV]s_vpu_register.phys_addr %p, vm_pagoff %lx\n",
+        pr_info("[VPUDRV]s_vpu_register.phys_addr %p, vm_pagoff %lx\n",
                 (void *)(s_vpu_register.phys_addr), vm->vm_pgoff);
         return vpu_map_to_register(fp, vm);
     }
@@ -1131,7 +1104,7 @@ static int vpu_mmap(struct file *fp, struct vm_area_struct *vm)
      * dma_address same as phys_address when no smmu
      */
     if (vm->vm_pgoff == (0xfe000 >> PAGE_SHIFT)) {
-        DPRINTK("[VPUDRV] vpucoda_device %p, s_common_memory.phys_addr %p, dma_addr %p ,base %p,  size %d, vm_pagoff %lx \n",
+        pr_info("[VPUDRV] vpucoda_device %p, s_common_memory.phys_addr %p, dma_addr %p ,base %p,  size %d, vm_pagoff %lx \n",
                 (void *)vpucoda_device,
                 (void *)s_common_memory.phys_addr,
                 (void *)s_common_memory.dma_addr,
@@ -1147,7 +1120,7 @@ static int vpu_mmap(struct file *fp, struct vm_area_struct *vm)
 
 #endif
 
-    DPRINTK("[VPUDRV-ERR] never come here while using ion  vm_pgoff %lx, s_common_memory.phys_addr %p, s_common_memory.phys_addr >> PAGE_SHIFT %llx \n  ",
+    pr_info("[VPUDRV-ERR] never come here while using ion  vm_pgoff %lx, s_common_memory.phys_addr %p, s_common_memory.phys_addr >> PAGE_SHIFT %llx \n  ",
             vm->vm_pgoff,
             (void *)s_common_memory.phys_addr,
             s_common_memory.phys_addr >> PAGE_SHIFT);
@@ -1180,6 +1153,7 @@ static void vpu_get_sram_info(struct platform_device *pdev, struct sram_info  *i
     struct resource *res = NULL;
     struct device_node *ram_node = NULL;
     struct resource res_temp = {0};
+    int32_t index = 0;	 /*sram2 index in soc_sram */
 
     if(pdev) {
         res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "inter_sram");
@@ -1190,19 +1164,63 @@ static void vpu_get_sram_info(struct platform_device *pdev, struct sram_info  *i
         }
 
         if(NULL != (ram_node = of_parse_phandle(pdev->dev.of_node, "vpu2,sram2", 0))) {
-            if(!of_address_to_resource(ram_node, 0, &res_temp)) {
+            if(!of_address_to_resource(ram_node, index, &res_temp)) {
                 info[1].phy = res_temp.start;
                 info[1].size = res_temp.end - res_temp.start + 1;
                 info[1].id = 2;   /* for soc sram */
             }
         }
 
+        index = 1; /*sram3 index in soc_sram */
+        if(NULL != (ram_node = of_parse_phandle(pdev->dev.of_node, "vpu2,sram3", 0))) {
+            if(!of_address_to_resource(ram_node, index, &res_temp)) {
+                info[1].phy = res_temp.start;
+                info[1].size = res_temp.end - res_temp.start + 1;
+                info[1].id = 2;   /* for soc sram */
+            }
+        }
     }
 
-    DPRINTK("[VPUDRV] Coda988 get sram info : sram[0].id %d;  sram[0].phy %#x; sram[0].size %#x ,sram[1].id %d;  sram[1].phy %#x; sram[1].size %#x \n",
+    pr_info("[VPUDRV] Coda988 get sram info : sram[0].id %d;  sram[0].phy %#x; sram[0].size %#x ,sram[1].id %d;  sram[1].phy %#x; sram[1].size %#x \n",
                                       info[0].id , info[0].phy, info[0].size,
                                       info[1].id , info[1].phy, info[1].size);
 }
+
+
+/*
+ *brief: show_coda988_device
+ *para:  dev
+ *para: attr
+ *buf   value
+ *note: set config info
+ */
+static ssize_t set_coda988_device (struct device *dev,
+                 struct device_attribute *attr,
+                 const char *buf, size_t len)
+{
+    return len;
+}
+
+/*
+ *brief: show coda device debug info
+ *para:  dev
+ *para:  attr
+ *buf    value
+ *note: cat /sys/device/platform/soc/31430000.coda988/coda_debug
+ */
+
+static ssize_t show_coda988_device (struct device *dev,
+                  struct device_attribute *attr, char *buf)
+{
+    return sprintf(buf, "sram[0]:  %#x\nsram[1]:  %#x\nclk_reference:  %d\ncommon_mem base %p\n",
+                    drive_data.sram[0].phy,
+                    drive_data.sram[1].phy,
+                    clk_reference,
+                    (void*)s_common_memory.base);
+
+}
+
+static DEVICE_ATTR(coda988_debug, 0664, show_coda988_device, set_coda988_device);
 
 struct file_operations vpu_fops = {
     .owner = THIS_MODULE,
@@ -1223,7 +1241,7 @@ static int vpu_probe(struct platform_device *pdev)
     int err = 0;
     struct resource *res = NULL;
     memset(&drive_data, 0 , sizeof(struct coda_drive));
-    DPRINTK("[VPUDRV] vpu_probe\n");
+    pr_info("[VPUDRV] vpu_probe\n");
 
     if (pdev) {
         vpucoda_device = &(pdev->dev);
@@ -1237,7 +1255,7 @@ static int vpu_probe(struct platform_device *pdev)
         s_vpu_register.virt_addr = (unsigned long) ioremap_nocache(res->start,
                                    res->end - res->start + 1);
         s_vpu_register.size = res->end - res->start + 1;
-        DPRINTK("[VPUDRV] : vpu base address get from platform driver physical base addr %p , kernel virtual base %p , vpucoda_device %p , s_vpu_register.size %#x\n",
+        pr_info("[VPUDRV] : vpu base address get from platform driver physical base addr %p , kernel virtual base %p , vpucoda_device %p , s_vpu_register.size %#x\n",
                 (void *)s_vpu_register.phys_addr, (void *)s_vpu_register.virt_addr,
                 vpucoda_device, s_vpu_register.size);
     }
@@ -1246,7 +1264,7 @@ static int vpu_probe(struct platform_device *pdev)
         s_vpu_register.virt_addr = (unsigned long) ioremap_nocache(
                                        s_vpu_register.phys_addr, VPU_REG_SIZE);
         s_vpu_register.size = VPU_REG_SIZE;
-        DPRINTK("[VPUDRV] : vpu base address get from defined value physical base addr %p, virtual base %p\n",
+        pr_info("[VPUDRV] : vpu base address get from defined value physical base addr %p, virtual base %p\n",
                 (void *)s_vpu_register.phys_addr, (void *)s_vpu_register.virt_addr);
 
     }
@@ -1262,7 +1280,7 @@ static int vpu_probe(struct platform_device *pdev)
                     scr_info.size = res->end - res->start + 1;
                 }
             }
-            DPRINTK("[VPUDRV]:Get scr_addr %#x %u\n", scr_info.phy_addr, scr_info.size);
+            pr_info("[VPUDRV]:Get scr_addr %#x %u\n", scr_info.phy_addr, scr_info.size);
         }
 #endif
 
@@ -1273,8 +1291,6 @@ static int vpu_probe(struct platform_device *pdev)
         goto ERROR_PROVE_DEVICE;
     }
 
-    DPRINTK(KERN_INFO "SUCCESS alloc_chrdev_region s_vpu_major %d\n", s_vpu_major);
-
     /* initialize the device structure and register the device with the kernel */
     cdev_init(&s_vpu_cdev, &vpu_fops);
 
@@ -1284,17 +1300,20 @@ static int vpu_probe(struct platform_device *pdev)
         goto ERROR_PROVE_DEVICE;
     }
 
-    if(NULL == (drive_data.coda_class = class_create(THIS_MODULE, "vpu_coda"))) {
+    if (NULL == (drive_data.coda_class = class_create(THIS_MODULE, "vpu_coda"))) {
         pr_err("[VPUDRV-ERR] could not allocate class\n");
         err = -EBUSY;
         goto ERROR_PROVE_DEVICE;
     }
 
-    if(NULL == (drive_data.coda_device = device_create(drive_data.coda_class, NULL, s_vpu_major, NULL, VPU_DEV_NAME))) {
-        class_destroy(drive_data.coda_class);
+    if (NULL == (drive_data.coda_device = device_create(drive_data.coda_class, NULL, s_vpu_major, NULL, VPU_DEV_NAME))) {
         err = -EBUSY;
-        drive_data.coda_class = NULL;
         pr_err("[VPUDRV-ERR] could not allocate device\n");
+        goto ERROR_PROVE_DEVICE;
+    }
+
+    if (device_create_file(&(pdev->dev), &dev_attr_coda988_debug)) {
+        pr_err("[VPUDRV-ERR] device_create_file fail \n");
         goto ERROR_PROVE_DEVICE;
     }
 
@@ -1304,10 +1323,10 @@ static int vpu_probe(struct platform_device *pdev)
         s_vpu_clk = vpu_clk_get(NULL);
 
     if (!s_vpu_clk) {
-        DPRINTK("[VPUDRV] : platforem can not support clock controller.\n");
+        pr_info("[VPUDRV] : platforem can not support clock controller.\n");
     }
     else
-        DPRINTK("[VPUDRV] : get clock controller s_vpu_clk=%p\n", s_vpu_clk);
+        pr_info("[VPUDRV] : get clock controller s_vpu_clk=%p\n", s_vpu_clk);
 
 //    vpu_clk_enable(s_vpu_clk);
 
@@ -1319,16 +1338,16 @@ static int vpu_probe(struct platform_device *pdev)
 
     if (res) { /* if platform driver is implemented */
         s_vpu_irq = res->start;
-        DPRINTK("[VPUDRV] : vpu irq number get from platform driver irq=0x%x\n",
+        pr_info("[VPUDRV] : vpu irq number get from platform driver irq=0x%x\n",
                 s_vpu_irq);
     }
     else {
-        DPRINTK("[VPUDRV] : vpu irq number get from defined value irq=0x%x\n",
+        pr_info("[VPUDRV] : vpu irq number get from defined value irq=0x%x\n",
                 s_vpu_irq);
     }
 
 #else
-    DPRINTK("[VPUDRV] : vpu irq number get from defined value irq=0x%x\n",
+    pr_info("[VPUDRV] : vpu irq number get from defined value irq=0x%x\n",
             s_vpu_irq);
 #endif
 
@@ -1361,17 +1380,17 @@ static int vpu_probe(struct platform_device *pdev)
         goto ERROR_PROVE_DEVICE;
     }
 
-    DPRINTK("[VPUDRV] success to probe vpu device with reserved video memory phys_addr=0x%lx, base=0x%lx\n",
+    pr_info("[VPUDRV] success to probe vpu device with reserved video memory phys_addr=0x%lx, base=0x%lx\n",
             s_video_memory.phys_addr, s_video_memory.base);
 #else
-    DPRINTK("[VPUDRV] success to probe vpu device with non reserved video memory\n");
+    pr_info("[VPUDRV] success to probe vpu device with non reserved video memory\n");
 #endif
 
     return 0;
 
 ERROR_PROVE_DEVICE:
 
-    if(drive_data.coda_device && drive_data.coda_class) {
+    if( drive_data.coda_device && drive_data.coda_class) {
          device_destroy(drive_data.coda_class, s_vpu_major);
          drive_data.coda_device = NULL;
     }
@@ -1392,7 +1411,7 @@ ERROR_PROVE_DEVICE:
 
 static int vpu_remove(struct platform_device *pdev)
 {
-    DPRINTK("[VPUDRV] vpu_remove\n");
+    pr_info("[VPUDRV] vpu_remove\n");
 #ifdef VPU_SUPPORT_PLATFORM_DRIVER_REGISTER
 
     if (s_instance_pool.base) {
@@ -1462,7 +1481,7 @@ static int vpu_suspend(struct platform_device *pdev,
     unsigned long timeout = jiffies + HZ;   /* vpu wait timeout to 1sec */
     int product_code;
 
-    DPRINTK("[VPUDRV] vpu_suspend\n");
+    pr_info("[VPUDRV] vpu_suspend\n");
 
     vpu_clk_enable(s_vpu_clk);
 
@@ -1508,7 +1527,7 @@ static int vpu_resume(struct platform_device *pdev)
     unsigned long timeout = jiffies + HZ;   /* vpu wait timeout to 1sec */
     int product_code;
 
-    DPRINTK("[VPUDRV] vpu_resume\n");
+    pr_info("[VPUDRV] vpu_resume\n");
 
     vpu_clk_enable(s_vpu_clk);
 
@@ -1588,19 +1607,19 @@ static int __init vpu_init(void)
 {
     int res;
 
-    DPRINTK("[VPUDRV] coda  begin vpu_init\n");
+    pr_info("[VPUDRV] coda  begin vpu_init\n");
 
     init_waitqueue_head(&s_interrupt_wait_q);
     s_common_memory.base = 0;
     s_instance_pool.base = 0;
 #ifdef VPU_SUPPORT_PLATFORM_DRIVER_REGISTER
-    DPRINTK("coda guy ...\n");
+    pr_info("coda guy ...\n");
     res = platform_driver_register(&vpu_driver);
 #else
     res = vpu_probe(NULL);
 #endif /* VPU_SUPPORT_PLATFORM_DRIVER_REGISTER */
 
-    DPRINTK("[VPUDRV] end vpu_init result=0x%x\n", res);
+    pr_info("[VPUDRV] end vpu_init result=0x%x\n", res);
     return res;
 }
 
@@ -1608,28 +1627,29 @@ static void __exit vpu_exit(void)
 {
 #ifdef VPU_SUPPORT_PLATFORM_DRIVER_REGISTER
 
-    DPRINTK("[VPUDRV] vpu_exit %d\n", s_vpu_major);
+    pr_info("[VPUDRV] vpu_exit %d\n", s_vpu_major);
 
     if(drive_data.coda_device && drive_data.coda_class) {
         device_destroy(drive_data.coda_class, s_vpu_major);
         drive_data.coda_device = NULL;
-        DPRINTK("[VPUDRV] device destrory \n");
+        pr_info("[VPUDRV] device destrory \n");
     }
 
     if(drive_data.coda_class) {
         class_destroy(drive_data.coda_class);
         drive_data.coda_class = NULL;
-        DPRINTK("[VPUDRV] class destroy \n");
+        pr_info("[VPUDRV] class destroy \n");
     }
 
+    device_remove_file(vpucoda_device, &dev_attr_coda988_debug);
     platform_driver_unregister(&vpu_driver);
 
 #else /* VPU_SUPPORT_PLATFORM_DRIVER_REGISTER */
-	if(s_vpu_clk) {
-	    vpu_clk_disable(s_vpu_clk);
-	    vpu_clk_put(s_vpu_clk);
-	    s_vpu_clk = NULL;
-	}
+    if(s_vpu_clk) {
+        vpu_clk_disable(s_vpu_clk);
+        vpu_clk_put(s_vpu_clk);
+        s_vpu_clk = NULL;
+    }
 
     if (s_instance_pool.base) {
 #ifdef USE_VMALLOC_FOR_INSTANCE_POOL_MEMORY
@@ -1727,19 +1747,16 @@ static struct clk  *vpu_clk_get(struct device *dev)
 
     if (s_vpu_clk)
         return s_vpu_clk;
-
-    DPRINTK("[VPUDRV] dev point %p ", dev);
     s_vpu_clk = clk_get(dev, "core-clk");
 
     if (!(s_vpu_clk == NULL
             || IS_ERR(s_vpu_clk))) {
 
-        DPRINTK("[VPUDRV] clk core_clk %p\n", s_vpu_clk);
-        DPRINTK("[VPUDRV] coda-rate %lu \n", clk_get_rate(s_vpu_clk));
+        pr_info("[VPUDRV] coda-rate %lu \n", clk_get_rate(s_vpu_clk));
         return s_vpu_clk;
     }
 
-    DPRINTK("[VPUDRV] get clk failure \n");
+    pr_err("[VPUDRV] get clk failure \n");
     return NULL;
 #else
 
@@ -1756,7 +1773,7 @@ static void vpu_clk_put(struct clk *clk)
             || IS_ERR(clk))) {
 
         clk_put(clk);
-        DPRINTK("[VPUDRV] colk and pclk put is success \n");
+        pr_info("[VPUDRV] colk and pclk put is success \n");
     }
     clk = NULL;
 
@@ -1785,7 +1802,7 @@ static int vpu_clk_enable(struct clk *clk)
             return err_code;
         }
         clk_enable(clk);
-        DPRINTK("[VPUDRV] colk enable success clk_reference %d  \n", ++clk_reference);
+        clk_reference++;
     }
 
     return 0;
@@ -1810,8 +1827,7 @@ static void vpu_clk_disable(struct clk *clk)
 
             clk_disable(clk);
             clk_unprepare(clk);
-
-            DPRINTK("[VPUDRV] colk and pclk disable is success clk_reference %d \n", --clk_reference);
+            clk_reference--;
         }
 
 #else
