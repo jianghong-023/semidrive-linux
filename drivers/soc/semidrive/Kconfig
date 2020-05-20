@@ -11,4 +11,12 @@ config SEMIDRIVE_IPCC
 	help
 	  This enables support for the shared memory regions for inter-processor communication
 
+config SEMIDRIVE_SCR
+	tristate "Semidrive SCR driver"
+	depends on ARCH_SEMIDRIVE_X9
+	select HWSEM_SEMIDRIVE
+	default n
+	help
+	  SemiDrive System Control Register driver.
+
 endmenu
