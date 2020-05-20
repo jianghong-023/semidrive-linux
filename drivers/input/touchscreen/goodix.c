@@ -49,6 +49,7 @@ struct goodix_ts_data {
 	struct gpio_desc *gpiod_rst;
 	u16 id;
 	u16 version;
+	u32 dev_type;	/* 0: main device, 1: aux device */
 	const char *cfg_name;
 	struct completion firmware_loading_complete;
 	unsigned long irq_flags;
@@ -642,7 +643,10 @@ static int goodix_request_input_dev(struct goodix_ts_data *ts)
 			    INPUT_MT_DIRECT | INPUT_MT_DROP_UNUSED);
 
 	ts->input_dev->name = "Goodix Capacitive TouchScreen";
-	ts->input_dev->phys = "input/ts";
+	if(ts->dev_type==1)
+		ts->input_dev->phys = "input/ts_aux";
+	else
+		ts->input_dev->phys = "input/ts_main";
 	ts->input_dev->id.bustype = BUS_I2C;
 	ts->input_dev->id.vendor = 0x0416;
 	ts->input_dev->id.product = ts->id;
@@ -801,6 +805,12 @@ static int goodix_ts_probe(struct i2c_client *client,
 	if (error) {
 		dev_err(&client->dev, "Read version failed.\n");
 		return error;
+	}
+
+	error = of_property_read_u32(client->dev.of_node, "dev_type", &ts->dev_type);
+	if(error < 0) {
+		dev_err(&client->dev, "Missing type, use default\n");
+		ts->dev_type = 0;
 	}
 
 	ts->cfg_len = goodix_get_cfg_len(ts->id);
