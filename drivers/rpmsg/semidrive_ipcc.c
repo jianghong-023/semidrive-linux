@@ -639,22 +639,25 @@ static void __rx_work_handler(struct work_struct *work)
 	struct sk_buff *skb;
 	unsigned long flags;
 
-	spin_lock_irqsave(&vrp->queue_lock, flags);
+	/* exhaust the rx skb queue for schedule work may lost */
+	for (;;) {
+		spin_lock_irqsave(&vrp->queue_lock, flags);
 
-	/* check for data in the queue */
-	if (skb_queue_empty(&vrp->queue)) {
+		/* check for data in the queue */
+		if (skb_queue_empty(&vrp->queue)) {
+			spin_unlock_irqrestore(&vrp->queue_lock, flags);
+				return;
+		}
+
+		skb = skb_dequeue(&vrp->queue);
 		spin_unlock_irqrestore(&vrp->queue_lock, flags);
+		if (!skb)
 			return;
+
+		rpmsg_ipcc_rx(vrp, skb->data, skb->len);
+
+		kfree_skb(skb);
 	}
-
-	skb = skb_dequeue(&vrp->queue);
-	spin_unlock_irqrestore(&vrp->queue_lock, flags);
-	if (!skb)
-		return;
-
-	rpmsg_ipcc_rx(vrp, skb->data, skb->len);
-
-	kfree_skb(skb);
 }
 
 static void __mbox_rx_cb(struct mbox_client *client, void *mssg)
