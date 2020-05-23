@@ -15,7 +15,10 @@
 #define __CLK__H__
 
 #define MAX_PARENT_NUM 10
-#include "ckgate.h"
+
+#include <dt-bindings/clk/x9-clk.h>
+#include <linux/of_address.h>
+
 #define IP_PREDIV_SHIFT 4
 #define IP_PREDIV_WIDTH 3
 #define IP_PREDIV_BUSYSHIFT 30
@@ -39,34 +42,17 @@
 #define BUS_POSTDIV_BUSYWIDTH 1
 #define BUS_POSTDIV_EXPECT 0
 
-enum CLK_TYPE {
-	CLK_TYPE_CORE,
-	CLK_TYPE_BUS,
-	CLK_TYPE_IP,
-	CLK_TYPE_IP_POST,
-	CLK_TYPE_UUU_MUX,
-	CLK_TYPE_UUU_MUX2,
-	CLK_TYPE_UUU_DIVIDER,
-	CLK_TYPE_GATE,
-};
-
 struct sdrv_cgu_out_clk {
-	int clk_id;
-	u8 n_parents;
 	const char *name;
-	enum CLK_TYPE type;
-	u32 slice_id;
-	int gate_id;
+	int type;
 	void __iomem	*base;
 	spinlock_t	*lock;
-	//divider
-	int parent_id;
 	//mux
 	u8 mux_shift;
 	u8 mux_width;
 	//composite
 	u32 *mux_table;
-	struct clk_divider      div;
+	struct clk_divider div;
 	struct clk_hw mux_hw;
 	struct clk_hw gate_hw;
 	unsigned long min_rate;
@@ -80,9 +66,9 @@ struct sdrv_cgu_out_clk {
 #define gate_to_sdrv_cgu_out_clk(_hw) container_of(_hw, struct sdrv_cgu_out_clk, gate_hw)
 #define div_to_sdrv_cgu_out_clk(_hw) container_of(_hw, struct sdrv_cgu_out_clk, div.hw)
 #define nb_to_sdrv_cgu_out_clk(nb) container_of(nb, struct sdrv_cgu_out_clk, clk_nb)
-
-struct clk *sdrv_register_out_composite(struct device_node *np, void __iomem *base, struct sdrv_cgu_out_clk *clk, const char *global_clk_names[]);
 int sdrv_get_clk_min_rate(const char *name, u32 *min);
 int sdrv_get_clk_max_rate(const char *name, u32 *max);
+bool sdrv_clk_of_device_is_available(const struct device_node *device);
+
 #endif
 

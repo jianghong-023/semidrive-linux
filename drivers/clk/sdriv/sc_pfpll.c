@@ -146,6 +146,10 @@ void sc_pfpll_getparams(void __iomem *base, unsigned int *fbdiv, unsigned int *r
 {
 	void __iomem *b = base;
 	u32 v = clk_readl(b + PLL_CTRL_OFF);
+	int a_isenable = v >> BS_PLL_CTRL_PLL_DIVA_CG_EN & 1;
+	int b_isenable = v >> BS_PLL_CTRL_PLL_DIVB_CG_EN & 1;
+	int c_isenable = v >> BS_PLL_CTRL_PLL_DIVC_CG_EN & 1;
+	int d_isenable = v >> BS_PLL_CTRL_PLL_DIVD_CG_EN & 1;
 
 	*isint = ((v & BM_PLL_CTRL_INT_MODE) >> BS_PLL_CTRL_INT_MODE);
 
@@ -161,11 +165,23 @@ void sc_pfpll_getparams(void __iomem *base, unsigned int *fbdiv, unsigned int *r
 	*frac = GFV_PLL_FRAC_FRAC(v);
 
 	v = clk_readl(b + PLL_OUT_DIV_1_OFF);
-	*diva = GFV_PLL_OUT_DIV_1_DIV_NUM_A(v);
-	*divb = GFV_PLL_OUT_DIV_1_DIV_NUM_B(v);
+	if(a_isenable)
+		*diva = GFV_PLL_OUT_DIV_1_DIV_NUM_A(v);
+	else
+		*diva = -1;
+	if(b_isenable)
+		*divb = GFV_PLL_OUT_DIV_1_DIV_NUM_B(v);
+	else
+		*divb = -1;
 
 	v = clk_readl(b + PLL_OUT_DIV_2_OFF);
-	*divc = GFV_PLL_OUT_DIV_2_DIV_NUM_C(v);
-	*divd = GFV_PLL_OUT_DIV_2_DIV_NUM_D(v);
+	if(c_isenable)
+		*divc = GFV_PLL_OUT_DIV_2_DIV_NUM_C(v);
+	else
+		*divc = -1;
+	if(d_isenable)
+		*divd = GFV_PLL_OUT_DIV_2_DIV_NUM_D(v);
+	else
+		*divd = -1;
 
 }

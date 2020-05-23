@@ -41,17 +41,16 @@ typedef enum {
 	UUU_SEL_PLL = 3,
 } uuu_src_sel_e;
 
-void ckgen_ip_slice_cfg(void __iomem *base, u32 slice_id,
-	u32 src_sel, u32 pre_div, u32 post_div);
-void ckgen_bus_slice_cfg(void __iomem *base, u32 slice_id,
+void ckgen_ip_slice_cfg(void __iomem *base,
+		u32 src_sel, u32 pre_div, u32 post_div);
+void ckgen_bus_slice_cfg(void __iomem *base,
 	u32 path, u32 src_sel, u32 pre_div);
-void ckgen_bus_slice_postdiv_update(void __iomem *base, u32 slice_id, u32 post_div);
-void ckgen_bus_slice_switch(void __iomem *base, u32 slice_id);
-void ckgen_core_slice_cfg(void __iomem *base, u32 slice_id, u32 path, u32 src_sel);
-void ckgen_core_slice_postdiv_update(void __iomem *base, u32 slice_id, u32 post_div);
-void ckgen_core_slice_switch(void __iomem *base, u32 slice_id);
-void ckgen_cg_en(void __iomem *base, u32 id);
-void ckgen_cg_dis(void __iomem *base, u32 id);
-void ckgen_uuu_slice_cfg(void __iomem *base, u32 slice_id, u32 src_sel, u32 div_mnpq);
+void ckgen_bus_slice_postdiv_update(void __iomem *base, u32 post_div);
+void ckgen_bus_slice_switch(void __iomem *base);
+void ckgen_core_slice_cfg(void __iomem *base, u32 path, u32 src_sel);
+void ckgen_core_slice_postdiv_update(void __iomem *base, u32 post_div);
+void ckgen_core_slice_switch(void __iomem *base);
+void ckgen_cg_en(void __iomem *base);
+void ckgen_cg_dis(void __iomem *base);
 
 #endif  /* __CKGEN_H__ */

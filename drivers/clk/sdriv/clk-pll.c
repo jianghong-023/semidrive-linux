@@ -19,12 +19,13 @@
 #include <linux/reboot.h>
 #include <linux/rational.h>
 #include <linux/of_address.h>
-#include "clk.h"
 #include "clk-pll.h"
 
 #define DEBUG_PLL 0
 
 #define to_sdrv_cgu_pll(_hw) container_of(_hw, struct sdrv_cgu_pll_clk, hw)
+static void __init sdrv_pll_of_init(struct device_node *np);
+
 /*2^24*/
 #define FRACM (16777216)
 static unsigned long sdrv_pll_calcurate_pll_cfg(const struct sdrv_pll_rate_table *rate)
@@ -42,16 +43,17 @@ static unsigned long sdrv_pll_get_curr_freq(struct sdrv_cgu_pll_clk *pll, const 
 {
 	unsigned long pll_cfg = sdrv_pll_calcurate_pll_cfg(cur);
 
-	if (pll->div == PLL_DIVA)
+	if (pll->type == PLL_DIVA && cur->div[0] !=-1)
 		return pll_cfg/(cur->div[0]+1);
-	else if (pll->div == PLL_DIVB)
+	else if (pll->type == PLL_DIVB && cur->div[1] !=-1)
 		return pll_cfg/(cur->div[1]+1);
-	else if (pll->div == PLL_DIVC)
+	else if (pll->type == PLL_DIVC && cur->div[2] !=-1)
 		return pll_cfg/(cur->div[2]+1);
-	else if (pll->div == PLL_DIVD)
+	else if (pll->type == PLL_DIVD && cur->div[3] !=-1)
 		return pll_cfg/(cur->div[3]+1);
-	else //root
+	else if (pll->type == PLL_ROOT) //root
 		return pll_cfg/cur->postdiv[0]/cur->postdiv[1];
+	return 0;
 }
 static void sdrv_pll_get_params(struct sdrv_cgu_pll_clk *pll,
 					struct sdrv_pll_rate_table *rate)
@@ -83,12 +85,8 @@ static unsigned long sdrv_pll_recalc_rate(struct clk_hw *hw,
 	struct sdrv_pll_rate_table cur;
 	u64 rate64 = prate;
 
-	if (pll->reg_base == NULL) {
-		rate64 = pll->clkin_freq[pll->clk_id];
-	} else {
-		sdrv_pll_get_params(pll, &cur);
-		rate64 = sdrv_pll_get_curr_freq(pll, &cur);
-	}
+	sdrv_pll_get_params(pll, &cur);
+	rate64 = sdrv_pll_get_curr_freq(pll, &cur);
 
 	return (unsigned long)rate64;
 }
@@ -188,29 +186,6 @@ static const struct clk_ops sdrv_pll_clk_ops = {
 	.init = sdrv_pll_init,
 };
 
-void __iomem *sdrv_get_pll_regbase(const char *name)
-{
-	void __iomem *reg_base = NULL;
-	struct device_node *np = NULL;
-
-	np = of_find_node_by_name(NULL, name);
-	if (np != NULL) {
-		if (of_device_is_available(np))
-			reg_base = of_iomap(np, 0);
-		of_node_put(np);
-	}
-	return reg_base;
-}
-
-static struct sdrv_cgu_pll_clk *sdrv_get_pll_by_id(int clk_id, struct sdrv_cgu_pll_clk *clk_table, int num)
-{
-	int i;
-
-	for (i = 0; i < num; i++)
-		if (clk_table[i].clk_id == clk_id)
-			return &clk_table[i];
-	return NULL;
-}
 static int sdrv_pll_pre_rate_change(struct sdrv_cgu_pll_clk *clk,
 					   struct clk_notifier_data *ndata)
 {
@@ -249,46 +224,70 @@ static int sdrv_pll_notifier_cb(struct notifier_block *nb,
 	return notifier_from_errno(ret);
 }
 
-struct clk *sdrv_register_pll(void __iomem *base, int index,
-		struct sdrv_cgu_pll_clk *clk_table, int num,
-		struct sdrv_pll_rate_table *rate_table, const char *clk_name[],
-		u64 *clkin_freq)
+static struct clk * __init get_clk_by_name(const char *name)
 {
-	struct sdrv_cgu_pll_clk *clk = &clk_table[index];
-	const char *name = clk_name[clk->clk_id];
+	struct of_phandle_args phandle;
+	struct clk *clk = ERR_PTR(-ENODEV);
+
+	phandle.np = of_find_node_by_name(NULL, name);
+
+	if (phandle.np) {
+		clk = of_clk_get_from_provider(&phandle);
+		of_node_put(phandle.np);
+	}
+	return clk;
+}
+
+static struct clk *sdrv_register_pll(struct device_node *np, void __iomem *base, int type,
+	const char *clk_name, struct sdrv_pll_rate_table *rate_table)
+{
 	const char *pll_parents[1];
 	struct clk_init_data init;
-	struct sdrv_cgu_pll_clk *pll = clk;
+	struct sdrv_cgu_pll_clk *pll;
 	struct clk *pll_clk;
 	u32 min_freq = 0, max_freq = 0;
 
-	pll->name = name;
-	pll->clkin_freq = clkin_freq;
+	pll = kzalloc(sizeof(*pll), GFP_KERNEL);
+	if (!pll)
+		return ERR_PTR(-ENOMEM);
+
+	pr_info("register pll type %d name %s\n", type, clk_name);
+	pll->name = clk_name;
+	pll->type = type;
+
 	if (base)
 		pll->reg_base = base;
 	/* now create the actual pll */
-	init.name = name;
+	init.name = clk_name;
 
 	/* keep all plls untouched for now */
 	init.flags = CLK_IGNORE_UNUSED;
-
-	if (pll->parent_id != -1) {
-		struct sdrv_cgu_pll_clk *p_clk = sdrv_get_pll_by_id(pll->parent_id, clk_table, num);
-		//init.flags |= CLK_SET_RATE_PARENT;
-		pll_parents[0] = clk_name[pll->parent_id];
-		init.parent_names = pll_parents;
-		init.num_parents = 1;
-		if (pll->reg_base && pll->reg_base == p_clk->reg_base)
-			pll->lock = p_clk->lock;
-	} else {
+	if (type == PLL_ROOT)
 		init.num_parents = 0;
+	else
+		init.num_parents = 1;
+
+	if(init.num_parents == 0) {
 		if (pll->reg_base) {
 			pll->lock = kmalloc(sizeof(spinlock_t), GFP_KERNEL);
 			if (pll->lock)
-				spin_lock_init(clk->lock);
+				spin_lock_init(pll->lock);
 		} else {
 			pll->lock = NULL;
 		}
+	} else {
+		struct sdrv_cgu_pll_clk *p_clk = NULL;
+		struct clk *pclk = get_clk_by_name(np->name);
+		pll_parents[0] = np->name;
+		if(IS_ERR(pclk)) {
+			pr_err("parent name %s no exist, need register parent first\n", pll_parents[0]);
+			BUG_ON(1);
+		}
+		p_clk = to_sdrv_cgu_pll(__clk_get_hw(pclk));
+		
+		init.parent_names = pll_parents;
+		if (pll->reg_base && pll->reg_base == p_clk->reg_base)
+			pll->lock = p_clk->lock;
 	}
 
 	if (rate_table) {
@@ -305,7 +304,7 @@ struct clk *sdrv_register_pll(void __iomem *base, int index,
 					GFP_KERNEL);
 		WARN(!pll->rate_table,
 			"%s: could not allocate rate table for %s\n",
-			__func__, name);
+			__func__, clk_name);
 	}
 
 	if (!pll->rate_table)
@@ -316,32 +315,119 @@ struct clk *sdrv_register_pll(void __iomem *base, int index,
 
 	pll->hw.init = &init;
 #if DEBUG_PLL
-	pr_err("pll %s\n", name);
+	pr_err("pll %s\n", clk_name);
 #endif
 	pll_clk = clk_register(NULL, &pll->hw);
 	if (IS_ERR(pll_clk)) {
 		pr_err("%s: failed to register pll clock %s : %ld\n",
-			__func__, name, PTR_ERR(pll_clk));
+			__func__, clk_name, PTR_ERR(pll_clk));
 		return NULL;
 	}
 
-	if (sdrv_get_clk_min_rate(name, &min_freq) == 0) {
+	if (sdrv_get_clk_min_rate(clk_name, &min_freq) == 0) {
 		clk_set_min_rate(pll_clk, min_freq);
 		pll->min_rate = min_freq;
 	} else {
 		pll->min_rate = 0;
 	}
-	if (sdrv_get_clk_max_rate(name, &max_freq) == 0) {
+	if (sdrv_get_clk_max_rate(clk_name, &max_freq) == 0) {
 		clk_set_max_rate(pll_clk, max_freq);
 		pll->max_rate = max_freq;
 	} else {
 		pll->max_rate = ULONG_MAX;
 	}
-	clk->clk_nb.notifier_call = sdrv_pll_notifier_cb;
+	pll->clk_nb.notifier_call = sdrv_pll_notifier_cb;
 	if (clk_notifier_register(pll_clk, &pll->clk_nb)) {
 		pr_err("%s: failed to register clock notifier for %s\n",
 				__func__, pll->name);
 	}
 	return pll_clk;
 }
+
+static void __init sdrv_pll_of_init(struct device_node *np)
+{
+	struct clk *clk;
+	void __iomem *reg_base;
+	int i = 0;
+	char clk_name[32]={""};
+	int ret;
+	u32 div=-1, readonly = 0;
+	struct sdrv_pll_rate_table *rate_table = NULL;
+	struct clk_onecell_data *clk_data;
+	struct clk **clks;
+
+	if (!sdrv_clk_of_device_is_available(np))
+		return;
+
+	clks= kzalloc(sizeof(struct clk *)*(PLL_DIVD+1), GFP_KERNEL);
+	if (!clks)
+		return;
+	clk_data = kzalloc(sizeof(struct clk_onecell_data), GFP_KERNEL);
+	if (!clk_data) {
+		kfree(clks);
+		return;
+	}
+	clk_data->clks = clks;
+	clk_data->clk_num = PLL_DIVD+1;
+
+	reg_base = of_iomap(np, 0);
+	if (!reg_base) {
+		pr_err("%s: failed to map address range %s\n", __func__, np->name);
+		goto err;
+	}
+	pr_debug("reg base %p\n", reg_base);
+
+	if (!of_property_read_u32(np, "sdrv,clk-readonly", &readonly)) {
+		if(!readonly) {
+			//init rate_table, TODO
+			rate_table = NULL;
+		}
+	}
+	for (i = 0; i <= PLL_DIVD; i++) {
+		if (i == PLL_ROOT) {
+			sprintf(clk_name,"%s", np->name);
+		} else if (i == PLL_DIVA) {
+			if(!of_property_read_u32(np, "sdrv,pll-diva", &div))
+				sprintf(clk_name,"%s_DIVA", np->name);
+			else
+				continue;
+		} else if (i == PLL_DIVB) {
+			if(!of_property_read_u32(np, "sdrv,pll-divb", &div))
+				sprintf(clk_name,"%s_DIVB", np->name);
+			else
+				continue;
+		} else if (i == PLL_DIVC) {
+			if(!of_property_read_u32(np, "sdrv,pll-divc", &div))
+				sprintf(clk_name,"%s_DIVC", np->name);
+			else
+				continue;
+		} else if (i == PLL_DIVD) {
+			if(!of_property_read_u32(np, "sdrv,pll-divd", &div))
+				sprintf(clk_name,"%s_DIVD", np->name);
+			else
+				continue;
+		}
+
+		clk = sdrv_register_pll(np, reg_base, i, clk_name,
+					rate_table);
+
+		if (IS_ERR(clk))
+			goto err;
+
+		clks[i] = clk;
+		ret = of_clk_add_provider(np, of_clk_src_simple_get, clk);
+		if (ret) {
+			clk_unregister(clk);
+			goto err;
+		}
+	}
+
+	of_clk_add_provider(np, of_clk_src_onecell_get, clk_data);
+	return;
+err:
+	kfree(clks);
+	kfree(clk_data);
+}
+
+CLK_OF_DECLARE(sdrv_pll, "semidrive,pll", sdrv_pll_of_init);
 

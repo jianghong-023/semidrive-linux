@@ -85,7 +85,7 @@ static int sd_clk_composite_determine_rate(struct clk_hw *hw,
 			rate = rate_ops->round_rate(rate_hw, req->rate,
 						    &req->best_parent_rate);
 			if (rate < 0)
-				return rate;
+				return -EINVAL;
 			if (rate < req->min_rate || rate > req->max_rate)
 				return -EINVAL;
 			req->rate = rate;
@@ -199,8 +199,9 @@ static int sd_clk_composite_is_enabled(struct clk_hw *hw)
 	struct clk_hw *gate_hw = composite->gate_hw;
 
 	__clk_hw_set_clk(gate_hw, hw);
-
-	return gate_ops->is_enabled(gate_hw);
+	if (gate_ops->is_enabled)
+		return gate_ops->is_enabled(gate_hw);
+	return 0;
 }
 
 static int sd_clk_composite_enable(struct clk_hw *hw)
@@ -210,8 +211,9 @@ static int sd_clk_composite_enable(struct clk_hw *hw)
 	struct clk_hw *gate_hw = composite->gate_hw;
 
 	__clk_hw_set_clk(gate_hw, hw);
-
-	return gate_ops->enable(gate_hw);
+	if (gate_ops->enable)
+		return gate_ops->enable(gate_hw);
+	return 0;
 }
 
 static void sd_clk_composite_disable(struct clk_hw *hw)
@@ -221,8 +223,8 @@ static void sd_clk_composite_disable(struct clk_hw *hw)
 	struct clk_hw *gate_hw = composite->gate_hw;
 
 	__clk_hw_set_clk(gate_hw, hw);
-
-	gate_ops->disable(gate_hw);
+	if (gate_ops->disable)
+		gate_ops->disable(gate_hw);
 }
 
 struct clk_hw *sd_clk_hw_register_composite(struct device *dev, const char *name,
@@ -300,12 +302,6 @@ struct clk_hw *sd_clk_hw_register_composite(struct device *dev, const char *name
 	}
 
 	if (gate_hw && gate_ops) {
-		if (!gate_ops->is_enabled || !gate_ops->enable ||
-		    !gate_ops->disable) {
-			hw = ERR_PTR(-EINVAL);
-			goto err;
-		}
-
 		composite->gate_hw = gate_hw;
 		composite->gate_ops = gate_ops;
 		clk_composite_ops->is_enabled = sd_clk_composite_is_enabled;
