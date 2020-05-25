@@ -17,14 +17,15 @@
 #include <linux/delay.h>
 #include <linux/cpu.h>
 
+#define MIN_FREQ 24000000
 static struct cpufreq_frequency_table *freq_table;
 
-static unsigned int	ref_freq;
+static unsigned long	ref_freq;
 static unsigned long	loops_per_jiffy_ref;
 
 static int sdrv_set_target(struct cpufreq_policy *policy, unsigned int index)
 {
-	unsigned int old_freq, new_freq;
+	unsigned long old_freq, new_freq;
 
 	old_freq = policy->cur;
 	new_freq = freq_table[index].frequency;
@@ -37,8 +38,9 @@ static int sdrv_set_target(struct cpufreq_policy *policy, unsigned int index)
 	if (old_freq < new_freq)
 		loops_per_jiffy = cpufreq_scale(
 			loops_per_jiffy_ref, ref_freq, new_freq);
-	if (new_freq > 24000 )
-		clk_set_rate(policy->clk, 24000000);
+	//if (new_freq > 24000 )
+	//	clk_set_rate(policy->clk, 24000000);
+	//pr_err("will set freq to %ld\n", new_freq);
 	clk_set_rate(policy->clk, new_freq * 1000);
 	if (new_freq < old_freq)
 		loops_per_jiffy = cpufreq_scale(
@@ -63,7 +65,7 @@ static int sdrv_cpufreq_driver_init(struct cpufreq_policy *policy)
 		goto out_err;
 	}
 
-	min_freq = (clk_round_rate(cpuclk, 1) + 500) / 1000;
+	min_freq = (clk_round_rate(cpuclk, MIN_FREQ) + 500) / 1000;
 	freq = (clk_round_rate(cpuclk, ~0UL) + 500) / 1000;
 	policy->cpuinfo.transition_latency = 0;
 
