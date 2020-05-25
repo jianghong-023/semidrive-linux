@@ -14,7 +14,9 @@ dtb-$(CONFIG_ARCH_SEMIDRIVE_X9) += x9_high_ref_native_ivi.dtb
 dtb-$(CONFIG_ARCH_SEMIDRIVE_X9) += x9_high_ref_native_cluster.dtb
 dtb-$(CONFIG_ARCH_SEMIDRIVE_X9) += x9_high_ref_native_controlpanel.dtb
 dtb-$(CONFIG_ARCH_SEMIDRIVE_X9) += x9_plus_ref_native_ivi.dtb
+dtb-$(CONFIG_ARCH_SEMIDRIVE_X9) += x9_plus_ref_native_cluster.dtb
 dtb-$(CONFIG_ARCH_SEMIDRIVE_X9) += x9_plus_evb_native_ivi.dtb
+dtb-$(CONFIG_ARCH_SEMIDRIVE_X9) += x9_plus_evb_native_cluster.dtb
 
 always		:= $(dtb-y)
 subdir-y	:= $(dts-dirs)
