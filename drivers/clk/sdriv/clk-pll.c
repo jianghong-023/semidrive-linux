@@ -186,6 +186,13 @@ static const struct clk_ops sdrv_pll_clk_ops = {
 	.init = sdrv_pll_init,
 };
 
+static const struct clk_ops sdrv_pll_clk_readonly_ops = {
+	.recalc_rate = sdrv_pll_recalc_rate,
+	.enable = NULL,
+	.disable = NULL,
+	.is_enabled = sdrv_pll_is_enabled,
+};
+
 static int sdrv_pll_pre_rate_change(struct sdrv_cgu_pll_clk *clk,
 					   struct clk_notifier_data *ndata)
 {
@@ -239,7 +246,7 @@ static struct clk * __init get_clk_by_name(const char *name)
 }
 
 static struct clk *sdrv_register_pll(struct device_node *np, void __iomem *base, int type,
-	const char *clk_name, struct sdrv_pll_rate_table *rate_table)
+	const char *clk_name, struct sdrv_pll_rate_table *rate_table, bool readonly)
 {
 	const char *pll_parents[1];
 	struct clk_init_data init;
@@ -312,6 +319,8 @@ static struct clk *sdrv_register_pll(struct device_node *np, void __iomem *base,
 	else
 		init.ops = &sdrv_pll_clk_ops;
 
+	if (readonly)
+		init.ops = &sdrv_pll_clk_readonly_ops;
 
 	pll->hw.init = &init;
 #if DEBUG_PLL
@@ -409,7 +418,7 @@ static void __init sdrv_pll_of_init(struct device_node *np)
 		}
 
 		clk = sdrv_register_pll(np, reg_base, i, clk_name,
-					rate_table);
+					rate_table, readonly);
 
 		if (IS_ERR(clk))
 			goto err;

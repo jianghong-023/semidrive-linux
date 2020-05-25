@@ -36,5 +36,5 @@
 #define PLL_DIVB 2
 #define PLL_DIVC 3
 #define PLL_DIVD 4
-#define SYS_CNT_FREQ 24000000
+#define SYS_CNT_FREQ 3000000
 #endif
