@@ -38,7 +38,7 @@ static struct ion_heap *sdrv_ion_heap_create(struct ion_platform_heap *heap_data
 	}
 
 	if (IS_ERR_OR_NULL(heap)) {
-		pr_err("%s: error creating heap %s type %d base %pa size %zu\n",
+		pr_err("%s: error creating heap %s type %d base 0x%lx size %zu\n",
 		       __func__, heap_data->name, heap_data->type,
 		       heap_data->base, heap_data->size);
 		return ERR_PTR(-EINVAL);
@@ -173,9 +173,6 @@ static int sdrv_ion_probe(struct platform_device *pdev)
 		goto freepdatas;
 	}
 
-	dev_data.num_heaps = num_valid;
-	dev_data.heaps = heaps;
-
 	/* create the heaps as specified in the board dts file */
 	for (i = 0; i < num_valid; i++) {
 		struct ion_platform_heap *heap_data = &pdatas[i];
@@ -185,12 +182,12 @@ static int sdrv_ion_probe(struct platform_device *pdev)
 			continue;
 		} else {
 			if (heap_data->size)
-				pr_info("ION heap %s created at %pa with size %zx\n",
+				pr_info("SDRV ION %s created at 0x%lx with size %zx\n",
 					heap_data->name,
 					heap_data->base,
 					heap_data->size);
 			else
-				pr_info("ION heap %s created\n",
+				pr_info("SDRV ION %s created, but size is 0\n",
 					heap_data->name);
 		}
 

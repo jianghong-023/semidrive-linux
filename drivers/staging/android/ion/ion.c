@@ -569,6 +569,9 @@ void ion_device_add_heap(struct ion_heap *heap)
 	plist_node_init(&heap->node, -heap->id);
 	plist_add(&heap->node, &dev->heaps);
 
+	printk(KERN_INFO "ION: added new heap %s(type=%d, id=%d)\n",
+		heap->name, heap->type, heap->id);
+
 	if (heap->shrinker.count_objects && heap->shrinker.scan_objects) {
 		char debug_name[64];
 

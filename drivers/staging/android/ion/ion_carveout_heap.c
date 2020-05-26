@@ -123,9 +123,10 @@ struct ion_heap *ion_carveout_heap_create(struct ion_platform_heap *heap_data)
 	page = pfn_to_page(PFN_DOWN(heap_data->base));
 	size = heap_data->size;
 
-	ret = ion_heap_pages_zero(page, size, pgprot_writecombine(PAGE_KERNEL));
-	if (ret)
-		return ERR_PTR(ret);
+	/* Skip the first 32 pages clearance to avoid mis-alignment, it's up to the user. */
+	/* ret = ion_heap_pages_zero(page, size, pgprot_writecombine(PAGE_KERNEL));
+	 * if (ret)
+	 *         return ERR_PTR(ret); */
 
 	carveout_heap = kzalloc(sizeof(*carveout_heap), GFP_KERNEL);
 	if (!carveout_heap)
