@@ -14,6 +14,7 @@
 #include <linux/module.h>
 #include <linux/of.h>
 
+#include <soc/semidrive/sdrv_scr.h>
 #include "sdhci-pltfm.h"
 
 #define SDHCI_VENDOR_BASE_REG (0xE8)
@@ -87,7 +88,7 @@
 struct dwcmshc_priv {
 	/* bus clock */
 	struct clk	*bus_clk;
-	void __iomem *scr_ioaddr;
+	u32	 scr_signals_ddr;
 	bool	    card_is_emmc;
 	bool 		no_3_3_v;
 };
@@ -289,19 +290,13 @@ static void set_ddr_mode(struct sdhci_host *host, unsigned int ddr_mode)
 {
 	struct sdhci_pltfm_host *pltfm_host;
 	struct dwcmshc_priv *priv;
-	void __iomem *iobase;
 	u32 value;
 
 	pltfm_host = sdhci_priv(host);
 	priv = sdhci_pltfm_priv(pltfm_host);
-	iobase = priv->scr_ioaddr;
 
-	if (iobase) {
-		value = readl(iobase);
-		writel((value & (~(1<<0))) | ((ddr_mode & 0x1) << 0), iobase);
-		pr_debug("%s: Set scr mshc ddr mode reg = 0x%08x\n",
-			mmc_hostname(host->mmc), readl(iobase));
-	}
+	if (priv->scr_signals_ddr)
+		sdrv_scr_set(SCR_SEC, priv->scr_signals_ddr, ddr_mode);
 }
 
 static void dwcmshc_set_uhs_signaling(struct sdhci_host *host, unsigned timing)
@@ -333,6 +328,7 @@ static void dwcmshc_sdhci_reset(struct sdhci_host *host, u8 mask)
 static void dwcmshc_get_property(struct platform_device *pdev, struct dwcmshc_priv *priv)
 {
 	struct device *dev = &pdev->dev;
+	u32 scr_signal;
 
 	if (device_property_present(dev, "no-3-3-v"))
 		priv->no_3_3_v = 1;
@@ -343,6 +339,10 @@ static void dwcmshc_get_property(struct platform_device *pdev, struct dwcmshc_pr
 		priv->card_is_emmc = 1;
 	else
 		priv->card_is_emmc = 0;
+
+	if (!device_property_read_u32(dev, "sdrv,scr_signals_ddr", &scr_signal))
+		priv->scr_signals_ddr = scr_signal;
+	dev_info(&pdev->dev, "the ddr mode scr signal = %d\n", priv->scr_signals_ddr);
 
 }
 
@@ -390,8 +390,6 @@ static int dwcmshc_probe(struct platform_device *pdev)
 	struct sdhci_pltfm_host *pltfm_host;
 	struct sdhci_host *host;
 	struct dwcmshc_priv *priv;
-	struct resource *scr_iomem;
-	void __iomem *scr_ioaddr = NULL;
 	u16 ctrl;
 	int err;
 
@@ -413,14 +411,6 @@ static int dwcmshc_probe(struct platform_device *pdev)
 			goto free_pltfm;
 		host->quirks |= SDHCI_QUIRK_CAP_CLOCK_BASE_BROKEN;
 	}
-
-	scr_iomem = platform_get_resource(pdev, IORESOURCE_MEM, 1);
-	if (scr_iomem != NULL) {
-		scr_ioaddr = devm_ioremap_resource(&pdev->dev, scr_iomem);
-		if(IS_ERR(scr_ioaddr))
-			scr_ioaddr = NULL;
-	}
-	priv->scr_ioaddr = scr_ioaddr;
 
 	priv->bus_clk = devm_clk_get(&pdev->dev, "bus");
 	if (!IS_ERR(priv->bus_clk))
