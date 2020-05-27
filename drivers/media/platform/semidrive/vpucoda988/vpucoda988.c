@@ -37,6 +37,7 @@
 #include <linux/reset.h>
 #include <linux/of.h>
 #include <linux/of_address.h>
+#include <soc/semidrive/sdrv_scr.h>
 
 #include "coda_config.h"
 #include "vpu.h"
@@ -115,18 +116,10 @@ struct coda_drive {
     struct dentry *debug_root;
     /* sram[0] inter sram[1] soc sram */
     struct sram_info  sram[2];
+    uint32_t  scr_signal;
 };
 
 static struct coda_drive drive_data;
-
-/*APB_SCR_SEC_BASE; will del when scr module is ready */
-struct apb_scr_info {
-    uint32_t  phy_addr;
-    uint32_t  size;
-    uint32_t  virt_addr;
-};
-static struct apb_scr_info scr_info = {0};
-/* will del when src module is ready */
 
 /* x9 plat ignored following */
 #ifdef VPU_SUPPORT_RESERVED_VIDEO_MEMORY
@@ -860,43 +853,28 @@ static long vpu_ioctl(struct file *filp, u_int cmd, u_long arg)
         break;
 
         case VDI_IOCTL_DEVICE_SRAM_CFG: {
-        #if 0
-            #define APB_SCR_SEC_BASE (0x38200000u)
+            int ret = 0;
             uint32_t mode = 0;
-            volatile unsigned int tmp_reg = 0;
-            volatile void __iomem *io_adress = NULL;
-
-            if (get_user(mode, (u32 __user *) arg)) {
-                pr_info("[VPUDRV]  sram cfg error get_user\n");
-                return -EFAULT;
-            }
-
-            io_adress = ioremap((APB_SCR_SEC_BASE + (0x48 << 10)), 32);
-            tmp_reg = readl(io_adress);
-			pr_info("[VPUDRV] sram default cfg:%d\n", tmp_reg);
-            writel(((tmp_reg & 0xFC) | mode), io_adress); //[1:0] available
-            pr_info("[VPUDRV] sram cfg:%ud, apb addr:%p data:%ud, tmp_reg %ux\n",mode,io_adress,readl(io_adress), tmp_reg);
-        #else  /* will del  when the scr module is ready */
-            uint32_t mode = 0;
-            volatile unsigned int tmp_reg = 0;
-            volatile void __iomem *io_adress = NULL;
 
             if (get_user(mode, (u32 __user *) arg)) {
                 pr_err("[VPUDRV-ERR]  sram cfg error get_user\n");
                 return -EFAULT;
             }
 
-            if(!scr_info.phy_addr)
-                return -1;
+            if (!drive_data.scr_signal) {
+                pr_err("[VPUDRV-ERR]  scr signal value null \n");
+                return -EFAULT;
+            }
 
-            io_adress = ioremap(scr_info.phy_addr, 32);
-            tmp_reg = readl(io_adress);
+            /* using  scr-api to set sram/linebuffer mode  */
+            if(ret = sdrv_scr_set(SCR_SEC, drive_data.scr_signal, mode)) {
+                pr_err("[VPUDRV-ERR]  scr config error, ret %d , mode %d \n", ret, mode);
+                return ret;
+            }
 
-            pr_info("[VPUDRV] sram default cfg:%d\n", tmp_reg);
-            writel(((tmp_reg & 0xFC) | mode), io_adress); //[1:0] available
-            pr_info("[VPUDRV] sram cfg:%ud, apb addr:%p data:%ud, tmp_reg %ux\n",mode,io_adress,readl(io_adress), tmp_reg);
-        #endif
+            return ret;
         }
+
         break;
 
         case VDI_IOCTL_DEVICE_GET_SRAM_INFO: {
@@ -1271,18 +1249,10 @@ static int vpu_probe(struct platform_device *pdev)
 
     vpu_get_sram_info(pdev, &(drive_data.sram[0]));
 
-#if 1   // will del when scr module is ready
-        {
-            if(pdev) {
-                res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "scr_addr");
-                if(res) {
-                    scr_info.phy_addr = res->start;
-                    scr_info.size = res->end - res->start + 1;
-                }
-            }
-            pr_info("[VPUDRV]:Get scr_addr %#x %u\n", scr_info.phy_addr, scr_info.size);
-        }
-#endif
+        /* get scr config info */
+    if (!device_property_read_u32(&(pdev->dev), "sdrv,scr_signal", &(drive_data.scr_signal))) {
+        pr_info("[VPUDRV] coda988 scr signal value  %d\n", drive_data.scr_signal);
+    }
 
     /* get the major number of the character device */
     if ((alloc_chrdev_region(&s_vpu_major, 0, 1, VPU_DEV_NAME)) < 0) {
