@@ -725,9 +725,11 @@ long drm_ioctl_kernel(struct file *file, drm_ioctl_t *func, void *kdata,
 	if (drm_dev_is_unplugged(dev))
 		return -ENODEV;
 
+#ifdef DRM_PERMISSION_CHECK_SEMIDRIVE
 	retcode = drm_ioctl_permit(flags, file_priv);
 	if (unlikely(retcode))
 		return retcode;
+#endif
 
 	/* Enforce sane locking for modern driver ioctls. */
 	if (!drm_core_check_feature(dev, DRIVER_LEGACY) ||
