@@ -951,8 +951,10 @@ static long vpu_ioctl(struct file *filp, u_int cmd, u_long arg)
                 pr_err("[VPUDRV-ERR]  scr signal value null \n");
                 return -EFAULT;
             }
+
             /* using  scr-api to set sram/linebuffer mode  */
-            if(ret = sdrv_scr_set(SCR_SEC, drive_data.scr_signal, mode)) {
+            ret = sdrv_scr_set(SCR_SEC, drive_data.scr_signal, mode);
+            if (0 != ret) {
                 pr_err("[VPUDRV-ERR]  scr config error, ret %d , mode %d \n", ret, mode);
                 return ret;
             }
