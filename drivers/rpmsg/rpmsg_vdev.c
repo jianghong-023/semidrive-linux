@@ -76,8 +76,10 @@ struct sd_virtdev {
 
 struct sd_notify_msg {
 	sd_msghdr_t msghead;
-	__u16 device_type;
-	__u16 vq_id;
+	__u8 device_type;
+	__u8 cc;
+	__u8 vq_id;
+	__u8 flags;
 } __attribute__((packed));
 
 struct sd_rpmsg_virt_device {
@@ -89,6 +91,7 @@ struct sd_rpmsg_virt_device {
 
 	__u64 rproc_message[MAX_MSG_NUM];
 	__u32 in_idx, out_idx;
+	__u8 counter;	/* tx continuity counter */
 
 	int rproc_id;
 	struct mbox_chan *mbox;
@@ -129,12 +132,14 @@ static bool sd_rpmsg_notify(struct virtqueue *vq)
 	struct sd_rpmsg_virt_device *rvdev = rpvq->rvdev;
 	int ret;
 
+	mutex_lock(&rvdev->lock);
+
 	MB_MSG_INIT_RPMSG_HEAD(&msg.msghead, rvdev->rproc_id,
 			sizeof(struct sd_notify_msg), IPCC_ADDR_RPMSG);
 	msg.vq_id = rpvq->vq_id;
-	msg.device_type = 0x99;
+	msg.cc = rvdev->counter++;
+	msg.device_type = 0x90;
 
-	mutex_lock(&rvdev->lock);
 	/* send the index of the triggered virtqueue as the mbox payload */
 	ret = mbox_send_message(rvdev->mbox, &msg);
 	mutex_unlock(&rvdev->lock);
