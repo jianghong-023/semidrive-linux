@@ -69,6 +69,8 @@ struct mbox_chan_ops {
  * @of_xlate:		Controller driver specific mapping of channel via DT
  * @poll_hrt:		API private. hrtimer used to poll for TXDONE on all
  *			channels.
+ * @hrt_state:		API private. Flag for current state of poll_hrt.
+ * @hrt_lock: 		API private. Lock for poll_hrt's state machine.
  * @node:		API private. To hook into list of controllers.
  */
 struct mbox_controller {
@@ -83,6 +85,9 @@ struct mbox_controller {
 				      const struct of_phandle_args *sp);
 	/* Internal to API */
 	struct hrtimer poll_hrt;
+	int hrt_state;
+	spinlock_t hrt_lock;
+
 	struct list_head node;
 };
 

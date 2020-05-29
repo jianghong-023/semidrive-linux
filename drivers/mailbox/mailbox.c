@@ -23,6 +23,11 @@
 
 #include "mailbox.h"
 
+
+#define HRT_INACTIVE   0
+#define HRT_SCHEDULED  1
+#define HRT_RESCHEDULE 2
+
 static LIST_HEAD(mbox_cons);
 static DEFINE_MUTEX(con_mutex);
 
@@ -85,9 +90,17 @@ static void msg_submit(struct mbox_chan *chan)
 exit:
 	spin_unlock_irqrestore(&chan->lock, flags);
 
-	if (!err && (chan->txdone_method & TXDONE_BY_POLL))
-		/* kick start the timer immediately to avoid delays */
-		hrtimer_start(&chan->mbox->poll_hrt, 0, HRTIMER_MODE_REL);
+	if (!err && (chan->txdone_method & TXDONE_BY_POLL)) {
+		spin_lock_irqsave(&chan->mbox->hrt_lock, flags);
+		if (chan->mbox->hrt_state == HRT_INACTIVE) {
+			/* kick start the timer immediately to avoid delays */
+			hrtimer_start(&chan->mbox->poll_hrt, 0, HRTIMER_MODE_REL);
+			chan->mbox->hrt_state = HRT_SCHEDULED;
+		} else {
+			chan->mbox->hrt_state = HRT_RESCHEDULE;
+		}
+		spin_unlock_irqrestore(&chan->mbox->hrt_lock, flags);
+	}
 }
 
 static void tx_tick(struct mbox_chan *chan, int r)
@@ -119,6 +132,8 @@ static enum hrtimer_restart txdone_hrtimer(struct hrtimer *hrtimer)
 	struct mbox_controller *mbox =
 		container_of(hrtimer, struct mbox_controller, poll_hrt);
 	bool txdone, resched = false;
+	enum hrtimer_restart ret;
+	unsigned long flags;
 	int i;
 
 	for (i = 0; i < mbox->num_chans; i++) {
@@ -133,11 +148,18 @@ static enum hrtimer_restart txdone_hrtimer(struct hrtimer *hrtimer)
 		}
 	}
 
-	if (resched) {
+	spin_lock_irqsave(&mbox->hrt_lock, flags);
+	if (resched || mbox->hrt_state == HRT_RESCHEDULE) {
 		hrtimer_forward_now(hrtimer, ms_to_ktime(mbox->txpoll_period));
-		return HRTIMER_RESTART;
+		mbox->hrt_state = HRT_SCHEDULED;
+		ret = HRTIMER_RESTART;
+	} else {
+		mbox->hrt_state = HRT_INACTIVE;
+		ret = HRTIMER_NORESTART;
 	}
-	return HRTIMER_NORESTART;
+	spin_unlock_irqrestore(&mbox->hrt_lock, flags);
+
+	return ret;
 }
 
 /**
@@ -466,6 +488,8 @@ int mbox_controller_register(struct mbox_controller *mbox)
 			return -EINVAL;
 		}
 
+		mbox->hrt_state = HRT_INACTIVE;
+		spin_lock_init(&mbox->hrt_lock);
 		hrtimer_init(&mbox->poll_hrt, CLOCK_MONOTONIC,
 			     HRTIMER_MODE_REL);
 		mbox->poll_hrt.function = txdone_hrtimer;
