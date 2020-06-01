@@ -32,11 +32,13 @@
 #include "sdrv-csi.h"
 #include "sdrv-mipi-csi2.h"
 
-#define MAX_SENSOR_NUM 4
+#define MAX_SENSOR_NUM 1
+
+#define MAX96706_DEVICE_ID 0x4A
 
 #define MAX96705_SLAVE_ID 0x40
 #define MAX96705_DEV_INDEX 0x30
-
+#define MAX96705_DEVICE_ID 0x41
 
 enum max96706_mode_id {
     MAX96706_MODE_720P_1280_720 = 0,
@@ -122,6 +124,7 @@ struct max96706_dev {
     struct mutex lock;
 
     int power_count;
+    int device_exist;
 
     struct v4l2_mbus_framefmt fmt;
     bool pending_fmt_change;
@@ -302,9 +305,9 @@ static struct v4l2_subdev *max96706_get_interface_subdev(
 static int max96706_s_power(struct v4l2_subdev *sd, int on)
 {
     struct max96706_dev *sensor = to_max96706_dev(sd);
-    struct v4l2_subdev *interface_sd = max96706_get_interface_subdev(sd);
-    struct sdrv_csi_mipi_csi2 *kcmc = v4l2_get_subdevdata(interface_sd);
-    kcmc->lane_count = sensor->link_count;
+
+    if (sensor->device_exist == -1)
+        return -1;
 
     return 0;
 }
@@ -555,6 +558,58 @@ free_ctrls:
 }
 
 
+static void max96706_power(struct max96706_dev *sensor, bool enable)
+{
+    gpiod_direction_output(sensor->pwdn_gpio, enable ? 1 : 0);
+    msleep(1);
+}
+
+static int max96706_check_chip_id(struct max96706_dev *sensor)
+{
+    struct i2c_client *client = sensor->i2c_client;
+    int ret = 0;
+    u8 chip_id;
+
+
+    ret = max96706_read_reg(sensor, 0x1e, &chip_id);
+
+    if (ret) {
+        dev_err(&client->dev, "%s: failed to read chip identifier\n",
+                __func__);
+    }
+
+    if (chip_id != MAX96706_DEVICE_ID) {
+        dev_err(&client->dev,
+                "%s: wrong chip identifier, expected 0x%x(max96706), got 0x%x\n",
+                __func__, MAX96706_DEVICE_ID, chip_id);
+        ret = -ENXIO;
+    }
+
+    return ret;
+}
+
+static int max96705_check_chip_id(struct max96706_dev *sensor)
+{
+    struct i2c_client *client = sensor->i2c_client;
+    int ret = 0;
+    u8 chip_id;
+
+    ret = max96705_read_reg(sensor, 0, 0x1e, &chip_id);
+
+    if (ret) {
+        dev_err(&client->dev, "%s: failed to read chip identifier\n",
+                __func__);
+    }
+
+    if (chip_id != MAX96705_DEVICE_ID) {
+        dev_err(&client->dev,
+                "%s: wrong chip identifier, expected 0x%x(max96705), got 0x%x\n",
+                __func__, MAX96705_DEVICE_ID, chip_id);
+        ret = -ENXIO;
+    }
+
+    return ret;
+}
 
 
 static int max96706_initialization(struct max96706_dev *sensor)
@@ -564,25 +619,8 @@ static int max96706_initialization(struct max96706_dev *sensor)
     u8 val;
     u8 link_status = 0, link_count = 0;
     int i = 0;
-    struct gpio_desc *gpiod;
 
-    dev_err(&client->dev, "%s()\n", __func__);
-
-    gpiod = devm_gpiod_get_optional(&client->dev, "powerdown", GPIOD_IN);
-
-    if (IS_ERR(gpiod)) {
-        ret = PTR_ERR(gpiod);
-
-        if (ret != -EPROBE_DEFER)
-            dev_err(&client->dev, "Failed to get %s GPIO: %d\n",
-                    "pwdn", ret);
-
-        return ret;
-    }
-
-    sensor->pwdn_gpio = gpiod;
-    gpiod_direction_output(sensor->pwdn_gpio, 1);
-    msleep(1);
+    dev_info(&client->dev, "%s()\n", __func__);
 
     //set him
     val = 0;
@@ -605,6 +643,15 @@ static int max96706_initialization(struct max96706_dev *sensor)
     max96706_write_reg(sensor, 0x04, val);
     msleep(1);
 
+    ret = max96705_check_chip_id(sensor);
+
+    if (ret != 0) {
+        dev_err(&client->dev, "%s: not found 96705, ret=%d\n", __func__, ret);
+        sensor->device_exist = -1;
+        return -1;
+    }
+
+    sensor->device_exist = 1;
 
     max96705_write_reg(sensor, 0, 0x01, (sensor->addr_96706) << 1);
     msleep(5);
@@ -615,20 +662,6 @@ static int max96706_initialization(struct max96706_dev *sensor)
                        (sensor->addr_96705 + MAX96705_DEV_INDEX) << 1);
     msleep(5);
 
-
-    gpiod = devm_gpiod_get_optional(&client->dev, "gpi", GPIOD_IN);
-
-    if (IS_ERR(gpiod)) {
-        ret = PTR_ERR(gpiod);
-
-        if (ret != -EPROBE_DEFER)
-            dev_err(&client->dev, "Failed to get %s GPIO: %d\n",
-                    "pwdn", ret);
-
-        return ret;
-    }
-
-    sensor->gpi_gpio = gpiod;
     gpiod_direction_output(sensor->gpi_gpio, 1);
     msleep(10);
     gpiod_direction_output(sensor->gpi_gpio, 0);
@@ -656,6 +689,7 @@ static int max96706_probe(struct i2c_client *client,
     struct v4l2_mbus_framefmt *fmt;
     u32 rotation;
     int ret;
+    struct gpio_desc *gpiod;
 
     sensor = devm_kzalloc(dev, sizeof(*sensor), GFP_KERNEL);
 
@@ -740,7 +774,40 @@ static int max96706_probe(struct i2c_client *client,
     if (ret)
         return ret;
 
+    gpiod = devm_gpiod_get_optional(&client->dev, "powerdown", GPIOD_IN);
+
+    if (IS_ERR(gpiod)) {
+        ret = PTR_ERR(gpiod);
+        dev_err(&client->dev, "get %s GPIO: %d\n", "pwdn", ret);
+
+        if (ret != -EPROBE_DEFER)
+            dev_err(&client->dev, "Failed to get %s GPIO: %d\n",
+                    "pwdn", ret);
+
+        return ret;
+    }
+
+    sensor->pwdn_gpio = gpiod;
+
+    gpiod = devm_gpiod_get_optional(&client->dev, "gpi", GPIOD_IN);
+
+    if (IS_ERR(gpiod)) {
+        ret = PTR_ERR(gpiod);
+
+        if (ret != -EPROBE_DEFER)
+            dev_err(&client->dev, "Failed to get %s GPIO: %d\n",
+                    "pwdn", ret);
+
+        return ret;
+    }
+
+    sensor->gpi_gpio = gpiod;
+
     mutex_init(&sensor->lock);
+
+    max96706_power(sensor, 1);
+    max96706_check_chip_id(sensor);
+
 
     max96706_initialization(sensor);
 

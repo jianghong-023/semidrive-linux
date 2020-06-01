@@ -295,7 +295,7 @@ static int sdrv_of_parse_ports(struct csi_core *csi)
 			}
 
 			if(kstream->id != ep.port){
-				dev_info(dev, "port not match\n");
+				//dev_info(dev, "port not match\n");
 				of_node_put(intf_ep);
 				continue;
 			}
