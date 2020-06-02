@@ -272,13 +272,10 @@ struct sd_mbox_tx_msg *sd_mu_alloc_msg(struct sd_mbox_device *mbdev, int prefer,
 	int i;
 	struct sd_mbox_tx_msg *msg;
 
-	spin_lock(&mbdev->msg_lock);
-
 	if (prefer < MB_MAX_MSGS) {
 		msg = &mbdev->tmsg[prefer];
 		if (!msg->used) {
 			msg->used = 1;
-			spin_unlock(&mbdev->msg_lock);
 			return msg;
 		}
 	}
@@ -287,22 +284,17 @@ struct sd_mbox_tx_msg *sd_mu_alloc_msg(struct sd_mbox_device *mbdev, int prefer,
 		msg = &mbdev->tmsg[i];
 		if (!msg->used) {
 			msg->used = 1;
-			spin_unlock(&mbdev->msg_lock);
 			return msg;
 		}
 	}
-
-	spin_unlock(&mbdev->msg_lock);
 
 	return NULL;
 }
 
 void sd_mu_free_msg(struct sd_mbox_device *mbdev, struct sd_mbox_tx_msg *msg)
 {
-	spin_lock(&mbdev->msg_lock);
 	msg->used = 0;
 	msg->remote = (u32) -1;
-	spin_unlock(&mbdev->msg_lock);
 }
 
 static int sd_mbox_send_data(struct mbox_chan *chan, void *data)
@@ -313,6 +305,9 @@ static int sd_mbox_send_data(struct mbox_chan *chan, void *data)
 		container_of(mbox, struct sd_mbox_device, controller);
 	int prefer_msg;
 	int ret = 0;
+	unsigned long flags;
+
+	spin_lock_irqsave(&mbdev->msg_lock, flags);
 
 	mlink->actual_size = mb_msg_parse_packet_len(data);
 	mlink->priority = mb_msg_parse_packet_prio(data);
@@ -327,6 +322,7 @@ static int sd_mbox_send_data(struct mbox_chan *chan, void *data)
 	if (!mlink->msg) {
         mlink->msg = sd_mu_alloc_msg(mbdev, prefer_msg, mlink->priority);
 		if (!mlink->msg) {
+			spin_unlock_irqrestore(&mbdev->msg_lock, flags);
 			dev_err(mbox->dev, "No msg available\n");
 			return -EBUSY;
 		}
@@ -348,6 +344,8 @@ static int sd_mbox_send_data(struct mbox_chan *chan, void *data)
 				mlink->target, ret);
 		sd_mu_free_msg(mbdev, mlink->msg);
 	}
+
+	spin_unlock_irqrestore(&mbdev->msg_lock, flags);
 
 	return ret;
 }
@@ -438,18 +436,24 @@ static irqreturn_t sd_mbox_rx_interrupt(int irq, void *p)
 	u32 remote_proc, mmask;
 	sd_msghdr_t *msg;
 	u32 dest;
+	unsigned long flags;
 
 	if (!mbdev) {
 		return IRQ_HANDLED;
 	}
+
+	spin_lock_irqsave(&mbdev->msg_lock, flags);
+
 	state = sd_mu_read_tms(mbdev);
 	if (!state) {
+		spin_unlock_irqrestore(&mbdev->msg_lock, flags);
 		dev_warn(mbox->dev, "%s: spurious interrupt %d\n",
 			 __func__, irq);
 		return IRQ_HANDLED;
 	}
 
 	dev_dbg(mbox->dev, "mu: rx intr state: 0x%x\n", state);
+
 	for (remote_proc = 0; remote_proc < MB_MAX_RPROC; remote_proc++) {
 		mmask = 0xf & (state >> (4 * remote_proc));
 		while (mmask) {
@@ -482,6 +486,8 @@ static irqreturn_t sd_mbox_rx_interrupt(int irq, void *p)
 			sd_mu_ack_msg(mbdev, remote_proc, msg_id);
 		}
 	}
+
+	spin_unlock_irqrestore(&mbdev->msg_lock, flags);
 
 	return IRQ_HANDLED;
 }
