@@ -787,6 +787,15 @@ config UNIPHIER_WATCHDOG
 	  To compile this driver as a module, choose M here: the
 	  module will be called uniphier_wdt.
 
+config SDRV_WATCHDOG
+	tristate "Semidrive watchdog support"
+	depends on ARCH_SEMIDRIVE_X9
+	select WATCHDOG_CORE
+	help
+	  Say Y here to include support for the watchdog timer
+	  in Semidrive SoC.
+	  This driver is required to reboot the Soc.
+
 # AVR32 Architecture
 
 config AT32AP700X_WDT
