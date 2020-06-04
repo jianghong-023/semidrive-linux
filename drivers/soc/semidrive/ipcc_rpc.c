@@ -5,6 +5,8 @@
 
 
 #include <linux/module.h>
+#include <linux/slab.h>
+#include <linux/ktime.h>
 #include <linux/rpmsg.h>
 #include <linux/soc/semidrive/mb_msg.h>
 
@@ -17,6 +19,10 @@
 #define RPMSG_RPC_ACK_PING               (RPMSG_RPC_REQ_PING+1)
 #define RPMSG_RPC_REQ_GETTIMEOFDAY       (0x1002)
 #define RPMSG_RPC_ACK_GETTIMEOFDAY       (RPMSG_RPC_REQ_GETTIMEOFDAY+1)
+
+#define SYS_RPC_REQ_BASE           (0x2000)
+#define SYS_RPC_REQ_SET_PROPERTY   (SYS_RPC_REQ_BASE + 0)
+#define SYS_RPC_REQ_GET_PROPERTY   (SYS_RPC_REQ_BASE + 1)
 
 #define RPMSG_RPC_MAX_PARAMS     (8)
 #define RPMSG_RPC_MAX_RESULT     (4)
@@ -40,11 +46,14 @@ struct rpmsg_rpc_device {
 	struct delayed_work delay_work;
 	struct rpmsg_device *rpmsg_device;
 	struct rpmsg_endpoint *channel;
+	int rproc;
 
 	int cb_err;
 	struct completion done;
 	struct rpc_ret_msg result;
 };
+
+static struct rpmsg_rpc_device *rpmsg_rpc_devp[3];
 
 int rpmsg_rpc_call(struct rpmsg_rpc_device *rpcdev, struct rpc_req_msg *req, struct rpc_ret_msg *result, int timeout)
 {
@@ -85,7 +94,7 @@ int rpmsg_rpc_call(struct rpmsg_rpc_device *rpcdev, struct rpc_req_msg *req, str
 	if (result)
 		memcpy(result, &rpcdev->result, sizeof(*result));
 
-	dev_info(rpcdev->dev, "succeed to call RPC %d\n", req->cmd);
+	dev_dbg(rpcdev->dev, "succeed to call RPC %d\n", req->cmd);
 
 err:
 	return ret;
@@ -141,6 +150,46 @@ int rpmsg_rpc_gettimeofday(struct rpmsg_rpc_device *rpcdev)
     return ret;
 }
 
+#define SYS_PROP_DC_STATUS        (4)
+int rpmsg_rpc_get_dc_status(struct rpmsg_rpc_device *rpcdev, int *val)
+{
+	struct rpc_ret_msg result;
+	struct rpc_req_msg request;
+	int ret = 0;
+
+	request.cmd = SYS_RPC_REQ_GET_PROPERTY;
+	request.cksum = RPMSG_SANITY_TAG;
+    request.param[0] = SYS_PROP_DC_STATUS;
+	ret = rpmsg_rpc_call(rpcdev, &request, &result, RPMSG_TEST_TIMEOUT);
+	if (ret < 0) {
+		dev_err(rpcdev->dev, "rpc: call-func:%x fail ret: %d\n", request.cmd, ret);
+		return ret;
+	}
+
+	ret = result.retcode;
+	if (ret < 0)
+		dev_warn(rpcdev->dev, "rpc: exec bad result %d %d\n", result.ack, ret);
+
+	if (!ret && val) {
+		*val = result.result[0];
+	}
+
+	return ret;
+}
+
+int sdrv_get_dc_status(int *val)
+{
+	struct rpmsg_rpc_device *rpcdev = rpmsg_rpc_devp[0];
+
+	if (!rpcdev) {
+		pr_warn("%s: Remote device not exist\n", __func__);
+		return -ENODEV;
+	}
+
+	return rpmsg_rpc_get_dc_status(rpcdev, val);
+}
+EXPORT_SYMBOL(sdrv_get_dc_status);
+
 static int rpmsg_rpcdev_cb(struct rpmsg_device *rpdev,
 						void *data, int len, void *priv, u32 src)
 {
@@ -181,9 +230,51 @@ static void rpc_work_handler(struct work_struct *work)
 {
 	struct rpmsg_rpc_device *rpcdev = container_of(to_delayed_work(work),
 					 struct rpmsg_rpc_device, delay_work);
+	int dc_status;
+	int ret;
+	ktime_t tss, tse;
 
-	rpmsg_rpc_ping(rpcdev);
-	rpmsg_rpc_gettimeofday(rpcdev);
+	tss = ktime_get_boottime();
+	ret = rpmsg_rpc_ping(rpcdev);
+	if (ret == 0) {
+		tse = ktime_get_boottime();
+		dev_info(rpcdev->dev, "RPC is on, latency %lld\n",
+				 ktime_us_delta(tse, tss));
+	}
+
+//	rpmsg_rpc_gettimeofday(rpcdev);
+	if (rpcdev->rproc == 0) {
+		ret = rpmsg_rpc_get_dc_status(rpcdev, &dc_status);
+		if (ret == 0) {
+			dev_info(rpcdev->dev, "dc_status is %d\n", dc_status);
+		}
+	}
+}
+
+#define IPCC_RPC_DEVNAME_PREFIX     "soc:ipcc@"
+static int register_rpcdev(struct rpmsg_rpc_device *rpcdev)
+{
+	char *name, *bufp, *p;
+	int id = -1;
+	int ret;
+
+	name = strstr(dev_name(rpcdev->dev), IPCC_RPC_DEVNAME_PREFIX);
+	bufp = kstrdup(name, GFP_KERNEL);
+	if (bufp) {
+		p = bufp + strlen(IPCC_RPC_DEVNAME_PREFIX);
+		p[1] = 0;
+		ret = kstrtoint(p, 10, &id);
+	}
+
+	if (ret < 0 || id < 0) {
+		dev_err(rpcdev->dev, "Bad rpcdev name %s\n", bufp);
+	} else {
+		rpcdev->rproc = id;
+		rpmsg_rpc_devp[id] = rpcdev;
+	}
+	kfree(bufp);
+
+	return 0;
 }
 
 static int rpmsg_rpcdev_probe(struct rpmsg_device *rpdev)
@@ -199,6 +290,8 @@ static int rpmsg_rpcdev_probe(struct rpmsg_device *rpdev)
 
 	rpcdev->rpmsg_device = rpdev;
 	dev_set_drvdata(&rpdev->dev, rpcdev);
+
+	register_rpcdev(rpcdev);
 
 	/* just async call RPC */
 	INIT_DELAYED_WORK(&rpcdev->delay_work, rpc_work_handler);
