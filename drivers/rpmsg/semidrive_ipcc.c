@@ -483,7 +483,7 @@ static int __send_offchannel_raw(struct rpmsg_ipcc_device *vrp,
 
 	mutex_lock(&vrp->tx_lock);
 
-	mbox_send_message(vrp->mbox, msg);
+	err = mbox_send_message(vrp->mbox, msg);
 
 	vrp->tx_buf_txing = 0;
 	mutex_unlock(&vrp->tx_lock);
