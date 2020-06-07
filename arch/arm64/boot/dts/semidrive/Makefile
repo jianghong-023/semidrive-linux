@@ -2,7 +2,7 @@
 dtb-$(CONFIG_ARCH_SEMIDRIVE_X9) += x9_z1.dtb
 dtb-$(CONFIG_ARCH_SEMIDRIVE_X9) += x9_z1-cpu1.dtb
 dtb-$(CONFIG_ARCH_SEMIDRIVE_X9) += x9_fpga.dtb
-dtb-$(CONFIG_ARCH_SEMIDRIVE_X9) += g9_ref.dtb
+dtb-$(CONFIG_ARCH_SEMIDRIVE_X9) += g9x_ref.dtb
 dtb-$(CONFIG_ARCH_SEMIDRIVE_X9) += x9_evb_1920x720.dtb
 dtb-$(CONFIG_ARCH_SEMIDRIVE_X9) += x9_ref_1920x720.dtb
 dtb-$(CONFIG_ARCH_SEMIDRIVE_X9) += x9_evb_memdisk.dtb
