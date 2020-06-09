@@ -358,7 +358,8 @@ static int alloc_fake_buffer(void)
 /* x9 pcm hardware definition.  */
 
 static const struct snd_pcm_hardware sdrv_pcm_hardware = {
-    .info = (SNDRV_PCM_INFO_INTERLEAVED | SNDRV_PCM_INFO_MMAP_VALID |
+
+    .info = (SNDRV_PCM_INFO_INTERLEAVED |
 	     SNDRV_PCM_INFO_BLOCK_TRANSFER),
     .formats = SND_FORMATS,
     .rates = SND_RATE,
@@ -711,12 +712,29 @@ int snd_afe_dai_hw_params(struct snd_pcm_substream *substream,
 		DEBUG_FUNC_PRT
 		return -EINVAL;
 	}
+
+	switch (params_format(hwparam)) {
+		case SNDRV_PCM_FORMAT_S8:
+			dev_err(afe->dev, "%s(%d) Don't support this function for S8 is low dynamic range.\n",
+				__func__,__LINE__);
+			return -EINVAL;
+		case SNDRV_PCM_FORMAT_S16_LE:
+		case SNDRV_PCM_FORMAT_S24_LE:
+		case SNDRV_PCM_FORMAT_S32_LE:
+			break;
+		default:
+			return -EINVAL;
+	}
+
 	/* Here calculate and fill sample rate.  */
 	if (true == afe->is_full_duplex) {
+
 		regmap_write(afe->regmap, REG_CDN_I2SSC_REGS_I2S_SRES_FDR,
 			     sample_size - 1);
+
 		regmap_write(afe->regmap, REG_CDN_I2SSC_REGS_I2S_SRES,
 			     sample_size - 1);
+
 	} else {
 		regmap_write(afe->regmap, REG_CDN_I2SSC_REGS_I2S_SRES,
 			     sample_size - 1);
@@ -962,7 +980,7 @@ int snd_soc_dai_probe(struct snd_soc_dai *dai)
 	struct sdrv_afe_i2s_sc *d = snd_soc_dai_get_drvdata(dai);
 	struct device *dev = d->dev;
 
-	dev_info(dev, "DAI probe.----------------------------\n");
+	dev_info(dev, "DAI probe.----------vaddr(0x%llx)------------------\n",d->regs);
 
 	/* 	struct zx_i2s_info *zx_i2s = dev_get_drvdata(dai->dev);
 	snd_soc_dai_init_dma_data(dai, &d->playback_dma_data,
@@ -992,6 +1010,7 @@ static struct snd_soc_dai_driver snd_afe_dais[] = {
 	.remove = snd_soc_dai_remove,
 	.playback =
 	    {
+		.stream_name = "I2S Playback",
 		.formats = SND_FORMATS,
 		.rates = SNDRV_PCM_RATE_8000_48000,
 		.channels_min = 1,
@@ -999,6 +1018,7 @@ static struct snd_soc_dai_driver snd_afe_dais[] = {
 	    },
 	.capture =
 	    {
+		.stream_name = "I2S Capture",
 		.formats = SND_FORMATS,
 		.rates = SNDRV_PCM_RATE_8000_48000,
 		.channels_min = 1,
@@ -1012,6 +1032,7 @@ static struct snd_soc_dai_driver snd_afe_dais[] = {
 	.remove = snd_soc_dai_remove,
 	.playback =
 	    {
+		.stream_name = "I2S1 Playback",
 		.formats = SND_FORMATS,
 		.rates = SNDRV_PCM_RATE_8000_48000,
 		.channels_min = 1,
@@ -1019,32 +1040,7 @@ static struct snd_soc_dai_driver snd_afe_dais[] = {
 	    },
 	.capture =
 	    {
-		.formats = SND_FORMATS,
-		.rates = SNDRV_PCM_RATE_8000_48000,
-		.channels_min = 1,
-		.channels_max = 2,
-	    },
-	.ops = &snd_afe_dai_ops,
-    },
-    {
-	.name = "snd-afe-sc-i2s-dai2",
-	.probe = snd_soc_dai_probe,
-	.remove = snd_soc_dai_remove,
-	.playback =
-	    {
-		.formats = SND_FORMATS,
-		.rates = SNDRV_PCM_RATE_8000_48000,
-		.channels_min = 1,
-		.channels_max = 2,
-	    },
-	.ops = &snd_afe_dai_ops,
-    },
-    {
-	.name = "snd-afe-sc-i2s-dai3",
-	.probe = snd_soc_dai_probe,
-	.remove = snd_soc_dai_remove,
-	.capture =
-	    {
+		.stream_name = "I2S1 Capture",
 		.formats = SND_FORMATS,
 		.rates = SNDRV_PCM_RATE_8000_48000,
 		.channels_min = 1,
@@ -1099,7 +1095,7 @@ static int sdrv_pcm_prepare_slave_config(struct snd_pcm_substream *substream,
 	struct sdrv_afe_i2s_sc *afe = snd_soc_dai_get_drvdata(rtd->cpu_dai);
 
 	int ret;
-	DEBUG_FUNC_PRT;
+
 
 	ret = snd_hwparams_to_dma_slave_config(substream, params, slave_config);
 	if (ret)
@@ -1108,10 +1104,27 @@ static int sdrv_pcm_prepare_slave_config(struct snd_pcm_substream *substream,
 	slave_config->dst_maxburst = 4;
 	slave_config->src_maxburst = 4;
 
-	/*TODO: Need change width by audio format */
-	slave_config->src_addr_width = DMA_SLAVE_BUSWIDTH_2_BYTES;
-	slave_config->dst_addr_width = DMA_SLAVE_BUSWIDTH_2_BYTES;
+	/*Change width by audio format */
 
+	switch (params_format(params)) {
+		case SNDRV_PCM_FORMAT_S8:
+			dev_err(afe->dev, "%s(%d) Don't support this function for S8 is low dynamic range.\n",
+				__func__,__LINE__);
+			return -EINVAL;
+		case SNDRV_PCM_FORMAT_S16_LE:
+			DEBUG_FUNC_PRT;
+			slave_config->src_addr_width = DMA_SLAVE_BUSWIDTH_2_BYTES;
+			slave_config->dst_addr_width = DMA_SLAVE_BUSWIDTH_2_BYTES;
+			break;
+		case SNDRV_PCM_FORMAT_S24_LE:
+		case SNDRV_PCM_FORMAT_S32_LE:
+			DEBUG_FUNC_PRT;
+			slave_config->src_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
+			slave_config->dst_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
+			break;
+		default:
+			return -EINVAL;
+	}
 	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
 		slave_config->dst_addr = afe->playback_dma_data.addr;
 	else
@@ -1123,7 +1136,7 @@ static int sdrv_pcm_prepare_slave_config(struct snd_pcm_substream *substream,
 static const struct snd_dmaengine_pcm_config sdrv_dmaengine_pcm_config = {
     .pcm_hardware = &sdrv_pcm_hardware,
     .prepare_slave_config = sdrv_pcm_prepare_slave_config,
-    .prealloc_buffer_size = SDRV_I2S_FIFO_SIZE * 8,
+    .prealloc_buffer_size = MAX_ABUF_SIZE,
 };
 
 static int snd_afe_soc_platform_probe(struct snd_soc_component *pdev)
@@ -1147,10 +1160,32 @@ static void snd_afe_soc_platform_remove(struct snd_soc_component *pdev)
 	return;
 }
 
-static struct snd_soc_component_driver snd_afe_soc_component = {
+static const struct snd_soc_dapm_widget afe_widgets[] = {
+    /* Outputs */
+	SND_SOC_DAPM_AIF_OUT("PCM0 OUT", NULL,  0,
+			SND_SOC_NOPM, 0, 0),
+	/* Inputs */
+	SND_SOC_DAPM_AIF_IN("PCM0 IN", NULL,  0,
+			SND_SOC_NOPM, 0, 0),
 
+};
+
+static const struct snd_soc_dapm_route afe_dapm_map[] = {
+    /* Line Out connected to LLOUT, RLOUT */
+   /* Outputs */
+   { "PCM0 OUT", NULL, "I2S Playback" },
+   /* Inputs */
+   { "I2S Capture", NULL, "PCM0 IN" },
+
+};
+static struct snd_soc_component_driver snd_afe_soc_component = {
+	.name = "afe-dai",
     .probe = snd_afe_soc_platform_probe,
     .remove = snd_afe_soc_platform_remove,
+	.dapm_widgets = afe_widgets,
+	.num_dapm_widgets = ARRAY_SIZE(afe_widgets),
+	.dapm_routes = afe_dapm_map,
+	.num_dapm_routes = ARRAY_SIZE(afe_dapm_map),
 };
 
 static int snd_afe_i2s_sc_probe(struct platform_device *pdev)
