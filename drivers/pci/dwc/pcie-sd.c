@@ -266,6 +266,34 @@ void sd_pcie_phy_refclk_sel(struct sd_pcie *sd_pcie)
 	}
 }
 
+void sd_pcie_of_get_ref_clk(const struct device_node *device, struct sd_pcie *pcie)
+{
+	const char *ref_clk;
+	int len;
+
+	ref_clk = of_get_property(device, "ref-clk", &len);
+
+	if (ref_clk == NULL) {
+		pr_info("no \"ref-clk\" property, will using default internal clk\n");
+		pcie->phy_refclk_sel = PHY_REFCLK_USE_INTERNAL;
+		return;
+	}
+
+	if (!strcmp(ref_clk, "external,diffbuf_on")) {
+		pcie->phy_refclk_sel = PHY_REFCLK_USE_EXTERNAL | DIFFBUF_OUT_EN;
+	} else if (!strcmp(ref_clk, "external")) {
+		pcie->phy_refclk_sel = PHY_REFCLK_USE_EXTERNAL;
+	} else if (!strcmp(ref_clk, "internal")) {
+		pcie->phy_refclk_sel = PHY_REFCLK_USE_INTERNAL;
+	} else if (!strcmp(ref_clk, "internal,diffbuf_on")) {
+		pcie->phy_refclk_sel = PHY_REFCLK_USE_INTERNAL | DIFFBUF_OUT_EN;
+	} else {
+		pr_info("wrong \"ref-clk\" property value, will using default internal clk\n");
+		pcie->phy_refclk_sel = PHY_REFCLK_USE_INTERNAL;
+	}
+
+}
+
 static void sd_pcie_lane_config(struct sd_pcie *sd_pcie)
 {
 	u32 lane0 = GET_LANE0_CFG(sd_pcie->lane_config);
@@ -465,15 +493,6 @@ static const struct dw_pcie_host_ops sd_pcie_host_ops = {
 	.host_init = sd_pcie_host_init,
 };
 
-static irqreturn_t sd_pcie_msi_handler(int irq, void *arg)
-{
-	struct sd_pcie *sd_pcie = arg;
-	struct dw_pcie *pcie = sd_pcie->pcie;
-	struct pcie_port *pp = &pcie->pp;
-
-	return dw_handle_msi_irq(pp);
-}
-
 static int __init sd_add_pcie_port(struct dw_pcie *pcie,
 				       struct platform_device *pdev)
 {
@@ -487,15 +506,6 @@ static int __init sd_add_pcie_port(struct dw_pcie *pcie,
 		if (pp->msi_irq <= 0) {
 			dev_err(dev, "failed to get MSI irq\n");
 			return -ENODEV;
-		}
-
-		ret = devm_request_irq(dev, pp->msi_irq,
-				     sd_pcie_msi_handler,
-				     IRQF_SHARED | IRQF_NO_THREAD,
-				     "sd-pcie-msi", sd_pcie);
-		if (ret) {
-			dev_err(dev, "failed to request MSI irq\n");
-			return ret;
 		}
 	}
 
@@ -534,7 +544,8 @@ static int sd_pcie_probe(struct platform_device *pdev)
 	pcie->ops = &sd_dw_pcie_ops;
 	sd_pcie->pcie = pcie;
 	sd_pcie->lane_config = PCIE1_2_EACH_ONE_LANE;
-	sd_pcie->phy_refclk_sel = PHY_REFCLK_USE_EXTERNAL | DIFFBUF_OUT_EN;
+
+	sd_pcie_of_get_ref_clk(dev->of_node, sd_pcie);
 
 	ret = sd_pcie_get_clk(sd_pcie, pdev);
 	if (ret)
