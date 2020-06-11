@@ -53,7 +53,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "dma_support.h"
 #include "kernel_compatibility.h"
 
-#define DMA_MAX_IOREMAP_ENTRIES 2
+#define DMA_MAX_IOREMAP_ENTRIES 8
 static IMG_BOOL gbEnableDmaIoRemapping = IMG_FALSE;
 static DMA_ALLOC gsDmaIoRemapArray[DMA_MAX_IOREMAP_ENTRIES] = {{0}};
 

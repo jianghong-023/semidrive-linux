@@ -94,6 +94,16 @@ e0:
 	return;
 }
 
+void SysVzDebugDumpConfig(PVRSRV_DEVICE_CONFIG *psDevConfig)
+{
+	PVRSRV_ERROR eError;
+
+	eError = PvzClientDebugDumpConfig(psDevConfig, 0);
+
+e0:
+	return;
+}
+
 PVRSRV_ERROR SysVzRegisterFwPhysHeap(PVRSRV_DEVICE_CONFIG *psDevConfig)
 {
 	PVRSRV_ERROR eError;
@@ -280,11 +290,7 @@ PVRSRV_ERROR  SysVzSetPhysHeapAddrSize(PVRSRV_DEVICE_CONFIG *psDevConfig,
 			psPhysHeapConfig->ui32NumOfRegions++;
 		}
 
-		if (eHeapType == PHYS_HEAP_TYPE_UMA)
-		{
-			psPhysHeapConfig->pasRegions[0].sCardBase = sPhysHeapAddr;
-		}
-
+		psPhysHeapConfig->pasRegions[0].sCardBase = sPhysHeapAddr;
 		psPhysHeapConfig->pasRegions[0].sStartAddr.uiAddr = sPhysHeapAddr.uiAddr;
 		psPhysHeapConfig->pasRegions[0].uiSize = ui64PhysHeapSize;
 		psPhysHeapConfig->eType = eHeapType;

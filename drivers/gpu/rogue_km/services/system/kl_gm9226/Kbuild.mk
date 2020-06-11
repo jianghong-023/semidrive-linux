@@ -58,7 +58,11 @@ $(PVRSRVKM_NAME)-y += services/system/common/env/linux/ion_support_generic.o
 endif
 
 ifeq ($(VMM_TYPE),xen)
-xen-gpufrontend-y += services/system/common/xengpufront.o
-xen-gpubackend-y  += services/system/common/xengpuback.o \
- services/system/common/xenbus.o
+$(PVRSRVKM_NAME)-y += services/system/common/env/xen/xengpufront.o
+$(PVRSRVKM_NAME)-y += services/system/common/env/xen/xengpuback.o \
+ services/system/common/env/xen/xenbus.o \
+ services/system/common/env/xen/xen_pvz_shbuf.o 
+
+ccflags-y += \
+ -I$(TOP)/services/system/common/env/xen
 endif

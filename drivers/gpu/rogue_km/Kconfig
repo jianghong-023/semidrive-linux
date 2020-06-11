@@ -32,5 +32,5 @@ config PVR_KMD_DEBUG
 	bool "debug version"
 	default y
 	help
-	 choose debug or release version
+	  choose debug or release version
 endif

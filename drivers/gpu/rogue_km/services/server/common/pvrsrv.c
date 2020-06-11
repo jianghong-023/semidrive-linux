@@ -3099,6 +3099,30 @@ PVRSRV_ERROR IMG_CALLCONV PVRSRVDeviceFinalise(PVRSRV_DEVICE_NODE *psDeviceNode,
 #if defined(SUPPORT_RGX)
 		if (PVRSRV_VZ_MODE_IS(DRIVER_MODE_GUEST))
 		{
+			{
+				PVRSRV_RGXDEV_INFO	*psDevInfo = psDeviceNode->pvDevice;
+				RGXFWIF_INIT		*psRGXFWInit = NULL;
+				/* Retrieve the FW information */
+				eError = DevmemAcquireCpuVirtAddr(psDevInfo->psRGXFWIfInitMemDesc,
+						(void **)&psRGXFWInit);
+				if (eError != PVRSRV_OK)
+				{
+					PVR_DPF((PVR_DBG_ERROR,
+							 "%s: Failed to acquire kernel fw compatibility check info (%u)",
+							__func__, eError));
+					return eError;
+				}
+#if 0
+				SysVzDebugDumpConfig(psDeviceNode->psDevConfig);
+
+				pr_err("######################psRGXFWInitActual is %p", psRGXFWInit);
+				pr_err("######psGuestOsFwInit->psKernelCCBCtl = 0x%x",   psRGXFWInit->psKernelCCBCtl.ui32Addr);
+				pr_err("######psGuestOsFwInit->psKernelCCB = 0x%x",	   psRGXFWInit->psKernelCCB.ui32Addr);
+				pr_err("######psGuestOsFwInit->psFirmwareCCBCtl = 0x%x", psRGXFWInit->psFirmwareCCBCtl.ui32Addr);
+				pr_err("######psGuestOsFwInit->psFirmwareCCB = 0x%x",    psRGXFWInit->psFirmwareCCB.ui32Addr);
+#endif
+			}
+
 			/* Kick an initial dummy command to make the firmware initialise all
 			 * its internal guest OS data structures and compatibility information */
 			if (RGXFWHealthCheckCmd((PVRSRV_RGXDEV_INFO *)(psDeviceNode->pvDevice)) != PVRSRV_OK)

@@ -238,12 +238,10 @@ PVRSRV_ERROR SysVzDevInit(PVRSRV_DEVICE_CONFIG *psDevConfig)
 		psDevData->psRGXTimingInfo->bEnableActivePM = IMG_FALSE;
 		psDevConfig->pfnPrePowerState  = NULL;
 		psDevConfig->pfnPostPowerState = NULL;
-
 		/* Perform additional guest-specific device
 		   configuration initialisation */
 		eError =  SysVzCreateDevConfig(psDevConfig);
 		PVR_LOGR_IF_ERROR(eError, "SysVzCreateDevConfig");
-
 		eError =  SysVzCreateDevPhysHeaps(psDevConfig);
 		PVR_LOGR_IF_ERROR(eError, "SysVzCreateDevPhysHeaps");
 	}

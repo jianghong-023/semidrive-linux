@@ -167,6 +167,12 @@ static void SysDevFeatureDepInit(PVRSRV_DEVICE_CONFIG *psDevConfig, IMG_UINT64 u
 		}
 }
 
+PVRSRV_DEVICE_CONFIG *gpsDevConfig = NULL;
+PVRSRV_DEVICE_CONFIG *getDevConfig(void)
+{
+	return gpsDevConfig;
+}
+
 
 PVRSRV_ERROR SysDevInit(void *pvOSDevice, PVRSRV_DEVICE_CONFIG **ppsDevConfig)
 {
@@ -187,7 +193,8 @@ PVRSRV_ERROR SysDevInit(void *pvOSDevice, PVRSRV_DEVICE_CONFIG **ppsDevConfig)
 
 	psDev = to_platform_device((struct device *)pvOSDevice);
 
-	dma_set_mask(pvOSDevice, DMA_BIT_MASK(40));
+	eError = dma_set_mask(pvOSDevice, DMA_BIT_MASK(40));
+	pr_err("in SysDevInit, pvOSDevice = %p, dma_set_mask return %d", pvOSDevice, eError);
 #endif
 
 	psDevConfig = OSAllocZMem(sizeof(*psDevConfig) +
@@ -313,6 +320,7 @@ PVRSRV_ERROR SysDevInit(void *pvOSDevice, PVRSRV_DEVICE_CONFIG **ppsDevConfig)
 #endif
 
 	*ppsDevConfig = psDevConfig;
+	gpsDevConfig = psDevConfig;
 
 	return PVRSRV_OK;
 

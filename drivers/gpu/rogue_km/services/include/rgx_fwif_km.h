@@ -294,7 +294,14 @@ typedef struct
 	IMG_UINT32				ui32T1PCX[RGXFWIF_MAX_PCX];
 	IMG_UINT32				ui32T1PCXWOff;
 
-	RGXFWIF_PER_OS_STATES	sPerOsStateMirror[RGXFW_NUM_OS];	/*!< State flags for each Operating System mirrored from Fw coremem> */
+/* modified by semidrive begin */
+/* to fix the issue of vz compile cannot be used as native mode */
+#if defined(PVRSRV_VZ_NUM_OSID) && (PVRSRV_VZ_NUM_OSID + 1U > 1U)
+	RGXFWIF_PER_OS_STATES	sPerOsStateMirror[PVRSRV_VZ_NUM_OSID];	/*!< State flags for each Operating System mirrored from Fw coremem> */
+#else
+        RGXFWIF_PER_OS_STATES   sPerOsStateMirror[1];
+#endif
+/* modified by semidrive end */
 
 	IMG_UINT32				ui32MMUFlushCounter;
 

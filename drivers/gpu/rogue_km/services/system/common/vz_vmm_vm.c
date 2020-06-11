@@ -125,6 +125,12 @@ SysVzPvzOnVmOnline(IMG_UINT32 ui32OSid, IMG_UINT32 ui32Priority)
 #endif
 	}
 
+	eError = RGXFWSetFwOsState(psDevInfo, ui32OSid, RGXFWIF_OS_ONLINE);
+	if (eError != PVRSRV_OK)
+	{
+		goto e0;
+	}
+
 	/* request new priority */
 	eError = RGXFWChangeOSidPriority(psDevInfo, ui32OSid, ui32Priority);
 	if (eError != PVRSRV_OK)

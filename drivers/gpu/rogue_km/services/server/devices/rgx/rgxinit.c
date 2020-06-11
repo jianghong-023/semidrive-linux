@@ -276,45 +276,67 @@ void RGX_WaitForInterruptsTimeout(PVRSRV_RGXDEV_INFO *psDevInfo)
 	}
 }
 
-static IMG_BOOL RGXFWIrqEventRx(PVRSRV_RGXDEV_INFO *psDevInfo)
+static IMG_BOOL RGXAckHwIrq(PVRSRV_RGXDEV_INFO *psDevInfo,
+								   IMG_UINT32 ui32IRQStatusReg,
+								   IMG_UINT32 ui32IRQStatusEventMsk,
+								   IMG_UINT32 ui32IRQClearReg,
+								   IMG_UINT32 ui32IRQClearMask)
 {
-	IMG_BOOL bIrqRx = IMG_TRUE;
-
-#if defined(RGX_IRQ_HYPERV_HANDLER)
-	 /* The hypervisor reads and clears the fw status register.
-	 * Then it injects an irq only in the recipient OS.
-	 * The KM driver should only execute the handler.*/
-	PVR_UNREFERENCED_PARAMETER(psDevInfo);
-#else
-	IMG_UINT32 ui32IRQStatus, ui32IRQStatusReg, ui32IRQStatusEventMsk, ui32IRQClearReg, ui32IRQClearMask;
-
-	if (RGX_IS_FEATURE_SUPPORTED(psDevInfo, MIPS))
-	{
-		ui32IRQStatusReg = RGX_CR_MIPS_WRAPPER_IRQ_STATUS;
-		ui32IRQStatusEventMsk = RGX_CR_MIPS_WRAPPER_IRQ_STATUS_EVENT_EN;
-		ui32IRQClearReg = RGX_CR_MIPS_WRAPPER_IRQ_CLEAR;
-		ui32IRQClearMask = RGX_CR_MIPS_WRAPPER_IRQ_CLEAR_EVENT_EN;
-	}else
-	{
-		ui32IRQStatusReg = RGX_CR_META_SP_MSLVIRQSTATUS;
-		ui32IRQStatusEventMsk = RGX_CR_META_SP_MSLVIRQSTATUS_TRIGVECT2_EN;
-		ui32IRQClearReg = RGX_CR_META_SP_MSLVIRQSTATUS;
-		ui32IRQClearMask = RGX_CR_META_SP_MSLVIRQSTATUS_TRIGVECT2_CLRMSK;
-	}
-
-	ui32IRQStatus = OSReadHWReg32(psDevInfo->pvRegsBaseKM, ui32IRQStatusReg);
+	IMG_UINT32 ui32IRQStatus = OSReadHWReg32(psDevInfo->pvRegsBaseKM, ui32IRQStatusReg);
 
 	if (ui32IRQStatus & ui32IRQStatusEventMsk)
 	{
+		/* acknowledge and clear the interrupt */
 		OSWriteHWReg32(psDevInfo->pvRegsBaseKM, ui32IRQClearReg, ui32IRQClearMask);
+		return IMG_TRUE;
 	}
 	else
 	{
-		bIrqRx = IMG_FALSE;
+		/* spurious interrupt */
+		return IMG_FALSE;
 	}
-#endif
+}
 
-	return bIrqRx;
+IMG_BOOL RGXAckIrq(PVRSRV_RGXDEV_INFO *psDevInfo)
+{
+	if (RGX_IS_FEATURE_VALUE_SUPPORTED(psDevInfo, META))
+	{
+		if (PVRSRV_VZ_MODE_IS(DRIVER_MODE_GUEST))
+		{
+			return IMG_TRUE;
+		}
+		else
+		{
+			/* single interrupt: META */
+			return RGXAckHwIrq(psDevInfo,
+							   RGX_CR_META_SP_MSLVIRQSTATUS,
+							   RGX_CR_META_SP_MSLVIRQSTATUS_TRIGVECT2_EN,
+							   RGX_CR_META_SP_MSLVIRQSTATUS,
+							   RGX_CR_META_SP_MSLVIRQSTATUS_TRIGVECT2_CLRMSK);
+		}
+	}
+	else if (RGX_IS_FEATURE_SUPPORTED(psDevInfo, GPU_VIRTUALISATION) && !PVRSRV_VZ_MODE_IS(DRIVER_MODE_NATIVE))
+	{
+		/* Dedicated interrupts
+		 * status & clearing registers are available on both Host and Guests
+		 * and are agnostic of the Fw CPU type. Due to the remappings done
+		 * by the 2nd stage device MMU, all drivers assume they are accessing
+		 * register bank 0  */
+		return RGXAckHwIrq(psDevInfo,
+						   RGX_CR_IRQ_OS0_EVENT_STATUS,
+						   RGX_CR_IRQ_OS0_EVENT_STATUS_SOURCE_EN,
+						   RGX_CR_IRQ_OS0_EVENT_CLEAR,
+						   RGX_CR_IRQ_OS0_EVENT_CLEAR_SOURCE_EN);
+	}
+	else
+	{
+		/* single interrupt: MIPS */
+		return RGXAckHwIrq(psDevInfo,
+						   RGX_CR_MIPS_WRAPPER_IRQ_STATUS,
+						   RGX_CR_MIPS_WRAPPER_IRQ_STATUS_EVENT_EN,
+						   RGX_CR_MIPS_WRAPPER_IRQ_CLEAR,
+						   RGX_CR_MIPS_WRAPPER_IRQ_CLEAR_EVENT_EN);
+	}
 }
 
 /*
@@ -329,13 +351,17 @@ static IMG_BOOL RGX_LISRHandler (void *pvData)
 
 	if (PVRSRV_VZ_MODE_IS(DRIVER_MODE_GUEST))
 	{
-		if (! psDevInfo->bRGXPowered)
+		if (psDevInfo->bRGXPowered)
 		{
-			return IMG_FALSE;
+			bInterruptProcessed = RGXAckIrq(psDevInfo);
+			OSScheduleMISR(psDevInfo->pvMISRData);
+		}
+		else
+		{
+			bInterruptProcessed = IMG_FALSE;
 		}
 
-		OSScheduleMISR(psDevInfo->pvMISRData);
-		return IMG_TRUE;
+		return bInterruptProcessed;
 	}
 	else
 	{
@@ -373,7 +399,7 @@ static IMG_BOOL RGX_LISRHandler (void *pvData)
 		}
 	}
 
-	if (RGXFWIrqEventRx(psDevInfo))
+	if (RGXAckIrq(psDevInfo))
 	{
 #if defined(PVRSRV_DEBUG_LISR_EXECUTION)
 		g_sLISRExecutionInfo.ui32State |= RGX_LISR_EVENT_EN;
@@ -382,7 +408,6 @@ static IMG_BOOL RGX_LISRHandler (void *pvData)
 #if defined(RGX_FEATURE_OCPBUS)
 		OSWriteHWReg32(psDevInfo->pvRegsBaseKM, RGX_CR_OCP_IRQSTATUS_2, RGX_CR_OCP_IRQSTATUS_2_RGX_IRQ_STATUS_EN);
 #endif
-
 		bInterruptProcessed = SampleIRQCount(psDevInfo);
 
 		if (!bInterruptProcessed)
@@ -890,6 +915,9 @@ static PVRSRV_ERROR RGXSetPowerParams(PVRSRV_RGXDEV_INFO   *psDevInfo,
 #if defined(PDUMP)
 	psDevInfo->sLayerParams.ui32PdumpFlags = PDUMP_FLAGS_CONTINUOUS;
 #endif
+
+	PVRSRV_VZ_RET_IF_MODE(DRIVER_MODE_GUEST, PVRSRV_OK);
+
 	if (RGX_IS_FEATURE_VALUE_SUPPORTED(psDevInfo, META))
 	{
 		IMG_DEV_PHYADDR sKernelMMUCtxPCAddr;
@@ -1295,6 +1323,7 @@ PVRSRV_ERROR RGXInitDevPart2(PVRSRV_DEVICE_NODE	*psDeviceNode,
 			RGX_MISRHandler_Main,
 			psDeviceNode,
 			"RGX_Main");
+
 	if (eError != PVRSRV_OK)
 	{
 		if (psDevInfo->pvAPMISRData != NULL)

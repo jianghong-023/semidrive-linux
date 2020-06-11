@@ -166,6 +166,13 @@ static void SysDevFeatureDepInit(PVRSRV_DEVICE_CONFIG *psDevConfig, IMG_UINT64 u
 		}
 }
 
+PVRSRV_DEVICE_CONFIG *gpsDevConfig = NULL;
+PVRSRV_DEVICE_CONFIG *getDevConfig(void)
+{
+	return gpsDevConfig;
+}
+
+
 PVRSRV_ERROR SysDevInit(void *pvOSDevice, PVRSRV_DEVICE_CONFIG **ppsDevConfig)
 {
 	PVRSRV_DEVICE_CONFIG *psDevConfig;
@@ -174,14 +181,16 @@ PVRSRV_ERROR SysDevInit(void *pvOSDevice, PVRSRV_DEVICE_CONFIG **ppsDevConfig)
 	PHYS_HEAP_CONFIG *pasPhysHeaps;
 	IMG_UINT32 uiPhysHeapCount;
 	PVRSRV_ERROR eError;
-	struct resource *psDevMemRes = NULL;
 
 #if defined(LINUX)
-        int err;
-        int iIrq;
-        IMG_UINT32 uiClk;
-        struct platform_device *psDev;
-        struct clk * coreClock;
+	int iIrq;
+	IMG_UINT32 uiClk;
+	struct platform_device *psDev;
+	struct clk * coreClock;
+	struct resource *psDevMemRes = NULL;
+	PVRSRV_ERROR err;
+
+	psDev = to_platform_device((struct device *)pvOSDevice);
 
         psDev = to_platform_device((struct device *)pvOSDevice);
 	dma_set_mask(pvOSDevice, DMA_BIT_MASK(40));
@@ -309,6 +318,7 @@ PVRSRV_ERROR SysDevInit(void *pvOSDevice, PVRSRV_DEVICE_CONFIG **ppsDevConfig)
 #endif
 
 	*ppsDevConfig = psDevConfig;
+	gpsDevConfig = psDevConfig;
 
 	return PVRSRV_OK;
 

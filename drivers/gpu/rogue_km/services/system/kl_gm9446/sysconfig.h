@@ -1,14 +1,14 @@
-/* 
+/*
 * sysconfig.h
-* 
-* Copyright (c) 2018 Semidrive Semiconductor. 
-* All rights reserved. 
-* 
-* Description: System abstraction layer . 
-* 
-* Revision History: 
-* ----------------- 
-* 011, 01/14/2019 Lili create this file 
+*
+* Copyright (c) 2018 Semidrive Semiconductor.
+* All rights reserved.
+*
+* Description: System abstraction layer .
+*
+* Revision History:
+* -----------------
+* 011, 01/14/2019 Lili create this file
 */
 
 #include "pvrsrv_device.h"
@@ -36,6 +36,8 @@ static IMG_UINT32 gauiBIFTilingHeapXStrides[RGXFWIF_NUM_BIF_TILING_CONFIGS] =
 /*****************************************************************************
  * system specific data structures
  *****************************************************************************/
- 
+
+PVRSRV_DEVICE_CONFIG *getDevConfig(void);
+
 #endif	/* __SYSCCONFIG_H__ */
 

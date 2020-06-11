@@ -314,4 +314,19 @@ PVRSRV_ERROR RGXVzInitCreateFWKernelMemoryContext(PVRSRV_DEVICE_NODE *psDeviceNo
  ******************************************************************************/
 void RGXVzDeInitDestroyFWKernelMemoryContext(PVRSRV_DEVICE_NODE *psDeviceNode);
 
+/*!
+ *******************************************************************************
+
+ @Function      RGXAckIrq
+
+ @Description   Checks the implementation specific IRQ status register,
+                clearing it if necessary and returning the IRQ status.
+
+ @Input:        psDevInfo - device info
+
+ @Return:       IRQ status
+
+ ******************************************************************************/
+IMG_BOOL RGXAckIrq(PVRSRV_RGXDEV_INFO *psDevInfo);
+
 #endif /* __RGXINIT_H__ */

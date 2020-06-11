@@ -874,35 +874,16 @@ PVRSRV_ERROR RGXStart(const void *hPrivate)
 	return eError;
 }
 
-static INLINE void ClearIRQStatusRegister(const void *hPrivate, IMG_BOOL bMetaFW)
-{
-	IMG_UINT32 ui32IRQClearReg;
-	IMG_UINT32 ui32IRQClearMask;
-
-	if (bMetaFW)
-	{
-		ui32IRQClearReg = RGX_CR_META_SP_MSLVIRQSTATUS;
-		ui32IRQClearMask = RGX_CR_META_SP_MSLVIRQSTATUS_TRIGVECT2_CLRMSK;
-	}
-	else
-	{
-		ui32IRQClearReg = RGX_CR_MIPS_WRAPPER_IRQ_CLEAR;
-		ui32IRQClearMask = RGX_CR_MIPS_WRAPPER_IRQ_CLEAR_EVENT_EN;
-	}
-
-	RGXWriteReg32(hPrivate, ui32IRQClearReg, ui32IRQClearMask);
-
-#if defined(RGX_FEATURE_OCPBUS)
-	RGXWriteReg32(hPrivate, RGX_CR_OCP_IRQSTATUS_2, RGX_CR_OCP_IRQSTATUS_2_RGX_IRQ_STATUS_EN);
-#endif
-}
-
 PVRSRV_ERROR RGXStop(const void *hPrivate)
 {
 	IMG_BOOL bMetaFW = !RGX_DEVICE_HAS_FEATURE(hPrivate, MIPS);
 	PVRSRV_ERROR eError;
 
-	ClearIRQStatusRegister(hPrivate, bMetaFW);
+	RGXDeviceAckIrq(hPrivate);
+
+#if defined(RGX_FEATURE_OCPBUS)
+	RGXWriteReg32(hPrivate, RGX_CR_OCP_IRQSTATUS_2, RGX_CR_OCP_IRQSTATUS_2_RGX_IRQ_STATUS_EN);
+#endif
 
 	/* Wait for Sidekick/Jones to signal IDLE except for the Garten Wrapper */
 	if (!RGX_DEVICE_HAS_FEATURE(hPrivate, S7_TOP_INFRASTRUCTURE))

@@ -2898,7 +2898,6 @@ PVRSRV_ERROR RGXSetupFirmware(PVRSRV_DEVICE_NODE       *psDeviceNode,
 				eError));
 		goto fail;
 	}
-
 	OSDeviceMemCopy(psRGXFWInitActual, psRGXFWInitScratch, sizeof(*psRGXFWInitActual));
 
 	/* We don't need access to the fw init data structure anymore */
