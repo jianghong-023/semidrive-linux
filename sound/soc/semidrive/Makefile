@@ -12,6 +12,9 @@ obj-$(CONFIG_SND_X9_FPGA_MACH) += snd-x9-fpga-mach.o
 snd-x9-evb-mach-objs := x9-evb-mach.o
 obj-$(CONFIG_SND_X9_EVB_MACH) += snd-x9-evb-mach.o
 
+snd-x9-ref-mach-objs := x9-ref-mach-ak7738.o
+obj-$(CONFIG_SND_X9_REF_MACH) += x9-ref-mach-ak7738.o
+
 snd-x9-ref-mach-hs-objs := x9-ref-mach-hs.o
 obj-$(CONFIG_SND_X9_REF_MACH_HS) += x9-ref-mach-hs.o
 

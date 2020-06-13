@@ -69,7 +69,7 @@ static const struct snd_soc_codec_driver soc_codec_dev_ak4556 = {
 
 static int ak4556_soc_probe(struct platform_device *pdev)
 {
-	/* pr_info("AK4556 Probed!"); */
+	/* pr_info("AK4556 Probed!");*/
 	return snd_soc_register_codec(&pdev->dev,
 				      &soc_codec_dev_ak4556,
 				      &ak4556_dai, 1);

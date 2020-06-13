@@ -1,5 +1,5 @@
 /*
- * x9-evb-mach
+ * x9-ref-mach-hs
  * Copyright (C) 2020 semidrive
  *
  * This program is free software; you can redistribute it and/or modify
@@ -157,7 +157,7 @@ static struct snd_soc_dai_link snd_x9_ref_soc_dai_links[] = {
 		.name = "x9_hifi_hs",
 		.stream_name = "x9 hifi hs",
 		.cpu_name = "30630000.i2s",
-		.cpu_dai_name = "snd-afe-sc-i2s-dai1",
+		.cpu_dai_name = "snd-afe-sc-i2s-dai0",
 		.platform_name = "30630000.i2s",
 		.codec_name = "ak4556",
 		.codec_dai_name = "ak4556-hifi",
@@ -165,7 +165,6 @@ static struct snd_soc_dai_link snd_x9_ref_soc_dai_links[] = {
 		.dai_fmt = SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_CBS_CFS,
 		.ops = &x9_ref_hs_ops,
     },
-
 };
 
 /*Sound Card Driver

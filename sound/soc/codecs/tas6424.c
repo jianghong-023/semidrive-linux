@@ -25,7 +25,7 @@
 #include <sound/tlv.h>
 
 #include "tas6424.h"
-#define TAS6424_DEBUG	1		//used at debug mode
+//#define TAS6424_DEBUG	1		//used at debug mode
 
 #ifdef TAS6424_DEBUG
 #define dev_prt dev_info
