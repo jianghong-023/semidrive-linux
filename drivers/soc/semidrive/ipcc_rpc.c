@@ -5,10 +5,11 @@
 
 
 #include <linux/module.h>
-#include <linux/slab.h>
 #include <linux/ktime.h>
 #include <linux/rpmsg.h>
+#include <linux/slab.h>
 #include <linux/soc/semidrive/mb_msg.h>
+#include <linux/soc/semidrive/ipcc.h>
 
 #include "ipcc_rpmsg.h"
 
@@ -19,25 +20,6 @@
 #define RPMSG_RPC_ACK_PING               (RPMSG_RPC_REQ_PING+1)
 #define RPMSG_RPC_REQ_GETTIMEOFDAY       (0x1002)
 #define RPMSG_RPC_ACK_GETTIMEOFDAY       (RPMSG_RPC_REQ_GETTIMEOFDAY+1)
-
-#define SYS_RPC_REQ_BASE           (0x2000)
-#define SYS_RPC_REQ_SET_PROPERTY   (SYS_RPC_REQ_BASE + 0)
-#define SYS_RPC_REQ_GET_PROPERTY   (SYS_RPC_REQ_BASE + 1)
-
-#define RPMSG_RPC_MAX_PARAMS     (8)
-#define RPMSG_RPC_MAX_RESULT     (4)
-
-struct rpc_req_msg {
-	u32 cmd;
-	u32 cksum;
-	u32 param[RPMSG_RPC_MAX_PARAMS];
-} ;
-
-struct rpc_ret_msg {
-	u32 ack;
-	u32 retcode;
-	u32 result[RPMSG_RPC_MAX_RESULT];
-};
 
 struct rpmsg_rpc_device {
 
@@ -54,6 +36,7 @@ struct rpmsg_rpc_device {
 };
 
 static struct rpmsg_rpc_device *rpmsg_rpc_devp[3];
+struct rpmsg_rpc_device *rpmsg_get_rpcdev(int dev_id);
 
 int rpmsg_rpc_call(struct rpmsg_rpc_device *rpcdev, struct rpc_req_msg *req, struct rpc_ret_msg *result, int timeout)
 {
@@ -64,6 +47,9 @@ int rpmsg_rpc_call(struct rpmsg_rpc_device *rpcdev, struct rpc_req_msg *req, str
 		dev_err(rpcdev->dev, "failed to open, rpmsg is not initialized\n");
 		return -EINVAL;
 	}
+
+	/* TODO: add real checksum later */
+	req->cksum = RPMSG_SANITY_TAG;
 
 	init_completion(&rpcdev->done);
 
@@ -97,6 +83,28 @@ int rpmsg_rpc_call(struct rpmsg_rpc_device *rpcdev, struct rpc_req_msg *req, str
 	dev_dbg(rpcdev->dev, "succeed to call RPC %d\n", req->cmd);
 
 err:
+	return ret;
+}
+
+int rpmsg_rpc_call_trace(int dev, struct rpc_req_msg *req, struct rpc_ret_msg *result)
+{
+	int ret = 0;
+	struct rpmsg_rpc_device *rpcdev;
+
+	rpcdev = rpmsg_get_rpcdev(dev);
+	if (!rpcdev)
+		return -ENODEV;
+
+	ret = rpmsg_rpc_call(rpcdev, req, result, 1000);
+	if (ret < 0) {
+		dev_err(rpcdev->dev, "rpc: call-func:%x fail ret: %d\n", req->cmd, ret);
+		return ret;
+	}
+
+	ret = result->retcode;
+	if (ret < 0)
+		dev_warn(rpcdev->dev, "rpc: exec bad result %d %d\n", result->ack, ret);
+
 	return ret;
 }
 
@@ -256,7 +264,7 @@ static int register_rpcdev(struct rpmsg_rpc_device *rpcdev)
 {
 	char *name, *bufp, *p;
 	int id = -1;
-	int ret;
+	int ret = 0;
 
 	name = strstr(dev_name(rpcdev->dev), IPCC_RPC_DEVNAME_PREFIX);
 	bufp = kstrdup(name, GFP_KERNEL);
@@ -272,9 +280,20 @@ static int register_rpcdev(struct rpmsg_rpc_device *rpcdev)
 		rpcdev->rproc = id;
 		rpmsg_rpc_devp[id] = rpcdev;
 	}
-	kfree(bufp);
+
+	if (bufp)
+		kfree(bufp);
 
 	return 0;
+}
+
+struct rpmsg_rpc_device *rpmsg_get_rpcdev(int dev_id)
+{
+	if (dev_id < ARRAY_SIZE(rpmsg_rpc_devp)) {
+		return rpmsg_rpc_devp[dev_id];
+	}
+
+	return NULL;
 }
 
 static int rpmsg_rpcdev_probe(struct rpmsg_device *rpdev)

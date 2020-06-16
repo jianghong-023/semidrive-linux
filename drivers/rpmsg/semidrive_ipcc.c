@@ -488,7 +488,10 @@ static int __send_offchannel_raw(struct rpmsg_ipcc_device *vrp,
 	vrp->tx_buf_txing = 0;
 	mutex_unlock(&vrp->tx_lock);
 
-	return err;
+	if (err < 0)
+		return err;
+
+	return 0;
 }
 
 static int rpmsg_ipcc_send_offchannel_raw(struct rpmsg_device *rpdev,
