@@ -267,32 +267,8 @@ static struct snd_soc_dai_link snd_x9_evb_soc_dai_links[] = {
 	.codec_name = "tlv320aic23-codec.0-001a",
 	.init = x9_evb_tlv320aic23_init,
 	.dai_fmt = SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_CBS_CFS,
-    },
-    {
-	.name = "x9_tlv320ai23 Playback",
-	.stream_name = "x9 Playback",
-	.cpu_dai_name = "snd-afe-sc-i2s-dai1",
-	.platform_name = "30650000.i2s",
-	.codec_dai_name = "tlv320aic23-hifi",
-	.ops = &x9_tlv320ai23_ops,
-	//.codec_dai_name = "snd-soc-dummy-dai",//"tlv320aic23-hifi",
-	.codec_name = "tlv320aic23-codec.0-001a",
-	.init = x9_evb_tlv320aic23_init,
-	.dai_fmt = SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_CBS_CFS,
-    },
-    {
-	.name = "x9_tlv320ai23 Capture",
-	.stream_name = "x9 Capture",
-	.cpu_dai_name = "snd-afe-sc-i2s-dai2",
-	.platform_name = "30650000.i2s",
-	.codec_dai_name = "tlv320aic23-hifi",
-	//.codec_dai_name = "snd-soc-dummy-dai",//"tlv320aic23-hifi",
-	//.codec_name = "snd-soc-dummy",
-	.ops = &x9_tlv320ai23_ops,
-	.codec_name = "tlv320aic23-codec.0-001a",
-	.init = x9_evb_tlv320aic23_init,
-	.dai_fmt = SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_CBS_CFS,
-    }};
+    }
+};
 
 /*Sound Card Driver
  * ------------------------------------------------------------------------*/
