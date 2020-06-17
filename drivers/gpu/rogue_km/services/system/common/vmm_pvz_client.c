@@ -210,6 +210,7 @@ PvzClientCreateDevPhysHeaps(PVRSRV_DEVICE_CONFIG *psDevConfig,
 			case PVRSRV_DEVICE_PHYS_HEAP_FW_LOCAL:
 				sPhysHeapAddr.uiAddr = ui64FwPhysHeapAddr;
 				ui64PhysHeapSize = ui64FwPhysHeapSize;
+				eHeapType = PHYS_HEAP_TYPE_LMA;
 				break;
 
 			default:
@@ -225,7 +226,6 @@ PvzClientCreateDevPhysHeaps(PVRSRV_DEVICE_CONFIG *psDevConfig,
 											  sPhysHeapAddr,
 											  ui64PhysHeapSize);
 			PVR_ASSERT(eError == PVRSRV_OK);
-
 			eError = SysVzRegisterPhysHeap(psDevConfig, ePhysHeap);
 			PVR_ASSERT(eError == PVRSRV_OK);
 		}
@@ -319,6 +319,35 @@ PvzClientUnmapDevPhysHeap(PVRSRV_DEVICE_CONFIG *psDevConfig,
 
 	eError = psVmmPvz->sHostFuncTab.pfnUnmapDevPhysHeap(uiFuncID,
 														ui32DevID);
+	if (eError != PVRSRV_OK)
+	{
+		goto e0;
+	}
+
+e0:
+	PvzClientLockRelease();
+	SysVzPvzConnectionRelease(psVmmPvz);
+
+	return eError;
+}
+
+PVRSRV_ERROR
+PvzClientDebugDumpConfig(PVRSRV_DEVICE_CONFIG *psDevConfig,
+						IMG_UINT32 ui32DevID)
+{
+	PVRSRV_ERROR eError;
+	VMM_PVZ_CONNECTION *psVmmPvz;
+	IMG_UINT32 uiFuncID = PVZ_BRIDGE_DEBUGDUMPCONFIG;
+
+	psVmmPvz = SysVzPvzConnectionAcquire();
+	PVR_ASSERT(psVmmPvz);
+
+	PvzClientLockAcquire();
+
+	PVR_ASSERT(psVmmPvz->sHostFuncTab.pfnDebugDumpConfig);
+
+	eError = psVmmPvz->sHostFuncTab.pfnDebugDumpConfig(uiFuncID,
+													  ui32DevID);
 	if (eError != PVRSRV_OK)
 	{
 		goto e0;

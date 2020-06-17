@@ -45,6 +45,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "osfunc.h"
 #include "pdump_km.h"
 #include "rgxfwutils.h"
+#include "rgxinit.h"
 #include "rgxfwimageutils.h"
 #include "devicemem.h"
 #include "cache_km.h"
@@ -1218,3 +1219,16 @@ IMG_BOOL RGXDevicePA0IsValid(const void *hPrivate)
 
 	return psDevInfo->sLayerParams.bDevicePA0IsValid;
 }
+
+IMG_BOOL RGXDeviceAckIrq(const void *hPrivate)
+{
+	RGX_LAYER_PARAMS *psParams;
+	PVRSRV_RGXDEV_INFO *psDevInfo;
+
+	PVR_ASSERT(hPrivate != NULL);
+	psParams = (RGX_LAYER_PARAMS*)hPrivate;
+	psDevInfo = psParams->psDevInfo;
+
+	return RGXAckIrq(psDevInfo);
+}
+

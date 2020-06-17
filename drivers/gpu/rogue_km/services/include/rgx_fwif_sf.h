@@ -701,6 +701,7 @@ X(22, RGXFW_GROUP_DBG, RGXFW_SF_DBG_5UNSIGNED, "%u %u %u %u %u\n", 5) \
 X(23, RGXFW_GROUP_DBG, RGXFW_SF_DBG_6UNSIGNED, "%u %u %u %u %u %u\n", 6) \
 X(24, RGXFW_GROUP_DBG, RGXFW_SF_DBG_7UNSIGNED, "%u %u %u %u %u %u %u\n", 7) \
 X(25, RGXFW_GROUP_DBG, RGXFW_SF_DBG_8UNSIGNED, "%u %u %u %u %u %u %u %u\n", 8) \
+X(26, RGXFW_GROUP_DBG, RGXFW_SF_DBG_PC_DEBUG,  "OSID %u using CATBASE%u = 0x%08x%08x; accessing RGNHDR at VA=0x%08x%08x; walks MMU pgtable to IPA 0x%08x%08x finding PD address 0x%08x; PD state %u (1=valid / 0=invalid)\n", 10) \
 \
 X(65535, RGXFW_GROUP_NULL, RGXFW_SF_LAST, "You should not use this string\n", 15)
 

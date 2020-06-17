@@ -260,6 +260,9 @@ PVRSRV_ERROR SysVzPvzRegisterFwPhysHeap(IMG_UINT32 ui32OSID,
  ******************************************************************************/
 PVRSRV_ERROR SysVzPvzUnregisterFwPhysHeap(IMG_UINT32 ui32OSID, IMG_UINT32 ui32DevID);
 
+void SysVzDebugDumpConfig(PVRSRV_DEVICE_CONFIG *psDevConfig);
+
+
 #endif /* _VZ_PHYSHEAP_H_ */
 
 /*****************************************************************************

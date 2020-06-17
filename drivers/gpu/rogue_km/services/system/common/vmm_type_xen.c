@@ -18,21 +18,46 @@
 #include "vmm_impl.h"
 #include "vmm_pvz_server.h"
 #include "xengpu.h"
+#include "xengpufront.h"
+#include "sysconfig.h"
 
+//#define SMMU_SUPPORTED 1
 
-/*
-    Enable to track contexts and buffers
-*/
-#define VMM_DEBUG 0
+int xengpu_xenbus_init(void);
+void xengpu_xenbus_fini(void);
 
-#if defined(VMM_DEBUG)
-    #define VMM_DEBUG_PRINT(fmt, ...) \
-        printk(KERN_WARNING, fmt, __VA_ARGS__)
+static PVRSRV_ERROR
+XenVMMDebugDumpConfig(IMG_UINT32 ui32FuncID,
+						  IMG_UINT32 ui32DevID)
+{
+   PVR_UNREFERENCED_PARAMETER(ui32FuncID);
+   PVR_UNREFERENCED_PARAMETER(ui32DevID);
+   VMM_DEBUG_PRINT("enter %s, funcID(%d), DevID(%d)",
+	   __FUNCTION__,
+	   ui32FuncID,
+	   ui32DevID);
+
+#ifdef VMM_DEBUG
+   /* call PvzServerDestroyDevPhysHeaps through hypervisor */
+   struct gpuif_request request;
+   struct gpuif_response *rsp=NULL;
+   PVRSRV_ERROR ret = PVRSRV_OK;
+
+   XENGPU_REQUEST_INIT(&request);
+
+   request.operation  = GPUIF_OP_DEBUG_DUMPCONFIG;
+   request.ui32FuncID = ui32FuncID;
+   request.ui32DevID  = ui32DevID;
+   ret = xengpu_do_request(&request, &rsp);
+   if ((!ret) && (rsp != NULL)) {
+	   ret					 = rsp->status;
+   }
+   kfree(rsp);
+   return ret;
 #else
-    #define VMM_DEBUG_PRINT(fmt, ...)
+   return PVRSRV_ERROR_NOT_IMPLEMENTED;
 #endif
-
-int xengpu_do_request(struct gpuif_request *pReq, struct gpuif_response **rsp);
+}
 
 static PVRSRV_ERROR
 XenVMMCreateDevConfig(IMG_UINT32 ui32FuncID,
@@ -85,15 +110,18 @@ XenVMMCreateDevPhysHeaps(IMG_UINT32 ui32FuncID,
 	PVR_UNREFERENCED_PARAMETER(pui64FwPhysHeapAddr);
 	PVR_UNREFERENCED_PARAMETER(pui64GpuPhysHeapSize);
 	PVR_UNREFERENCED_PARAMETER(pui64GpuPhysHeapAddr);
-    VMM_DEBUG_PRINT("enter %s, funcID%d), DevID(%d)",
+    VMM_DEBUG_PRINT("enter %s, funcID(%d), DevID(%d)",
         __FUNCTION__,
         ui32FuncID,
         ui32DevID);
 #ifdef SMMU_SUPPORTED
     /* call PvzServerCreateDevPhysHeaps through hypervisor */
     struct gpuif_request request;
-    struct gpuif_response *rsp;
+    struct gpuif_response *rsp = NULL;
     PVRSRV_ERROR ret = PVRSRV_OK;
+	PVRSRV_DEVICE_CONFIG *pConfig = getDevConfig();
+	PHYS_HEAP_CONFIG *psPhysHeapConfig;
+	struct device * pvrsrvdev = (struct device *)pConfig->pvOSDevice;
 
     XENGPU_REQUEST_INIT(&request);
 
@@ -108,9 +136,45 @@ XenVMMCreateDevPhysHeaps(IMG_UINT32 ui32FuncID,
         *pui64FwPhysHeapAddr  = rsp->ui64FwPhysHeapAddr;
         *pui64GpuPhysHeapSize = rsp->ui64GpuPhysHeapSize;
         *pui64GpuPhysHeapAddr = rsp->ui64GpuPhysHeapAddr;
-        kfree(rsp);
     }
+	kfree(rsp);
 
+#if defined(VMM_DEBUG)
+	{
+		int i=0;
+		int32_t *addr = phys_to_virt(*pui64FwPhysHeapAddr);
+		const struct dma_map_ops *dma_ops;
+
+		for (i = 0; i< 100; i++)
+		{
+			VMM_DEBUG_PRINT("---- 0x%x ----", addr[i]);
+		}
+
+		memset(addr, 0xAB,100);
+
+		dma_ops = get_dma_ops(pvrsrvdev);
+		dma_ops->sync_single_for_device(pvrsrvdev, *pui64FwPhysHeapAddr, *pui64FwPhysHeapSize, DMA_TO_DEVICE);
+		dma_ops->sync_single_for_cpu(pvrsrvdev, *pui64FwPhysHeapAddr, *pui64FwPhysHeapSize, DMA_FROM_DEVICE);
+	}
+
+	XenVMMDebugDumpConfig(ui32FuncID, ui32DevID);
+#endif
+
+	psPhysHeapConfig = SysVzGetPhysHeapConfig(pConfig, PVRSRV_DEVICE_PHYS_HEAP_FW_LOCAL);
+	if (psPhysHeapConfig->pasRegions == NULL)
+	{
+		psPhysHeapConfig->pasRegions = OSAllocZMem(sizeof(PHYS_HEAP_REGION));
+
+		PVR_ASSERT(! psPhysHeapConfig->bDynAlloc);
+		psPhysHeapConfig->bDynAlloc = IMG_TRUE;
+		psPhysHeapConfig->ui32NumOfRegions++;
+	}
+
+	if (psPhysHeapConfig->pasRegions[0].hPrivData == NULL)
+	{
+		psPhysHeapConfig->pasRegions[0].hPrivData = getDMAallocinfo();
+	}
+	return ret;
 #else
     return PVRSRV_ERROR_NOT_IMPLEMENTED;
 #endif
@@ -130,8 +194,10 @@ XenVMMDestroyDevPhysHeaps(IMG_UINT32 ui32FuncID,
 #ifdef SMMU_SUPPORTED
     /* call PvzServerDestroyDevPhysHeaps through hypervisor */
     struct gpuif_request request;
-    struct gpuif_response *rsp;
+    struct gpuif_response *rsp=NULL;
     PVRSRV_ERROR ret = PVRSRV_OK;
+	PVRSRV_DEVICE_CONFIG *pConfig = getDevConfig();
+	PHYS_HEAP_CONFIG *psPhysHeapConfig;
 
     XENGPU_REQUEST_INIT(&request);
 
@@ -141,9 +207,18 @@ XenVMMDestroyDevPhysHeaps(IMG_UINT32 ui32FuncID,
     ret = xengpu_do_request(&request, &rsp);
     if ((!ret) && (rsp != NULL)) {
         ret                   = rsp->status;
-        kfree(rsp);
-    }
+	}
+	kfree(rsp);
 
+	psPhysHeapConfig = SysVzGetPhysHeapConfig(pConfig, PVRSRV_DEVICE_PHYS_HEAP_FW_LOCAL);
+	if (psPhysHeapConfig->pasRegions != NULL)
+	{
+		OSFreeMem(psPhysHeapConfig->pasRegions);
+		psPhysHeapConfig->bDynAlloc = IMG_FALSE;
+		psPhysHeapConfig->ui32NumOfRegions--;
+	}
+
+	return ret;
 #else
     return PVRSRV_ERROR_NOT_IMPLEMENTED;
 #endif
@@ -155,34 +230,55 @@ XenVMMMapDevPhysHeap(IMG_UINT32 ui32FuncID,
 					  IMG_UINT64 ui64Size,
 					  IMG_UINT64 ui64Addr)
 {
+	int i;
+
+	PVR_UNREFERENCED_PARAMETER(i);
 	PVR_UNREFERENCED_PARAMETER(ui32FuncID);
 	PVR_UNREFERENCED_PARAMETER(ui32DevID);
 	PVR_UNREFERENCED_PARAMETER(ui64Size);
 	PVR_UNREFERENCED_PARAMETER(ui64Addr);
-    VMM_DEBUG_PRINT("enter %s, funcID(%d), DevID(%d)",
-        __FUNCTION__,
-        ui32FuncID,
-        ui32DevID);
+	VMM_DEBUG_PRINT("enter %s, funcID(%d), DevID(%d), ui64Size(%d), ui64Addr(0x%x)",
+			__FUNCTION__,
+			ui32FuncID,
+			ui32DevID,
+			ui64Size,
+			ui64Addr);
 #ifndef SMMU_SUPPORTED
-    /* call PvzServerMapDevPhysHeap through hypervisor */
-    struct gpuif_request request;
-    struct gpuif_response *rsp;
-    PVRSRV_ERROR ret = PVRSRV_OK;
+	/* call PvzServerMapDevPhysHeap through hypervisor */
+	int ret;
 
-    XENGPU_REQUEST_INIT(&request);
+#if defined(VMM_DEBUG)
+	PVRSRV_DEVICE_CONFIG *pConfig = getDevConfig();
+	struct device * pvrsrvdev = (struct device *)pConfig->pvOSDevice;
+	const struct dma_map_ops *dma_ops;
+	PVRSRV_DEVICE_CONFIG * pDevConf = getDevConfig();
+	PHYS_HEAP_CONFIG * psPhysHeapConfig = SysVzGetPhysHeapConfig(pDevConf,PVRSRV_DEVICE_PHYS_HEAP_FW_LOCAL);
+	DMA_ALLOC *psDmaAlloc = (DMA_ALLOC *)psPhysHeapConfig->pasRegions[0].hPrivData;
+	IMG_UINT64 *start = psDmaAlloc->pvVirtAddr;
+	memset(start, 0xAB,100);
+	dma_ops = get_dma_ops(pvrsrvdev);
+	dma_ops->sync_single_for_device(pvrsrvdev, ui64Addr, 100, DMA_BIDIRECTIONAL );
+	dma_ops->sync_single_for_cpu(pvrsrvdev, ui64Addr, 100, DMA_BIDIRECTIONAL );
+	VMM_DEBUG_PRINT("#########set 0x%x to virt 0x%p############", *start, start);
+#endif
 
-    request.operation  = GPUIF_OP_MAP_DEVPHYSHEAPS;
-    request.ui32FuncID = ui32FuncID;
-    request.ui32DevID  = ui32DevID;
-    request.ui64Size   = ui64Size;
-    request.ui64Addr   = ui64Addr;
-    ret = xengpu_do_request(&request, &rsp);
-    if ((!ret) && (rsp != NULL)) {
-        ret                   = rsp->status;
-        kfree(rsp);
-    }
+	ret = gsx_front_map(ui32FuncID, ui32DevID, ui64Size, ui64Addr);
+	if (!ret) {
+		VMM_DEBUG_PRINT("%s:%d, ret=%d", __FUNCTION__, __LINE__, ret);
+	}
+
+#if defined(VMM_DEBUG)
+	VMM_DEBUG_PRINT("#########return to guest begin############", *start, start);
+	for (i = 0; i< 100; i++)
+	{
+		VMM_DEBUG_PRINT("---- 0x%x ----", start[i]);
+	}
+	VMM_DEBUG_PRINT("#########finish guest############", *start, start);
+#endif
+
+	return ret;
 #else
-    return PVRSRV_ERROR_NOT_IMPLEMENTED;
+	return PVRSRV_ERROR_NOT_IMPLEMENTED;
 #endif
 }
 
@@ -199,19 +295,15 @@ XenVMMUnmapDevPhysHeap(IMG_UINT32 ui32FuncID,
 #ifndef SMMU_SUPPORTED
     /* call PvzServerUnmapDevPhysHeap through hypervisor */
     struct gpuif_request request;
-    struct gpuif_response *rsp;
+    struct gpuif_response *rsp = NULL;
     PVRSRV_ERROR ret = PVRSRV_OK;
 
-    XENGPU_REQUEST_INIT(&request);
+	ret = gsx_front_unmap(ui32FuncID, ui32DevID);
+	if (!ret) {
+		VMM_DEBUG_PRINT("%s:%d, ret=%d", __FUNCTION__, __LINE__, ret);
+	}
 
-    request.operation  = GPUIF_OP_UNMAP_DEVPHYSHEAPS;
-    request.ui32FuncID = ui32FuncID;
-    request.ui32DevID  = ui32DevID;
-    ret = xengpu_do_request(&request, &rsp);
-    if ((!ret) && (rsp != NULL)) {
-        ret                   = rsp->status;
-        kfree(rsp);
-    }
+	return ret;
 #else
     return PVRSRV_ERROR_NOT_IMPLEMENTED;
 #endif
@@ -230,7 +322,7 @@ XenVMMGetDevPhysHeapOrigin(PVRSRV_DEVICE_CONFIG *psDevConfig,
         eHeapType);
 
 #ifdef SMMU_SUPPORTED
-    if (eHeapType == PVRSRV_DEVICE_PHYS_HEAP_FW_GUEST) {
+    if (eHeapType == PVRSRV_DEVICE_PHYS_HEAP_FW_LOCAL) {
         *peOrigin = PVRSRV_DEVICE_PHYS_HEAP_ORIGIN_HOST;
     } else {
         *peOrigin = PVRSRV_DEVICE_PHYS_HEAP_ORIGIN_GUEST;
@@ -244,40 +336,46 @@ XenVMMGetDevPhysHeapOrigin(PVRSRV_DEVICE_CONFIG *psDevConfig,
 
 static PVRSRV_ERROR
 XenVMMGetDevPhysHeapAddrSize(PVRSRV_DEVICE_CONFIG *psDevConfig,
-							  PVRSRV_DEVICE_PHYS_HEAP eHeapType,
-							  IMG_UINT64 *pui64Size,
-							  IMG_UINT64 *pui64Addr)
+							PVRSRV_DEVICE_PHYS_HEAP eHeapType,
+							IMG_UINT64 *pui64Size,
+							IMG_UINT64 *pui64Addr)
 {
-    PVRSRV_ERROR eError = PVRSRV_OK;
+	PVRSRV_ERROR eError = PVRSRV_OK;
 	*pui64Size = 0;
 	*pui64Addr = 0;
 	PVR_UNREFERENCED_PARAMETER(psDevConfig);
 	PVR_UNREFERENCED_PARAMETER(eHeapType);
-    VMM_DEBUG_PRINT("enter %s, psDevConfig(%p), eHeapType(%d)",
-        __FUNCTION__,
-        psDevConfig,
-        eHeapType);
+	VMM_DEBUG_PRINT("enter %s, psDevConfig(%p), eHeapType(%d)",
+		__FUNCTION__,
+		psDevConfig,
+		eHeapType);
 
-    /* only support uma */
-    if (eHeapType != PHYS_HEAP_TYPE_UMA)
-    {
-        return PVRSRV_ERROR_NOT_IMPLEMENTED;
-    }
 #ifdef SMMU_SUPPORTED
 	switch (eHeapType)
 	{
 		case PVRSRV_DEVICE_PHYS_HEAP_FW_LOCAL:
-            /* host allocate this heap*/
-            /*should return heap Addr/Size value pairs obtained
-            in sHostFuncTab->pfnCreateDevPhysHeaps().*/
-            PHYS_HEAP_CONFIG *psPhysHeapConfig;
+		{
+			/* host allocate this heap*/
+			/*should return heap Addr/Size value pairs obtained
+			 in sHostFuncTab->pfnCreateDevPhysHeaps().*/
+    		if (PVRSRV_VZ_MODE_IS(DRIVER_MODE_GUEST))
+			{
+				PHYS_HEAP_CONFIG *psPhysHeapConfig;
 
-            psPhysHeapConfig = SysVzGetPhysHeapConfig(psDevConfig, eHeapType);
-    		*pui64Addr = psPhysHeapConfig->pasRegions[0].sStartAddr.uiAddr;
-    		*pui64Size = psPhysHeapConfig->pasRegions[0].uiSize;
+				psPhysHeapConfig = SysVzGetPhysHeapConfig(psDevConfig, eHeapType);
+				if (psPhysHeapConfig->pasRegions != NULL) {
+					*pui64Addr = psPhysHeapConfig->pasRegions[0].sStartAddr.uiAddr;
+					*pui64Size = psPhysHeapConfig->pasRegions[0].uiSize;
+				} else {
+					*pui64Size = RGX_FIRMWARE_RAW_HEAP_SIZE;
+				}
+			} else {
+				*pui64Size = RGX_FIRMWARE_RAW_HEAP_SIZE;
+			}
 			break;
+		}
 		case PVRSRV_DEVICE_PHYS_HEAP_GPU_LOCAL:
-            /* for gpu heap, guest allocate this heap and uma is using, return 0/0*/
+			/* for gpu heap, guest allocate this heap and uma is using, return 0/0*/
 			break;
 		default:
 			eError = PVRSRV_ERROR_NOT_IMPLEMENTED;
@@ -288,11 +386,11 @@ XenVMMGetDevPhysHeapAddrSize(PVRSRV_DEVICE_CONFIG *psDevConfig,
 	switch (eHeapType)
 	{
 		case PVRSRV_DEVICE_PHYS_HEAP_FW_LOCAL:
-            /* host allocate this heap and uma is using*/
-            *pui64Size = RGX_FIRMWARE_RAW_HEAP_SIZE;
+			/* host allocate this heap and dma is using*/
+			*pui64Size = RGX_FIRMWARE_RAW_HEAP_SIZE;
 			break;
 		case PVRSRV_DEVICE_PHYS_HEAP_GPU_LOCAL:
-            /* for gpu heap, guest allocate this heap and uma is using, return 0/0*/
+			/* for gpu heap, guest allocate this heap and uma is using, return 0/0*/
 			break;
 		default:
 			eError = PVRSRV_ERROR_NOT_IMPLEMENTED;
@@ -301,6 +399,10 @@ XenVMMGetDevPhysHeapAddrSize(PVRSRV_DEVICE_CONFIG *psDevConfig,
 	}
 
 #endif
+	VMM_DEBUG_PRINT("out %s, *pui64Addr(%p), *pui64Size(%d)",
+		__FUNCTION__,
+		*pui64Addr,
+		*pui64Size);
 	return eError;
 }
 
@@ -323,7 +425,9 @@ static VMM_PVZ_CONNECTION gsXenVmmPvz =
 		&XenVMMMapDevPhysHeap,
 
 		/* pfnUnmapDevPhysHeap */
-		&XenVMMUnmapDevPhysHeap
+		&XenVMMUnmapDevPhysHeap,
+
+		&XenVMMDebugDumpConfig
 	},
 
 	.sGuestFuncTab = {
@@ -411,20 +515,27 @@ static PVRSRV_ERROR XenCreatePvzConnection(void)
 {
 	IMG_UINT32 uiOSID;
 	IMG_BOOL bRequireOsidOnline = IMG_FALSE;
-    PVRSRV_ERROR ret = PVRSRV_OK;
+	PVRSRV_ERROR ret = PVRSRV_OK;
 
 	if (PVRSRV_VZ_MODE_IS(DRIVER_MODE_GUEST))
 	{
-	    struct gpuif_request request;
-        struct gpuif_response *rsp;
-        XENGPU_REQUEST_INIT(&request);
+		struct gpuif_request request;
+		struct gpuif_response *rsp = NULL;
+		XENGPU_REQUEST_INIT(&request);
 
-        request.operation = GPUIF_OP_CREATE_PVZCONNECTION;
-        ret = xengpu_do_request(&request, &rsp);
-        if (rsp != NULL) {
-            ret = rsp->status;
-            kfree(rsp);
-        }
+		ret = xengpu_init();
+                if (ret != PVRSRV_OK) {
+                        pr_err("%s:%d,xengpu_init return 0x%x", __FUNCTION__, __LINE__, ret);
+                        return ret;
+                }
+		request.operation = GPUIF_OP_CREATE_PVZCONNECTION;
+		ret = xengpu_do_request(&request, &rsp);
+		if (rsp != NULL) {
+			ret = rsp->status;
+			kfree(rsp);
+		}
+	} else {
+		xengpu_xenbus_init();
 	}
 
 	return ret;
@@ -433,19 +544,22 @@ static PVRSRV_ERROR XenCreatePvzConnection(void)
 /* this function is running on guest */
 static void XenDestroyPvzConnection(void)
 {
-    PVRSRV_ERROR ret = PVRSRV_OK;
+	PVRSRV_ERROR ret = PVRSRV_OK;
 	if (PVRSRV_VZ_MODE_IS(DRIVER_MODE_GUEST))
 	{
-	    struct gpuif_request request;
-        struct gpuif_response *rsp;
-        XENGPU_REQUEST_INIT(&request);
+		struct gpuif_request request;
+		struct gpuif_response *rsp = NULL;
+		XENGPU_REQUEST_INIT(&request);
 
-        request.operation = GPUIF_OP_DESTROY_PVZCONNECTION;
-        ret = xengpu_do_request(&request, &rsp);
-        if (rsp != NULL) {
-            ret = rsp->status;
-            kfree(rsp);
-        }
+		request.operation = GPUIF_OP_DESTROY_PVZCONNECTION;
+		ret = xengpu_do_request(&request, &rsp);
+		if (rsp != NULL) {
+			ret = rsp->status;
+			kfree(rsp);
+		}
+		xengpu_exit();
+	} else {
+		xengpu_xenbus_fini();
 	}
 }
 

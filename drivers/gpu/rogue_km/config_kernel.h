@@ -10,7 +10,7 @@
 #define SUPPORT_MULTIBVNC
 #define LINUX
 #define PVR_BUILD_TYPE "release"
-#define PVRSRV_MODNAME "pvrsrvkm_9446"
+#define PVRSRV_MODNAME "pvrsrvkm"
 #define PVRSYNC_MODNAME "pvr_sync"
 #define SUPPORT_RGX 1
 #define RELEASE

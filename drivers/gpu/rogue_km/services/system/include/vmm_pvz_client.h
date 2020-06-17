@@ -136,6 +136,10 @@ PVRSRV_ERROR
 PvzClientUnmapDevPhysHeap(PVRSRV_DEVICE_CONFIG *psDevConfig,
 						  IMG_UINT32 ui32DevID);
 
+PVRSRV_ERROR
+PvzClientDebugDumpConfig(PVRSRV_DEVICE_CONFIG *psDevConfig,
+					  IMG_UINT32 ui32DevID);
+
 #endif /* _VMM_PVZ_CLIENT_H_ */
 
 /*****************************************************************************

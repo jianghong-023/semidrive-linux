@@ -19,7 +19,7 @@ endif
 override PVR_BUILD_TYPE := release
 override BUILD := release
 
-override KERNEL_COMPONENTS := pvrsrvkm_9446
+override KERNEL_COMPONENTS := pvrsrvkm
 override SUPPORT_GPUTRACE_EVENTS := 1
 override SUPPORT_ION := 1
 
@@ -33,11 +33,10 @@ override TARGET_FORCE_32BIT :=
 override METAG_VERSION_NEEDED := 2.8.1.0.3
 override MIPS_VERSION_NEEDED := 2014.07-1
 override KERNEL_COMPONENTS := srvkm
-override PVRSRV_MODNAME := pvrsrvkm_9226
+override PVRSRV_MODNAME := pvrsrvkm
 override PVRSYNC_MODNAME := pvr_sync
 override PVR_BUILD_TYPE := release
 override SUPPORT_RGX := 1
-override PVR_SYSTEM := kl_gm9226
 override PVR_LOADER :=
 override BUILD := release
 override DEBUGLINK := 1

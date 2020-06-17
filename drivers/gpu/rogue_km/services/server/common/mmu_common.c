@@ -1311,6 +1311,7 @@ static PVRSRV_ERROR _SetupPxE(MMU_CONTEXT *psMMUContext,
 				PVR_ASSERT(pui32Px[uiIndex] != ui64PxE64);
 			}
 			pui32Px[uiIndex] = (IMG_UINT32) ui64PxE64;
+
 			HTBLOGK(HTB_SF_MMU_PAGE_OP_TABLE,
 			        HTBLOG_PTR_BITS_HIGH(psLevel), HTBLOG_PTR_BITS_LOW(psLevel),
 			        uiIndex, eMMULevel,

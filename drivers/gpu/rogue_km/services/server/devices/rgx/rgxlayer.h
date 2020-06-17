@@ -731,6 +731,21 @@ IMG_UINT32 RGXGetDevicePhysBusWidth(const void *hPrivate);
 ******************************************************************************/
 IMG_BOOL RGXDevicePA0IsValid(const void *hPrivate);
 
+/*!
+ *******************************************************************************
+
+ @Function      RGXDeviceAckIrq
+
+ @Description   Checks the implementation specific IRQ status register,
+                clearing it if necessary and returning the IRQ status.
+
+ @Input          hPrivate    : Implementation specific data
+
+ @Return:       IRQ status
+
+ ******************************************************************************/
+IMG_BOOL RGXDeviceAckIrq(const void *hPrivate);
+
 #if defined (__cplusplus)
 }
 #endif

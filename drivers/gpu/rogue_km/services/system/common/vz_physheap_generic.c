@@ -150,6 +150,7 @@ SysVzCreatePhysHeap(PVRSRV_DEVICE_CONFIG *psDevConfig,
 
 	/* Initialise physical heap and region state */
 	psPhysHeapRegion = &psPhysHeapConfig->pasRegions[0];
+
 	psPhysHeapRegion->sStartAddr.uiAddr = sHeapAddr.uiAddr;
 	psPhysHeapRegion->sCardBase.uiAddr = sHeapAddr.uiAddr;
 	psPhysHeapRegion->uiSize = ui64HeapSize;
@@ -268,8 +269,7 @@ SysVzCreatePhysHeap(PVRSRV_DEVICE_CONFIG *psDevConfig,
 		PVR_LOGG_IF_FALSE((NULL != gahPhysHeapIoRemap[ePhysHeap]), "OSMapPhysToLin", e0);
 #endif
 
-		/* Services managed UMA carve-out physheap setup complete */
-		psPhysHeapConfig->eType = PHYS_HEAP_TYPE_UMA;
+		psPhysHeapConfig->eType = PHYS_HEAP_TYPE_LMA;
 	}
 
 	return eError;

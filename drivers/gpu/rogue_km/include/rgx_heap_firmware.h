@@ -87,7 +87,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  * the minimum is 4MiB (1<<22); the default firmware heap size is set to
  * maximum 32MiB.
  */
-#if defined(RGX_FW_HEAP_SHIFT) && (RGX_FW_HEAP_SHIFT < 22 || RGX_FW_HEAP_SHIFT > 25)
+#if defined(RGX_FW_HEAP_SHIFT) && (RGX_FW_HEAP_SHIFT < 20 || RGX_FW_HEAP_SHIFT > 25)
 #error "RGX_FW_HEAP_SHIFT is outside valid range [22, 25]"
 #endif
 

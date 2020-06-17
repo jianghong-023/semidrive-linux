@@ -245,6 +245,9 @@ static struct of_device_id pvr_of_ids[] = {
 #if defined(SYS_RGX_OF_COMPATIBLE)
 	{ .compatible = SYS_RGX_OF_COMPATIBLE, },
 #endif
+#if defined(SYS_RGX_OF_COMPATIBLE1)
+        { .compatible = SYS_RGX_OF_COMPATIBLE1, },
+#endif
 	{},
 };
 
