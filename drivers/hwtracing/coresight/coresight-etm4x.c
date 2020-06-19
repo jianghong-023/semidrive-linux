@@ -61,7 +61,7 @@ static void etm4_os_unlock(struct etmv4_drvdata *drvdata)
 
 static bool etm4_arch_supported(u8 arch)
 {
-	switch (arch) {
+	switch (arch & 0xf0) { //suport 4.x
 	case ETM_ARCH_V4:
 		break;
 	default:
@@ -1068,12 +1068,18 @@ static const struct amba_id etm4_ids[] = {
 		.mask = 0x000fffff,
 		.data = "ETM 4.0",
 	},
+	{       /* ETM 4.2 - A55 */
+		.id = 0x003bbd05,
+		.mask = 0x00ffffff,
+		.data = "ETM 4.2",
+	},
 	{ 0, 0},
 };
 
 static struct amba_driver etm4x_driver = {
 	.drv = {
 		.name   = "coresight-etm4x",
+		.owner  = THIS_MODULE,
 		.suppress_bind_attrs = true,
 	},
 	.probe		= etm4_probe,
