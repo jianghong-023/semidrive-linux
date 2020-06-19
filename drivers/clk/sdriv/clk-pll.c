@@ -22,6 +22,7 @@
 #include "clk-pll.h"
 
 #define DEBUG_PLL 0
+#define PLL_DUMMY_ROOT 5
 
 #define to_sdrv_cgu_pll(_hw) container_of(_hw, struct sdrv_cgu_pll_clk, hw)
 static void __init sdrv_pll_of_init(struct device_node *np);
@@ -39,22 +40,55 @@ static unsigned long sdrv_pll_calcurate_pll_cfg(const struct sdrv_pll_rate_table
 	freq = (tmp + (rate->fbdiv*(1000000)))*(SOC_PLL_REFCLK_FREQ/(1000000))/rate->refdiv;
 	return freq;
 }
-static unsigned long sdrv_pll_get_curr_freq(struct sdrv_cgu_pll_clk *pll, const struct sdrv_pll_rate_table *cur)
+static unsigned long sdrv_pll_get_curr_freq(struct sdrv_cgu_pll_clk *pll,
+		const struct sdrv_pll_rate_table *cur)
 {
 	unsigned long pll_cfg = sdrv_pll_calcurate_pll_cfg(cur);
 
-	if (pll->type == PLL_DIVA && cur->div[0] !=-1)
-		return pll_cfg/(cur->div[0]+1);
-	else if (pll->type == PLL_DIVB && cur->div[1] !=-1)
-		return pll_cfg/(cur->div[1]+1);
-	else if (pll->type == PLL_DIVC && cur->div[2] !=-1)
-		return pll_cfg/(cur->div[2]+1);
-	else if (pll->type == PLL_DIVD && cur->div[3] !=-1)
-		return pll_cfg/(cur->div[3]+1);
+	if (pll->type == PLL_DIVA && cur->div[0] != -1)
+		return pll_cfg/(cur->div[0] + 1);
+	else if (pll->type == PLL_DIVB && cur->div[1] != -1)
+		return pll_cfg/(cur->div[1] + 1);
+	else if (pll->type == PLL_DIVC && cur->div[2] != -1)
+		return pll_cfg/(cur->div[2] + 1);
+	else if (pll->type == PLL_DIVD && cur->div[3] != -1)
+		return pll_cfg/(cur->div[3] + 1);
 	else if (pll->type == PLL_ROOT) //root
 		return pll_cfg/cur->postdiv[0]/cur->postdiv[1];
 	return 0;
 }
+static unsigned long sdrv_pll_get_freq(int plltype,
+		const struct sdrv_pll_rate_table *cur)
+{
+	unsigned long pll_cfg = sdrv_pll_calcurate_pll_cfg(cur);
+
+	if (plltype == PLL_DIVA && cur->div[0] != -1)
+		return pll_cfg/(cur->div[0] + 1);
+	else if (plltype == PLL_DIVB && cur->div[1] != -1)
+		return pll_cfg/(cur->div[1] + 1);
+	else if (plltype == PLL_DIVC && cur->div[2] != -1)
+		return pll_cfg/(cur->div[2] + 1);
+	else if (plltype == PLL_DIVD && cur->div[3] != -1)
+		return pll_cfg/(cur->div[3] + 1);
+	else if (plltype == PLL_ROOT) //root
+		return pll_cfg/cur->postdiv[0]/cur->postdiv[1];
+	else if (plltype == PLL_DUMMY_ROOT)
+		return pll_cfg;
+	return 0;
+}
+
+static unsigned long sdrv_pll_get_prate(int plltype,
+		const struct sdrv_pll_rate_table *cur)
+{
+	unsigned long pll_cfg = sdrv_pll_calcurate_pll_cfg(cur);
+
+	if (plltype >= PLL_DIVA && plltype <= PLL_DIVD)// parent is root
+		return pll_cfg/cur->postdiv[0]/cur->postdiv[1];
+	else if (plltype == PLL_ROOT) // no parent
+		return 0;
+	return 0;
+}
+
 static void sdrv_pll_get_params(struct sdrv_cgu_pll_clk *pll,
 					struct sdrv_pll_rate_table *rate)
 {
@@ -75,6 +109,13 @@ static void sdrv_pll_set_params(struct sdrv_cgu_pll_clk *pll,
 	sc_pfpll_setparams(pll->reg_base, rate->fbdiv, rate->refdiv,
 		rate->postdiv[0], rate->postdiv[1], rate->frac,
 		rate->div[0], rate->div[1], rate->div[2], rate->div[3], rate->isint);
+#if DEBUG_PLL
+	pr_err("set pll %s reg_base 0x%lx fbdiv %d, refdiv %d, postdiv1 %d postdiv2 %d frac %ld, diva %d, divb %d divc %d divd %d, isint %d\n",
+		clk_hw_get_name(&pll->hw), pll->reg_base,
+		rate->fbdiv, rate->refdiv, rate->postdiv[0], rate->postdiv[1],
+		rate->frac, rate->div[0], rate->div[1], rate->div[2],
+		rate->div[3], rate->isint);
+#endif
 }
 
 
@@ -126,6 +167,209 @@ static long sdrv_pll_round_rate(struct clk_hw *hw,
 	}
 
 	return rate;
+}
+
+static bool is_valid_pll_config(struct sdrv_pll_rate_table *conf)
+{
+	// check the pll limit
+	//fvco 800MHZ~3200MHZ
+	unsigned long fvco;
+	unsigned int pfd;
+
+	fvco = sdrv_pll_get_freq(PLL_DUMMY_ROOT, conf);
+
+	if (fvco < 800000000 || fvco > 3200000000)
+		return false;
+
+	//pfd >10Mhz in fac mode. and >5Mhz in int mode
+	pfd = 24000000 / conf->refdiv;
+
+	if (conf->isint && pfd <= 5000000)
+		return false;
+
+	if (conf->isint == 0 && pfd <= 10000000)
+		return false;
+
+	return true;
+}
+
+
+unsigned long pll_translate_freq_to_config(unsigned long freq, int plldiv,
+		struct sdrv_pll_rate_table *config)
+{
+	unsigned long bestrate = 0, bestratediff = ULONG_MAX, rate;
+	unsigned long diff;
+	unsigned int maxdiv = 0, mindiv, bestdiv;
+	struct sdrv_pll_rate_table conf;
+
+	conf = *config;
+
+	if (plldiv == PLL_DUMMY_ROOT) {
+		int fbdiv = 1, refdiv = 1;
+		int refdiv_max;
+		int fbdiv_max, fbdiv_min;
+
+		if (conf.isint) {
+			fbdiv_min = 16;
+			fbdiv_max = 640;
+			refdiv_max = 4;
+		} else {
+			fbdiv_min = 20;
+			fbdiv_max = 320;
+			refdiv_max = 2;
+		}
+
+		freq = min(freq, 3200000000);
+		freq = max(freq, 800000000);
+
+		for (refdiv = 1; refdiv <= refdiv_max; refdiv++) {
+			int fbdivmin, fbdivmax;
+			int fbtmp = ((freq * refdiv / 24) -
+			(conf.frac * 1000000) / 16777216) / 1000000;
+			fbdivmin = max(fbtmp - 2, fbdiv_min);
+			fbdivmax = min(fbtmp + 2, fbdiv_max);
+
+			for (fbdiv = fbdivmin; fbdiv <= fbdivmax; fbdiv++) {
+				conf.fbdiv = fbdiv;
+				conf.refdiv = refdiv;
+
+				if (!is_valid_pll_config(&conf))
+					continue;
+
+				rate = sdrv_pll_get_freq(plldiv, &conf);
+				diff = abs_diff(freq, rate);
+				if (diff == 0) {
+					config->fbdiv = conf.fbdiv;
+					config->refdiv = conf.refdiv;
+					return freq;
+				}
+
+				if (diff < bestratediff) {
+					bestratediff = diff;
+					bestrate = rate;
+					config->fbdiv = conf.fbdiv;
+					config->refdiv = conf.refdiv;
+				}
+			}
+		}
+	} else if (plldiv == PLL_ROOT) {
+		int i, j;
+		int postdiv0div_max = 7;
+		int postdiv1div_max = 7;
+
+		maxdiv = postdiv0div_max * postdiv1div_max;
+		maxdiv = min(ULONG_MAX / freq, maxdiv);
+		mindiv = 1;
+		//initial value of bestdiv is the fix div or current div.
+		bestdiv = mindiv;
+
+		for (i = 1; i <= postdiv0div_max; i++) {
+			for (j = 1; j <= postdiv1div_max; j++) {
+				if (((i * j) < (int)mindiv) ||
+					((i * j) > (int)maxdiv))
+					break;
+
+				if (i < j) //post0 >= post1
+					break;
+
+				rate = pll_translate_freq_to_config(i * j * freq,
+					PLL_DUMMY_ROOT, &conf);
+				diff = abs_diff(freq, rate / (i * j));
+
+				if (diff == 0) {
+					*config = conf;
+					config->postdiv[0] = i;
+					config->postdiv[1] = j;
+					return freq;
+				}
+
+				if (diff < bestratediff) {
+					bestratediff = diff;
+					bestdiv = (i * j);
+					bestrate = rate / bestdiv;
+					*config = conf;
+					config->postdiv[0] = i;
+					config->postdiv[1] = j;
+				}
+			}
+		}
+	} else if (plldiv >= PLL_DIVA && plldiv <= PLL_DIVD) {
+		int div_max  = 16;
+		int i;
+
+		maxdiv = div_max;
+		maxdiv = min(ULONG_MAX / freq, maxdiv);
+		mindiv = 1;
+		maxdiv = max(maxdiv, mindiv);
+		//initial value of bestdiv is the fix div or current div.
+		bestdiv = mindiv;
+
+		for (i = mindiv; i <= (int)maxdiv; i++) {
+			rate = pll_translate_freq_to_config(i * freq,
+				PLL_DUMMY_ROOT, &conf);
+			diff = abs_diff(freq, rate / i);
+
+			if (diff == 0) {
+				*config = conf;
+				config->div[plldiv - 1] = i - 1;
+				return freq;
+			}
+
+			if (diff < bestratediff) {
+				bestratediff = diff;
+				bestdiv = i;
+				bestrate = rate / bestdiv;
+				*config = conf;
+				config->div[plldiv - 1] = i - 1;
+			}
+		}
+	}
+
+	return bestrate;
+}
+
+static long sdrv_pll_round_rate_moreprecise(struct clk_hw *hw,
+		unsigned long drate, unsigned long *prate)
+{
+	struct sdrv_cgu_pll_clk *pll = to_sdrv_cgu_pll(hw);
+	const struct sdrv_pll_rate_table *params = &pll->params;
+	int i;
+	unsigned long rate = 0;
+	int plltype = pll->type;
+
+	rate = pll_translate_freq_to_config(drate, plltype, params);
+	// set prate
+	*prate = sdrv_pll_get_prate(plltype, params);
+	return rate;
+}
+static int sdrv_pll_set_rate_moreprecise(struct clk_hw *hw, unsigned long drate,
+		unsigned long prate)
+{
+	struct sdrv_cgu_pll_clk *pll = to_sdrv_cgu_pll(hw);
+	int i;
+	unsigned long rate, flags = 0;
+
+	if (pll->lock)
+		spin_lock_irqsave(pll->lock, flags);
+	else
+		__acquire(pll->lock);
+
+	sdrv_pll_get_params(pll, &pll->params);
+	//stuff valid params
+	//calculate
+	rate = pll_translate_freq_to_config(drate, pll->type, &pll->params);
+
+	// check prate
+	//BUG_ON(prate != sdrv_pll_get_prate(pll->type, pll->params));
+
+	sdrv_pll_set_params(pll, &pll->params);
+
+	if (pll->lock)
+		spin_unlock_irqrestore(pll->lock, flags);
+	else
+		__release(pll->lock);
+
+	return 0;
 }
 
 static int sdrv_pll_set_rate(struct clk_hw *hw, unsigned long drate,
@@ -180,6 +424,15 @@ static const struct clk_ops sdrv_pll_clk_ops = {
 	.recalc_rate = sdrv_pll_recalc_rate,
 	.round_rate = sdrv_pll_round_rate,
 	.set_rate = sdrv_pll_set_rate,
+	.enable = sdrv_pll_enable,
+	.disable = sdrv_pll_disable,
+	.is_enabled = sdrv_pll_is_enabled,
+	.init = sdrv_pll_init,
+};
+static const struct clk_ops sdrv_pll_clk_moreprecise_ops = {
+	.recalc_rate = sdrv_pll_recalc_rate,
+	.round_rate = sdrv_pll_round_rate_moreprecise,
+	.set_rate = sdrv_pll_set_rate_moreprecise,
 	.enable = sdrv_pll_enable,
 	.disable = sdrv_pll_disable,
 	.is_enabled = sdrv_pll_is_enabled,
@@ -261,14 +514,14 @@ static struct clk *sdrv_register_pll(struct device_node *np, void __iomem *base,
 	pr_info("register pll type %d name %s\n", type, clk_name);
 	pll->name = clk_name;
 	pll->type = type;
-
+	pll->isreadonly = readonly;
 	if (base)
 		pll->reg_base = base;
 	/* now create the actual pll */
 	init.name = clk_name;
 
 	/* keep all plls untouched for now */
-	init.flags = CLK_IGNORE_UNUSED;
+	init.flags = CLK_IGNORE_UNUSED | CLK_GET_RATE_NOCACHE;
 	if (type == PLL_ROOT)
 		init.num_parents = 0;
 	else
@@ -284,7 +537,7 @@ static struct clk *sdrv_register_pll(struct device_node *np, void __iomem *base,
 		}
 	} else {
 		struct sdrv_cgu_pll_clk *p_clk = NULL;
-		struct clk *pclk = get_clk_by_name(np->name);
+		struct clk *pclk = get_clk_by_name(np->name);/*parent*/
 		pll_parents[0] = np->name;
 		if(IS_ERR(pclk)) {
 			pr_err("parent name %s no exist, need register parent first\n", pll_parents[0]);
@@ -314,13 +567,12 @@ static struct clk *sdrv_register_pll(struct device_node *np, void __iomem *base,
 			__func__, clk_name);
 	}
 
-	if (!pll->rate_table)
-		init.ops = &sdrv_pll_clk_norate_ops;
-	else
-		init.ops = &sdrv_pll_clk_ops;
-
-	if (readonly)
+	if (pll->isreadonly) {
 		init.ops = &sdrv_pll_clk_readonly_ops;
+	} else {
+		init.ops = &sdrv_pll_clk_moreprecise_ops;
+		init.flags |= CLK_SET_RATE_PARENT;
+	}
 
 	pll->hw.init = &init;
 #if DEBUG_PLL

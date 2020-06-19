@@ -130,13 +130,17 @@ void sc_pfpll_setparams(void __iomem *base, unsigned int fbdiv, unsigned int ref
 	v |= FV_PLL_OUT_DIV_2_DIV_NUM_C(divc) | FV_PLL_OUT_DIV_2_DIV_NUM_D(divd);
 	clk_writel(v, b + PLL_OUT_DIV_2_OFF);
 
-/*No need to touch divA/B/C/D which default
- * value had been selected properly when being integarated.
- */
 /* these DIVs and CGs is outside sc pll IP, they are in a wrapper */
-	ctrl |= BM_PLL_CTRL_PLL_DIVD_CG_EN | BM_PLL_CTRL_PLL_DIVC_CG_EN
-		| BM_PLL_CTRL_PLL_DIVB_CG_EN | BM_PLL_CTRL_PLL_DIVA_CG_EN
-		| BM_PLL_CTRL_PLLPOSTCG_EN;
+	ctrl |= BM_PLL_CTRL_PLLPOSTCG_EN;
+	if (diva != -1)
+		ctrl |= BM_PLL_CTRL_PLL_DIVA_CG_EN;
+	if (divb != -1)
+		ctrl |= BM_PLL_CTRL_PLL_DIVB_CG_EN;
+	if (divc != -1)
+		ctrl |= BM_PLL_CTRL_PLL_DIVC_CG_EN;
+	if (divd != -1)
+		ctrl |= BM_PLL_CTRL_PLL_DIVD_CG_EN;
+
 	clk_writel(ctrl, b + PLL_CTRL_OFF);
 }
 
