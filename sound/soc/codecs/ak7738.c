@@ -43,7 +43,7 @@
 #include "ak7738.h"
 #include "ak7738_dsp_code.h"
 
-#define AK7738_DEBUG			//used at debug mode
+//#define AK7738_DEBUG	1		//used at debug mode
 //#define AK7738_DIT_ENABLE		//used at DIT mode
 
 #define AK7738_MAX_REGISTER	(AK7738_MAX_REGISTERS - 1)
@@ -4024,7 +4024,7 @@ static const struct snd_soc_dapm_route ak7738_intercon[] = {
 
 	{"AIN1 Rch MUX", "IN2P_N", "IN2P_N"},
 	{"AIN1 Rch MUX", "AIN1R", "AIN1R"},
-	{"MicBias2", NULL, "AIN1 Lch MUX"},
+	{"MicBias2", NULL, "AIN1 Rch MUX"},
 	{"MicBias2 MUX", "LineIn", "AIN1 Rch MUX"},
 	{"MicBias2 MUX", "MicBias", "MicBias2"},
 
@@ -6570,7 +6570,6 @@ static int ak7738_probe(struct snd_soc_codec *codec)
 	int ret = 0;
 
 	akdbgprt("\t[AK7738] %s(%d)\n",__FUNCTION__,__LINE__);
-
 	ak7738->codec = codec;
 
 	ret = ak7738_parse_dt(ak7738);
