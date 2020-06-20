@@ -205,29 +205,30 @@ static const struct snd_soc_dapm_widget sd_x9_ref_dapm_widgets[] = {
     SND_SOC_DAPM_SPK("RL SPK", NULL),
     SND_SOC_DAPM_SPK("RR SPK", NULL),
 
-    /* Inputs */
-    SND_SOC_DAPM_LINE("Line In", NULL),
-    SND_SOC_DAPM_MIC("Mic In", NULL),
+    /* Inputs front left and right*/
+	SND_SOC_DAPM_MIC("FL Mic", NULL),
+	SND_SOC_DAPM_MIC("FR Mic", NULL),
+
+	/* Inputs rear left and right*/
+	SND_SOC_DAPM_MIC("RL Mic", NULL),
+	SND_SOC_DAPM_MIC("RR Mic", NULL),
 };
 
 static const struct snd_soc_dapm_route sd_x9_ref_dapm_map[] = {
     /* Main SPK Out connected to amplifier*/
-
-    {"DAC IN", NULL, "SDOUT5"},
-    {"FL SPK", NULL, "DIG_AMP_OUT"},
-    {"FR SPK", NULL, "DIG_AMP_OUT"},
-
-    /* Line in connected to LLINEIN, RLINEIN */
-    {"Line In", NULL, "AIN2"},
-    {"Line In", NULL, "AIN2"},
-    /*  Mic in*/
-    {"Mic In", NULL, "AIN2"},
-
-    {"AIF2 Playback", NULL, "PCM0 OUT"},
+	{"AIF2 Playback", NULL, "PCM0 OUT"},
+	{"DAC IN", NULL, "SDOUT5"},
     /* {"ANA Playback", NULL, "PCM0 OUT"}, */
     {"DIG_AMP Playback", NULL, "SDOUT5"},
+	{"FL SPK", NULL, "DIG_AMP_OUT"},
+	{"FR SPK", NULL, "DIG_AMP_OUT"},
 
-    {"PCM0 IN", NULL, "AIF2 Capture"},
+    /* Capture audio route*/
+	{"PCM0 IN",NULL,"AIF2 Capture"},
+	{"AIN1L",NULL,"FL Mic"},
+	{"IN1P_N",NULL,"FL Mic"},
+	{"AIN1R",NULL,"FR Mic"},
+	{"IN2P_N",NULL,"FR Mic"},
 };
 
 /*DAI
