@@ -429,7 +429,7 @@ static long init_hw(struct platform_device *pdev, struct xrp_hw_semidrive *hw,
 	}
 
 	if (ret == 0 && hw->host_irq_mode != XRP_IRQ_NONE)
-		irq = platform_get_irq(pdev, 0);
+		of_property_read_u32(pdev->dev.of_node, "host-irq", &irq);
 	else
 		irq = -1;
 
