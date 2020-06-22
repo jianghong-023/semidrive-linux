@@ -495,7 +495,6 @@ static int sdrv_gpio_set_config(struct gpio_chip *gc, unsigned offset,
 
 
 	if (pinconf_to_config_param(config) != PIN_CONFIG_INPUT_DEBOUNCE) {
-		dev_err(gpio->dev, "%s, Not support debounce!\n", __func__);
 		return -ENOTSUPP;
 	}
 
