@@ -115,7 +115,6 @@ int rpmsg_rpc_ping(struct rpmsg_rpc_device *rpcdev)
 	int ret;
 
 	request.cmd = RPMSG_RPC_REQ_PING;
-	request.cksum = RPMSG_SANITY_TAG;
 	ret = rpmsg_rpc_call(rpcdev, &request, &result, RPMSG_TEST_TIMEOUT);
 	if (ret < 0) {
 		dev_err(rpcdev->dev, "rpc: call_func:%x fail ret: %d\n", request.cmd, ret);
@@ -142,7 +141,6 @@ int rpmsg_rpc_gettimeofday(struct rpmsg_rpc_device *rpcdev)
 	int ret;
 
 	request.cmd = RPMSG_RPC_REQ_GETTIMEOFDAY;
-	request.cksum = RPMSG_SANITY_TAG;
 	ret = rpmsg_rpc_call(rpcdev, &request, &result, RPMSG_TEST_TIMEOUT);
 	if (ret < 0) {
 		dev_err(rpcdev->dev, "rpc: call-func:%x fail ret: %d\n", request.cmd, ret);
@@ -166,7 +164,6 @@ int rpmsg_rpc_get_dc_status(struct rpmsg_rpc_device *rpcdev, int *val)
 	int ret = 0;
 
 	request.cmd = SYS_RPC_REQ_GET_PROPERTY;
-	request.cksum = RPMSG_SANITY_TAG;
     request.param[0] = SYS_PROP_DC_STATUS;
 	ret = rpmsg_rpc_call(rpcdev, &request, &result, RPMSG_TEST_TIMEOUT);
 	if (ret < 0) {

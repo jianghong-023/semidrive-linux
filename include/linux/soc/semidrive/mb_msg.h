@@ -7,6 +7,8 @@
 #define MB_MSG_PROTO_ROM        (1)
 /* this msg is for rpmsg virtio */
 #define MB_MSG_PROTO_RPMSG      (2)
+/* this msg is for vdsp */
+#define MB_MSG_PROTO_DSP        (3)
 
 /* used in mbox dts cell */
 #define MB_DST_ADDR(uid)		((uid >> 8) & 0xff)
@@ -39,6 +41,9 @@ typedef struct {
 
 #define MB_MSG_INIT_RPMSG_HEAD(m, rproc, size, dest)	\
 	mb_msg_init_head(m, rproc, MB_MSG_PROTO_RPMSG, true, size, dest)
+
+#define MB_MSG_INIT_VDSP_HEAD(m, size)	\
+	mb_msg_init_head(m, 5, MB_MSG_PROTO_DSP, false, size, IPCC_ADDR_VDSP_ANN)
 
 inline static void mb_msg_init_head(sd_msghdr_t *msg, int rproc,
         int proto, bool priority, u16 size, u8 dest)
