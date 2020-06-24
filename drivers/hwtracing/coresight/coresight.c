@@ -775,6 +775,9 @@ static struct device_type coresight_dev_type[] = {
 		.name = "source",
 		.groups = coresight_source_groups,
 	},
+	{
+		.name = "ect",
+	},
 };
 
 static void coresight_device_release(struct device *dev)
