@@ -69,7 +69,7 @@ static const struct snd_soc_codec_driver soc_codec_dev_ak4556 = {
 
 static int ak4556_soc_probe(struct platform_device *pdev)
 {
-	/* pr_info("AK4556 Probed!");*/
+	/* pr_info("AK4556 Probed!"); */
 	return snd_soc_register_codec(&pdev->dev,
 				      &soc_codec_dev_ak4556,
 				      &ak4556_dai, 1);
@@ -81,21 +81,47 @@ static int ak4556_soc_remove(struct platform_device *pdev)
 	return 0;
 }
 
-static const struct of_device_id ak4556_of_match[] = {
+/* static const struct of_device_id ak4556_of_match[] = {
 	{ .compatible = "asahi-kasei,ak4556" },
 	{},
 };
-MODULE_DEVICE_TABLE(of, ak4556_of_match);
+MODULE_DEVICE_TABLE(of, ak4556_of_match); */
 
 static struct platform_driver ak4556_driver = {
 	.driver = {
 		.name = "ak4556-adc-dac",
-		.of_match_table = ak4556_of_match,
+		/* .of_match_table = ak4556_of_match, */
 	},
 	.probe	= ak4556_soc_probe,
 	.remove	= ak4556_soc_remove,
 };
-module_platform_driver(ak4556_driver);
+//module_platform_driver(ak4556_driver);
+
+static struct platform_device *ak4556_soc_dev;
+
+static int __init snd_soc_ak4556_init(void)
+{
+	int ret;
+	/* pr_info("AK4556 init!"); */
+	ak4556_soc_dev =
+		platform_device_register_simple("ak4556-adc-dac", -1, NULL, 0);
+	if (IS_ERR(ak4556_soc_dev))
+		return PTR_ERR(ak4556_soc_dev);
+
+	ret = platform_driver_register(&ak4556_driver);
+	if (ret != 0)
+		platform_device_unregister(ak4556_soc_dev);
+
+	return ret;
+}
+module_init(snd_soc_ak4556_init);
+
+void __exit snd_soc_ak4556_exit(void)
+{
+	platform_device_unregister(ak4556_soc_dev);
+	platform_driver_unregister(&ak4556_driver);
+}
+module_exit(snd_soc_ak4556_exit);
 
 MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("SoC ak4556 driver");
