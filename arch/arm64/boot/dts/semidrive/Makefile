@@ -19,6 +19,9 @@ dtb-$(CONFIG_ARCH_SEMIDRIVE_X9) += g9x_ref.dtb
 dtb-$(CONFIG_ARCH_SEMIDRIVE_X9) += g9x_ii4_ref.dtb
 dtb-$(CONFIG_ARCH_SEMIDRIVE_X9) += x9_high_ref_native_cluster_serdes.dtb
 dtb-$(CONFIG_ARCH_SEMIDRIVE_X9) += x9_high_ref_native_ivi_serdes.dtb
+dtb-$(CONFIG_ARCH_SEMIDRIVE_X9) += x9_high_evb_native_ivi_avm.dtb
+dtb-$(CONFIG_ARCH_SEMIDRIVE_X9) += x9_high_ref_native_ivi_avm.dtb
+dtb-$(CONFIG_ARCH_SEMIDRIVE_X9) += x9_high_ref_native_ivi_serdes_avm.dtb
 
 always		:= $(dtb-y)
 subdir-y	:= $(dts-dirs)
