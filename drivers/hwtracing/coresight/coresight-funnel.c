@@ -64,6 +64,7 @@ static int dynamic_funnel_enable_hw(struct funnel_drvdata *drvdata, int port)
 	writel_relaxed(drvdata->priority, drvdata->base + FUNNEL_PRICTL);
 
 	CS_LOCK(drvdata->base);
+	return 0;
 }
 
 static int funnel_enable(struct coresight_device *csdev, int inport,

@@ -680,6 +680,10 @@ static const struct amba_id debug_ids[] = {
 		.id	= 0x000bbd08,
 		.mask	= 0x000fffff,
 	},
+	{       /* Debug for Cortex-A55 */
+		.id	= 0x003bbd05,
+		.mask	= 0x00ffffff,
+	},
 	{ 0, 0 },
 };
 

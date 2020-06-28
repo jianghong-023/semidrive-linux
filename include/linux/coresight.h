@@ -47,6 +47,7 @@ enum coresight_dev_type {
 	CORESIGHT_DEV_TYPE_LINK,
 	CORESIGHT_DEV_TYPE_LINKSINK,
 	CORESIGHT_DEV_TYPE_SOURCE,
+	CORESIGHT_DEV_TYPE_ECT,
 };
 
 enum coresight_dev_subtype_sink {
@@ -69,6 +70,11 @@ enum coresight_dev_subtype_source {
 	CORESIGHT_DEV_SUBTYPE_SOURCE_SOFTWARE,
 };
 
+enum coresight_dev_subtype_ect {
+	CORESIGHT_DEV_SUBTYPE_ECT_NONE,
+	CORESIGHT_DEV_SUBTYPE_ECT_CTI,
+};
+
 /**
  * struct coresight_dev_subtype - further characterisation of a type
  * @sink_subtype:	type of sink this component is, as defined
@@ -77,11 +83,14 @@ enum coresight_dev_subtype_source {
 			by @coresight_dev_subtype_link.
  * @source_subtype:	type of source this component is, as defined
 			by @coresight_dev_subtype_source.
+ * @ect_subtype:        type of cross trigger this component is, as
+ *			defined by @coresight_dev_subtype_ect
  */
 struct coresight_dev_subtype {
 	enum coresight_dev_subtype_sink sink_subtype;
 	enum coresight_dev_subtype_link link_subtype;
 	enum coresight_dev_subtype_source source_subtype;
+	enum coresight_dev_subtype_ect ect_subtype;
 };
 
 /**
@@ -237,10 +246,22 @@ struct coresight_ops_source {
 			struct perf_event *event);
 };
 
+/**
+ * struct coresight_ops_ect - Ops for an embedded cross trigger device
+ *
+ * @enable	: Enable the device
+ * @disable	: Disable the device
+ */
+struct coresight_ops_ect {
+	int (*enable)(struct coresight_device *csdev);
+	int (*disable)(struct coresight_device *csdev);
+};
+
 struct coresight_ops {
 	const struct coresight_ops_sink *sink_ops;
 	const struct coresight_ops_link *link_ops;
 	const struct coresight_ops_source *source_ops;
+	const struct coresight_ops_ect *ect_ops;
 };
 
 #ifdef CONFIG_CORESIGHT
