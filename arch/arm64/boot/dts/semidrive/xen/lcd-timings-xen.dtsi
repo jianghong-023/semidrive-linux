@@ -72,6 +72,17 @@
 		hsync-len = <40>;
 		vsync-len = <38>;
 	};
+        hsd_fhd1920x720: hsd_1920x720@60 {
+		clock-frequency = <95000000>;
+		hactive = <1920>;
+		vactive = <720>;
+		hback-porch = <40>;
+		hfront-porch = <40>;
+		vback-porch = <50>;
+		vfront-porch = <50>;
+		hsync-len = <40>;
+		vsync-len = <10>;
+	};
 };
 
 &dtimings1 {
@@ -112,7 +123,7 @@
 		hsync-len = <32>;
 		vsync-len = <6>;
 	};
-        	fhd1920x720_1: vesa_1920x720@60 {
+        fhd1920x720_1: vesa_1920x720@60 {
 		clock-frequency = <95000000>;
 		hactive = <1920>;
 		vactive = <720>;
@@ -156,6 +167,17 @@
 		vfront-porch = <2>;
 		hsync-len = <40>;
 		vsync-len = <38>;
+	};
+        hsd_fhd1920x720_1: hsd_1920x720@60 {
+		clock-frequency = <95000000>;
+		hactive = <1920>;
+		vactive = <720>;
+		hback-porch = <40>;
+		hfront-porch = <40>;
+		vback-porch = <50>;
+		vfront-porch = <50>;
+		hsync-len = <40>;
+		vsync-len = <10>;
 	};
 };
 
@@ -206,6 +228,17 @@
 		hsync-len = <20>;
 		vsync-len = <12>;
 	};
+        hsd_fhd1920x720_2: hsd_1920x720@60 {
+		clock-frequency = <95000000>;
+		hactive = <1920>;
+		vactive = <720>;
+		hback-porch = <40>;
+		hfront-porch = <40>;
+		vback-porch = <50>;
+		vfront-porch = <50>;
+		hsync-len = <40>;
+		vsync-len = <10>;
+	};
 };
 
 &dtimings3 {
@@ -254,5 +287,16 @@
 		vfront-porch = <20>;
 		hsync-len = <20>;
 		vsync-len = <12>;
+	};
+        hsd_fhd1920x720_3: hsd_1920x720@60 {
+		clock-frequency = <95000000>;
+		hactive = <1920>;
+		vactive = <720>;
+		hback-porch = <40>;
+		hfront-porch = <40>;
+		vback-porch = <50>;
+		vfront-porch = <50>;
+		hsync-len = <40>;
+		vsync-len = <10>;
 	};
 };
