@@ -517,7 +517,7 @@ static int cqspi_indirect_read_execute(struct spi_nor *nor, u8 *rxbuf,
 	struct cqspi_flash_pdata *f_pdata = nor->priv;
 	struct cqspi_st *cqspi = f_pdata->cqspi;
 	void __iomem *reg_base = cqspi->iobase;
-	void __iomem *ahb_base = cqspi->ahb_base;
+	void __iomem *trigger_address = cqspi->ahb_base + cqspi->trigger_address;
 	unsigned int remaining = n_rx;
 	unsigned int mod_bytes = n_rx % 4;
 	unsigned int bytes_to_read = 0;
@@ -557,10 +557,10 @@ static int cqspi_indirect_read_execute(struct spi_nor *nor, u8 *rxbuf,
 			bytes_to_read = round_down(bytes_to_read, 4);
 			/* Read 4 byte word chunks then single bytes */
 			if (bytes_to_read) {
-				ioread32_rep(ahb_base, rxbuf,
+				ioread32_rep(trigger_address, rxbuf,
 					     (bytes_to_read / 4));
 			} else if (!word_remain && mod_bytes) {
-				unsigned int temp = ioread32(ahb_base);
+				unsigned int temp = ioread32(trigger_address);
 
 				bytes_to_read = mod_bytes;
 				memcpy(rxbuf, &temp, min((unsigned int)
@@ -630,6 +630,7 @@ static int cqspi_indirect_write_execute(struct spi_nor *nor, loff_t to_addr,
 	struct cqspi_flash_pdata *f_pdata = nor->priv;
 	struct cqspi_st *cqspi = f_pdata->cqspi;
 	void __iomem *reg_base = cqspi->iobase;
+	void __iomem *trigger_address = cqspi->ahb_base + cqspi->trigger_address;
 	unsigned int remaining = n_tx;
 	unsigned int write_bytes;
 	int ret;
@@ -663,14 +664,14 @@ static int cqspi_indirect_write_execute(struct spi_nor *nor, loff_t to_addr,
 		mod_bytes = write_bytes % 4;
 		/* Write 4 bytes at a time then single bytes. */
 		if (write_words) {
-			iowrite32_rep(cqspi->ahb_base, txbuf, write_words);
+			iowrite32_rep(trigger_address, txbuf, write_words);
 			txbuf += (write_words * 4);
 		}
 		if (mod_bytes) {
 			unsigned int temp = 0xFFFFFFFF;
 
 			memcpy(&temp, txbuf, mod_bytes);
-			iowrite32(temp, cqspi->ahb_base);
+			iowrite32(temp, trigger_address);
 			txbuf += mod_bytes;
 		}
 
@@ -1491,6 +1492,11 @@ static const struct cqspi_driver_platdata am654_ospi = {
 	.quirks = CQSPI_NEEDS_WR_DELAY,
 };
 
+static const struct cqspi_driver_platdata sdrv_ospi = {
+	.hwcaps_mask = CQSPI_BASE_HWCAPS_MASK | SNOR_HWCAPS_READ_1_1_8,
+	.quirks = CQSPI_NEEDS_WR_DELAY,
+};
+
 static const struct of_device_id cqspi_dt_ids[] = {
 	{
 		.compatible = "cdns,qspi-nor",
@@ -1503,6 +1509,10 @@ static const struct of_device_id cqspi_dt_ids[] = {
 	{
 		.compatible = "ti,am654-ospi",
 		.data = &am654_ospi,
+	},
+	{
+		.compatible = "sdrv,ospi-nor",
+		.data = &sdrv_ospi,
 	},
 	{ /* end of table */ }
 };
