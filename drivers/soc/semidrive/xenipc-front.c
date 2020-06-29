@@ -225,9 +225,11 @@ int xenipc_rpc_trace(int dev, struct rpc_req_msg *req, struct rpc_ret_msg *resul
 
 	ret = xenipc_do_request(dev, &xreq, &xrsp);
 
-	result->ack = xrsp.ack;
-	result->retcode = xrsp.retcode;
-	memcpy(result->result, xrsp.result, sizeof(xrsp.result));
+	if (result) {
+		result->ack = xrsp.ack;
+		result->retcode = xrsp.retcode;
+		memcpy(result->result, xrsp.result, sizeof(xrsp.result));
+	}
 
 	return ret;
 }
@@ -437,7 +439,7 @@ static int xenipc_front_probe(struct xenbus_device *dev,
 }
 
 static const struct xenbus_device_id xenipc_fe_ids[] = {
-	{ "xenipc"  },
+	{ "xrpc"  },
 	{ ""  }
 };
 

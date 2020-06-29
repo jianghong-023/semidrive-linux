@@ -13,7 +13,7 @@ struct rpc_req_msg {
 	u32 cmd;
 	u32 cksum;
 	u32 param[RPMSG_RPC_MAX_PARAMS];
-} ;
+};
 
 struct rpc_ret_msg {
 	u32 ack;
@@ -46,5 +46,10 @@ bool sd_is_dc_inited(void);
 int sd_set_dc_status(dc_state_t val);
 
 int sd_get_dc_status(dc_state_t *val);
+
+int sd_kick_vdsp(void);
+
+typedef void(*vdsp_isr_callback)(void *ctx, void *mssg);
+int sd_connect_vdsp(void *hwctx, vdsp_isr_callback isr_cb);
 
 #endif //__IPCC_HEAD_FILE__
