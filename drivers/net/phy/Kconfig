@@ -335,6 +335,12 @@ config MARVELL_AUTO_PHY
 	---help---
 	  Support for the Marvell Automotive 88Q211X and compatible PHYs.
 
+config MARVELL_SWITCH
+	tristate "Marvell Automotive Switch"
+	---help---
+	  Support for the Marvell Automotive 5050 and 5072 switch chips.
+	  This driver just for test.
+
 config MESON_GXL_PHY
 	tristate "Amlogic Meson GXL Internal PHY"
 	depends on ARCH_MESON || COMPILE_TEST
