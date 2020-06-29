@@ -25,6 +25,7 @@ dts-dirs += xilinx
 dts-dirs += lg
 dts-dirs += zte
 dts-dirs += semidrive
+dts-dirs += semidrive/xen
 
 subdir-y	:= $(dts-dirs)
 
