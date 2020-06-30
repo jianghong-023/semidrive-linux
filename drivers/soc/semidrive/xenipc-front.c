@@ -439,7 +439,7 @@ static int xenipc_front_probe(struct xenbus_device *dev,
 }
 
 static const struct xenbus_device_id xenipc_fe_ids[] = {
-	{ "xrpc"  },
+	{ "vrpc"  },
 	{ ""  }
 };
 

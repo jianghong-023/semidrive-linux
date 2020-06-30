@@ -349,7 +349,7 @@ static int xenipc_back_remove(struct xenbus_device *dev)
 }
 
 static const struct xenbus_device_id xenipc_be_ids[] = {
-	{ "xrpc" },
+	{ "vrpc" },
 	{ "" }
 };
 
