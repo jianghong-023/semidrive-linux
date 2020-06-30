@@ -480,7 +480,7 @@ static int xengpufront_probe(struct xenbus_device *dev,
 
 // This defines the name of the devices the driver reacts to
 static const struct xenbus_device_id xengpufront_ids[] = {
-    { "xengpu"  },
+    { "vgpu"  },
     { ""  }
 };
 
