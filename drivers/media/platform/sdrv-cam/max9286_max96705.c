@@ -35,6 +35,7 @@
 #define MAX_SENSOR_NUM 4
 
 #define MAX96705_SLAVE_ID 0x40
+#define MAX9286_DEVICE_ID 0x40
 
 enum max9286_mode_id {
     MAX9286_MODE_720P_1280_720 = 0,
@@ -585,10 +586,10 @@ static int max9286_check_chip_id(struct max9286_dev *sensor)
         //goto power_off;
     }
 
-    if (chip_id != 0x40) {
+    if (chip_id != MAX9286_DEVICE_ID) {
         dev_err(&client->dev,
-                "%s: wrong chip identifier, expected 0x40(max9286), got 0x%x\n",
-                __func__, chip_id);
+                "%s: wrong chip identifier, expected 0x%x(max9286), got 0x%x\n",
+                __func__, MAX9286_DEVICE_ID, chip_id);
         ret = -ENXIO;
     }
 
