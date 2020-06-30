@@ -1,6 +1,8 @@
+#include <dt-bindings/display/dpu-sdx9.h>
+
 /{
-        soc {
-                display: display@0 {
+    soc {
+        display: display@0 {
 			compatible = "semdrive,display-subsystem";
 			sdriv,crtc = <&crtc0>;
 			status = "disabled";
@@ -24,7 +26,7 @@
 			status = "disabled";
 		};
 
-		crtc0: crtc@30440000 {
+		crtc0: crtc0@30440000 {
 			compatible = "semidrive,kunlun-crtc";
 			reg-names = "dc-base", "dp-base";
 			reg = <0x0 0x30db0000 0x0 0x10000>,
@@ -41,7 +43,7 @@
 			};
 		};
 
-		crtc1: crtc@30460000 {
+		crtc1: crtc1@30460000 {
 			compatible = "semidrive,kunlun-crtc";
 			reg-names = "dc-base", "dp-base";
 			reg = <0x0 0x30dc0000 0x0 0x10000>,
@@ -58,7 +60,7 @@
 			};
 		};
 
-                crtc2: crtc@30480000 {
+        crtc2: crtc2@30480000 {
 			compatible = "semidrive,kunlun-crtc";
 			reg-names = "dc-base", "dp-base";
 			reg = <0x0 0x30dd0000 0x0 0x10000>,
@@ -75,7 +77,7 @@
 			};
 		};
 
-                crtc3: crtc@304a0000 {
+        crtc3: crtc3@304a0000 {
 			compatible = "semidrive,kunlun-crtc";
 			reg-names = "dc-base", "dp-base";
 			reg = <0x0 0x30de0000 0x0 0x10000>;
