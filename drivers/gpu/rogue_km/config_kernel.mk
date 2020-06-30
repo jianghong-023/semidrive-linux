@@ -35,14 +35,11 @@ override MIPS_VERSION_NEEDED := 2014.07-1
 override KERNEL_COMPONENTS := srvkm
 override PVRSRV_MODNAME := pvrsrvkm
 override PVRSYNC_MODNAME := pvr_sync
-override PVR_BUILD_TYPE := release
 override SUPPORT_RGX := 1
 override PVR_LOADER :=
-override BUILD := release
 override DEBUGLINK := 1
 override SUPPORT_PHYSMEM_TEST := 1
 override COMPRESS_DEBUG_SECTIONS := 1
-override VMM_TYPE := stub
 override undefine PDUMP
 override OPTIM := -O2
 override RGX_TIMECORR_CLOCK := sched
