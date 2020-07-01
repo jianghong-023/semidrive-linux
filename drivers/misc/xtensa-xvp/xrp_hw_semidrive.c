@@ -38,12 +38,14 @@
 #include <linux/mailbox_client.h>
 #include <linux/mailbox_controller.h>
 #include <linux/soc/semidrive/mb_msg.h>
+#include <linux/soc/semidrive/ipcc.h>
 #include "xrp_kernel_defs.h"
 #include "xrp_hw.h"
 #include "xrp_internal.h"
 #include "xrp_hw_semidrive_dsp_interface.h"
 
 #define DRIVER_NAME "xrp-hw-semidrive"
+#define CONFIG_MBOX_IRQ		(0)
 
 enum xrp_irq_mode {
 	XRP_IRQ_NONE,
@@ -205,21 +207,34 @@ static void send_irq(void *hw_arg)
 
 	switch (hw->device_irq_mode) {
 	case XRP_IRQ_LEVEL:
+#if CONFIG_MBOX_IRQ
 		mb_msg_init_head(&msg, 5, 0, 0, MB_MSG_HDR_SZ, IPCC_ADDR_VDSP_ANN);
 		ret = mbox_send_message(hw->tx_channel, &msg); // send no-content mail
+#else
+		ret = sd_kick_vdsp();
+#endif
 		if (ret < 0)
 			pr_err("Failed to send message via mailbox, ret = %d\n", ret);
 	default:
 		break;
 	}
 }
-
+#if CONFIG_MBOX_IRQ
 static void xrp_hw_mbox_irq(struct mbox_client *client, void *message)
 {
 	struct xvp *xvp = dev_get_drvdata(client->dev); /* set by xrp_init_common */
 	/* called before sd_mu_ack_msg, no need to lock */
 	xrp_irq_handler(-1, xvp);
 }
+#else
+static void xrp_hw_mbox_cb(void *ctx, void *message)
+{
+	struct device *dev = ctx;
+	struct xvp *xvp = dev_get_drvdata(dev); /* set by xrp_init_common */
+	/* called before sd_mu_ack_msg, no need to lock */
+	xrp_irq_handler(-1, xvp);
+}
+#endif
 
 #if defined(__XTENSA__)
 static bool cacheable(void *hw_arg, unsigned long pfn, unsigned long n_pages)
@@ -316,7 +331,7 @@ static const struct xrp_hw_ops hw_ops = {
 	.dma_sync_for_cpu    = dma_sync_for_cpu,
 #endif
 };
-
+#if CONFIG_MBOX_IRQ
 static struct mbox_chan *
 xrp_hw_mbox_request_channel(struct platform_device *pdev, const char *name)
 {
@@ -343,7 +358,7 @@ xrp_hw_mbox_request_channel(struct platform_device *pdev, const char *name)
 
 	return channel;
 }
-
+#endif
 static long init_hw(struct platform_device *pdev, struct xrp_hw_semidrive *hw,
 		    int mem_idx, enum xrp_init_flags *init_flags)
 {
@@ -435,9 +450,12 @@ static long init_hw(struct platform_device *pdev, struct xrp_hw_semidrive *hw,
 
 	if (irq > 0) {
 		dev_dbg(&pdev->dev, "%s: host IRQ = %d, ", __func__, irq);
-
+#if CONFIG_MBOX_IRQ
 		/* if using IRQ mode, get mailbox channel */
 		hw->tx_channel = xrp_hw_mbox_request_channel(pdev, "tx");
+#else
+		sd_connect_vdsp(&pdev->dev, xrp_hw_mbox_cb);
+#endif
 		dev_info(&pdev->dev, "tx %p channel\n", hw->tx_channel);
 
 		*init_flags |= XRP_INIT_USE_HOST_IRQ;

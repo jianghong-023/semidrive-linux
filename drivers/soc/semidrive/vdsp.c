@@ -145,6 +145,7 @@ static int vdsp_ipc_probe(struct platform_device *pdev)
 	}
 	vdsp->dev = &pdev->dev;
 	platform_set_drvdata(pdev, vdsp);
+	vdsp_ipc_dev = vdsp;
 
 	return ret;
 
