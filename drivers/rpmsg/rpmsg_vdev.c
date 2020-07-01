@@ -509,7 +509,7 @@ static int __init sd_rpmsg_init(void)
 	return ret;
 }
 
-subsys_initcall(sd_rpmsg_init);
+arch_initcall(sd_rpmsg_init);
 
 MODULE_AUTHOR("Semidrive Semiconductor");
 MODULE_DESCRIPTION("Semidrive rpmsg virtio device");

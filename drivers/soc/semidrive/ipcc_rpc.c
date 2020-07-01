@@ -355,7 +355,7 @@ static int rpmsg_rpcdev_init(void)
 
 	return ret;
 }
-subsys_initcall(rpmsg_rpcdev_init);
+arch_initcall(rpmsg_rpcdev_init);
 
 static void rpmsg_rpcdev_exit(void)
 {
