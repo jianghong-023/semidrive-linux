@@ -1773,6 +1773,19 @@ config RTC_DRV_RTD119X
 	  If you say yes here, you get support for the RTD1295 SoC
 	  Real Time Clock.
 
+config RTC_DRV_SDRV
+	tristate "SEMIDRIVE RTC"
+	help
+	  RTC driver for SEMIDRIVE Real Time Clock controller
+
+config RTC_START_YEAR
+	int "set rtc counter start year"
+	default "1970"
+	depends on RTC_DRV_SDRV
+	help
+	  This will set rtc default date if not initialized.
+	  System time will start from this setting.
+
 comment "HID Sensor RTC drivers"
 
 config RTC_DRV_HID_SENSOR_TIME
