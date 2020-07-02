@@ -45,7 +45,6 @@
 #include "xrp_hw_semidrive_dsp_interface.h"
 
 #define DRIVER_NAME "xrp-hw-semidrive"
-#define CONFIG_MBOX_IRQ		(0)
 
 enum xrp_irq_mode {
 	XRP_IRQ_NONE,
@@ -207,7 +206,7 @@ static void send_irq(void *hw_arg)
 
 	switch (hw->device_irq_mode) {
 	case XRP_IRQ_LEVEL:
-#if CONFIG_MBOX_IRQ
+#ifndef CONFIG_SEMIDRIVE_IPCC
 		mb_msg_init_head(&msg, 5, 0, 0, MB_MSG_HDR_SZ, IPCC_ADDR_VDSP_ANN);
 		ret = mbox_send_message(hw->tx_channel, &msg); // send no-content mail
 #else
@@ -219,7 +218,7 @@ static void send_irq(void *hw_arg)
 		break;
 	}
 }
-#if CONFIG_MBOX_IRQ
+#ifndef CONFIG_SEMIDRIVE_IPCC
 static void xrp_hw_mbox_irq(struct mbox_client *client, void *message)
 {
 	struct xvp *xvp = dev_get_drvdata(client->dev); /* set by xrp_init_common */
@@ -331,7 +330,7 @@ static const struct xrp_hw_ops hw_ops = {
 	.dma_sync_for_cpu    = dma_sync_for_cpu,
 #endif
 };
-#if CONFIG_MBOX_IRQ
+#ifndef CONFIG_SEMIDRIVE_IPCC
 static struct mbox_chan *
 xrp_hw_mbox_request_channel(struct platform_device *pdev, const char *name)
 {
@@ -450,14 +449,13 @@ static long init_hw(struct platform_device *pdev, struct xrp_hw_semidrive *hw,
 
 	if (irq > 0) {
 		dev_dbg(&pdev->dev, "%s: host IRQ = %d, ", __func__, irq);
-#if CONFIG_MBOX_IRQ
+#ifndef CONFIG_SEMIDRIVE_IPCC
 		/* if using IRQ mode, get mailbox channel */
 		hw->tx_channel = xrp_hw_mbox_request_channel(pdev, "tx");
+		dev_info(&pdev->dev, "tx %p channel\n", hw->tx_channel);
 #else
 		sd_connect_vdsp(&pdev->dev, xrp_hw_mbox_cb);
 #endif
-		dev_info(&pdev->dev, "tx %p channel\n", hw->tx_channel);
-
 		*init_flags |= XRP_INIT_USE_HOST_IRQ;
 	} else {
 		dev_info(&pdev->dev, "using polling mode on the host side\n");
