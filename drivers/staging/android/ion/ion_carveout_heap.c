@@ -97,7 +97,8 @@ static void ion_carveout_heap_free(struct ion_buffer *buffer)
 	struct page *page = sg_page(table->sgl);
 	phys_addr_t paddr = PFN_PHYS(page_to_pfn(page));
 
-	ion_heap_buffer_zero(buffer);
+	/* Skip clearance to avoid mis-alignment, it's up to the user. */
+	/* ion_heap_buffer_zero(buffer); */
 
 	ion_carveout_free(heap, paddr, buffer->size);
 	sg_free_table(table);
@@ -123,7 +124,7 @@ struct ion_heap *ion_carveout_heap_create(struct ion_platform_heap *heap_data)
 	page = pfn_to_page(PFN_DOWN(heap_data->base));
 	size = heap_data->size;
 
-	/* Skip the first 32 pages clearance to avoid mis-alignment, it's up to the user. */
+	/* Skip clearance to avoid mis-alignment, it's up to the user. */
 	/* ret = ion_heap_pages_zero(page, size, pgprot_writecombine(PAGE_KERNEL));
 	 * if (ret)
 	 *         return ERR_PTR(ret); */
