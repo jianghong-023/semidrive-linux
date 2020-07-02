@@ -47,6 +47,15 @@
 
 #define CONFIG_MBOX_DUMP_HEX	(0)
 
+enum master_id {
+	MASTER_SAF_PLATFORM	= 0,
+	MASTER_SEC_PLATFORM	= 1,
+	MASTER_MP_PLATFORM	= 2,
+	MASTER_AP1			= 3,
+	MASTER_AP2			= 4,
+	MASTER_VDSP			= 5,
+};
+
 struct sd_mbox_tx_msg {
 	bool	used;
 	unsigned msg_id;
@@ -469,7 +478,7 @@ static irqreturn_t sd_mbox_rx_interrupt(int irq, void *p)
 			/* protocol default is callback user
 			 * otherwise is rom code test
 			 */
-			if (MB_MSG_PROTO_ROM == msg->protocol) {
+			if (MB_MSG_PROTO_ROM == msg->protocol && remote_proc != MASTER_VDSP) {
 				dev_info(mbox->dev, "mu: suppose not ROM msg\n");
 			} else {
 				chan = find_used_chan_atomic(mbdev, remote_proc, dest);
@@ -531,15 +540,6 @@ static struct mbox_chan *sd_mbox_of_xlate(struct mbox_controller *mbox,
 		local_addr, remote_link, p->np->name);
 	return ERR_PTR(-ENOENT);
 }
-
-enum master_id {
-	MASTER_SAF_PLATFORM	= 0,
-	MASTER_SEC_PLATFORM	= 1,
-	MASTER_MP_PLATFORM	= 2,
-	MASTER_AP1			= 3,
-	MASTER_AP2			= 4,
-	MASTER_VDSP			= 5,
-};
 
 static int sd_mbox_probe(struct platform_device *pdev)
 {
