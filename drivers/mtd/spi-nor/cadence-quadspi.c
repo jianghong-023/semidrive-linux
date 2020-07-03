@@ -44,6 +44,8 @@
 
 /* Quirks */
 #define CQSPI_NEEDS_WR_DELAY		BIT(0)
+#define CQSPI_NEEDS_CHECK_RES		BIT(1)
+
 
 /* Capabilities mask */
 #define CQSPI_BASE_HWCAPS_MASK					\
@@ -251,6 +253,8 @@ struct cqspi_driver_platdata {
 					 CQSPI_REG_IRQ_UNDERFLOW)
 
 #define CQSPI_IRQ_STATUS_MASK		0x1FFFF
+
+static int ospi_handover = 0;
 
 static int cqspi_wait_for_bit(void __iomem *reg, const u32 mask, bool clr)
 {
@@ -1155,6 +1159,13 @@ static int cqspi_of_get_pdata(struct platform_device *pdev)
 	struct device_node *np = pdev->dev.of_node;
 	struct cqspi_st *cqspi = platform_get_drvdata(pdev);
 
+	if (CQSPI_NEEDS_CHECK_RES) {
+		if (!ospi_handover & of_property_read_bool(np, "sdrv,need-handover")) {
+			dev_err(&pdev->dev, "controller res not handover!\n");
+			return -ENXIO;
+		}
+	}
+
 	cqspi->is_decoded_cs = of_property_read_bool(np, "cdns,is-decoded-cs");
 
 	if (of_property_read_u32(np, "cdns,fifo-depth", &cqspi->fifo_depth)) {
@@ -1494,7 +1505,7 @@ static const struct cqspi_driver_platdata am654_ospi = {
 
 static const struct cqspi_driver_platdata sdrv_ospi = {
 	.hwcaps_mask = CQSPI_BASE_HWCAPS_MASK | SNOR_HWCAPS_READ_1_1_8,
-	.quirks = CQSPI_NEEDS_WR_DELAY,
+	.quirks = CQSPI_NEEDS_WR_DELAY | CQSPI_NEEDS_CHECK_RES,
 };
 
 static const struct of_device_id cqspi_dt_ids[] = {
@@ -1529,8 +1540,19 @@ static struct platform_driver cqspi_platform_driver = {
 	},
 };
 
-module_platform_driver(cqspi_platform_driver);
+module_param(ospi_handover, int, 0);
 
+static int __init ospi_handover_parse(char *str)
+{
+	if (*str)
+		return 0;
+	ospi_handover = 1;
+	return 1;
+}
+
+__setup("ospi-handover", ospi_handover_parse);
+
+module_platform_driver(cqspi_platform_driver);
 MODULE_DESCRIPTION("Cadence QSPI Controller Driver");
 MODULE_LICENSE("GPL v2");
 MODULE_ALIAS("platform:" CQSPI_NAME);
