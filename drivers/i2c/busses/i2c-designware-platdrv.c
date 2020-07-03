@@ -44,6 +44,9 @@
 #include <linux/slab.h>
 
 #include "i2c-designware-core.h"
+#include <linux/soc/semidrive/ipcc.h>
+
+
 
 static u32 i2c_dw_get_clk_rate_khz(struct dw_i2c_dev *dev)
 {
@@ -268,6 +271,27 @@ static int dw_i2c_plat_probe(struct platform_device *pdev)
 		return -ENOMEM;
 
 	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+
+#ifdef CONFIG_SEMIDRIVE_IPCC
+	i2c_state_t status = 0;
+	int sync_enable=0;
+	int ret1;
+	device_property_read_u32(&pdev->dev, "sync_enable",
+					 &sync_enable);
+	dev_info(&pdev->dev, "sync_enable=0x%x\n", sync_enable);
+	if (sync_enable == 1){
+		dev_err(&pdev->dev, "enter:\n");
+		while(1) {
+			ret1 = sd_get_i2c_status(&status);
+			dev_info(&pdev->dev, "status=%d, ret1=%d\n", status, ret1);
+			if (status>I2C_STAT_INITING)
+				break;
+			msleep(100);
+		}
+		dev_err(&pdev->dev, "exit: status=0x%x\n", status);
+	}
+#endif
+
 	dev->base = devm_ioremap_resource(&pdev->dev, mem);
 	if (IS_ERR(dev->base))
 		return PTR_ERR(dev->base);
