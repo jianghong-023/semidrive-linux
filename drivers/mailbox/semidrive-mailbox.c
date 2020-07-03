@@ -702,7 +702,7 @@ static int __init sd_mbox_init(void)
 
 	return platform_driver_register(&sd_mbox_driver);
 }
-subsys_initcall(sd_mbox_init);
+arch_initcall(sd_mbox_init);
 
 static void __exit sd_mbox_exit(void)
 {

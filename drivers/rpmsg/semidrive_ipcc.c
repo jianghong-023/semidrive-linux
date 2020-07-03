@@ -980,7 +980,7 @@ static int __init rpmsg_ipcc_init(void)
 	return ret;
 }
 
-subsys_initcall(rpmsg_ipcc_init);
+arch_initcall(rpmsg_ipcc_init);
 
 static void __exit rpmsg_ipcc_exit(void)
 {
