@@ -1557,7 +1557,7 @@ DONE_WAKEUP:
 
 #ifdef VPU_SUPPORT_PLATFORM_DRIVER_REGISTER
 static const struct of_device_id vpucoda_of_table[] = {
-    {.compatible = "coda988",},
+    {.compatible = "semidrive,coda988",},
     {},
 };
 MODULE_DEVICE_TABLE(of, vpucoda_of_table);
