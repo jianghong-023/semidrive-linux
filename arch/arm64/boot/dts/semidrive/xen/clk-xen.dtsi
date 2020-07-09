@@ -1527,6 +1527,7 @@
 		#clock-cells = <0>;
 		sdrv,type =<CLK_TYPE_IP>;
 		clocks=<&RC_24M>, <&RC_RTC>, <&XTAL_24M>, <&XTAL_RTC>, <&PLL3 PLL_DIVC>, <&PLL3 PLL_DIVD>, <&PLL5 PLL_DIVD>, <&PLL3 PLL_DIVB>;
+		sdrv,clk-readonly = <1>;/*if this property exist, will ignore below params. TODO*/
 		sdrv,prediv = <1>;/*TODO*/
 		sdrv,postdiv = <1>;/*TODO*/
 		status = "disabled";
@@ -1587,6 +1588,7 @@
 		#clock-cells = <0>;
 		sdrv,type =<CLK_TYPE_IP>;
 		clocks=<&RC_24M>, <&RC_RTC>, <&XTAL_24M>, <&XTAL_RTC>, <&PLL3 PLL_DIVC>, <&PLL3 PLL_DIVD>, <&PLL5 PLL_DIVD>, <&PLL3 PLL_DIVB>;
+		sdrv,clk-readonly = <1>;/*if this property exist, will ignore below params. TODO*/
 		sdrv,prediv = <1>;/*TODO*/
 		sdrv,postdiv = <1>;/*TODO*/
 		status = "disabled";
