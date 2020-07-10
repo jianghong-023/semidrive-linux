@@ -1716,25 +1716,9 @@
 		clocks=<&UART_SEC0>;
 		status = "disabled";
 	};
-        UART_SEC0_10: UART_SEC0_10 {
-		compatible = "semidrive,clkgen-composite";
-		reg =  <0 0x3812f000 0 0x1000>;
-		#clock-cells = <0>;
-		sdrv,type =<CLK_TYPE_GATE>;
-		clocks=<&UART_SEC0>;
-		status = "disabled";
-	};
         UART_SEC0_11: UART_SEC0_11 {
 		compatible = "semidrive,clkgen-composite";
 		reg =  <0 0x38130000 0 0x1000>;
-		#clock-cells = <0>;
-		sdrv,type =<CLK_TYPE_GATE>;
-		clocks=<&UART_SEC0>;
-		status = "disabled";
-	};
-        UART_SEC0_12: UART_SEC0_12 {
-		compatible = "semidrive,clkgen-composite";
-		reg =  <0 0x38131000 0 0x1000>;
 		#clock-cells = <0>;
 		sdrv,type =<CLK_TYPE_GATE>;
 		clocks=<&UART_SEC0>;
@@ -1748,14 +1732,6 @@
 		clocks=<&UART_SEC0>;
 		status = "disabled";
 	};
-        UART_SEC0_14: UART_SEC0_14 {
-		compatible = "semidrive,clkgen-composite";
-		reg =  <0 0x38133000 0 0x1000>;
-		#clock-cells = <0>;
-		sdrv,type =<CLK_TYPE_GATE>;
-		clocks=<&UART_SEC0>;
-		status = "disabled";
-	};
         UART_SEC0_15: UART_SEC0_15 {
 		compatible = "semidrive,clkgen-composite";
 		reg =  <0 0x38134000 0 0x1000>;
@@ -1764,25 +1740,9 @@
 		clocks=<&UART_SEC0>;
 		status = "disabled";
 	};
-        UART_SEC1_9: UART_SEC1_9 {
-		compatible = "semidrive,clkgen-composite";
-		reg =  <0 0x3812e000 0 0x1000>;
-		#clock-cells = <0>;
-		sdrv,type =<CLK_TYPE_GATE>;
-		clocks=<&UART_SEC1>;
-		status = "disabled";
-	};
-	UART_SEC1_10: UART_SEC1_10 {
-		compatible = "semidrive,clkgen-composite";
+        UART_SEC1_10: UART_SEC1_10 {
+                compatible = "semidrive,clkgen-composite";
 		reg =  <0 0x3812f000 0 0x1000>;
-		#clock-cells = <0>;
-		sdrv,type =<CLK_TYPE_GATE>;
-		clocks=<&UART_SEC1>;
-		status = "disabled";
-	};
-        UART_SEC1_11: UART_SEC1_11 {
-		compatible = "semidrive,clkgen-composite";
-		reg =  <0 0x38130000 0 0x1000>;
 		#clock-cells = <0>;
 		sdrv,type =<CLK_TYPE_GATE>;
 		clocks=<&UART_SEC1>;
@@ -1796,15 +1756,7 @@
 		clocks=<&UART_SEC1>;
 		status = "disabled";
 	};
-        UART_SEC1_13: UART_SEC1_13 {
-		compatible = "semidrive,clkgen-composite";
-		reg =  <0 0x38132000 0 0x1000>;
-		#clock-cells = <0>;
-		sdrv,type =<CLK_TYPE_GATE>;
-		clocks=<&UART_SEC1>;
-		status = "disabled";
-	};
-	UART_SEC1_14: UART_SEC1_14 {
+        UART_SEC1_14: UART_SEC1_14 {
 		compatible = "semidrive,clkgen-composite";
 		reg =  <0 0x38133000 0 0x1000>;
 		#clock-cells = <0>;
@@ -1812,15 +1764,7 @@
 		clocks=<&UART_SEC1>;
 		status = "disabled";
 	};
-        UART_SEC1_15: UART_SEC1_15 {
-		compatible = "semidrive,clkgen-composite";
-		reg =  <0 0x38133000 0 0x1000>;
-		#clock-cells = <0>;
-		sdrv,type =<CLK_TYPE_GATE>;
-		clocks=<&UART_SEC1>;
-		status = "disabled";
-	};
-	UART_SEC1_16: UART_SEC1_16 {
+        UART_SEC1_16: UART_SEC1_16 {
 		compatible = "semidrive,clkgen-composite";
 		reg =  <0 0x38135000 0 0x1000>;
 		#clock-cells = <0>;
