@@ -2,7 +2,7 @@
 
 /{
     soc {
-        display: display@0 {
+                display: display@0 {
 			compatible = "semdrive,display-subsystem";
 			sdriv,crtc = <&crtc0>;
 			status = "disabled";
