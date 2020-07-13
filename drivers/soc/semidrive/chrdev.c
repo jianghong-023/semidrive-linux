@@ -25,6 +25,8 @@
 #include <linux/slab.h>
 #include <linux/uaccess.h>
 
+#include <linux/soc/semidrive/ipcc.h>
+
 union dcf_ioctl_arg {
 	int a;
 	int b;
@@ -35,11 +37,11 @@ struct dcf_device {
 	umode_t mode;
 	const struct file_operations *fops;
 	fmode_t fmode;
+	int myaddr;
 
 	int minor;
 	struct device *dev;
 	struct rpmsg_device *rpdev;
-	struct rpmsg_channel_info chinfo;
 	struct mutex ept_lock;
 
 	spinlock_t queue_lock;
@@ -122,10 +124,13 @@ static ssize_t read_dcf(struct file *filp, char __user *buf,
 				 size_t len, loff_t *f_pos)
 {
 	struct dcf_device *eptdev = filp->private_data;
-	struct rpmsg_endpoint *ept = eptdev->rpdev->ept;
+	struct rpmsg_device *rpdev = eptdev->rpdev;
 	unsigned long flags;
 	struct sk_buff *skb;
 	int use;
+
+	if (!rpdev->ept)
+		return -EPIPE;
 
 	spin_lock_irqsave(&eptdev->queue_lock, flags);
 
@@ -139,11 +144,11 @@ static ssize_t read_dcf(struct file *filp, char __user *buf,
 		/* Wait until we get data or the endpoint goes away */
 		if (wait_event_interruptible(eptdev->readq,
 						 !skb_queue_empty(&eptdev->queue) ||
-						 !ept))
+						 !rpdev->ept))
 			return -ERESTARTSYS;
 
 		/* We lost the endpoint while waiting */
-		if (!ept)
+		if (!rpdev->ept)
 			return -EPIPE;
 
 		spin_lock_irqsave(&eptdev->queue_lock, flags);
@@ -158,8 +163,6 @@ static ssize_t read_dcf(struct file *filp, char __user *buf,
 	if (copy_to_user(buf, skb->data, use))
 		use = -EFAULT;
 
-	dev_dbg(eptdev->dev, "read!\n");
-
 	kfree_skb(skb);
 
 	return use;
@@ -170,7 +173,7 @@ static ssize_t write_dcf(struct file *filp, const char __user *buf,
 				  size_t len, loff_t *f_pos)
 {
 	struct dcf_device *eptdev = filp->private_data;
-	struct rpmsg_endpoint *ept = eptdev->rpdev->ept;
+	struct rpmsg_device *rpdev = eptdev->rpdev;
 	void *kbuf;
 	int ret;
 
@@ -183,17 +186,15 @@ static ssize_t write_dcf(struct file *filp, const char __user *buf,
 		goto free_kbuf;
 	}
 
-	if (!ept) {
+	if (!rpdev->ept) {
 		ret = -EPIPE;
 		goto unlock_eptdev;
 	}
 
-	dev_dbg(eptdev->dev, "write!\n");
-
 	if (filp->f_flags & O_NONBLOCK)
-		ret = rpmsg_trysend(ept, kbuf, len);
+		ret = rpmsg_trysend(rpdev->ept, kbuf, len);
 	else
-		ret = rpmsg_send(ept, kbuf, len);
+		ret = rpmsg_send(rpdev->ept, kbuf, len);
 
 unlock_eptdev:
 	mutex_unlock(&eptdev->ept_lock);
@@ -201,16 +202,15 @@ unlock_eptdev:
 free_kbuf:
 	kfree(kbuf);
 	return ret < 0 ? ret : len;
-
 }
 
 static unsigned int poll_dcf(struct file *filp, poll_table *wait)
 {
 	struct dcf_device *eptdev = filp->private_data;
-	struct rpmsg_endpoint *ept = eptdev->rpdev->ept;
+	struct rpmsg_device *rpdev = eptdev->rpdev;
 	unsigned int mask = 0;
 
-	if (!ept)
+	if (!rpdev->ept)
 		return POLLERR;
 
 	poll_wait(filp, &eptdev->readq, wait);
@@ -218,22 +218,64 @@ static unsigned int poll_dcf(struct file *filp, poll_table *wait)
 	if (!skb_queue_empty(&eptdev->queue))
 		mask |= POLLIN | POLLRDNORM;
 
-	mask |= rpmsg_poll(ept, filp, wait);
+	mask |= rpmsg_poll(rpdev->ept, filp, wait);
 
 	return mask;
+}
+
+static int dcf_eptdev_cb(struct rpmsg_device *rpdev, void *buf, int len,
+			void *priv, u32 addr)
+{
+	struct dcf_device *eptdev = priv;
+	struct sk_buff *skb;
+
+	skb = alloc_skb(len, GFP_ATOMIC);
+	if (!skb)
+		return -ENOMEM;
+
+	skb_put_data(skb, buf, len);
+
+	spin_lock(&eptdev->queue_lock);
+	skb_queue_tail(&eptdev->queue, skb);
+	spin_unlock(&eptdev->queue_lock);
+
+	/* wake up any blocking processes, waiting for new data */
+	wake_up_interruptible(&eptdev->readq);
+
+	return 0;
 }
 
 static int open_dcf(struct inode *inode, struct file *filp)
 {
 	struct dcf_device *eptdev = filp->private_data;
+	struct rpmsg_device *rpdev = eptdev->rpdev;
 	struct device *dev = eptdev->dev;
+	struct rpmsg_channel_info chinfo;
 
 	get_device(dev);
+	mutex_init(&eptdev->ept_lock);
 	spin_lock_init(&eptdev->queue_lock);
 	skb_queue_head_init(&eptdev->queue);
 	init_waitqueue_head(&eptdev->readq);
 
-	dev_dbg(dev, "open!\n");
+	if (rpdev->ept) {
+		dev_err(dev, "Already exist\n");
+		return -EEXIST;
+	}
+
+	strncpy(chinfo.name, eptdev->name, RPMSG_NAME_SIZE);
+	chinfo.src = eptdev->myaddr;
+	chinfo.dst = RPMSG_ADDR_ANY;
+
+	rpdev->ept = rpmsg_create_ept(rpdev, dcf_eptdev_cb, eptdev, chinfo);
+	if (!rpdev->ept) {
+		dev_err(dev, "failed to create endpoint\n");
+		put_device(dev);
+		return -ENOMEM;
+	}
+	rpdev->src = rpdev->ept->addr;
+
+	dev_info(dev, "open %s %d->%d \n", chinfo.name, chinfo.src, chinfo.dst);
 
 	return 0;
 }
@@ -241,8 +283,17 @@ static int open_dcf(struct inode *inode, struct file *filp)
 static int release_dcf(struct inode *inode, struct file *filp)
 {
 	struct dcf_device *eptdev = filp->private_data;
+	struct rpmsg_device *rpdev = eptdev->rpdev;
 	struct device *dev = eptdev->dev;
 	struct sk_buff *skb;
+
+	/* Close the endpoint, if it's not already destroyed by the parent */
+	mutex_lock(&eptdev->ept_lock);
+	if (rpdev->ept) {
+			rpmsg_destroy_ept(rpdev->ept);
+			rpdev->ept = NULL;
+	}
+	mutex_unlock(&eptdev->ept_lock);
 
 	/* Discard all SKBs */
 	while (!skb_queue_empty(&eptdev->queue)) {
@@ -252,7 +303,7 @@ static int release_dcf(struct inode *inode, struct file *filp)
 
 	put_device(dev);
 
-	dev_dbg(dev, "release!\n");
+	dev_info(dev, "released!\n");
 
 	return 0;
 }
@@ -282,12 +333,14 @@ static const struct file_operations __maybe_unused sec_fops = {
 	.read		= read_dcf,
 	.write		= write_dcf,
 	.unlocked_ioctl = ioctl_dcf,
+	.open		= open_dcf,
+	.release	= release_dcf,
 };
 
 static struct dcf_device devlist[] = {
-	 [1] = { "cluster",  0666, &cluster_fops, FMODE_UNSIGNED_OFFSET },
-	 [2] = { "earlyapp", 0666, &avm_fops,     FMODE_UNSIGNED_OFFSET },
-	 [3] = { "ssystem",  0600, &sec_fops,     FMODE_UNSIGNED_OFFSET },
+	 [1] = { "cluster",  0666, &cluster_fops, FMODE_UNSIGNED_OFFSET, SD_CLUSTER_EPT},
+	 [2] = { "earlyapp", 0666, &avm_fops,     FMODE_UNSIGNED_OFFSET, SD_EARLYAPP_EPT},
+	 [3] = { "ssystem",  0600, &sec_fops,     FMODE_UNSIGNED_OFFSET, SD_SSYSTEM_EPT},
 };
 
 static struct rpmsg_device_id rpmsg_bridge_id_table[] = {
@@ -300,7 +353,7 @@ static struct rpmsg_device_id rpmsg_bridge_id_table[] = {
 static dev_t dcf_major;
 static struct class *dcf_class;
 
-static int dcf_open(struct inode *inode, struct file *filp)
+static int dcf_chrdev_open(struct inode *inode, struct file *filp)
 {
 	int minor;
 	const struct dcf_device *dev;
@@ -314,7 +367,7 @@ static int dcf_open(struct inode *inode, struct file *filp)
 		return -ENXIO;
 
 	filp->f_mode |= dev->fmode;
-	filp->private_data = dev;
+	filp->private_data = (void*)dev;
 	replace_fops(filp, dev->fops);
 
 	if (dev->fops->open)
@@ -323,8 +376,8 @@ static int dcf_open(struct inode *inode, struct file *filp)
 	return 0;
 }
 
-static const struct file_operations dcf_fops = {
-	.open = dcf_open,
+static const struct file_operations dcf_chrdev_fops = {
+	.open = dcf_chrdev_open,
 	.llseek = noop_llseek,
 };
 
@@ -369,18 +422,9 @@ static void rpmsg_bridge_remove(struct rpmsg_device *rpdev)
 	dev_set_drvdata(&rpdev->dev, NULL);
 }
 
-static int rpmsg_bridge_cb(struct rpmsg_device *rpdev,
-						void *data, int len, void *priv, u32 src)
-{
-	struct dcf_device *dev = dev_get_drvdata(&rpdev->dev);
-
-	return 0;
-}
-
 static struct rpmsg_driver rpmsg_bridge_driver = {
 	.probe = rpmsg_bridge_probe,
 	.remove = rpmsg_bridge_remove,
-	.callback = rpmsg_bridge_cb,
 	.id_table = rpmsg_bridge_id_table,
 	.drv = {
 		.name = "sd,rpmsg-br"
@@ -392,7 +436,7 @@ static int __init dcf_char_init(void)
 	int major;
 	int ret;
 
-	major = register_chrdev(0, "dcf", &dcf_fops);
+	major = register_chrdev(0, "dcf", &dcf_chrdev_fops);
 	if (major < 0) {
 		pr_err("dcf: failed to register char dev region\n");
 		return major;

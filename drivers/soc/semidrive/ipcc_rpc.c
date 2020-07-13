@@ -136,8 +136,8 @@ int rpmsg_rpc_ping(struct rpmsg_rpc_device *rpcdev)
 
 int rpmsg_rpc_gettimeofday(struct rpmsg_rpc_device *rpcdev)
 {
-	struct rpc_ret_msg result;
-	struct rpc_req_msg request;
+	struct rpc_ret_msg result = {0,};
+	struct rpc_req_msg request = {0,};
 	int ret;
 
 	request.cmd = RPMSG_RPC_REQ_GETTIMEOFDAY;
@@ -155,45 +155,6 @@ int rpmsg_rpc_gettimeofday(struct rpmsg_rpc_device *rpcdev)
 
     return ret;
 }
-
-#define SYS_PROP_DC_STATUS        (4)
-int rpmsg_rpc_get_dc_status(struct rpmsg_rpc_device *rpcdev, int *val)
-{
-	struct rpc_ret_msg result;
-	struct rpc_req_msg request;
-	int ret = 0;
-
-	request.cmd = SYS_RPC_REQ_GET_PROPERTY;
-    request.param[0] = SYS_PROP_DC_STATUS;
-	ret = rpmsg_rpc_call(rpcdev, &request, &result, RPMSG_TEST_TIMEOUT);
-	if (ret < 0) {
-		dev_err(rpcdev->dev, "rpc: call-func:%x fail ret: %d\n", request.cmd, ret);
-		return ret;
-	}
-
-	ret = result.retcode;
-	if (ret < 0)
-		dev_warn(rpcdev->dev, "rpc: exec bad result %d %d\n", result.ack, ret);
-
-	if (!ret && val) {
-		*val = result.result[0];
-	}
-
-	return ret;
-}
-
-int sdrv_get_dc_status(int *val)
-{
-	struct rpmsg_rpc_device *rpcdev = rpmsg_rpc_devp[0];
-
-	if (!rpcdev) {
-		pr_warn("%s: Remote device not exist\n", __func__);
-		return -ENODEV;
-	}
-
-	return rpmsg_rpc_get_dc_status(rpcdev, val);
-}
-EXPORT_SYMBOL(sdrv_get_dc_status);
 
 static int rpmsg_rpcdev_cb(struct rpmsg_device *rpdev,
 						void *data, int len, void *priv, u32 src)
@@ -235,7 +196,7 @@ static void rpc_work_handler(struct work_struct *work)
 {
 	struct rpmsg_rpc_device *rpcdev = container_of(to_delayed_work(work),
 					 struct rpmsg_rpc_device, delay_work);
-	int dc_status;
+	dc_state_t dc_status;
 	int ret;
 	ktime_t tss, tse;
 
@@ -247,12 +208,13 @@ static void rpc_work_handler(struct work_struct *work)
 				 ktime_us_delta(tse, tss));
 	}
 
-//	rpmsg_rpc_gettimeofday(rpcdev);
 	if (rpcdev->rproc == 0) {
-		ret = rpmsg_rpc_get_dc_status(rpcdev, &dc_status);
+		ret = sd_get_dc_status(&dc_status);
 		if (ret == 0) {
-			dev_info(rpcdev->dev, "dc_status is %d\n", dc_status);
+			dev_info(rpcdev->dev, "dc_status is 0x%x\n", dc_status);
 		}
+
+//        schedule_delayed_work(&rpcdev->delay_work, msecs_to_jiffies(100));
 	}
 }
 
