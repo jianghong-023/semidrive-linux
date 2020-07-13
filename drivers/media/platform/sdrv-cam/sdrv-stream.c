@@ -453,7 +453,7 @@ static int kstream_set_channel(struct kstream_device *kstream)
 				kcsi_writel(kstream->base, IMG_CHN_SPLIT_(n), pix_fmts[pos].split[n]);
 			}
 			kcsi_writel(kstream->base, IMG_CHN_PACK_(n), pix_fmts[pos].pack[n]);
-			dev_err(kstream->dev, "%s: pix_fmts[pos=%d]\n", __func__, pos);
+			//dev_err(kstream->dev, "%s: pix_fmts[pos=%d]\n", __func__, pos);
 		}
 		if(n < pix_fmt->num_planes)
 			ctrl |= ((1 << n) << IMG_PIXEL_STREAM_EN_SHIFT);
