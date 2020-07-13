@@ -49,6 +49,9 @@ typedef enum {
 	I2C_STAT_MAX         = I2C_STAT_NORMAL,
 } i2c_state_t;
 
+#define SD_CLUSTER_EPT	(70)
+#define SD_SSYSTEM_EPT	(72)
+#define SD_EARLYAPP_EPT	(80)
 
 int sd_close_dc(bool is_block);
 

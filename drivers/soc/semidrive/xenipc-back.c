@@ -35,8 +35,6 @@ static void process_front_request(struct xenipc_be_channel *chan, const struct x
 	struct rpc_req_msg request;
 	int ret = 0;
 
-	pr_info("enter %s, get cmd %d", __FUNCTION__, req->cmd);
-
 	request.cmd = req->cmd;
 	memcpy(request.param, req->param, sizeof(req->param));
 	ret = rpmsg_rpc_call_trace(0, &request, &result);

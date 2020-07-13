@@ -25,8 +25,8 @@ int xenipc_rpc_trace(int dev, struct rpc_req_msg *req, struct rpc_ret_msg *resul
 
 static int rpc_get_dc_status(dc_state_t *val)
 {
-	struct rpc_ret_msg result;
-	struct rpc_req_msg request;
+	struct rpc_ret_msg result = {0,};
+	struct rpc_req_msg request = {0,};
 	int ret = 0;
 
 	request.cmd = SYS_RPC_REQ_GET_PROPERTY;
@@ -48,8 +48,8 @@ static int rpc_get_dc_status(dc_state_t *val)
 
 static int rpc_set_dc_status(dc_state_t val, bool block)
 {
-	struct rpc_ret_msg result;
-	struct rpc_req_msg request;
+	struct rpc_ret_msg result = {0,};
+	struct rpc_req_msg request = {0,};
 	int ret = 0;
 
 	request.cmd = SYS_RPC_REQ_SET_PROPERTY;

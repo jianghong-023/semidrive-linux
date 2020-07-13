@@ -12,7 +12,7 @@
 /*
  * Enable to track contexts and buffers
  */
-#define VMM_DEBUG 1
+#define VMM_DEBUG 0
 
 #if defined(VMM_DEBUG)
     #define VMM_DEBUG_PRINT(fmt, ...) \
