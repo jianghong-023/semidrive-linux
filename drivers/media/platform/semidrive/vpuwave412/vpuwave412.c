@@ -1722,7 +1722,7 @@ DONE_WAKEUP:
 
 #ifdef VPU_SUPPORT_PLATFORM_DRIVER_REGISTER
 static const struct of_device_id vpuwave_of_table[] = {
-    {.compatible = "wave412",},
+    {.compatible = "semidrive,wave412",},
     {},
 };
 MODULE_DEVICE_TABLE(of, vpuwave_of_table);
