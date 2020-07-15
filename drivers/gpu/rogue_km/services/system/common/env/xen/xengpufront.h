@@ -33,9 +33,9 @@ struct xengpu_info {
 };
 
 
-int gsx_front_map(uint32_t func_id, uint32_t dev_id,
+int gsx_front_map(uint32_t func_id, uint32_t dev_id, uint32_t os_id,
    uint64_t size, uint64_t addr);
-int gsx_front_unmap(uint32_t func_id, uint32_t dev_id);
+int gsx_front_unmap(uint32_t func_id, uint32_t dev_id, uint32_t os_id);
 
 int xengpu_init(void);
 void xengpu_exit(void);

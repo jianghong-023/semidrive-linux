@@ -232,6 +232,9 @@ struct _PVRSRV_DEVICE_CONFIG_
 	/*! Device interrupt number */
 	IMG_UINT32 ui32IRQ;
 
+	/* modified by lili, semidrive begin*/
+	IMG_UINT32 ui32OsId;
+	/* modified by lili, semidrive end*/
 	PVRSRV_DEVICE_SNOOP_MODE eCacheSnoopingMode;
 
 	/*! Device specific data handle */

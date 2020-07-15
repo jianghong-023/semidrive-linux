@@ -42,12 +42,13 @@ XenVMMDebugDumpConfig(IMG_UINT32 ui32FuncID,
    struct gpuif_request request;
    struct gpuif_response *rsp=NULL;
    PVRSRV_ERROR ret = PVRSRV_OK;
-
+   PVRSRV_DEVICE_CONFIG *pConfig = getDevConfig();
    XENGPU_REQUEST_INIT(&request);
 
    request.operation  = GPUIF_OP_DEBUG_DUMPCONFIG;
    request.ui32FuncID = ui32FuncID;
    request.ui32DevID  = ui32DevID;
+   request.ui32OsID = pConfig->ui32OsId;
    ret = xengpu_do_request(&request, &rsp);
    if ((!ret) && (rsp != NULL)) {
 	   ret					 = rsp->status;
@@ -128,6 +129,7 @@ XenVMMCreateDevPhysHeaps(IMG_UINT32 ui32FuncID,
     request.operation  = GPUIF_OP_CREATE_DEVPHYSHEAPS;
     request.ui32FuncID = ui32FuncID;
     request.ui32DevID  = ui32DevID;
+	request.ui32OsID = pConfig->ui32OsId;
     ret = xengpu_do_request(&request, &rsp);
     if ((!ret) && (rsp != NULL)) {
         ret                   = rsp->status;
@@ -200,7 +202,7 @@ XenVMMDestroyDevPhysHeaps(IMG_UINT32 ui32FuncID,
 	PHYS_HEAP_CONFIG *psPhysHeapConfig;
 
     XENGPU_REQUEST_INIT(&request);
-
+	request.ui32OsID = pConfig->ui32OsId;
     request.operation  = GPUIF_OP_DESTROY_DEVPHYSHEAPS;
     request.ui32FuncID = ui32FuncID;
     request.ui32DevID  = ui32DevID;
@@ -251,8 +253,7 @@ XenVMMMapDevPhysHeap(IMG_UINT32 ui32FuncID,
 	PVRSRV_DEVICE_CONFIG *pConfig = getDevConfig();
 	struct device * pvrsrvdev = (struct device *)pConfig->pvOSDevice;
 	const struct dma_map_ops *dma_ops;
-	PVRSRV_DEVICE_CONFIG * pDevConf = getDevConfig();
-	PHYS_HEAP_CONFIG * psPhysHeapConfig = SysVzGetPhysHeapConfig(pDevConf,PVRSRV_DEVICE_PHYS_HEAP_FW_LOCAL);
+	PHYS_HEAP_CONFIG * psPhysHeapConfig = SysVzGetPhysHeapConfig(pConfig,PVRSRV_DEVICE_PHYS_HEAP_FW_LOCAL);
 	DMA_ALLOC *psDmaAlloc = (DMA_ALLOC *)psPhysHeapConfig->pasRegions[0].hPrivData;
 	IMG_UINT64 *start = psDmaAlloc->pvVirtAddr;
 	memset(start, 0xAB,100);
@@ -262,7 +263,7 @@ XenVMMMapDevPhysHeap(IMG_UINT32 ui32FuncID,
 	VMM_DEBUG_PRINT("#########set 0x%x to virt 0x%p############", *start, start);
 #endif
 
-	ret = gsx_front_map(ui32FuncID, ui32DevID, ui64Size, ui64Addr);
+	ret = gsx_front_map(ui32FuncID, ui32DevID, pConfig->ui32OsId, ui64Size, ui64Addr);
 	if (!ret) {
 		VMM_DEBUG_PRINT("%s:%d, ret=%d", __FUNCTION__, __LINE__, ret);
 	}
@@ -288,17 +289,19 @@ XenVMMUnmapDevPhysHeap(IMG_UINT32 ui32FuncID,
 {
 	PVR_UNREFERENCED_PARAMETER(ui32FuncID);
 	PVR_UNREFERENCED_PARAMETER(ui32DevID);
-    VMM_DEBUG_PRINT("enter %s, funcID(%d), DevID(%d)",
-        __FUNCTION__,
-        ui32FuncID,
-        ui32DevID);
+	VMM_DEBUG_PRINT("enter %s, funcID(%d), DevID(%d)",
+		__FUNCTION__,
+		ui32FuncID,
+		ui32DevID);
 #ifndef SMMU_SUPPORTED
-    /* call PvzServerUnmapDevPhysHeap through hypervisor */
-    struct gpuif_request request;
-    struct gpuif_response *rsp = NULL;
-    PVRSRV_ERROR ret = PVRSRV_OK;
+	/* call PvzServerUnmapDevPhysHeap through hypervisor */
+	struct gpuif_request request;
+	struct gpuif_response *rsp = NULL;
+	PVRSRV_DEVICE_CONFIG *pConfig = getDevConfig();
 
-	ret = gsx_front_unmap(ui32FuncID, ui32DevID);
+	PVRSRV_ERROR ret = PVRSRV_OK;
+
+	ret = gsx_front_unmap(ui32FuncID, ui32DevID, pConfig->ui32OsId);
 	if (!ret) {
 		VMM_DEBUG_PRINT("%s:%d, ret=%d", __FUNCTION__, __LINE__, ret);
 	}
@@ -521,6 +524,7 @@ static PVRSRV_ERROR XenCreatePvzConnection(void)
 	{
 		struct gpuif_request request;
 		struct gpuif_response *rsp = NULL;
+		PVRSRV_DEVICE_CONFIG *pConfig = getDevConfig();
 		XENGPU_REQUEST_INIT(&request);
 
 		ret = xengpu_init();
@@ -529,6 +533,7 @@ static PVRSRV_ERROR XenCreatePvzConnection(void)
                         return ret;
                 }
 		request.operation = GPUIF_OP_CREATE_PVZCONNECTION;
+		request.ui32OsID = pConfig->ui32OsId;
 		ret = xengpu_do_request(&request, &rsp);
 		if (rsp != NULL) {
 			ret = rsp->status;
@@ -549,9 +554,11 @@ static void XenDestroyPvzConnection(void)
 	{
 		struct gpuif_request request;
 		struct gpuif_response *rsp = NULL;
+		PVRSRV_DEVICE_CONFIG *pConfig = getDevConfig();
 		XENGPU_REQUEST_INIT(&request);
 
 		request.operation = GPUIF_OP_DESTROY_PVZCONNECTION;
+		request.ui32OsID = pConfig->ui32OsId;
 		ret = xengpu_do_request(&request, &rsp);
 		if (rsp != NULL) {
 			ret = rsp->status;

@@ -186,6 +186,7 @@ PVRSRV_ERROR SysDevInit(void *pvOSDevice, PVRSRV_DEVICE_CONFIG **ppsDevConfig)
 #if defined(LINUX)
 	int iIrq;
 	IMG_UINT32 uiClk;
+	IMG_UINT32 uiOsId = -1;
 	struct platform_device *psDev;
 	struct clk * coreClock;
 	struct resource *psDevMemRes = NULL;
@@ -239,58 +240,67 @@ PVRSRV_ERROR SysDevInit(void *pvOSDevice, PVRSRV_DEVICE_CONFIG **ppsDevConfig)
 
 	/* Device setup information */
 #if defined(LINUX)
-        psDevMemRes = platform_get_resource(psDev, IORESOURCE_MEM, 0);
-        if (psDevMemRes)
-        {
-            psDevConfig->sRegsCpuPBase.uiAddr = psDevMemRes->start;
-            psDevConfig->ui32RegsSize         = (unsigned int)(psDevMemRes->end - psDevMemRes->start);
-        }
-        else
+	psDevMemRes = platform_get_resource(psDev, IORESOURCE_MEM, 0);
+	if (psDevMemRes)
+	{
+	    psDevConfig->sRegsCpuPBase.uiAddr = psDevMemRes->start;
+	    psDevConfig->ui32RegsSize         = (unsigned int)(psDevMemRes->end - psDevMemRes->start);
+	}
+	else
 #endif
-        {
+	{
 #if defined(LINUX)
-            PVR_LOG(("%s: platform_get_resource() failed",
-                    __func__));
+		PVR_LOG(("%s: platform_get_resource() failed",
+		        __func__));
 #endif
-            psDevConfig->sRegsCpuPBase.uiAddr   = 0x34c00000;
-            psDevConfig->ui32RegsSize           = 0x10000;
-        }
+		psDevConfig->sRegsCpuPBase.uiAddr   = 0x34c00000;
+		psDevConfig->ui32RegsSize           = 0x10000;
+	}
 
 	psDevConfig->ui32IRQ                = 168;
 #if defined(LINUX)
-        iIrq = platform_get_irq(psDev, 0);
-        if (iIrq >= 0)
-        {
-                psDevConfig->ui32IRQ = (IMG_UINT32) iIrq;
-        }
+	iIrq = platform_get_irq(psDev, 0);
+	if (iIrq >= 0)
+	{
+		psDevConfig->ui32IRQ = (IMG_UINT32) iIrq;
+	}
 #endif
 
 #if defined(LINUX)
-        /* Always ask for fixed clock rate from a property. */
-        device_property_read_u32(&psDev->dev, "clock-frequency", &uiClk);
+	/* Always ask for fixed clock rate from a property. */
+	device_property_read_u32(&psDev->dev, "clock-frequency", &uiClk);
 
-        /* If there is separate gpucoreclk, get the rate from it. */
-        coreClock = devm_clk_get(&psDev->dev, "gpucoreclk");
-        if (IS_ERR(coreClock) && PTR_ERR(coreClock) != -EPROBE_DEFER)
-                coreClock = devm_clk_get(&psDev->dev, NULL);
-        if (IS_ERR(coreClock) && PTR_ERR(coreClock) == -EPROBE_DEFER)
-                return -EPROBE_DEFER;
-        if (!IS_ERR_OR_NULL(coreClock)) {
-                err = clk_prepare_enable(coreClock);
-                if (err)
-                        dev_warn(&psDev->dev, "could not enable optional gpucoreclk: %d\n", err);
-                else
-                        uiClk  = clk_get_rate(coreClock);
-        }
+	/* If there is separate gpucoreclk, get the rate from it. */
+	coreClock = devm_clk_get(&psDev->dev, "gpucoreclk");
+	if (IS_ERR(coreClock) && PTR_ERR(coreClock) != -EPROBE_DEFER)
+		coreClock = devm_clk_get(&psDev->dev, NULL);
+	if (IS_ERR(coreClock) && PTR_ERR(coreClock) == -EPROBE_DEFER)
+		return -EPROBE_DEFER;
+	if (!IS_ERR_OR_NULL(coreClock)) {
+		err = clk_prepare_enable(coreClock);
+		if (err)
+			dev_warn(&psDev->dev, "could not enable optional gpucoreclk: %d\n", err);
+		else
+			uiClk  = clk_get_rate(coreClock);
+	}
 
-        /* If no clock rate is defined, fail. */
-        if (!uiClk) {
-                dev_err(&psDev->dev, "clock rate not defined\n");
-                err = -EINVAL;
-                goto ErrorFreeDevConfig;
-        }
-        psRGXTimingInfo->ui32CoreClockSpeed = uiClk;
-        pr_info("core clock is %d\n", psRGXTimingInfo->ui32CoreClockSpeed);
+	/* If no clock rate is defined, fail. */
+	if (!uiClk) {
+		dev_err(&psDev->dev, "clock rate not defined\n");
+		err = -EINVAL;
+		goto ErrorFreeDevConfig;
+	}
+	psRGXTimingInfo->ui32CoreClockSpeed = uiClk;
+	pr_info("core clock is %d\n", psRGXTimingInfo->ui32CoreClockSpeed);
+
+	device_property_read_u32(&psDev->dev, "osid", &uiOsId);
+	if (uiOsId < 0) {
+		dev_err(&psDev->dev, "osid not defined\n");
+		err = -EINVAL;
+		goto ErrorFreeDevConfig;
+	}
+	psDevConfig->ui32OsId = uiOsId;
+	pr_info("os id is %d\n", psDevConfig->ui32OsId);
 #endif
 
 	psDevConfig->pasPhysHeaps			= pasPhysHeaps;

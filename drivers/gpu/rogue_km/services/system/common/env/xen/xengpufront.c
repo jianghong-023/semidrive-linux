@@ -32,7 +32,7 @@ DMA_ALLOC * getDMAallocinfo(void)
 	return gXenGpuInfo.psDmaAlloc;
 }
 
-int gsx_front_unmap(uint32_t func_id, uint32_t dev_id)
+int gsx_front_unmap(uint32_t func_id, uint32_t dev_id, uint32_t os_id)
 {
 	struct xengpu_info *drv_info = &gXenGpuInfo;
 	struct gpuif_request request;
@@ -45,6 +45,7 @@ int gsx_front_unmap(uint32_t func_id, uint32_t dev_id)
 	request.operation  = GPUIF_OP_UNMAP_DEVPHYSHEAPS;
 	request.ui32FuncID = func_id;
 	request.ui32DevID = dev_id;
+	request.ui32OsID = os_id;
 
 	ret = xengpu_do_request(&request, &rsp);
 	if ((!ret) && (rsp != NULL)) {
@@ -60,7 +61,7 @@ int gsx_front_unmap(uint32_t func_id, uint32_t dev_id)
 }
 
 
-int gsx_front_map(uint32_t func_id, uint32_t dev_id,
+int gsx_front_map(uint32_t func_id, uint32_t dev_id, uint32_t os_id,
    uint64_t size, uint64_t addr)
 {
    struct xengpu_info *drv_info = &gXenGpuInfo;
@@ -85,6 +86,7 @@ int gsx_front_map(uint32_t func_id, uint32_t dev_id,
    request.operation  = GPUIF_OP_MAP_DEVPHYSHEAPS;
    request.ui32FuncID = func_id;
    request.ui32DevID = dev_id;
+   request.ui32OsID = os_id;
    request.op.map_dev_heap.gref_directory =
 		   xen_pvz_shbuf_get_dir_start(drv_info->shbuf);
    request.op.map_dev_heap.buffer_sz = size;
