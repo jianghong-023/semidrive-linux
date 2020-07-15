@@ -425,8 +425,8 @@ int ion_alloc(size_t len, unsigned int heap_id_mask, unsigned int flags)
 		/* carveout heap is originally not included in default
 		 * scenarios, only for private and special use in Semidrive's
 		 * strategy */
-		if ((ION_HEAP_TYPE_CARVEOUT == heap->id) &&
-		    ((1 << ION_HEAP_TYPE_CARVEOUT) != heap_id_mask))
+		if ((ION_HEAP_TYPE_CARVEOUT == heap->type) &&
+		    ((1 << heap->id) != heap_id_mask))
 			continue;
 		buffer = ion_buffer_create(heap, dev, len, flags);
 		if (!IS_ERR(buffer))
