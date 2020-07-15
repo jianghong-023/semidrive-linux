@@ -51,17 +51,17 @@ static void process_gpu_request(struct xen_gpuif *gpuif, const struct gpuif_requ
 
     switch (req->operation) {
         case GPUIF_OP_CREATE_PVZCONNECTION:
-            status = XenHostCreateConnection(gpuif->domid);
+            status = XenHostCreateConnection(req->ui32OsID);
             break;
         case GPUIF_OP_DESTROY_PVZCONNECTION:
-            XenHostDestroyConnection(gpuif->domid);
+            XenHostDestroyConnection(req->ui32OsID);
             break;
         case GPUIF_OP_CREATE_DEVPHYSHEAPS:
         	{
 			unsigned long flags;
 			int ret;
 			struct xen_pvz_shbuf_cfg buf_cfg;
-            status = PvzServerCreateDevPhysHeaps(gpuif->domid,
+            status = PvzServerCreateDevPhysHeaps(req->ui32OsID,
 												req->ui32FuncID,
 												req->ui32DevID,
 												&eType,
@@ -91,13 +91,13 @@ static void process_gpu_request(struct xen_gpuif *gpuif, const struct gpuif_requ
 			}
 #endif
 
-			VMM_DEBUG_PRINT("created Guest FW with OSID %d IPA 0x%x sz %llu, ret %d",
-				gpuif->domid, ui64FwAddr,
+			VMM_DEBUG_PRINT("created Guest FW with OSID %d(domid %d) IPA 0x%x sz %llu, ret %d",
+				req->ui32OsID, gpuif->domid, ui64FwAddr,
 				ui64FwSize, status);
 			gpuif->be->shbuf = xen_pvz_shbuf_alloc(&buf_cfg);
 			if (IS_ERR(gpuif->be->shbuf)) {
-				VMM_DEBUG_PRINT("create Guest FW with OSID %d, ret %d",
-					gpuif->domid, gpuif->be->shbuf);
+				VMM_DEBUG_PRINT("create Guest FW with OSID %d(domid %d), ret %d",
+					req->ui32OsID, gpuif->domid, gpuif->be->shbuf);
 				break;
 			}
 			rsp->eType = eType;
@@ -105,12 +105,12 @@ static void process_gpu_request(struct xen_gpuif *gpuif, const struct gpuif_requ
 				   xen_pvz_shbuf_get_dir_start(gpuif->be->shbuf);
 			rsp->op.map_dev_heap.buffer_sz = ui64FwSize;
 			VMM_DEBUG_PRINT("created Guest FW with gref_directory %d",
-				gpuif->domid, rsp->op.map_dev_heap.gref_directory);
+				rsp->op.map_dev_heap.gref_directory);
 
             break;
         	}
         case GPUIF_OP_DESTROY_DEVPHYSHEAPS:
-            status = PvzServerDestroyDevPhysHeaps(gpuif->domid,
+            status = PvzServerDestroyDevPhysHeaps(req->ui32OsID,
                         					      req->ui32FuncID,
                         						  req->ui32DevID);
 			xen_pvz_shbuf_free(gpuif->be->shbuf);
@@ -127,7 +127,7 @@ static void process_gpu_request(struct xen_gpuif *gpuif, const struct gpuif_requ
 				VMM_DEBUG_PRINT("#########GPUIF_OP_MAP_DEVPHYSHEAPS,virt 0x%p host side:############", gpuif->be->heap_obj->vAddr);
 
 				status = PvzServerMapDevPhysHeap(
-					gpuif->domid, req->ui32FuncID, req->ui32DevID,
+					req->ui32OsID, req->ui32FuncID, req->ui32DevID,
 					req->op.map_dev_heap.buffer_sz,
 					ui64PAddr);
 				if (status == PVRSRV_OK)
@@ -153,23 +153,22 @@ static void process_gpu_request(struct xen_gpuif *gpuif, const struct gpuif_requ
 				VMM_DEBUG_PRINT("#########end of GPUIF_OP_MAP_DEVPHYSHEAPS,virt 0x%p host side:############", gpuif->be->heap_obj->vAddr);
 
 			}
-			VMM_DEBUG_PRINT("Mapping Guest FW with OSID %d IPA 0x%x sz %llu, ret %d",
-				gpuif->domid, ui64PAddr,
+			VMM_DEBUG_PRINT("Mapping Guest FW with OSID %d (domid %d)IPA 0x%x sz %llu, ret %d",
+				req->ui32OsID, gpuif->domid, ui64PAddr,
 				req->op.map_dev_heap.buffer_sz, status);
 			break;
 		case GPUIF_OP_UNMAP_DEVPHYSHEAPS:
 			if (gpuif->ui32DevID != req->ui32DevID) {
 				status = -EINVAL;
-				VMM_DEBUG_PRINT("Wrong device ID while unmapping: provided %d expected %d, domain ID %d",
-					req->ui32DevID, gpuif->ui32DevID,
-					gpuif->domid);
+				VMM_DEBUG_PRINT("Wrong device ID while unmapping: provided %d expected %d, osid %d, domain ID %d",
+					req->ui32DevID, gpuif->ui32DevID,req->ui32OsID,	gpuif->domid);
 			} else {
 				status = PvzServerUnmapDevPhysHeap(
-					gpuif->domid, req->ui32FuncID, req->ui32DevID);
+					req->ui32OsID, req->ui32FuncID, req->ui32DevID);
 
 				gpuif->ui32DevID= VGSX_BAD_DEVICE_ID;
-				VMM_DEBUG_PRINT("Unmapping Guest FW with OSID %d, ret %d",
-					gpuif->domid, status);
+				VMM_DEBUG_PRINT("Unmapping Guest FW with OSID %d(domid %d), ret %d",
+					req->ui32OsID, gpuif->domid, status);
 			}
 			xdrv_unmap_dev_heap((struct xen_drvinfo *)gpuif->be);
 			rsp->status = status;

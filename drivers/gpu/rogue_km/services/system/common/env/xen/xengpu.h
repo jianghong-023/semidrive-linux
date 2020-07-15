@@ -59,6 +59,7 @@ struct gpuif_request {
 	uint8_t  operation;    /* GPUIF_OP_???                         */
 	uint8_t  reserved;
 	uint32_t ui32FuncID;
+	uint32_t ui32OsID;
     uint32_t ui32DevID;
     uint64_t ui64Size;
     uint64_t ui64Addr;
