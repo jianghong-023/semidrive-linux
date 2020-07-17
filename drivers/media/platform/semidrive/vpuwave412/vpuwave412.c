@@ -225,11 +225,11 @@ enum {
     W4_INT_DEC_PIC         = 3,
     W4_INT_SET_FRAMEBUF    = 4,
     W4_INT_FLUSH_DEC       = 5,
-    W4_INT_GET_FW_VERSION  = 9,
-    W4_INT_QUERY_DEC       = 10,
-    W4_INT_SLEEP_VPU       = 11,
-    W4_INT_WAKEUP_VPU      = 12,
-    W4_INT_CHANGE_INT      = 13,
+    W4_INT_GET_FW_VERSION  = 8,
+    W4_INT_QUERY_DEC       = 9,
+    W4_INT_SLEEP_VPU       = 10,
+    W4_INT_WAKEUP_VPU      = 11,
+    W4_INT_CHANGE_INT      = 12,
     W4_INT_CREATE_INSTANCE = 14,
     W4_INT_BSBUF_EMPTY     = 15,   /*!<< Bitstream buffer empty */
     W4_INT_ENC_SLICE_INT   = 15,
@@ -1678,7 +1678,7 @@ static int vpu_resume(struct platform_device *pdev)
             regVal  = (1 << W4_INT_DEC_PIC_HDR);
             regVal |= (1 << W4_INT_DEC_PIC);
             regVal |= (1 << W4_INT_QUERY_DEC);
-            regVal |= (1 << W4_INT_SLEEP_VPU);
+            //regVal |= (1 << W4_INT_SLEEP_VPU);
             regVal |= (1 << W4_INT_BSBUF_EMPTY);
 
             WriteVpuRegister(W4_VPU_VINT_ENABLE,  regVal);
