@@ -39,7 +39,7 @@ int debug_locks_off(void)
 {
 	if (__debug_locks_off()) {
 		if (!debug_locks_silent) {
-			console_verbose();
+			//console_verbose(); /* don't change the loglevel in debug locks */
 			return 1;
 		}
 	}
