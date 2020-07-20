@@ -80,6 +80,8 @@
 #define APP_HOLD_PHY_RST_BIT (0x1 << 6)
 #define INTR_SMLH_LINK_UP (0x1 << 28)
 #define INTR_RDLH_LINK_UP (0x1 << 27)
+#define RESET_MASK (0x3f << 6)
+#define RESET_OFF (0x3f << 6)
 
 /* Time for delay */
 #define TIME_PHY_RST_MIN (5)
@@ -435,6 +437,11 @@ static void sd_pcie_core_init(struct sd_pcie *sd_pcie)
 	reg_val = sd_ctrl_ncr_readl(sd_pcie, PCIE_CTRL_NCR_CTRL0);
 	reg_val |= DEVICE_TYPE_BIT;
 	sd_ctrl_ncr_writel(sd_pcie, reg_val, PCIE_CTRL_NCR_CTRL0);
+
+	reg_val = sd_ctrl_ncr_readl(sd_pcie, PCIE_CTRL_NCR_CTRL2);
+	reg_val &= ~RESET_MASK;
+	reg_val |= RESET_OFF;
+	sd_ctrl_ncr_writel(sd_pcie, reg_val, PCIE_CTRL_NCR_CTRL2);
 
 	sd_ctrl_ncr_writel(sd_pcie, 0, PCIE_CTRL_NCR_CTRL21);
 	sd_ctrl_ncr_writel(sd_pcie, 0, PCIE_CTRL_NCR_CTRL23);
