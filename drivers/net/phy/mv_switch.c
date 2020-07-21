@@ -20,15 +20,39 @@ struct mv_data {
 	unsigned int data[5];
 };
 
-#define MV_GET_CMD		_IOWR('M', 8, struct mv_data)
-#define MV_5050_PHYID		0x50505050
-#define MV_5072_PHYID		0x50725072
-#define MV_GLOBAL1_PORT		0x1b
+#define MV_GET_CMD				_IOWR('M', 8, struct mv_data)
+#define MV_SET_TEST_MODE			_IOW('M', 9, struct mv_data)
+#define MV_SET_AUTO_NEGOTIATION			_IOW('M', 10, struct mv_data)
+#define MV_GET_AUTO_NEGOTIATION_STATE		_IOWR('M', 11, struct mv_data)
+#define MV_5050_PHYID				0x50505050
+#define MV_5072_PHYID				0x50725072
+#define MV_GLOBAL1_PORT				0x1b
+#define MV_GLOBAL2_PORT				0x1c
+
+#define MV_PHY_TEST_CTRL_REG			0x836
+#define MV_PHY_TEST_CTRL_OFFSET			13
+
+#define MV_PHY_AUTO_NEGO_CTRL_REG		0x200
+#define MV_PHY_AUTO_NEGO_EN_OFFSET		12
+
+#define MV_PHY_AUTO_NEGO_STA_REG		0x201
+
+#define MV_SMI_PHY_CMD_REG			0x18
+#define MV_SMI_BUSY_OFFSET			15
+#define MV_SMI_OP_OFFSET			10
+#define MV_SMI_DEV_ADDR_OFFSET			5
+#define MV_SMI_REG_ADDR_OFFSET			0
+
+#define MV_SMI_PHY_DATA_REG			0x19
+
+#define MV_SMI_OP_C45_WRITE_ADDR		0
+#define MV_SMI_OP_C45_WRITE_DATA		1
+#define MV_SMI_OP_C45_READ_WITH_INC		2
+#define MV_SMI_OP_C45_READ			3
 
 static struct phy_device *mv_phy[2];
 static const struct file_operations mv_5050_fops;
 static const struct file_operations mv_5072_fops;
-
 
 static inline int mv_read(struct phy_device *phydev, u32 portaddr, u32 regnum)
 {
@@ -73,6 +97,104 @@ static int mv_get_data(struct phy_device *phy, struct mv_data *data)
 	return 0;
 }
 
+static int mv_wait_smi_idle(struct phy_device *phy, int timeout)
+{
+	u16 smi_phy_reg;
+
+	do {
+		udelay(1);
+		smi_phy_reg = mv_read(phy, MV_GLOBAL2_PORT, MV_SMI_PHY_CMD_REG);
+	} while (--timeout && (smi_phy_reg & (1 << MV_SMI_BUSY_OFFSET)));
+
+	if (!timeout) {
+		phydev_err(phy, "mv_switch: wait smi idle out of time\n");
+		return -ETIMEDOUT;
+	}
+
+	return 0;
+}
+
+static int mv_write_phy_register(struct phy_device *phy, u16 smi_device, u16 smi_register,
+				u16 reg_addr, u16 write_data)
+{
+	u16 base_cmd;
+
+	if (mv_wait_smi_idle(phy, 50) < 0)
+		return -EBUSY;
+
+	base_cmd = (1 << MV_SMI_BUSY_OFFSET) | \
+		(smi_device << MV_SMI_DEV_ADDR_OFFSET) | smi_register;
+
+	mv_write(phy, MV_GLOBAL2_PORT, MV_SMI_PHY_DATA_REG, reg_addr);
+	mv_write(phy, MV_GLOBAL2_PORT, MV_SMI_PHY_CMD_REG, \
+		base_cmd | (MV_SMI_OP_C45_WRITE_ADDR << MV_SMI_OP_OFFSET));
+
+	if (mv_wait_smi_idle(phy, 50) < 0)
+		return -EBUSY;
+
+	mv_write(phy, MV_GLOBAL2_PORT, MV_SMI_PHY_DATA_REG, write_data);
+	mv_write(phy, MV_GLOBAL2_PORT, MV_SMI_PHY_CMD_REG, \
+		base_cmd | (MV_SMI_OP_C45_WRITE_DATA << MV_SMI_OP_OFFSET));
+
+	if (mv_wait_smi_idle(phy, 50) < 0)
+		return -EBUSY;
+
+	return 0;
+}
+
+static int mv_read_phy_register(struct phy_device *phy, u16 smi_device, u16 smi_register, u16 reg_addr)
+{
+	u16 base_cmd;
+
+	if (mv_wait_smi_idle(phy, 50) < 0)
+		return -EBUSY;
+
+	base_cmd = (1 << MV_SMI_BUSY_OFFSET) | \
+		(smi_device << MV_SMI_DEV_ADDR_OFFSET) | smi_register;
+
+	mv_write(phy, MV_GLOBAL2_PORT, MV_SMI_PHY_DATA_REG, reg_addr);
+	mv_write(phy, MV_GLOBAL2_PORT, MV_SMI_PHY_CMD_REG, \
+		base_cmd | (MV_SMI_OP_C45_WRITE_ADDR << MV_SMI_OP_OFFSET));
+
+	if (mv_wait_smi_idle(phy, 50) < 0)
+		return -EBUSY;
+
+	mv_write(phy, MV_GLOBAL2_PORT, MV_SMI_PHY_CMD_REG, \
+		base_cmd | (MV_SMI_OP_C45_READ << MV_SMI_OP_OFFSET));
+
+	if (mv_wait_smi_idle(phy, 50) < 0)
+		return -EBUSY;
+
+	return mv_read(phy, MV_GLOBAL2_PORT, MV_SMI_PHY_DATA_REG);
+}
+
+
+static int mv_set_test_mode(struct phy_device *phy, struct mv_data *data)
+{
+	u16 test_mode;
+
+	test_mode = (u16)data->data[0];
+	if (test_mode == 3 || test_mode > 5) {
+		phydev_err(phy, "mv_switch: test_mode set error:%d\n", test_mode);
+		return -EINVAL;
+	}
+
+	return mv_write_phy_register(phy, data->portaddr, 1, \
+		MV_PHY_TEST_CTRL_REG, (u16)(test_mode << MV_PHY_TEST_CTRL_OFFSET));
+}
+
+static int mv_set_auto_negotiation(struct phy_device *phy, struct mv_data *data)
+{
+	return mv_write_phy_register(phy, data->portaddr, 7, \
+		MV_PHY_AUTO_NEGO_CTRL_REG, (u16)(1 << MV_PHY_AUTO_NEGO_EN_OFFSET));
+}
+
+static int mv_get_auto_negotiation_state(struct phy_device *phy, struct mv_data *data)
+{
+	return mv_read_phy_register(phy, data->portaddr, 7, \
+		MV_PHY_AUTO_NEGO_STA_REG);
+}
+
 static long mv_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 {
 	int ret = -1;
@@ -86,6 +208,14 @@ static long mv_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	switch (cmd) {
 	case MV_GET_CMD:
 		ret = mv_get_data(phy, &data);
+	case MV_SET_TEST_MODE:
+		ret = mv_set_test_mode(phy, &data);
+		break;
+	case MV_SET_AUTO_NEGOTIATION:
+		ret = mv_set_auto_negotiation(phy, &data);
+		break;
+	case MV_GET_AUTO_NEGOTIATION_STATE:
+		ret = mv_get_auto_negotiation_state(phy, &data);
 		break;
 	default:
 		return -EINVAL;
