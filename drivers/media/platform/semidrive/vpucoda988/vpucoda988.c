@@ -812,11 +812,6 @@ static long vpu_ioctl(struct file *filp, u_int cmd, u_long arg)
 
             dma_buf_put(temp);
 
-            pr_info("get dma handle %d, dma buf addr %p, attachment %p, sgt %p\n",
-                    buf.buf_handle,
-                    (void *)buf.dma_addr,
-                    (void *)buf.attachment,
-                    (void *)buf.sgt);
         }
         break;
 
@@ -848,7 +843,6 @@ static long vpu_ioctl(struct file *filp, u_int cmd, u_long arg)
             dma_buf_put(temp);
             temp = NULL;
 
-            pr_info("dma unmap attachment success now \n" );
         }
         break;
 

@@ -933,7 +933,6 @@ static long vpu_ioctl(struct file *filp, u_int cmd, u_long arg)
             dma_buf_put(temp);
             temp = NULL;
 
-            pr_info("[VPUDRV] dma unmap attachment success now \n" );
         }
         break;
 
