@@ -98,9 +98,10 @@ static irqreturn_t xenipc_interrupt(int irq, void *dev_id)
 	struct xenipc_frontend *fe = dev_get_drvdata(&xbdev->dev);
 	struct xenipc_channel *chan = fe->channel;
 	struct xenipc_call_info *current_call = NULL;
+	unsigned long flags;
 
 again:
-	spin_lock(&chan->ring_lock);
+	spin_lock_irqsave(&chan->ring_lock, flags);
 	rp = chan->front_ring.sring->rsp_prod;
 	rmb(); /* Ensure we see queued responses up to 'rp'. */
 
@@ -135,7 +136,7 @@ again:
 	} else
 		chan->front_ring.sring->rsp_event = i + 1;
 
-	spin_unlock(&chan->ring_lock);
+	spin_unlock_irqrestore(&chan->ring_lock, flags);
 
 	return IRQ_HANDLED;
 }

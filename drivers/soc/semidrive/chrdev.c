@@ -418,8 +418,8 @@ static void rpmsg_bridge_remove(struct rpmsg_device *rpdev)
 	if (dev->dev)
 		device_destroy(dcf_class, dev->dev->devt);
 
-	dev->rpdev = NULL;
 	dev_set_drvdata(&rpdev->dev, NULL);
+	dev->rpdev = NULL;
 }
 
 static struct rpmsg_driver rpmsg_bridge_driver = {

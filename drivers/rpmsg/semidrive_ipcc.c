@@ -885,7 +885,7 @@ static int rpmsg_ipcc_probe(struct platform_device *pdev)
 		struct rpmsg_ipcc_nsm nsm;
 
 //		MB_MSG_INIT_RPMSG_HEAD(&nsm.mboxhdr, vrp->rproc, sizeof(nsm), 0);
-		strncpy(nsm.name, "rpmsg-ipcc-echo", RPMSG_NAME_SIZE);
+		strncpy(nsm.name, "ipcc-echo", RPMSG_NAME_SIZE);
 		nsm.addr = RPMSG_ECHO_ADDR;
 		nsm.flags = RPMSG_NS_CREATE;
 		ret = __send_offchannel_raw(vrp, RPMSG_ECHO_ADDR, RPMSG_NS_ADDR, &nsm, sizeof(nsm), true);
