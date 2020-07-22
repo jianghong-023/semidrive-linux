@@ -29,7 +29,10 @@ struct mv_data {
 #define MV_GLOBAL1_PORT				0x1b
 #define MV_GLOBAL2_PORT				0x1c
 
-#define MV_PHY_TEST_CTRL_REG			0x836
+#define MV_INTERNAL_PHY_TEST_ADDR		0x1
+#define MV_EXTERNAL_PHY_TEST_ADDR		0x1
+#define MV_INTERNAL_PHY_TEST_CTRL_REG		0x836
+#define MV_EXTERNAL_PHY_TEST_CTRL_REG		0x904
 #define MV_PHY_TEST_CTRL_OFFSET			13
 
 #define MV_PHY_AUTO_NEGO_CTRL_REG		0x200
@@ -39,6 +42,7 @@ struct mv_data {
 
 #define MV_SMI_PHY_CMD_REG			0x18
 #define MV_SMI_BUSY_OFFSET			15
+#define MV_SMI_FUNC_OFFSET			13
 #define MV_SMI_OP_OFFSET			10
 #define MV_SMI_DEV_ADDR_OFFSET			5
 #define MV_SMI_REG_ADDR_OFFSET			0
@@ -49,6 +53,13 @@ struct mv_data {
 #define MV_SMI_OP_C45_WRITE_DATA		1
 #define MV_SMI_OP_C45_READ_WITH_INC		2
 #define MV_SMI_OP_C45_READ			3
+
+#define MV_INTERNAL_PHY				0
+#define MV_EXTERNAL_PHY				1
+#define MV_5050_MAX_INTERNA_PHY			5
+#define MV_5072_MAX_INTERNA_PHY			7
+#define MV_5050_EXTERNA_PHY_OFFSET		5
+#define MV_5072_EXTERNA_PHY_OFFSET		8
 
 static struct phy_device *mv_phy[2];
 static const struct file_operations mv_5050_fops;
@@ -114,15 +125,15 @@ static int mv_wait_smi_idle(struct phy_device *phy, int timeout)
 	return 0;
 }
 
-static int mv_write_phy_register(struct phy_device *phy, u16 smi_device, u16 smi_register,
-				u16 reg_addr, u16 write_data)
+static int mv_write_phy_register(struct phy_device *phy, u16 func,
+	u16 smi_device, u16 smi_register, u16 reg_addr, u16 write_data)
 {
 	u16 base_cmd;
 
 	if (mv_wait_smi_idle(phy, 50) < 0)
 		return -EBUSY;
 
-	base_cmd = (1 << MV_SMI_BUSY_OFFSET) | \
+	base_cmd = (1 << MV_SMI_BUSY_OFFSET) | (func << MV_SMI_FUNC_OFFSET) | \
 		(smi_device << MV_SMI_DEV_ADDR_OFFSET) | smi_register;
 
 	mv_write(phy, MV_GLOBAL2_PORT, MV_SMI_PHY_DATA_REG, reg_addr);
@@ -142,15 +153,16 @@ static int mv_write_phy_register(struct phy_device *phy, u16 smi_device, u16 smi
 	return 0;
 }
 
-static int mv_read_phy_register(struct phy_device *phy, u16 smi_device, u16 smi_register, u16 reg_addr)
+static int mv_read_phy_register(struct phy_device *phy, u16 func,
+			u16 smi_device, u16 smi_register, u16 reg_addr)
 {
 	u16 base_cmd;
 
 	if (mv_wait_smi_idle(phy, 50) < 0)
 		return -EBUSY;
 
-	base_cmd = (1 << MV_SMI_BUSY_OFFSET) | \
-		(smi_device << MV_SMI_DEV_ADDR_OFFSET) | smi_register;
+	base_cmd = (1 << MV_SMI_BUSY_OFFSET) | (func << MV_SMI_FUNC_OFFSET) | \
+		   (smi_device << MV_SMI_DEV_ADDR_OFFSET) | smi_register;
 
 	mv_write(phy, MV_GLOBAL2_PORT, MV_SMI_PHY_DATA_REG, reg_addr);
 	mv_write(phy, MV_GLOBAL2_PORT, MV_SMI_PHY_CMD_REG, \
@@ -172,26 +184,56 @@ static int mv_read_phy_register(struct phy_device *phy, u16 smi_device, u16 smi_
 static int mv_set_test_mode(struct phy_device *phy, struct mv_data *data)
 {
 	u16 test_mode;
+	u16 phy_type, phy_port, phy_addr, phy_reg, max_internal_port;
+	u16 phy_external_port_offset;
 
 	test_mode = (u16)data->data[0];
-	if (test_mode == 3 || test_mode > 5) {
+
+	if (phy->phy_id == MV_5050_PHYID) {
+		max_internal_port = MV_5050_MAX_INTERNA_PHY;
+		phy_external_port_offset = MV_5050_EXTERNA_PHY_OFFSET;
+	} else {
+		max_internal_port = MV_5072_MAX_INTERNA_PHY;
+		phy_external_port_offset = MV_5072_EXTERNA_PHY_OFFSET;
+	}
+
+	if (((data->portaddr <= max_internal_port) && (test_mode == 3 ||
+		test_mode > 5)) || ((data->portaddr > max_internal_port) &&
+		(test_mode == 3 || test_mode > 7))) {
 		phydev_err(phy, "mv_switch: test_mode set error:%d\n", test_mode);
 		return -EINVAL;
 	}
 
-	return mv_write_phy_register(phy, data->portaddr, 1, \
-		MV_PHY_TEST_CTRL_REG, (u16)(test_mode << MV_PHY_TEST_CTRL_OFFSET));
+	if (data->portaddr <= max_internal_port) {
+		phy_type = MV_INTERNAL_PHY;
+		phy_port = data->portaddr;
+		phy_addr = MV_INTERNAL_PHY_TEST_ADDR;
+		phy_reg = MV_INTERNAL_PHY_TEST_CTRL_REG;
+	} else {
+		phy_type = MV_EXTERNAL_PHY;
+		/*
+		 * the external phy port addr is only 1 or 2
+		 * 5072 port 9 is 1, port 10 is 2
+		 * 5050 port 6 is 1, port 7 is 2
+		 */
+		phy_port = data->portaddr - phy_external_port_offset;
+		phy_addr = MV_EXTERNAL_PHY_TEST_ADDR;
+		phy_reg = MV_EXTERNAL_PHY_TEST_CTRL_REG;
+	}
+
+	return mv_write_phy_register(phy, phy_type, phy_port, phy_addr, \
+			phy_reg, (u16)(test_mode << MV_PHY_TEST_CTRL_OFFSET));
 }
 
 static int mv_set_auto_negotiation(struct phy_device *phy, struct mv_data *data)
 {
-	return mv_write_phy_register(phy, data->portaddr, 7, \
+	return mv_write_phy_register(phy, MV_INTERNAL_PHY, data->portaddr, 7, \
 		MV_PHY_AUTO_NEGO_CTRL_REG, (u16)(1 << MV_PHY_AUTO_NEGO_EN_OFFSET));
 }
 
 static int mv_get_auto_negotiation_state(struct phy_device *phy, struct mv_data *data)
 {
-	return mv_read_phy_register(phy, data->portaddr, 7, \
+	return mv_read_phy_register(phy, MV_INTERNAL_PHY, data->portaddr, 7, \
 		MV_PHY_AUTO_NEGO_STA_REG);
 }
 
