@@ -157,7 +157,7 @@ typedef struct _VMM_PVZ_CONNECTION_
 											IMG_UINT32 ui32DevID);
 
 		PVRSRV_ERROR (*pfnDebugDumpConfig)(IMG_UINT32 ui32FuncID,
-								  IMG_UINT32 ui32DevID)
+								  IMG_UINT32 ui32DevID);
 	} sHostFuncTab;
 
 	struct {

@@ -99,6 +99,7 @@ void SysVzDebugDumpConfig(PVRSRV_DEVICE_CONFIG *psDevConfig)
 	PVRSRV_ERROR eError;
 
 	eError = PvzClientDebugDumpConfig(psDevConfig, 0);
+	PVR_LOGG_IF_ERROR(eError, "PvzClientDebugDumpConfig", e0);
 
 e0:
 	return;

@@ -16,7 +16,7 @@
 
 /*!< System specific poll/timeout details */
 #define MAX_HW_TIME_US                           (500000)
-#define DEVICES_WATCHDOG_POWER_ON_SLEEP_TIMEOUT  (10000)
+#define DEVICES_WATCHDOG_POWER_ON_SLEEP_TIMEOUT  (1500)
 #define DEVICES_WATCHDOG_POWER_OFF_SLEEP_TIMEOUT (3600000)
 #define WAIT_TRY_COUNT                           (10000)
 
