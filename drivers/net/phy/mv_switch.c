@@ -250,6 +250,7 @@ static long mv_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	switch (cmd) {
 	case MV_GET_CMD:
 		ret = mv_get_data(phy, &data);
+		break;
 	case MV_SET_TEST_MODE:
 		ret = mv_set_test_mode(phy, &data);
 		break;
