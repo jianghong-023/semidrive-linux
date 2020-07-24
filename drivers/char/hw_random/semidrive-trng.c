@@ -380,51 +380,24 @@ bool trng_startup_failed(void)
 	return rng_startup_failed;
 }
 
-uint32_t rng_get_trng(void __iomem *ce_base, uint32_t vce_id, uint8_t* dst, uint32_t size)
+uint32_t rng_get_trng(void __iomem *ce_base, uint8_t* dst, uint32_t size)
 {
 	uint32_t ret = 0;
 	uint32_t rng_value;
 	uint32_t i;
+	unsigned long baddr;
 
 	pr_info("rng_get_trng enter size=%d", size);
 
-	if (size % 4)
-		return ret;
+	baddr = ce_base + (0x114<<0);
 
-	if (rng_needs_startup_chk) {
-		trng_wait_startup(ce_base);
-		rng_needs_startup_chk = false;
+	for (i = 0; i < size; i++) {
+			rng_value = readl(baddr);
+			pr_info("rng_get_trng rng_value=%x.\n", rng_value);
+			memcpy(dst+i, (void *)(&rng_value), sizeof(rng_value));
+			i = i+4;
+			ret = i;
 	}
-
-	trng_wait_ready(ce_base, vce_id);
-
-	for (i = 0; i < size;) {
-		if (i % 8 == 0) {
-			trng_wait_ready(ce_base, vce_id);
-			pr_info("reg%x value = %x.\n", REG_CE_TRNG_CONTROL,
-				readl(ce_base + REG_CE_TRNG_CONTROL_OFFSET));
-			pr_info("reg(%x) value = %x.\n", REG_CE_TRNG_STATUS,
-				readl(ce_base + TRNG_STATUS_OFFSET));
-			if (readl(ce_base + TRNG_STATUS_OFFSET) & 0x100) {
-				writel(readl(ce_base +
-				TRNG_STATUS_OFFSET) & 0xFFFFFEFF,
-				ce_base + TRNG_STATUS_OFFSET);
-			}
-			pr_info("after readl(%x) value = %x.\n",
-			REG_CE_TRNG_STATUS,
-			readl(ce_base + TRNG_STATUS_OFFSET));
-			writel(0x1, ce_base + REG_CE_TRNG_CTRL_OFFSET);
-		}
-
-		rng_value = readl((
-		(ce_base + CE0_TRNG_NUM0_OFFSET) + CE_JUMP * vce_id)
-		+ (i % 8));
-		pr_info("trng_get_rand rng_value=%x.\n", rng_value);
-		memcpy(dst + i, (void *)(&rng_value), 4);
-		i = i + 4;
-	}
-
-	ret = i;
 	return ret;
 }
 
@@ -448,7 +421,7 @@ uint32_t trng_get_rand_by_fifo(void __iomem *ce_base, uint8_t * dst, uint32_t si
 	while ((status & 0x300) != 0x0) {
 		pr_info("trng_get_rand_by_fifo status=0x%x.\n", status);
 		trng_soft_reset(ce_base + REG_CE_TRNG_CONTROL_OFFSET);
-		status = readl(ce_base+TRNG_STATUS_OFFSET);
+		status = readl(ce_base + TRNG_STATUS_OFFSET);
 	}
 	size_time = size/CE_TRNG_FIFO_SIZE_VALUE;
 	size_left = size%CE_TRNG_FIFO_SIZE_VALUE;
@@ -494,7 +467,7 @@ static int semidrive_rng_init(struct hwrng *rng)
 	struct semidrive_rng_data *priv = to_semidrive_rng(rng);
 
 	pr_info("semidrive_rng_init enter ");
-	trng_init(priv->base);
+	//trng_init(priv->base);
 	return 0;
 }
 
@@ -513,8 +486,8 @@ static int semidrive_rng_read(struct hwrng *rng, void *buf, size_t max, bool wai
 
 	pr_info("semidrive_rng_read enter size =0x%x",max);
 
-	//ret = rng_get_trng(priv->base, TRNG_CE2_VCE2_NUM, buf, max);
-	ret = trng_get_rand_by_fifo(priv->base, buf, max);
+	ret = rng_get_trng(priv->base, buf, max);
+	//ret = trng_get_rand_by_fifo(priv->base, buf, max);
 
 	pr_info("semidrive_rng_read out ");
 	return ret;
