@@ -100,8 +100,8 @@ static irqreturn_t xenipc_interrupt(int irq, void *dev_id)
 	struct xenipc_call_info *current_call = NULL;
 	unsigned long flags;
 
-again:
 	spin_lock_irqsave(&chan->ring_lock, flags);
+again:
 	rp = chan->front_ring.sring->rsp_prod;
 	rmb(); /* Ensure we see queued responses up to 'rp'. */
 
