@@ -57,7 +57,7 @@ config SND_X9_REF_MACH_HS
 
 config SND_G9_REF_MACH
 	tristate "ASoC Audio driver for g9 platform"
-	depends on ARCH_SEMIDRIVE_X9
+	depends on ARCH_SEMIDRIVE_G9
 	select SND_SOC_GENERIC_DMAENGINE_PCM
 	help
 	  This adds support for ASoC machine driver for SEMI_DRIVE G9

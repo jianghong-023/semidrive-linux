@@ -5,7 +5,7 @@ menu "Semidrive SoC drivers"
 
 config SEMIDRIVE_IPCC
 	tristate "Semidrive Inter-Processor Communication Channel"
-	depends on ARCH_SEMIDRIVE_X9
+	depends on ARCH_SEMIDRIVE
 	depends on MAILBOX
 	depends on RPMSG_SEMIDRIVE
 	help
@@ -13,7 +13,7 @@ config SEMIDRIVE_IPCC
 
 config SEMIDRIVE_SCR
 	tristate "Semidrive SCR driver"
-	depends on ARCH_SEMIDRIVE_X9
+	depends on ARCH_SEMIDRIVE
 	select HWSEM_SEMIDRIVE
 	default n
 	help

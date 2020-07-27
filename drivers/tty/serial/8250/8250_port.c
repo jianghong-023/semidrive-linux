@@ -2500,7 +2500,7 @@ static unsigned int npcm_get_divisor(struct uart_8250_port *up,
 
 	return DIV_ROUND_CLOSEST(port->uartclk, 16 * baud + 2) - 2;
 }
-#ifdef CONFIG_ARCH_SEMIDRIVE_X9
+#ifdef CONFIG_ARCH_SEMIDRIVE
 static unsigned int dw_serial8250_get_divisor(struct uart_8250_port *up,
 					   unsigned int baud,
 					   unsigned int *frac)
@@ -2616,7 +2616,7 @@ static void serial8250_set_divisor(struct uart_port *port, unsigned int baud,
 		serial_port_out(port, 0x2, quot_frac);
 	}
 	/* dw uart support dlf */
-#ifdef CONFIG_ARCH_SEMIDRIVE_X9
+#ifdef CONFIG_ARCH_SEMIDRIVE
 	quot_frac = DIV_ROUND_CLOSEST(quot_frac * 16, 1000);
 	/* pr_info("frac :%ld baud %ld, uartclk %ld quot %d\n", quot_frac, baud, port->uartclk, quot);*/
 	/* Preserve bits not related to baudrate. */
@@ -2658,7 +2658,7 @@ serial8250_do_set_termios(struct uart_port *port, struct ktermios *termios,
 	cval = serial8250_compute_lcr(up, termios->c_cflag);
 
 	baud = serial8250_get_baud_rate(port, termios, old);
-#ifdef CONFIG_ARCH_SEMIDRIVE_X9
+#ifdef CONFIG_ARCH_SEMIDRIVE
 	quot = dw_serial8250_get_divisor(up, baud, &frac);
 #else
 	quot = serial8250_get_divisor(up, baud, &frac);

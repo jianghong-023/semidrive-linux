@@ -55,7 +55,7 @@ config RPMSG_SEMIDRIVE
 	bool "Semidrive RPMSG device driver"
 	select RPMSG
 	select RPMSG_VIRTIO
-	depends on ARCH_SEMIDRIVE_X9
+	depends on ARCH_SEMIDRIVE
 	depends on SEMIDRIVE_MBOX
 
 endmenu

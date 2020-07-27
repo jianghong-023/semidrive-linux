@@ -789,7 +789,7 @@ config UNIPHIER_WATCHDOG
 
 config SDRV_WATCHDOG
 	tristate "Semidrive watchdog support"
-	depends on ARCH_SEMIDRIVE_X9
+	depends on ARCH_SEMIDRIVE
 	select WATCHDOG_CORE
 	help
 	  Say Y here to include support for the watchdog timer

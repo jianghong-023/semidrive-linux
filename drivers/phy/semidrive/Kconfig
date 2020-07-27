@@ -3,7 +3,7 @@
 #
 config PHY_SEMIDRIVE_USB
     tristate "Semidrive USB PHY Driver"
-    depends on ARCH_SEMIDRIVE_X9 && OF
+    depends on ARCH_SEMIDRIVE && OF
     select GENERIC_PHY
     help
       Say 'Y' here to add support for Semidrive USB PHY driver,

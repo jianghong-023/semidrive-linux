@@ -2162,7 +2162,7 @@ static const struct file_operations possible_parents_fops = {
 	.llseek		= seq_lseek,
 	.release	= single_release,
 };
-#ifdef CONFIG_ARCH_SEMIDRIVE_X9
+#ifdef CONFIG_ARCH_SEMIDRIVE
 static ssize_t sdrv_gate_read(struct file *filp, char __user *buffer,
 		size_t count, loff_t *ppos)
 {
@@ -2326,7 +2326,7 @@ static int clk_debug_create_one(struct clk_core *core, struct dentry *pdentry)
 		if (ret)
 			goto err_out;
 	}
-	#ifdef CONFIG_ARCH_SEMIDRIVE_X9
+	#ifdef CONFIG_ARCH_SEMIDRIVE
 	sdrv_clk_create(core);
 	#endif
 	ret = 0;

@@ -535,7 +535,7 @@ config KAPROBE
 
 config SEMIDRIVE_REGCTL
 	tristate "Semidrive generic register programming driver"
-	depends on ARCH_SEMIDRIVE_X9
+	depends on ARCH_SEMIDRIVE
 	default n
 	help
 	  This adds support for Semidriver SOC generic register programming.

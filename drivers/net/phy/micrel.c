@@ -970,7 +970,7 @@ static struct phy_driver ksphy_driver[] = {
 	.phy_id_mask	= MICREL_PHY_ID_MASK,
 	.name		= "Micrel KSZ9031 Gigabit PHY",
 	.features	= PHY_GBIT_FEATURES,
-#ifdef CONFIG_ARCH_SEMIDRIVE_X9
+#ifdef CONFIG_ARCH_SEMIDRIVE
 	.flags		= PHY_POLL,
 #else
 	.flags		= PHY_HAS_INTERRUPT,
