@@ -179,6 +179,7 @@ int xenipc_do_request(int dev, struct xenipc_request *pReq, struct xenipc_respon
 
 	ret = xenipc_rpc_call(hRpc, pReq);
 	if (ret) {
+		spin_unlock_irqrestore(&hRpc->calls_lock, flags);
 		pr_err("xenipc failled to call\n");
 		return ret;
 	}
