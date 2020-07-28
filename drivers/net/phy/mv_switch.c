@@ -24,6 +24,9 @@ struct mv_data {
 #define MV_SET_TEST_MODE			_IOW('M', 9, struct mv_data)
 #define MV_SET_AUTO_NEGOTIATION			_IOW('M', 10, struct mv_data)
 #define MV_GET_AUTO_NEGOTIATION_STATE		_IOWR('M', 11, struct mv_data)
+#define MV_ACCESS_PHY_CMD			_IOWR('M', 12, struct mv_data)
+#define MV_ACCESS_LBU_CMD			_IOWR('M', 13, struct mv_data)
+
 #define MV_5050_PHYID				0x50505050
 #define MV_5072_PHYID				0x50725072
 #define MV_GLOBAL1_PORT				0x1b
@@ -60,6 +63,25 @@ struct mv_data {
 #define MV_5072_MAX_INTERNA_PHY			7
 #define MV_5050_EXTERNA_PHY_OFFSET		5
 #define MV_5072_EXTERNA_PHY_OFFSET		8
+
+#define MV_AHB_MASTER				0x11
+#define MV_AHB_MASTER_BUSY			15
+#define MV_AHB_MASTER_POINTER			8
+#define MV_AHB_LBU_BUSY				7
+
+#define MV_AHB_MASTER_CTRL			0x00
+#define MV_AHB_TRANS_MODE			0x02
+#define MV_AHB_TRANS_ADDR0			0x04
+#define MV_AHB_TRANS_ADDR1			0x05
+#define MV_AHB_TRANS_ADDR2			0x06
+#define MV_AHB_TRANS_ADDR3			0x07
+#define MV_AHB_TRANS_DATA0			0x10
+#define MV_AHB_TRANS_DATA1			0x11
+#define MV_AHB_TRANS_DATA2			0x12
+#define MV_AHB_TRANS_DATA3			0x13
+
+#define MV_AHB_WRITE_START			0x81
+#define MV_AHB_READ_START			0x80
 
 static struct phy_device *mv_phy[2];
 static const struct file_operations mv_5050_fops;
@@ -180,6 +202,126 @@ static int mv_read_phy_register(struct phy_device *phy, u16 func,
 	return mv_read(phy, MV_GLOBAL2_PORT, MV_SMI_PHY_DATA_REG);
 }
 
+static int mv_access_phy(struct phy_device *phy, struct mv_data *data)
+{
+	if (data->is_write)
+		mv_write_phy_register(phy, (u16)(data->data[0]), data->portaddr,
+					(u16)(data->data[1]), data->regnum,
+					(u16)(data->data[2]));
+	else
+		data->data[0] = mv_read_phy_register(phy, (u16)(data->data[0]),
+					data->portaddr, (u16)(data->data[1]),
+					data->regnum);
+	return 0;
+}
+
+static int mv_wait_ahb_idle(struct phy_device *phy, int timeout)
+{
+	u16 reg;
+
+	do {
+		udelay(1);
+		reg = mv_read(phy, MV_GLOBAL2_PORT, MV_AHB_MASTER);
+	} while (--timeout && (reg & (1 << MV_AHB_MASTER_BUSY)));
+
+	if (!timeout) {
+		phydev_err(phy, "wait AHB idle timeout\n");
+		return -ETIMEDOUT;
+	}
+
+	return 0;
+}
+
+static int mv_write_ahb_reg(struct phy_device *phy, u8 addr, u8 data)
+{
+	u16 tmp = 0;
+
+	tmp = (1 << MV_AHB_MASTER_BUSY) | (addr << MV_AHB_MASTER_POINTER) | data;
+	mv_write(phy, MV_GLOBAL2_PORT, MV_AHB_MASTER, tmp);
+
+	return mv_wait_ahb_idle(phy, 50);
+}
+
+static int mv_read_ahb_reg(struct phy_device *phy, u8 addr, u8 *data)
+{
+	u16 tmp = 0;
+
+	tmp = (addr << MV_AHB_MASTER_POINTER);
+	mv_write(phy, MV_GLOBAL2_PORT, MV_AHB_MASTER, tmp);
+
+	tmp = mv_read(phy, MV_GLOBAL2_PORT, MV_AHB_MASTER);
+	*data = (u8)(tmp & 0xff);
+	return 0;
+}
+
+static int mv_wait_lbu_idle(struct phy_device *phy, int timeout)
+{
+	u8 tmp;
+
+	do {
+		udelay(1);
+		mv_read_ahb_reg(phy, MV_AHB_MASTER_CTRL, &tmp);
+	} while (--timeout && (tmp & (1 << MV_AHB_LBU_BUSY)));
+
+	if (!timeout) {
+		phydev_err(phy, "wait AHB lbu timeout\n");
+		return -ETIMEDOUT;
+	}
+
+	return 0;
+}
+
+static int mv_write_lbu_reg(struct phy_device *phy, u32 addr, u32 data)
+{
+	mv_write_ahb_reg(phy, MV_AHB_TRANS_ADDR0, (u8)(addr & 0xff));
+	mv_write_ahb_reg(phy, MV_AHB_TRANS_ADDR1, (u8)((addr >> 8) & 0xff));
+	mv_write_ahb_reg(phy, MV_AHB_TRANS_ADDR2, (u8)((addr >> 16) & 0xff));
+	mv_write_ahb_reg(phy, MV_AHB_TRANS_ADDR3, (u8)((addr >> 24) & 0xff));
+
+	mv_write_ahb_reg(phy, MV_AHB_TRANS_DATA0, (u8)(data & 0xff));
+	mv_write_ahb_reg(phy, MV_AHB_TRANS_DATA1, (u8)((data >> 8) & 0xff));
+	mv_write_ahb_reg(phy, MV_AHB_TRANS_DATA2, (u8)((data >> 16) & 0xff));
+	mv_write_ahb_reg(phy, MV_AHB_TRANS_DATA3, (u8)((data >> 24) & 0xff));
+
+	mv_write_ahb_reg(phy, MV_AHB_MASTER_CTRL, MV_AHB_WRITE_START);
+
+	return mv_wait_lbu_idle(phy, 50);
+}
+
+static int mv_read_lbu_reg(struct phy_device *phy, u32 addr, u32 *data)
+{
+	u8 tmp[4];
+	int ret = 0;
+
+	mv_write_ahb_reg(phy, MV_AHB_TRANS_ADDR0, (u8)(addr & 0xff));
+	mv_write_ahb_reg(phy, MV_AHB_TRANS_ADDR1, (u8)((addr >> 8) & 0xff));
+	mv_write_ahb_reg(phy, MV_AHB_TRANS_ADDR2, (u8)((addr >> 16) & 0xff));
+	mv_write_ahb_reg(phy, MV_AHB_TRANS_ADDR3, (u8)((addr >> 24) & 0xff));
+
+	mv_write_ahb_reg(phy, MV_AHB_MASTER_CTRL, MV_AHB_READ_START);
+	ret = mv_wait_lbu_idle(phy, 50);
+	if (ret)
+		return ret;
+
+	mv_read_ahb_reg(phy, MV_AHB_TRANS_DATA0, &tmp[0]);
+	mv_read_ahb_reg(phy, MV_AHB_TRANS_DATA1, &tmp[1]);
+	mv_read_ahb_reg(phy, MV_AHB_TRANS_DATA2, &tmp[2]);
+	mv_read_ahb_reg(phy, MV_AHB_TRANS_DATA3, &tmp[3]);
+
+	*data = (tmp[3] << 24) | (tmp[2] << 16) | (tmp[1] << 8) | tmp[0];
+	return 0;
+}
+
+static int mv_access_lbu(struct phy_device *phy, struct mv_data *data)
+{
+	int ret = 0;
+
+	if (data->is_write)
+		ret = mv_write_lbu_reg(phy, data->data[0], data->data[1]);
+	else
+		ret = mv_read_lbu_reg(phy, data->data[0], &data->data[1]);
+	return ret;
+}
 
 static int mv_set_test_mode(struct phy_device *phy, struct mv_data *data)
 {
@@ -250,6 +392,12 @@ static long mv_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	switch (cmd) {
 	case MV_GET_CMD:
 		ret = mv_get_data(phy, &data);
+		break;
+	case MV_ACCESS_PHY_CMD:
+		ret = mv_access_phy(phy, &data);
+		break;
+	case MV_ACCESS_LBU_CMD:
+		ret = mv_access_lbu(phy, &data);
 		break;
 	case MV_SET_TEST_MODE:
 		ret = mv_set_test_mode(phy, &data);
