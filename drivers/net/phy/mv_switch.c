@@ -83,6 +83,10 @@ struct mv_data {
 #define MV_AHB_WRITE_START			0x81
 #define MV_AHB_READ_START			0x80
 
+#define MV_5050_INTERNAL_PHY_DEVICE1		1
+#define MV_5050_INTERNAL_PHY_PMA_PMD_REG	0x0834
+#define MV_5050_INTERNAL_PHY_PMA_PMD_DATA	0x8000
+
 static struct phy_device *mv_phy[2];
 static const struct file_operations mv_5050_fops;
 static const struct file_operations mv_5072_fops;
@@ -379,6 +383,17 @@ static int mv_get_auto_negotiation_state(struct phy_device *phy, struct mv_data 
 		MV_PHY_AUTO_NEGO_STA_REG);
 }
 
+static int mv_5050_init(struct phy_device *phy)
+{
+	int port;
+
+	/* init all 5050 internal T1 phy as slave mode */
+	for (port = 1; port <= MV_5050_MAX_INTERNA_PHY; port++)
+		mv_write_phy_register(phy, MV_INTERNAL_PHY, port,
+			MV_5050_INTERNAL_PHY_DEVICE1, MV_5050_INTERNAL_PHY_PMA_PMD_REG,
+			MV_5050_INTERNAL_PHY_PMA_PMD_DATA);
+}
+
 static long mv_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 {
 	int ret = -1;
@@ -458,6 +473,7 @@ static int mv_probe(struct phy_device *phydev)
 	if (phydev->phy_id == MV_5050_PHYID) {
 		mv_misc = &mv_5050;
 		mv_phy[0] = phydev;
+		mv_5050_init(phydev);
 	} else {
 		mv_misc = &mv_5072;
 		mv_phy[1] = phydev;
