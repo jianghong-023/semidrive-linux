@@ -50,6 +50,7 @@ typedef enum {
 } i2c_state_t;
 
 #define SD_CLUSTER_EPT	(70)
+#define SD_IVI_EPT	(71)
 #define SD_SSYSTEM_EPT	(72)
 #define SD_EARLYAPP_EPT	(80)
 

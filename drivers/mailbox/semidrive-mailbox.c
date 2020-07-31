@@ -91,6 +91,7 @@ typedef struct sd_mbox_device {
 	struct sd_mbox_chan mlink[MB_MAX_CHANS];
 	struct mbox_chan chan[MB_MAX_CHANS];
 	struct mbox_controller controller;
+	bool initialized;
 } sd_mbox_controller_t;
 
 #define FM_TMH0_MDP	(0xffU << 16U)
@@ -410,6 +411,9 @@ inline static struct mbox_chan *find_used_chan_atomic(
 	struct sd_mbox_chan *mlink;
 	struct mbox_controller *mbox = &mbdev->controller;
 
+	if (!mbox->dev || mbdev->initialized == false)
+		return NULL;
+
 	if (dest) {
 		/* match exact reciever address */
 		for (idx = 0;idx < MB_MAX_CHANS; idx++) {
@@ -482,6 +486,7 @@ static irqreturn_t sd_mbox_rx_interrupt(int irq, void *p)
 				dev_info(mbox->dev, "mu: suppose not ROM msg\n");
 			} else {
 				chan = find_used_chan_atomic(mbdev, remote_proc, dest);
+				msg->rproc = chan ? remote_proc : msg->rproc;
 			}
 
 #if CONFIG_MBOX_DUMP_HEX
@@ -624,6 +629,7 @@ static int sd_mbox_probe(struct platform_device *pdev)
 		dev_err(dev, "Failed to register mailboxes %d\n", err);
 		return err;
 	}
+	mbdev->initialized = true;
 
 	dev_info(dev, "Semidrive Mailbox registered\n");
 	return 0;

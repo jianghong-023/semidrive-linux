@@ -67,6 +67,7 @@ struct rpmsg_ipcc_device {
 	struct mbox_client client;
 	struct mbox_chan *mbox;
 	struct rpmsg_endpoint *ns_ept;
+	struct delayed_work ns_work;
 	struct rpmsg_endpoint *echo_ept;
 	struct work_struct rx_work;
 	struct idr endpoints;
@@ -635,6 +636,26 @@ static int rpmsg_ipcc_rx(struct rpmsg_ipcc_device *vrp,
 	return 0;
 }
 
+static void __ns_announce_delayed(struct work_struct *work)
+{
+	struct delayed_work *dwork = to_delayed_work(work);
+	struct rpmsg_ipcc_device *vrp = container_of(dwork, struct rpmsg_ipcc_device,
+	                    ns_work);
+	struct rpmsg_ipcc_nsm nsm;
+	int ret;
+
+	strncpy(nsm.name, "ipcc-echo", RPMSG_NAME_SIZE);
+	nsm.addr = RPMSG_ECHO_ADDR;
+	nsm.flags = RPMSG_NS_CREATE;
+	ret = __send_offchannel_raw(vrp, RPMSG_ECHO_ADDR, RPMSG_NS_ADDR, &nsm, sizeof(nsm), true);
+	if (ret) {
+		dev_warn(vrp->dev, "failed to announce ns %d, try later\n", ret);
+		schedule_delayed_work(&vrp->ns_work, msecs_to_jiffies(2000));
+		return;
+	}
+	dev_info(vrp->dev, "delayed announce ns %s\n", nsm.name);
+}
+
 static void __rx_work_handler(struct work_struct *work)
 {
 	struct rpmsg_ipcc_device *vrp = container_of(work, struct rpmsg_ipcc_device,
@@ -783,7 +804,7 @@ static int rpmsg_ipcc_echo_cb(struct rpmsg_device *rpdev, void *data, int len,
 	void *msg_ptr;
 	int err = 0;
 
-	dev_info(dev, "%s in\n", __func__);
+	dev_dbg(dev, "%s in\n", __func__);
 	if (len == 0) {
 		dev_err(dev, "malformed echo msg (%d)\n", len);
 		return -EINVAL;
@@ -837,6 +858,8 @@ static int rpmsg_ipcc_probe(struct platform_device *pdev)
 	mutex_init(&vrp->tx_lock);
 	init_waitqueue_head(&vrp->sendq);
 	INIT_WORK(&vrp->rx_work, __rx_work_handler);
+	INIT_DELAYED_WORK(&vrp->ns_work, __ns_announce_delayed);
+	vrp->rproc = -1;	/* This is not used */
 
 	spin_lock_init(&vrp->queue_lock);
 	skb_queue_head_init(&vrp->queue);
@@ -882,16 +905,9 @@ static int rpmsg_ipcc_probe(struct platform_device *pdev)
 
 	/* need to tell remote processor's name service about this channel ? */
 	if (ipcc_has_feature(vrp, RPMSG_F_NS)) {
-		struct rpmsg_ipcc_nsm nsm;
-
-//		MB_MSG_INIT_RPMSG_HEAD(&nsm.mboxhdr, vrp->rproc, sizeof(nsm), 0);
-		strncpy(nsm.name, "ipcc-echo", RPMSG_NAME_SIZE);
-		nsm.addr = RPMSG_ECHO_ADDR;
-		nsm.flags = RPMSG_NS_CREATE;
-		ret = __send_offchannel_raw(vrp, RPMSG_ECHO_ADDR, RPMSG_NS_ADDR, &nsm, sizeof(nsm), true);
-		if (ret)
-			dev_err(&pdev->dev, "failed to announce ns service %d\n", ret);
+		schedule_delayed_work(&vrp->ns_work, 0);
 	}
+	dev_info(&pdev->dev, "%s done\n", __func__);
 
 	return ret;
 
