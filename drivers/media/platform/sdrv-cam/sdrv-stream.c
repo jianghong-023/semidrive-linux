@@ -194,7 +194,7 @@ const struct kstream_pix_format pix_fmts[] = {
 		.pack_uv_even = 0x03,
 		.pack_pix_odd = 0x03,
 		.pack_pix_even = 0x03,
-		.split = {0x53, 0x3F},
+		.split = {0x21a, 0x3F},
 		.pack = {0x42108, 0},
 	},
 	{
@@ -443,17 +443,13 @@ static int kstream_set_channel(struct kstream_device *kstream)
 		return pos;
 
 	for(n = 0; n < IMG_HW_NUM_PLANES; n++) {
+		dev_err(kstream->dev, "%s: pix_fmts[pos=%d]\n", __func__, pos);
 		if((kstream->core->host_id==0) || (kstream->core->host_id==1)){
 			kcsi_writel(kstream->base, IMG_CHN_SPLIT_(n), 0x13);
 			kcsi_writel(kstream->base, IMG_CHN_PACK_(n), 0x108);
 		} else {
-			if(kstream->id==0){
-				kcsi_writel(kstream->base, IMG_CHN_SPLIT_(n), 0x21a);
-			} else {
-				kcsi_writel(kstream->base, IMG_CHN_SPLIT_(n), pix_fmts[pos].split[n]);
-			}
+			kcsi_writel(kstream->base, IMG_CHN_SPLIT_(n), pix_fmts[pos].split[n]);
 			kcsi_writel(kstream->base, IMG_CHN_PACK_(n), pix_fmts[pos].pack[n]);
-			//dev_err(kstream->dev, "%s: pix_fmts[pos=%d]\n", __func__, pos);
 		}
 		if(n < pix_fmt->num_planes)
 			ctrl |= ((1 << n) << IMG_PIXEL_STREAM_EN_SHIFT);

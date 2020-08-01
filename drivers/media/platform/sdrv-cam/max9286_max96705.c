@@ -34,8 +34,15 @@
 
 #define MAX_SENSOR_NUM 4
 
-#define MAX96705_SLAVE_ID 0x40
 #define MAX9286_DEVICE_ID 0x40
+
+#define MAX96705_SLAVE_ID 0x40
+#define MAX96705_DEV_INDEX -4
+#define MAX96705_DEVICE_ID 0x41
+
+#define AP0101_SLAVE_ID 0x5d
+#define AP0101_DEV_INDEX -4
+
 
 enum max9286_mode_id {
     MAX9286_MODE_720P_1280_720 = 0,
@@ -147,6 +154,7 @@ struct max9286_dev {
 
     bool pending_mode_change;
     bool streaming;
+    int sec_9286_shift;
 };
 
 
@@ -574,9 +582,9 @@ static int max9286_check_chip_id(struct max9286_dev *sensor)
 {
     struct i2c_client *client = sensor->i2c_client;
     int ret = 0;
-    u8 chip_id;
+    u8 chip_id = 0;
 
-    max9286_power(sensor, 1);
+    //max9286_power(sensor, 1);
 
     ret = max9286_read_reg(sensor, 0x1e, &chip_id);
 
@@ -652,6 +660,7 @@ static int max9286_initialization(struct max9286_dev *sensor)
 
     max9286_read_reg(sensor, 0x49, &val);
     link_status = val & 0xf;
+    dev_err(&client->dev, "link_status=0x%x\n", link_status);
     max9286_write_reg(sensor, 0x0, (0xe0 | link_status));
     msleep(10);
 
@@ -674,62 +683,89 @@ static int max9286_initialization(struct max9286_dev *sensor)
 
     val = 0;
 
-    for (i = 1; i <= MAX_SENSOR_NUM; i++) {
+    for (i = 0; i < MAX_SENSOR_NUM; i++) {
 
-        if (((1 << (i - 1)) & link_status) == 0)
+        if (((1 << i) & link_status) == 0)
             continue;
 
         link_count++;
         //Enable Link control channel
-        val |= (0x11 << (i - 1));
+        val |= (0x11 << i);
         //sensor->i2c_client->addr = sensor->addr_9286;
         max9286_write_reg(sensor, 0x0A, val);
         msleep(10);
 
-        dev_info(&client->dev, "reg=0x%x, aid=0x%x\n", val,
-                 (MAX96705_SLAVE_ID + i));
+        dev_err(&client->dev, "reg=0x%x, aid=0x%x\n", val,
+                (MAX96705_SLAVE_ID + MAX96705_DEV_INDEX + sensor->sec_9286_shift + i));
         //Set MAX9271 new address for link 0
         //sensor->i2c_client->addr = sensor->addr_96705;
 
 
-        max96705_write_reg(sensor, 0, 0x00, (MAX96705_SLAVE_ID + i) << 1);
+        max96705_write_reg(sensor, 0, 0x00,
+                           (MAX96705_SLAVE_ID + MAX96705_DEV_INDEX + sensor->sec_9286_shift + i) <<
+                           1);
         msleep(10);
 
         //enable dbl, hven
-        max96705_write_reg(sensor, i, 0x7, 0x84);
+        max96705_write_reg(sensor, MAX96705_DEV_INDEX + sensor->sec_9286_shift + i,
+                           0x7, 0x84);
         msleep(10);
 
 
         //vs delay
-        max96705_write_reg(sensor, i, 0x43, 0x25);
+        max96705_write_reg(sensor, MAX96705_DEV_INDEX + sensor->sec_9286_shift + i,
+                           0x43, 0x25);
         msleep(10);
-        max96705_write_reg(sensor, i, 0x45, 0x01);
+        max96705_write_reg(sensor, MAX96705_DEV_INDEX + sensor->sec_9286_shift + i,
+                           0x45, 0x01);
         msleep(10);
-        max96705_write_reg(sensor, i, 0x47, 0x26);
+        max96705_write_reg(sensor, MAX96705_DEV_INDEX + sensor->sec_9286_shift + i,
+                           0x47, 0x26);
         msleep(10);
 
         //max96705_write_reg(sensor, i, 0x4d, 0xcc);
 
-        max96705_write_reg(sensor, i, 0x20, 0x07);
-        max96705_write_reg(sensor, i, 0x21, 0x06);
-        max96705_write_reg(sensor, i, 0x22, 0x05);
-        max96705_write_reg(sensor, i, 0x23, 0x04);
-        max96705_write_reg(sensor, i, 0x24, 0x03);
-        max96705_write_reg(sensor, i, 0x25, 0x02);
-        max96705_write_reg(sensor, i, 0x26, 0x01);
-        max96705_write_reg(sensor, i, 0x27, 0x00);
+        max96705_write_reg(sensor, MAX96705_DEV_INDEX + sensor->sec_9286_shift + i,
+                           0x20, 0x07);
+        max96705_write_reg(sensor, MAX96705_DEV_INDEX + sensor->sec_9286_shift + i,
+                           0x21, 0x06);
+        max96705_write_reg(sensor, MAX96705_DEV_INDEX + sensor->sec_9286_shift + i,
+                           0x22, 0x05);
+        max96705_write_reg(sensor, MAX96705_DEV_INDEX + sensor->sec_9286_shift + i,
+                           0x23, 0x04);
+        max96705_write_reg(sensor, MAX96705_DEV_INDEX + sensor->sec_9286_shift + i,
+                           0x24, 0x03);
+        max96705_write_reg(sensor, MAX96705_DEV_INDEX + sensor->sec_9286_shift + i,
+                           0x25, 0x02);
+        max96705_write_reg(sensor, MAX96705_DEV_INDEX + sensor->sec_9286_shift + i,
+                           0x26, 0x01);
+        max96705_write_reg(sensor, MAX96705_DEV_INDEX + sensor->sec_9286_shift + i,
+                           0x27, 0x00);
         msleep(10);
 
-        max96705_write_reg(sensor, i, 0x30, 0x17);
-        max96705_write_reg(sensor, i, 0x31, 0x16);
-        max96705_write_reg(sensor, i, 0x32, 0x15);
-        max96705_write_reg(sensor, i, 0x33, 0x14);
-        max96705_write_reg(sensor, i, 0x34, 0x13);
-        max96705_write_reg(sensor, i, 0x35, 0x12);
-        max96705_write_reg(sensor, i, 0x36, 0x11);
-        max96705_write_reg(sensor, i, 0x37, 0x10);
+        max96705_write_reg(sensor, MAX96705_DEV_INDEX + sensor->sec_9286_shift + i,
+                           0x30, 0x17);
+        max96705_write_reg(sensor, MAX96705_DEV_INDEX + sensor->sec_9286_shift + i,
+                           0x31, 0x16);
+        max96705_write_reg(sensor, MAX96705_DEV_INDEX + sensor->sec_9286_shift + i,
+                           0x32, 0x15);
+        max96705_write_reg(sensor, MAX96705_DEV_INDEX + sensor->sec_9286_shift + i,
+                           0x33, 0x14);
+        max96705_write_reg(sensor, MAX96705_DEV_INDEX + sensor->sec_9286_shift + i,
+                           0x34, 0x13);
+        max96705_write_reg(sensor, MAX96705_DEV_INDEX + sensor->sec_9286_shift + i,
+                           0x35, 0x12);
+        max96705_write_reg(sensor, MAX96705_DEV_INDEX + sensor->sec_9286_shift + i,
+                           0x36, 0x11);
+        max96705_write_reg(sensor, MAX96705_DEV_INDEX + sensor->sec_9286_shift + i,
+                           0x37, 0x10);
         msleep(10);
 
+        max96705_write_reg(sensor, MAX96705_DEV_INDEX + sensor->sec_9286_shift + i,
+                           0x9, (AP0101_SLAVE_ID + AP0101_DEV_INDEX + sensor->sec_9286_shift + i) <<
+                           1);
+        max96705_write_reg(sensor, MAX96705_DEV_INDEX + sensor->sec_9286_shift + i,
+                           0xa, AP0101_SLAVE_ID << 1);
         msleep(10);
     }
 
@@ -745,6 +781,7 @@ static int max9286_probe(struct i2c_client *client,
     struct max9286_dev *sensor;
     struct v4l2_mbus_framefmt *fmt;
     u32 rotation;
+    u32 sec_9286;
     int ret;
     struct gpio_desc *gpiod;
 
@@ -874,6 +911,20 @@ static int max9286_probe(struct i2c_client *client,
     else {
         gpiod_direction_output(gpiod, 1);
         msleep(1);
+    }
+
+    ret = fwnode_property_read_u32(dev_fwnode(&client->dev), "sec_9286",
+                                   &sec_9286);
+    dev_err(&client->dev, "sec_9286: %d, ret=%d\n", sec_9286, ret);
+
+    if (!ret) {
+        if (sec_9286 == 1)
+            sensor->sec_9286_shift = -4;
+        else
+            sensor->sec_9286_shift = 0;
+    }
+    else {
+        sensor->sec_9286_shift = 0;
     }
 
     max9286_power(sensor, 1);
