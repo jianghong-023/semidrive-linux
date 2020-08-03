@@ -686,7 +686,8 @@ static int max9286_initialization(struct max9286_dev *sensor)
         max9286_write_reg(sensor, 0x0A, val);
         msleep(10);
 
-        printk("reg=0x%x, aid=0x%x\n", val, (MAX96705_SLAVE_ID + i));
+        dev_info(&client->dev, "reg=0x%x, aid=0x%x\n", val,
+                 (MAX96705_SLAVE_ID + i));
         //Set MAX9271 new address for link 0
         //sensor->i2c_client->addr = sensor->addr_96705;
 
@@ -839,7 +840,6 @@ static int max9286_probe(struct i2c_client *client,
         return ret;
 
 
-#if 1
     //struct gpio_desc *gpiod;
     gpiod = devm_gpiod_get_optional(&client->dev, "pwdn", GPIOD_IN);
 
@@ -856,7 +856,25 @@ static int max9286_probe(struct i2c_client *client,
     sensor->pwdn_gpio = gpiod;
     //gpiod_direction_output(gpiod, 1);
     //msleep(1);
-#endif
+
+
+    //struct gpio_desc *gpiod;
+    gpiod = devm_gpiod_get_optional(&client->dev, "vin", GPIOD_IN);
+
+    if (IS_ERR(gpiod)) {
+        ret = PTR_ERR(gpiod);
+
+        if (ret != -EPROBE_DEFER)
+            dev_err(&client->dev, "Failed to get %s GPIO: %d\n",
+                    "vin", ret);
+
+        printk("%s: get vin gpio fail\n", __func__);
+        //return ret;
+    }
+    else {
+        gpiod_direction_output(gpiod, 1);
+        msleep(1);
+    }
 
     max9286_power(sensor, 1);
     max9286_check_chip_id(sensor);
