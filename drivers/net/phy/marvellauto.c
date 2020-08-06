@@ -7,9 +7,79 @@
 #include <linux/errno.h>
 #include <linux/init.h>
 #include <linux/module.h>
+#include <linux/of.h>
 #include <linux/mii.h>
 #include <linux/delay.h>
 #include <linux/phy.h>
+
+// 1000 BASE-T1 Operating Mode
+#define MRVL_88Q211X_MODE_LEGACY    0x06B0
+#define MRVL_88Q211X_MODE_DEFAULT   0x0000
+#define MRVL_88Q211X_MODE_ADVERTISE 0x0002
+
+// Current Speed
+#define MRVL_88Q2112_1000BASE_T1    0x0001
+#define MRVL_88Q2112_100BASE_T1     0x0000
+
+enum phy_dr_mode {
+	PHY_DR_MODE_UNKNOWN,
+	PHY_DR_MODE_MASTER,
+	PHY_DR_MODE_SLAVE,
+	PHY_DR_MODE_AUTONEGO,
+};
+
+enum phy_device_speed {
+	PHY_SPEED_UNKNOWN,
+	PHY_SPEED_10M,
+	PHY_SPEED_100M,
+	PHY_SPEED_1000M,
+};
+
+struct ma211x_priv {
+	enum phy_dr_mode dr_mode;
+	enum phy_device_speed device_speed;
+};
+
+static const char *const phy_dr_modes[] = {
+	[PHY_DR_MODE_UNKNOWN]		= "",
+	[PHY_DR_MODE_MASTER]		= "master",
+	[PHY_DR_MODE_SLAVE]		= "slave",
+	[PHY_DR_MODE_AUTONEGO]		= "autonego",
+};
+
+static const char *const speed_names[] = {
+	[PHY_SPEED_UNKNOWN]	= "UNKNOWN",
+	[PHY_SPEED_10M]		= "10M-speed",
+	[PHY_SPEED_100M]	= "100M-speed",
+	[PHY_SPEED_1000M]	= "1000M-speed",
+};
+
+enum phy_dr_mode phy_get_dr_mode(struct device *dev)
+{
+	const char *dr_mode;
+	int ret;
+
+	ret = device_property_read_string(dev, "dr_mode", &dr_mode);
+	if (ret < 0)
+		return PHY_DR_MODE_UNKNOWN;
+
+	ret = match_string(phy_dr_modes, ARRAY_SIZE(phy_dr_modes), dr_mode);
+	return (ret < 0) ? PHY_DR_MODE_UNKNOWN : ret;
+}
+
+enum phy_device_speed phy_get_maximum_speed(struct device *dev)
+{
+	const char *maximum_speed;
+	int ret;
+
+	ret = device_property_read_string(dev, "maximum-speed", &maximum_speed);
+	if (ret < 0)
+		return PHY_SPEED_UNKNOWN;
+
+	ret = match_string(speed_names, ARRAY_SIZE(speed_names), maximum_speed);
+
+	return (ret < 0) ? PHY_SPEED_UNKNOWN : ret;
+}
 
 static int ma211x_read(struct phy_device *phydev, u32 devaddr, u32 regaddr)
 {
@@ -29,6 +99,14 @@ static int ma211x_get_autonego_enable(struct phy_device *phydev)
 	return (0x0 != (ma211x_read(phydev, 7, 0x0200) & 0x1000));
 }
 
+static void ma211x_set_autonego_enalbe(struct phy_device *phydev, int is_enable)
+{
+	if (is_enable)
+		ma211x_write(phydev, 7, 0x0200, 0x1200); //an_enalbe, an_restart
+	else
+		ma211x_write(phydev, 7, 0x0200, 0);
+}
+
 /* return 1 1000MB, return 0 100MB */
 static int ma211x_get_speed(struct phy_device *phydev)
 {
@@ -42,7 +120,7 @@ static int ma211x_set_master(struct phy_device *phydev, int is_master)
 {
 	u16 data = ma211x_read(phydev, 1, 0x0834);
 
-	if (is_master)
+	if (is_master == PHY_DR_MODE_MASTER)
 		data |= 0x4000;
 	else
 		data &= 0xBFFF;
@@ -51,30 +129,136 @@ static int ma211x_set_master(struct phy_device *phydev, int is_master)
 
 static int ma211x_check_link(struct phy_device *phydev)
 {
-	u16 data1, data2;
-	u32 count = 10;
+	u32 data;
 
-	while (count--) {
-		data1 = ma211x_read(phydev, 3, 0x8109);
-		data2 = ma211x_read(phydev, 3, 0x8108);
-		if ((0x0 != (data1 & 0x0004)) && (0x0 != (data2 & 0x3000)))
-			break;
-		msleep(20);
-	}
-
-	if (count)
-		return 0;
+	if (ma211x_get_speed(phydev) == MRVL_88Q2112_1000BASE_T1) {
+		data = ma211x_read(phydev, 3, 0x0901);
+		data = ma211x_read(phydev, 3, 0x0901);
+	} else
+		data = ma211x_read(phydev, 3, 0x8109);
+	if (0x4 == (data & 0x4))
+		return 1;
 	else
-		return -ETIMEDOUT;
+		return 0;
+}
+
+static int ma211x_ge_init(struct phy_device *phydev)
+{
+	u16 data;
+
+	ma211x_write(phydev, 1, 0x0900, 0x4000);
+
+	data = ma211x_read(phydev, 1, 0x0834);
+	data = (data & 0xFFF0) | 0x0001;
+	ma211x_write(phydev, 1, 0x0834, data);
+
+	ma211x_write(phydev, 3, 0xFFE4, 0x07B5);
+	ma211x_write(phydev, 3, 0xFFE4, 0x06B6);
+	msleep(100);
+
+	ma211x_write(phydev, 3, 0xFFDE, 0x402F);
+	ma211x_write(phydev, 3, 0xFE2A, 0x3C3D);
+	ma211x_write(phydev, 3, 0xFE34, 0x4040);
+	//ma211x_write(phydev, 3, 0xFE4B, 0x9337);
+	ma211x_write(phydev, 3, 0xFE2A, 0x3C1D);
+	ma211x_write(phydev, 3, 0xFE34, 0x0040);
+	ma211x_write(phydev, 7, 0x8032, 0x0064);
+	ma211x_write(phydev, 7, 0x8031, 0x0A01);
+	ma211x_write(phydev, 7, 0x8031, 0x0C01);
+	ma211x_write(phydev, 3, 0xFE0F, 0x0000);
+	ma211x_write(phydev, 3, 0x800C, 0x0000);
+	ma211x_write(phydev, 3, 0x801D, 0x0800);
+	ma211x_write(phydev, 3, 0xFC00, 0x01C0);
+	ma211x_write(phydev, 3, 0xFC17, 0x0425);
+	ma211x_write(phydev, 3, 0xFC94, 0x5470);
+	ma211x_write(phydev, 3, 0xFC95, 0x0055);
+	ma211x_write(phydev, 3, 0xFC19, 0x08D8);
+	ma211x_write(phydev, 3, 0xFC1a, 0x0110);
+	ma211x_write(phydev, 3, 0xFC1b, 0x0A10);
+	ma211x_write(phydev, 3, 0xFC3A, 0x2725);
+	ma211x_write(phydev, 3, 0xFC61, 0x2627);
+	ma211x_write(phydev, 3, 0xFC3B, 0x1612);
+	ma211x_write(phydev, 3, 0xFC62, 0x1C12);
+	ma211x_write(phydev, 3, 0xFC9D, 0x6367);
+	ma211x_write(phydev, 3, 0xFC9E, 0x8060);
+	ma211x_write(phydev, 3, 0xFC00, 0x01C8);
+	ma211x_write(phydev, 3, 0x8000, 0x0000);
+	ma211x_write(phydev, 3, 0x8016, 0x0011);
+
+	ma211x_write(phydev, 3, 0xFDA3, 0x1800);
+
+	ma211x_write(phydev, 3, 0xFE02, 0x00C0);
+	ma211x_write(phydev, 3, 0xFFDB, 0x0010);
+	ma211x_write(phydev, 3, 0xFFF3, 0x0020);
+	ma211x_write(phydev, 3, 0xFE40, 0x00A6);
+
+	ma211x_write(phydev, 3, 0xFE60, 0x0000);
+	ma211x_write(phydev, 3, 0xFE04, 0x0008);
+	ma211x_write(phydev, 3, 0xFE2A, 0x3C3D);
+	ma211x_write(phydev, 3, 0xFE4B, 0x9334);
+
+	ma211x_write(phydev, 3, 0xFC10, 0xF600);
+	ma211x_write(phydev, 3, 0xFC11, 0x073D);
+	ma211x_write(phydev, 3, 0xFC12, 0x000D);
+	//ma211x_write(phydev, 3, 0xFC13, 0x0010);
+
+	return 0;
+}
+
+static int ma211x_ge_set_opmode(struct phy_device *phydev, u32 op_mode)
+{
+	if (op_mode == MRVL_88Q211X_MODE_LEGACY) {
+		// Enable 1000 BASE-T1 legacy mode support
+		ma211x_write(phydev, 3, 0xFDB8, 0x0001);
+		ma211x_write(phydev, 3, 0xFD3D, 0x0C14);
+	} else {
+		// Set back to default compliant mode setting
+		ma211x_write(phydev, 3, 0xFDB8, 0x0000);
+		ma211x_write(phydev, 3, 0xFD3D, 0x0000);
+	}
+	ma211x_write(phydev, 1, 0x0902, op_mode | MRVL_88Q211X_MODE_ADVERTISE);
+	return 0;
+}
+
+static int ma211x_ge_soft_reset(struct phy_device *phydev)
+{
+	u16 data;
+
+	if (ma211x_get_autonego_enable(phydev))
+		ma211x_write(phydev, 3, 0xFFF3, 0x0024);
+
+	//enable low-power mode
+	data = ma211x_read(phydev, 1, 0x0000);
+	ma211x_write(phydev, 1, 0x0000, data | 0x0800);
+
+	ma211x_write(phydev, 3, 0xFFF3, 0x0020);
+	ma211x_write(phydev, 3, 0xFFE4, 0x000C);
+	msleep(100);
+
+	ma211x_write(phydev, 3, 0xffe4, 0x06B6);
+
+	// disable low-power mode
+	ma211x_write(phydev, 1, 0x0000, data & 0xF7FF);
+	msleep(100);
+
+	ma211x_write(phydev, 3, 0xFC47, 0x0030);
+	ma211x_write(phydev, 3, 0xFC47, 0x0031);
+	ma211x_write(phydev, 3, 0xFC47, 0x0030);
+	ma211x_write(phydev, 3, 0xFC47, 0x0000);
+	ma211x_write(phydev, 3, 0xFC47, 0x0001);
+	ma211x_write(phydev, 3, 0xFC47, 0x0000);
+
+	ma211x_write(phydev, 3, 0x0900, 0x8000);
+
+	ma211x_write(phydev, 1, 0x0900, 0x0000);
+	ma211x_write(phydev, 3, 0xFFE4, 0x000C);
+	return 0;
 }
 
 static int ma211x_fe_init(struct phy_device *phydev)
 {
 	u16 data = 0;
 
-	ma211x_set_master(phydev, 1);
-
-	ma211x_write(phydev, 7, 0x0200, 0);
 	ma211x_write(phydev, 3, 0xFA07, 0x0202);
 
 	data = ma211x_read(phydev, 1, 0x0834);
@@ -107,16 +291,33 @@ static int ma211x_fe_init(struct phy_device *phydev)
 	msleep(100);
 
 	ma211x_write(phydev, 31, 0x8001, 0xc000);
-	// check link
-	return ma211x_check_link(phydev);
+	return 0;
 }
 
 static int ma211x_probe(struct phy_device *phydev)
 {
+	struct device *dev = &phydev->mdio.dev;
+	struct ma211x_priv *priv;
 	u32 id = 0;
 
-	if(!phydev->is_c45)
+	if (!phydev->is_c45)
 		return -ENOTSUPP;
+
+	priv = devm_kzalloc(&phydev->mdio.dev, sizeof(*priv), GFP_KERNEL);
+	if (!priv)
+		return -ENOMEM;
+
+	priv->dr_mode = phy_get_dr_mode(dev);
+	priv->device_speed = phy_get_maximum_speed(dev);
+	phydev->priv = priv;
+
+	printk("%s dr_mode %d maximum_speed %d\n",
+	       __func__, priv->dr_mode, priv->device_speed);
+
+	if (priv->dr_mode == PHY_DR_MODE_UNKNOWN)
+		priv->dr_mode =  PHY_DR_MODE_MASTER;
+	if (priv->device_speed == PHY_SPEED_UNKNOWN)
+		priv->device_speed = PHY_SPEED_100M;
 	id = ma211x_read(phydev, 1, 2) << 16 | ma211x_read(phydev, 1, 3);
 	printk("%s get phy id[%x]\n", __func__, id);
 	return 0;
@@ -129,14 +330,30 @@ static int ma211x_soft_reset(struct phy_device *phydev)
 
 static int ma211x_config_init(struct phy_device *phydev)
 {
-	ma211x_fe_init(phydev);
+	struct ma211x_priv *priv = phydev->priv;
+
+	if (priv->device_speed ==  PHY_SPEED_100M) {
+		ma211x_set_master(phydev, priv->dr_mode);
+		ma211x_set_autonego_enalbe(phydev, 0);
+		ma211x_fe_init(phydev);
+	} else if (priv->device_speed ==  PHY_SPEED_1000M) {
+		ma211x_set_master(phydev, priv->dr_mode);
+		ma211x_set_autonego_enalbe(phydev, 0);
+		ma211x_ge_init(phydev);
+		ma211x_ge_set_opmode(phydev, MRVL_88Q211X_MODE_DEFAULT);
+		ma211x_ge_soft_reset(phydev);
+	} else {
+		phydev_err(phydev, "not supported\n");
+		return -ENOTSUPP;
+	}
+
 	return 0;
 }
 
 static int ma211x_config_aneg(struct phy_device *phydev)
 {
-	phydev->supported = SUPPORTED_100baseT_Full;
-	phydev->advertising = SUPPORTED_100baseT_Full;
+	phydev->supported = SUPPORTED_100baseT_Full | SUPPORTED_1000baseT_Full;
+	phydev->advertising = SUPPORTED_100baseT_Full | SUPPORTED_1000baseT_Full;
 	return 0;
 }
 
@@ -153,9 +370,9 @@ static int ma211x_read_status(struct phy_device *phydev)
 		phydev->speed = SPEED_100;
 
 	if (ma211x_check_link(phydev))
-		phydev->link = 0;
-	else
 		phydev->link = 1;
+	else
+		phydev->link = 0;
 	phydev->duplex = DUPLEX_FULL;
 	phydev->pause = 0;
 	phydev->asym_pause = 0;
