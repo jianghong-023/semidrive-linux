@@ -146,16 +146,16 @@ static int gpuif_request(struct xengpu_info *info, struct gpuif_request *pReq)
 
 static irqreturn_t gpuif_interrupt(int irq, void *dev_id)
 {
-    struct gpuif_response *bret;
-    RING_IDX i, rp;
-    unsigned long flags;
+	struct gpuif_response *bret;
+	RING_IDX i, rp;
+	unsigned long flags;
 	struct xenbus_device *xbdev = (struct xenbus_device *)dev_id;
-    struct xengpu_info *info = dev_get_drvdata(&xbdev->dev);
-    struct gpufront_info *rinfo = info->rinfo;
-    struct xengpu_call_info *current_call = NULL;
+	struct xengpu_info *info = dev_get_drvdata(&xbdev->dev);
+	struct gpufront_info *rinfo = info->rinfo;
+	struct xengpu_call_info *current_call = NULL;
 
+        spin_lock(&rinfo->ring_lock);
 again:
-	spin_lock(&rinfo->ring_lock);
   	rp = rinfo->front_ring.sring->rsp_prod;
   	rmb(); /* Ensure we see queued responses up to 'rp'. */
 
@@ -228,6 +228,7 @@ int xengpu_do_request(struct gpuif_request *pReq, struct gpuif_response **rsp)
 
 	ret = gpuif_request(&gXenGpuInfo, pReq);
 	if (ret) {
+		spin_unlock_irqrestore(&gXenGpuInfo.calls_lock, flags);
 		pr_err("xen gpu is not initialized correctly");
 		return ret;
 	}
@@ -238,10 +239,10 @@ int xengpu_do_request(struct gpuif_request *pReq, struct gpuif_response **rsp)
         if (wait_for_completion_interruptible(&call->call_completed) < 0)
                 return -ETIMEDOUT;
 
-    VMM_DEBUG_PRINT("%s:%d, get rsp!", __FUNCTION__, __LINE__);
+	VMM_DEBUG_PRINT("%s:%d, get rsp!", __FUNCTION__, __LINE__);
 
-    spin_lock_irqsave(&gXenGpuInfo.calls_lock, flags);
-    current_call = gXenGpuInfo.call_head;
+	spin_lock_irqsave(&gXenGpuInfo.calls_lock, flags);
+	current_call = gXenGpuInfo.call_head;
 	if ( current_call == NULL ) {
 		// do nothing
 	} else if ( current_call == call ){
@@ -256,7 +257,7 @@ int xengpu_do_request(struct gpuif_request *pReq, struct gpuif_response **rsp)
 			current_call->next = current_call->next->next;
 	}
 
-    spin_unlock_irqrestore(&gXenGpuInfo.calls_lock, flags);
+	spin_unlock_irqrestore(&gXenGpuInfo.calls_lock, flags);
 
 	switch (call->rsp->operation)
 	{
