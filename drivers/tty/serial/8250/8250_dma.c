@@ -129,9 +129,6 @@ int serial8250_rx_dma(struct uart_8250_port *p)
 	if (!desc)
 		return -EBUSY;
 
-	/*WA: about dma have not support residue */
-	memset(dma->rx_buf, 0, dma->rx_size);
-
 	dma->rx_running = 1;
 	desc->callback = __dma_rx_complete;
 	desc->callback_param = p;
