@@ -18,11 +18,11 @@
 #define _CODA_CONFIG_H_
 
 #define CODA980_CODE                    0x9800
+#define CODA_CORE_ID                    0x0
 
 #define PRODUCT_CODE_CODA988(x) (x == CODA980_CODE)
 #define MAX_INST_HANDLE_SIZE            48              /* DO NOT CHANGE THIS VALUE */
 #define MAX_NUM_INSTANCE                4
-#define MAX_NUM_VPU_CORE                1
 #define MAX_NUM_VCORE                   1
 
 /************************************************************************/
