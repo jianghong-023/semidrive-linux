@@ -37,8 +37,12 @@
 #define MAX96706_DEVICE_ID 0x4A
 
 #define MAX96705_SLAVE_ID 0x40
-#define MAX96705_DEV_INDEX 0x30
+#define MAX96705_DEV_INDEX -9
 #define MAX96705_DEVICE_ID 0x41
+
+#define AP0101_SLAVE_ID 0x5d
+#define AP0101_DEV_INDEX -9
+
 
 enum max96706_mode_id {
     MAX96706_MODE_720P_1280_720 = 0,
@@ -108,6 +112,7 @@ struct max96706_dev {
     struct i2c_client *i2c_client;
     unsigned short addr_96706;
     unsigned short addr_96705;
+    unsigned short addr_0101;
     struct v4l2_subdev sd;
 
     struct media_pad pad;
@@ -117,6 +122,7 @@ struct max96706_dev {
     struct gpio_desc *reset_gpio;
     struct gpio_desc *pwdn_gpio;
     struct gpio_desc *gpi_gpio;
+    struct gpio_desc *poc_gpio;
 
     bool   upside_down;
     uint32_t link_count;
@@ -278,6 +284,194 @@ static int max96705_read_reg(struct max96706_dev *sensor, u8 idx, u8 reg,
     return 0;
 }
 
+static int ap0101_read_reg8(struct max96706_dev *sensor, u8 idx, u16 reg,
+                            u8 *val)
+{
+    struct i2c_client *client = sensor->i2c_client;
+    struct i2c_msg msg[2];
+    u8 buf[2];
+    int ret;
+    client->addr = sensor->addr_0101;
+    buf[0] = reg >> 8;
+    buf[1] = reg & 0xff;
+
+    msg[0].addr = client->addr + idx;
+    msg[0].flags = client->flags;
+    msg[0].buf = buf;
+    msg[0].len = sizeof(buf);
+
+    msg[1].addr = client->addr + idx;
+    msg[1].flags = client->flags | I2C_M_RD;
+    msg[1].buf = buf;
+    msg[1].len = 1;
+
+    ret = i2c_transfer(client->adapter, msg, 2);
+
+    if (ret < 0) {
+        dev_err(&client->dev, "%s: error: reg=%x\n",
+                __func__, reg);
+        return ret;
+    }
+
+    *val = ((u16)buf[0] << 8) | (u16)buf[1];
+
+    return 0;
+
+}
+static int ap0101_write_reg8(struct max96706_dev *sensor, u8 idx, u16 reg,
+                             u8 val)
+{
+    struct i2c_client *client = sensor->i2c_client;
+    struct i2c_msg msg;
+    u8 buf[3];
+    int ret;
+    client->addr = sensor->addr_0101;
+    buf[0] = reg >> 8;
+    buf[1] = reg & 0xff;
+    buf[2] = val;
+
+    msg.addr = client->addr + idx;
+    msg.flags = client->flags;
+    msg.buf = buf;
+    msg.len = sizeof(buf);
+
+    ret = i2c_transfer(client->adapter, &msg, 1);
+
+    if (ret < 0) {
+        dev_err(&client->dev, "%s: error: reg=0x%x, val=0x%x\n",
+                __func__, reg, val);
+        return ret;
+    }
+
+    return 0;
+}
+static int ap0101_read_reg16(struct max96706_dev *sensor, u8 idx, u16 reg,
+                             u16 *val)
+{
+    struct i2c_client *client = sensor->i2c_client;
+    struct i2c_msg msg[2];
+    u8 buf[2];
+    int ret;
+    client->addr = sensor->addr_0101;
+    buf[0] = reg >> 8;
+    buf[1] = reg & 0xff;
+
+    msg[0].addr = client->addr + idx;
+    msg[0].flags = client->flags;
+    msg[0].buf = buf;
+    msg[0].len = sizeof(buf);
+
+    msg[1].addr = client->addr + idx;
+    msg[1].flags = client->flags | I2C_M_RD;
+    msg[1].buf = buf;
+    msg[1].len = 2;
+
+    ret = i2c_transfer(client->adapter, msg, 2);
+
+    if (ret < 0) {
+        dev_err(&client->dev, "%s: error: reg=%x\n",
+                __func__, reg);
+        return ret;
+    }
+
+    *val = ((u16)buf[0] << 8) | (u16)buf[1];
+
+    return 0;
+
+}
+static int ap0101_write_reg16(struct max96706_dev *sensor, u8 idx, u16 reg,
+                              u16 val)
+{
+    struct i2c_client *client = sensor->i2c_client;
+    struct i2c_msg msg;
+    u8 buf[4];
+    int ret;
+    client->addr = sensor->addr_0101;
+    buf[0] = reg >> 8;
+    buf[1] = reg & 0xff;
+    buf[2] = val >> 8;
+    buf[3] = val & 0xff;
+
+    msg.addr = client->addr + idx;
+    msg.flags = client->flags;
+    msg.buf = buf;
+    msg.len = sizeof(buf);
+
+    ret = i2c_transfer(client->adapter, &msg, 1);
+
+    if (ret < 0) {
+        dev_err(&client->dev, "%s: error: reg=0x%x, val=0x%x\n",
+                __func__, reg, val);
+        return ret;
+    }
+
+    return 0;
+}
+static int ap0101_read_reg32(struct max96706_dev *sensor, u8 idx, u16 reg,
+                             u32 *val)
+{
+    struct i2c_client *client = sensor->i2c_client;
+    struct i2c_msg msg[2];
+    u8 buf[4];
+    int ret;
+    client->addr = sensor->addr_0101;
+    buf[0] = reg >> 8;
+    buf[1] = reg & 0xff;
+
+    msg[0].addr = client->addr + idx;
+    msg[0].flags = client->flags;
+    msg[0].buf = buf;
+    msg[0].len = 2;
+
+    msg[1].addr = client->addr + idx;
+    msg[1].flags = client->flags | I2C_M_RD;
+    msg[1].buf = buf;
+    msg[1].len = 4;
+
+    ret = i2c_transfer(client->adapter, msg, 2);
+
+    if (ret < 0) {
+        dev_err(&client->dev, "%s: error: reg=%x\n",
+                __func__, reg);
+        return ret;
+    }
+
+    *val = ((u32)buf[0] << 24) | ((u32)buf[1] << 16) | ((u32)buf[2] << 8) |
+           (u32)buf[3];
+
+    return 0;
+
+}
+static int ap0101_write_reg32(struct max96706_dev *sensor, u8 idx, u16 reg,
+                              u32 val)
+{
+    struct i2c_client *client = sensor->i2c_client;
+    struct i2c_msg msg;
+    u8 buf[6];
+    int ret;
+    client->addr = sensor->addr_0101;
+    buf[0] = reg >> 8;
+    buf[1] = reg & 0xff;
+    buf[2] = val >> 24;
+    buf[3] = val >> 16;
+    buf[4] = val >> 8;
+    buf[5] = val & 0xff;
+
+    msg.addr = client->addr + idx;
+    msg.flags = client->flags;
+    msg.buf = buf;
+    msg.len = sizeof(buf);
+
+    ret = i2c_transfer(client->adapter, &msg, 1);
+
+    if (ret < 0) {
+        dev_err(&client->dev, "%s: error: reg=0x%x, val=0x%x\n",
+                __func__, reg, val);
+        return ret;
+    }
+
+    return 0;
+}
 
 
 static struct v4l2_subdev *max96706_get_interface_subdev(
@@ -561,6 +755,8 @@ free_ctrls:
 static void max96706_power(struct max96706_dev *sensor, bool enable)
 {
     gpiod_direction_output(sensor->pwdn_gpio, enable ? 1 : 0);
+    msleep(100);
+    gpiod_direction_output(sensor->poc_gpio, enable ? 1 : 0);
     msleep(1);
 }
 
@@ -568,7 +764,7 @@ static int max96706_check_chip_id(struct max96706_dev *sensor)
 {
     struct i2c_client *client = sensor->i2c_client;
     int ret = 0;
-    u8 chip_id;
+    u8 chip_id = 0;
 
 
     ret = max96706_read_reg(sensor, 0x1e, &chip_id);
@@ -592,7 +788,7 @@ static int max96705_check_chip_id(struct max96706_dev *sensor)
 {
     struct i2c_client *client = sensor->i2c_client;
     int ret = 0;
-    u8 chip_id;
+    u8 chip_id = 0;
 
     ret = max96705_read_reg(sensor, 0, 0x1e, &chip_id);
 
@@ -611,6 +807,35 @@ static int max96705_check_chip_id(struct max96706_dev *sensor)
     return ret;
 }
 
+static int ap0101_change_config(struct max96706_dev *sensor, u8 idx)
+{
+    u16 reg;
+    u16 val16;
+    int i;
+
+    reg = 0xfc00;
+    val16 = 0x2800;
+    ap0101_write_reg16(sensor, AP0101_DEV_INDEX, reg, val16);
+    msleep(10);
+
+    reg = 0x0040;
+    val16 = 0x8100;
+    ap0101_write_reg16(sensor, AP0101_DEV_INDEX, reg, val16);
+    msleep(10);
+
+    for (i = 0; i < 10; i++) {
+        reg = 0x0040;
+        val16 = 0;
+        ap0101_read_reg16(sensor, AP0101_DEV_INDEX, reg, &val16);
+
+        if (val16 == 0x0)
+            return 0;
+
+        msleep(10);
+    }
+
+    return -1;
+}
 
 static int max96706_initialization(struct max96706_dev *sensor)
 {
@@ -643,6 +868,7 @@ static int max96706_initialization(struct max96706_dev *sensor)
     max96706_write_reg(sensor, 0x04, val);
     msleep(1);
 
+    msleep(500);
     ret = max96705_check_chip_id(sensor);
 
     if (ret != 0) {
@@ -668,13 +894,44 @@ static int max96706_initialization(struct max96706_dev *sensor)
     msleep(1);
     gpiod_direction_output(sensor->gpi_gpio, 1);
 
-
     //enable dbl, hven
     max96705_write_reg(sensor, MAX96705_DEV_INDEX, 0x07, 0x84);
     msleep(10);
     //[7]dbl, [2]hven, [1]cxtp
     max96706_write_reg(sensor, 0x07, 0x86);
     msleep(10);
+
+    max96705_write_reg(sensor, MAX96705_DEV_INDEX, 0x9,
+                       (AP0101_SLAVE_ID + AP0101_DEV_INDEX) << 1);
+    max96705_write_reg(sensor, MAX96705_DEV_INDEX, 0xa, AP0101_SLAVE_ID << 1);
+    msleep(10);
+
+    u16 reg;
+    u16 val8, val16, val32;
+
+    reg = 0x0;    //chip version, 0x0160
+    val16 = 0;
+    ap0101_read_reg16(sensor, AP0101_DEV_INDEX, reg, &val16);
+    dev_err(&client->dev, "0101, reg=0x%x, val=0x%x\n", reg, val16);
+
+
+    reg = 0xca9c;    //
+    val16 = 0;
+    ap0101_read_reg16(sensor, AP0101_DEV_INDEX, reg, &val16);
+    dev_err(&client->dev, "0101, reg=0x%x, val=0x%x\n", reg, val16);
+    val16 |= 0x200;
+    ap0101_write_reg16(sensor, AP0101_DEV_INDEX, reg, val16);
+    msleep(10);
+
+    for (i = 0; i < 10; i++) {
+        ret = ap0101_change_config(sensor, 0);
+
+        if (ret == 0) break;
+
+        msleep(100);
+    }
+
+    dev_err(&client->dev, "0101, end msb. i=%d\n", i);
 
     sensor->link_count = link_count;
     return 0;
@@ -701,7 +958,7 @@ static int max96706_probe(struct i2c_client *client,
 
     sensor->addr_96706 = client->addr;
     sensor->addr_96705 = MAX96705_SLAVE_ID;
-
+    sensor->addr_0101 = AP0101_SLAVE_ID;
 
     /*
      * default init sequence initialize sensor to
@@ -803,8 +1060,23 @@ static int max96706_probe(struct i2c_client *client,
 
     sensor->gpi_gpio = gpiod;
 
+    gpiod = devm_gpiod_get_optional(&client->dev, "poc", GPIOD_IN);
+
+    if (IS_ERR(gpiod)) {
+        ret = PTR_ERR(gpiod);
+
+        if (ret != -EPROBE_DEFER)
+            dev_err(&client->dev, "Failed to get %s GPIO: %d\n",
+                    "pwdn", ret);
+
+        return ret;
+    }
+
+    sensor->poc_gpio = gpiod;
+
     mutex_init(&sensor->lock);
 
+    dev_err(dev, "%s(): call max96706_power()-100-500\n", __func__);
     max96706_power(sensor, 1);
     max96706_check_chip_id(sensor);
 
