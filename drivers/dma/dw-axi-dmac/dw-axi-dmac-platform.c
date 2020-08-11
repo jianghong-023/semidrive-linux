@@ -28,7 +28,7 @@
 #include "dw-axi-dmac.h"
 #include "../dmaengine.h"
 #include "../virt-dma.h"
-/*#define DEBUG 1*/
+/* #define DEBUG 1 */
 
 /*
  * The set of bus widths supported by the DMA controller. DW AXI DMAC supports
@@ -917,6 +917,7 @@ static void axi_chan_one_block_xfer_complete(struct axi_dma_chan *chan)
 {
 	struct virt_dma_desc *vd;
 	unsigned long flags;
+	struct axi_dma_desc *axi_desc;
 
 	if (unlikely(!axi_chan_is_hw_enable(chan))) {
 		dev_err(chan2dev(chan),
@@ -928,13 +929,18 @@ static void axi_chan_one_block_xfer_complete(struct axi_dma_chan *chan)
 	spin_lock_irqsave(&chan->vc.lock, flags);
 
 	vd = vchan_next_desc(&chan->vc);
-	if (true == vd_to_axi_desc(vd)->cyclic) {
-		// dev_vdbg(chan2dev(chan), "%s: cyclic
-		// interrupt!\n",axi_chan_name(chan));
-		vchan_cyclic_callback(vd);
-	} else {
-		dev_err(chan2dev(chan), "%s: cyclic interrupt status error!\n",
-			axi_chan_name(chan));
+	if(vd){
+		axi_desc = vd_to_axi_desc(vd);
+		if(axi_desc){
+			if (true == axi_desc->cyclic) {
+				// dev_vdbg(chan2dev(chan), "%s: cyclic
+				// interrupt!\n",axi_chan_name(chan));
+				vchan_cyclic_callback(vd);
+			} else {
+				dev_err(chan2dev(chan), "%s: cyclic interrupt status error!\n",
+					axi_chan_name(chan));
+			}
+		}
 	}
 	spin_unlock_irqrestore(&chan->vc.lock, flags);
 }
