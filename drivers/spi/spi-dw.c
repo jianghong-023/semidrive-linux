@@ -22,6 +22,7 @@
 #include <linux/spi/spi.h>
 #include <linux/gpio.h>
 
+#include <soc/semidrive/sdrv_scr.h>
 #include "spi-dw.h"
 
 #ifdef CONFIG_DEBUG_FS
@@ -475,6 +476,7 @@ int dw_spi_add_host(struct device *dev, struct dw_spi *dws)
 {
 	struct spi_master *master;
 	int ret;
+	uint32_t tmp;
 
 	BUG_ON(dws == NULL);
 
@@ -509,6 +511,10 @@ int dw_spi_add_host(struct device *dev, struct dw_spi *dws)
 
 	/* Basic HW init */
 	spi_hw_init(dev, dws);
+
+	/* Setup SCR opmode as master */
+	if (dws->scr_opmode)
+		sdrv_scr_set(SCR_SEC, dws->scr_opmode, 0);
 
 	if (dws->dma_ops && dws->dma_ops->dma_init) {
 		ret = dws->dma_ops->dma_init(dws);
