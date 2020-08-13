@@ -140,6 +140,12 @@ EXPORT_SYMBOL_GPL(snd_dmaengine_pcm_set_config_from_dai_data);
 static void dmaengine_pcm_dma_complete(void *arg)
 {
 	struct snd_pcm_substream *substream = arg;
+	if (!substream->runtime)
+	{
+		pr_info("BUG: dmaengine_pcm_dma_complete substream(%p)->runtime is null.\n",substream);
+		snd_pcm_period_elapsed(substream);
+		return;
+	}
 	struct dmaengine_pcm_runtime_data *prtd = substream_to_prtd(substream);
 
 	prtd->pos += snd_pcm_lib_period_bytes(substream);
