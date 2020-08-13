@@ -469,24 +469,19 @@ static enum dma_status dma_chan_tx_status(struct dma_chan *dchan,
 		vd = vchan_find_desc(&chan->vc, cookie);
  		if (vd) {
 			/* Vd is on the issued list, maybe still not removed by terminate function.*/
-
 			desc = vd_to_axi_desc(vd);
 			residue = desc->total_len;
 		}
-
 		if ((chan->desc && chan->desc->vd.tx.cookie == cookie)) {
 			/* Vd is running or not be removed */
-
 			residue = axi_chan_get_residue(
-				    chan, vd_to_axi_desc(vd));
-		} else {
-			residue = 0;
+				    chan, vd_to_axi_desc(&chan->desc->vd));
 		}
 	}
-	spin_unlock_irqrestore(&chan->vc.lock, flags);
-	dev_vdbg(chan2dev(chan),"%s get residue %ud.  \n", __func__,residue);
 
+	spin_unlock_irqrestore(&chan->vc.lock, flags);
 	dma_set_residue(txstate, residue);
+	dev_vdbg(chan2dev(chan),"%s get residue %ud.  \n", __func__,residue);
 
 	if (chan->is_paused && ret == DMA_IN_PROGRESS)
 		ret = DMA_PAUSED;
