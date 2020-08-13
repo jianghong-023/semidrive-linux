@@ -341,7 +341,7 @@ static struct dcf_device devlist[] = {
 	[1] = { "cluster",  0666, &cluster_fops, FMODE_UNSIGNED_OFFSET, SD_CLUSTER_EPT},
 	[2] = { "earlyapp", 0666, &avm_fops,     FMODE_UNSIGNED_OFFSET, SD_EARLYAPP_EPT},
 	[3] = { "ssystem",  0600, &sec_fops,     FMODE_UNSIGNED_OFFSET, SD_SSYSTEM_EPT},
-	[3] = { "ivi",      0600, &cluster_fops, FMODE_UNSIGNED_OFFSET, SD_IVI_EPT},
+	[4] = { "ivi",      0666, &cluster_fops, FMODE_UNSIGNED_OFFSET, SD_IVI_EPT},
 };
 
 static struct rpmsg_device_id rpmsg_bridge_id_table[] = {
