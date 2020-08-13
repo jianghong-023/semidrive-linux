@@ -71,9 +71,9 @@ static inline int _scr_dev_lock(struct sdrv_scr_device *scr)
 
 	if (scr->hwlock) {
 		/*
-		 * Try to acquire the HW spinlock, in 1 ms.
+		 * Try to acquire the HW spinlock, in 10 ms.
 		 */
-		ret = __hwspin_lock_timeout(scr->hwlock, 1, 0, NULL);
+		ret = __hwspin_lock_timeout(scr->hwlock, 10, 0, NULL);
 		if (ret)
 			dev_alert(scr->dev,
 				  "Cannot lock scr device (%d)!\n", ret);
@@ -122,6 +122,10 @@ static struct sdrv_scr_signal *_scr_map_signal(uint32_t scr, uint32_t _signal)
 	if (scr_dev != NULL) {
 		list_for_each_entry(signal, &scr_dev->signals, list) {
 			if (signal->id == _signal) {
+
+				if (_scr_dev_lock(signal->dev))
+					return NULL;
+
 				signal->base = ioremap(
 					scr_dev->addr + signal->offset, 4);
 				if (signal->base)
@@ -140,6 +144,7 @@ static void _scr_unmap_signal(struct sdrv_scr_signal *signal)
 	if (signal) {
 		iounmap(signal->base);
 		signal->base = NULL;
+		_scr_dev_unlock(signal->dev);
 	}
 }
 
@@ -215,11 +220,11 @@ int sdrv_scr_is_locked(uint32_t scr, uint32_t _signal, bool *locked)
 	if (!signal || !locked)
 		return -EINVAL;
 
-	if (_scr_dev_lock(signal->dev))
-		return -EBUSY;
+	//if (_scr_dev_lock(signal->dev))
+	//	return -EBUSY;
 
 	*locked = _scr_signal_is_locked(signal);
-	_scr_dev_unlock(signal->dev);
+	//_scr_dev_unlock(signal->dev);
 
 	_scr_unmap_signal(signal);
 	return 0;
@@ -234,11 +239,11 @@ int sdrv_scr_lock(uint32_t scr, uint32_t _signal)
 	if (!signal)
 		return -EINVAL;
 
-	if (_scr_dev_lock(signal->dev))
-		return -EBUSY;
+	//if (_scr_dev_lock(signal->dev))
+	//	return -EBUSY;
 
 	ret = _scr_lock_signal(signal);
-	_scr_dev_unlock(signal->dev);
+	//_scr_dev_unlock(signal->dev);
 
 	_scr_unmap_signal(signal);
 	return ret;
@@ -252,11 +257,11 @@ int sdrv_scr_get(uint32_t scr, uint32_t _signal, uint32_t *val)
 	if (!signal || !val)
 		return -EINVAL;
 
-	if (_scr_dev_lock(signal->dev))
-		return -EBUSY;
+	//if (_scr_dev_lock(signal->dev))
+	//	return -EBUSY;
 
 	*val = _scr_read_signal(signal);
-	_scr_dev_unlock(signal->dev);
+	//_scr_dev_unlock(signal->dev);
 
 	_scr_unmap_signal(signal);
 	return 0;
@@ -271,8 +276,8 @@ int sdrv_scr_set(uint32_t scr, uint32_t _signal, uint32_t val)
 	if (!signal)
 		return -EINVAL;
 
-	if (_scr_dev_lock(signal->dev))
-		return -EBUSY;
+	//if (_scr_dev_lock(signal->dev))
+	//	return -EBUSY;
 
 	if (_scr_signal_writable(signal)) {
 		_scr_write_signal(signal, val);
@@ -281,7 +286,7 @@ int sdrv_scr_set(uint32_t scr, uint32_t _signal, uint32_t val)
 	else
 		ret = -EPERM;
 
-	_scr_dev_unlock(signal->dev);
+	//_scr_dev_unlock(signal->dev);
 
 	_scr_unmap_signal(signal);
 	return ret;
