@@ -39,6 +39,7 @@
 #define VDI_IOCTL_DEVICE_MEMORY_UNMAP       _IO(VDI_IOCTL_MAGIC, 14)
 #define VDI_IOCTL_DEVICE_SRAM_CFG           _IO(VDI_IOCTL_MAGIC, 15)
 #define VDI_IOCTL_DEVICE_GET_SRAM_INFO      _IO(VDI_IOCTL_MAGIC, 16)
+#define VDI_IOCTL_MEMORY_CACHE_REFRESH      _IO(VDI_IOCTL_MAGIC, 17)
 
 /**
  *@Brief Description of buffer memory allocated by driver
@@ -58,25 +59,26 @@ typedef struct vpudrv_buffer_t {
     uint64_t dma_addr;
     uint64_t attachment;
     uint64_t sgt;
-    int32_t	 buf_handle;
+    int32_t  buf_handle;
+    int32_t  data_direction;
 } vpudrv_buffer_t;
 
 typedef struct vpu_bit_firmware_info_t {
-	uint32_t size;				/* size of this structure*/
-	uint32_t core_idx;
-	uint64_t reg_base_offset;
-	uint16_t bit_code[512];
+    uint32_t size;              /* size of this structure*/
+    uint32_t core_idx;
+    uint64_t reg_base_offset;
+    uint16_t bit_code[512];
 } vpu_bit_firmware_info_t;
 
 typedef struct vpudrv_inst_info_t {
-	uint32_t core_idx;
-	uint32_t inst_idx;
-	int32_t inst_open_count;	   /* for output only*/
+    uint32_t core_idx;
+    uint32_t inst_idx;
+    int32_t inst_open_count;    /* for output only*/
 } vpudrv_inst_info_t;
 
 typedef struct vpudrv_intr_info_t {
-	uint32_t timeout;
-	int32_t	 intr_reason;
+    uint32_t timeout;
+    int32_t  intr_reason;
 } vpudrv_intr_info_t;
 
 #endif
