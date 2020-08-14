@@ -498,9 +498,8 @@ static void axi_chan_block_xfer_start(struct axi_dma_chan *chan,
 	u8 lms = 0; /* Select AXI0 master for LLI fetching */
 
 	if (unlikely(axi_chan_is_hw_enable(chan))) {
- 		dev_err(chan2dev(chan), "%s is non-idle!\n",
-			axi_chan_name(chan));
-
+		dev_info(chan2dev(chan), "%s is non-idle!\n",
+				 axi_chan_name(chan));
 		return;
 	}
 
@@ -996,6 +995,17 @@ static int dma_chan_terminate_all(struct dma_chan *dchan)
 	 */
 	vchan_dma_desc_free_list(&chan->vc, &head);
 
+	if (unlikely(axi_chan_is_hw_enable(chan))){
+/* 		dev_info(chan2dev(chan),"%s is non-idle after disabled!!\n",
+		axi_chan_name(chan));
+		*/
+		mdelay(10);
+		if (unlikely(axi_chan_is_hw_enable(chan))){
+			dev_info(chan2dev(chan),"%s :BUG is non-idle after disabled and delay!\n",
+			axi_chan_name(chan));
+			mdelay(20);
+		}
+	}
 	spin_unlock_irqrestore(&chan->vc.lock, flags);
 
 	dev_vdbg(dchan2dev(dchan), "terminated: %s\n", axi_chan_name(chan));
@@ -1860,7 +1870,7 @@ static int dw_probe(struct platform_device *pdev)
 	dw->dma.dst_addr_widths = AXI_DMA_BUSWIDTHS;
 	dw->dma.directions =
 	    BIT(DMA_DEV_TO_MEM) | BIT(DMA_MEM_TO_DEV) | BIT(DMA_MEM_TO_MEM);
-	dw->dma.residue_granularity = DMA_RESIDUE_GRANULARITY_BURST;//DMA_RESIDUE_GRANULARITY_BURST;
+	dw->dma.residue_granularity = DMA_RESIDUE_GRANULARITY_DESCRIPTOR;//DMA_RESIDUE_GRANULARITY_BURST;
 	//DMA_RESIDUE_GRANULARITY_DESCRIPTOR;
 
 	dw->dma.dev = chip->dev;
