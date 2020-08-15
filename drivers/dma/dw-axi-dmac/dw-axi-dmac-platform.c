@@ -999,11 +999,11 @@ static int dma_chan_terminate_all(struct dma_chan *dchan)
 /* 		dev_info(chan2dev(chan),"%s is non-idle after disabled!!\n",
 		axi_chan_name(chan));
 		*/
-		mdelay(10);
+		udelay(300);
 		if (unlikely(axi_chan_is_hw_enable(chan))){
 			dev_info(chan2dev(chan),"%s :BUG is non-idle after disabled and delay!\n",
 			axi_chan_name(chan));
-			mdelay(20);
+			udelay(600);
 		}
 	}
 	spin_unlock_irqrestore(&chan->vc.lock, flags);
