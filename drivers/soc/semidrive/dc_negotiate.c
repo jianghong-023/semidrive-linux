@@ -9,8 +9,7 @@
 #include <xen/xenbus.h>
 #include <linux/soc/semidrive/mb_msg.h>
 #include <linux/soc/semidrive/ipcc.h>
-#include "ipcc_rpmsg.h"
-#include "xenipc.h"
+#include <linux/soc/semidrive/xenipc.h>
 
 #define CONFIG_DC_NEGOTIABLE		(1)
 

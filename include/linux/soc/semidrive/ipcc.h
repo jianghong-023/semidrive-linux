@@ -54,6 +54,14 @@ typedef enum {
 #define SD_SSYSTEM_EPT	(72)
 #define SD_EARLYAPP_EPT	(80)
 
+#define SYS_RPC_REQ_BASE			(0x2000)
+#define SYS_RPC_REQ_SET_PROPERTY	(SYS_RPC_REQ_BASE + 0)
+#define SYS_RPC_REQ_GET_PROPERTY	(SYS_RPC_REQ_BASE + 1)
+/* Here defined backlight RPC cmd */
+#define MOD_RPC_REQ_BASE			(0x3000)
+#define MOD_RPC_REQ_SET_BRIGHT		(MOD_RPC_REQ_BASE + 8)
+#define MOD_RPC_REQ_GET_BRIGHT		(MOD_RPC_REQ_BASE + 9)
+
 int sd_close_dc(bool is_block);
 
 bool sd_is_dc_closed(void);

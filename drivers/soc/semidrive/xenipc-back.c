@@ -4,7 +4,7 @@
 #include <xen/page.h>
 #include <xen/events.h>
 #include <linux/vmalloc.h>
-#include "xenipc.h"
+#include <linux/soc/semidrive/xenipc.h>
 
 struct xenipc_be_channel {
 	/* Unique identifier for this interface. */
