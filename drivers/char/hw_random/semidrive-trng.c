@@ -383,21 +383,36 @@ bool trng_startup_failed(void)
 uint32_t rng_get_trng(void __iomem *ce_base, uint8_t* dst, uint32_t size)
 {
 	uint32_t ret = 0;
-	uint32_t rng_value;
-	uint32_t i;
+	uint32_t rng_value = 0;
+	uint32_t i = 0;
+	uint32_t index = 0;
+	uint32_t index_max = 0;
+	uint32_t cp_left = 0;
 	unsigned long baddr;
 
-	pr_info("rng_get_trng enter size=%d", size);
+	pr_info("rng_get_trng enter dst=%p size=%d", dst, size);
 
 	baddr = ce_base + (0x114<<0);
 
-	for (i = 0; i < size; i++) {
+	index = 0;
+	index_max = size>>2; //4 byte one cp
+	cp_left = size&0x3;
+
+	for (i = 0; i < index_max; i++) {
 			rng_value = readl(baddr);
 			pr_info("rng_get_trng rng_value=%x.\n", rng_value);
-			memcpy(dst+i, (void *)(&rng_value), sizeof(rng_value));
-			i = i+4;
-			ret = i;
+			memcpy(dst+index, (void *)(&rng_value), sizeof(rng_value));
+			index = index+4;
+			ret = index;
 	}
+
+	if(cp_left > 0){
+		rng_value = readl(baddr);
+		pr_info("rng_get_trng last %d rng_value=%x.\n", cp_left, rng_value);
+		memcpy(dst+index, (void *)(&rng_value), cp_left);
+		ret = index+cp_left;
+	}
+
 	return ret;
 }
 
