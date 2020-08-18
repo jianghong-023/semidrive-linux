@@ -976,12 +976,30 @@ static int dma_chan_terminate_all(struct dma_chan *dchan)
 {
 	struct axi_dma_chan *chan = dchan_to_axi_dma_chan(dchan);
 	unsigned long flags;
+	int delaycount = 0;
 	//struct axi_dma_desc *axi_desc;
 	LIST_HEAD(head);
+	axi_chan_disable(chan);
+
+	while(axi_chan_is_hw_enable(chan)){
+		//usleep_range(80,120);
+		udelay(100);
+		delaycount++;
+		if (delaycount > 3000)
+		{
+			dev_info(chan2dev(chan),"%s :BUG is non-idle after disabled and delay 300ms!!!\n",
+			axi_chan_name(chan));
+			BUG_ON(axi_chan_is_hw_enable(chan));
+			break;
+		}
+	}
+	if(delaycount > 10){
+		dev_info(chan2dev(chan),"%s :BUG is non-idle after disabled and delay %d00!\n",
+		axi_chan_name(chan),delaycount);
+	}
 
 	spin_lock_irqsave(&chan->vc.lock, flags);
 
-	axi_chan_disable(chan);
 	//axi_desc = chan->desc;
 	chan->desc = NULL;
 
@@ -995,17 +1013,6 @@ static int dma_chan_terminate_all(struct dma_chan *dchan)
 	 */
 	vchan_dma_desc_free_list(&chan->vc, &head);
 
-	if (unlikely(axi_chan_is_hw_enable(chan))){
-/* 		dev_info(chan2dev(chan),"%s is non-idle after disabled!!\n",
-		axi_chan_name(chan));
-		*/
-		udelay(300);
-		if (unlikely(axi_chan_is_hw_enable(chan))){
-			dev_info(chan2dev(chan),"%s :BUG is non-idle after disabled and delay!\n",
-			axi_chan_name(chan));
-			udelay(600);
-		}
-	}
 	spin_unlock_irqrestore(&chan->vc.lock, flags);
 
 	dev_vdbg(dchan2dev(dchan), "terminated: %s\n", axi_chan_name(chan));
