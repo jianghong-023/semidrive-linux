@@ -61,6 +61,10 @@ typedef enum {
 #define MOD_RPC_REQ_BASE			(0x3000)
 #define MOD_RPC_REQ_SET_BRIGHT		(MOD_RPC_REQ_BASE + 8)
 #define MOD_RPC_REQ_GET_BRIGHT		(MOD_RPC_REQ_BASE + 9)
+/* Safe Touchscreen ioctl RPC cmd */
+#define MOD_RPC_REQ_STS_IOCTL		(MOD_RPC_REQ_BASE + 10)
+
+int semidrive_rpcall(struct rpc_req_msg *req, struct rpc_ret_msg *result);
 
 int sd_close_dc(bool is_block);
 
