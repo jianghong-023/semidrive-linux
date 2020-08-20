@@ -16,7 +16,7 @@
 #include <linux/mailbox_client.h>
 #include <linux/soc/semidrive/mb_msg.h>
 #include <linux/soc/semidrive/ipcc.h>
-#include "xenipc.h"
+#include <linux/soc/semidrive/xenipc.h>
 
 struct vdsp_ipc_device {
 	struct device *dev;

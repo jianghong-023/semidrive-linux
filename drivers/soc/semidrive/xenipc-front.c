@@ -20,8 +20,7 @@
 #include <xen/page.h>
 #include <xen/events.h>
 #include <xen/grant_table.h>
-
-#include "xenipc.h"
+#include <linux/soc/semidrive/xenipc.h>
 
 #define IPC_MAX_RING_SIZE	\
      	__CONST_RING_SIZE(xenipc, XEN_PAGE_SIZE * XENBUS_MAX_RING_GRANTS)
