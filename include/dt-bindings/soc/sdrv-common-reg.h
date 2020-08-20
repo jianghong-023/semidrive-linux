@@ -18,8 +18,8 @@
 #define SDRV_REG_SDPE 2
 #define SDRV_REG_MCAL 3
 #define SDRV_REG_BOOTREASON 4
-#define SDRV_REG_UNUSED1 5
-#define SDRV_REG_UNUSED2 6
-#define SDRV_REG_UNUSED3 7
+#define SDRV_REG_HWID 5
+#define SDRV_REG_UNUSED1 6
+#define SDRV_REG_UNUSED2 7
 
 #endif
