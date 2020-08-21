@@ -93,7 +93,7 @@ static struct snd_soc_jack_pin hs_jack_pin[] = {
 /*
  * Logic for a tlv320aic23 as connected on a x9_ref_hs
  */
-static int x9_ref_hs_ak4556_init(struct snd_soc_pcm_runtime *rtd)
+static int x9_ref_tlv320aic23_init(struct snd_soc_pcm_runtime *rtd)
 {
 	int err;
 	DEBUG_FUNC_PRT;
@@ -115,7 +115,7 @@ static int x9_ref_hs_ak4556_init(struct snd_soc_pcm_runtime *rtd)
 }
 
 /*Dapm widtets*/
-static const struct snd_soc_dapm_widget sd_x9_ref_hs_dapm_widgets[] = {
+static const struct snd_soc_dapm_widget sd_x9_ref_tlv320aic23_dapm_widgets[] = {
     /* Outputs */
     SND_SOC_DAPM_HP("Headphone Jack", NULL),
 
@@ -124,7 +124,7 @@ static const struct snd_soc_dapm_widget sd_x9_ref_hs_dapm_widgets[] = {
     SND_SOC_DAPM_MIC("Mic In", NULL),
 };
 
-static const struct snd_soc_dapm_route sd_x9_ref_hs_dapm_map[] = {
+static const struct snd_soc_dapm_route sd_x9_ref_tlv320aic23_dapm_map[] = {
     /* Line Out connected to LLOUT, RLOUT */
     {"Headphone Jack", NULL, "LOUT"},
     {"Headphone Jack", NULL, "ROUT"},
@@ -137,19 +137,34 @@ static const struct snd_soc_dapm_route sd_x9_ref_hs_dapm_map[] = {
 
 /*DAI
  * Link-------------------------------------------------------------------------------*/
-static int x9_ak4456_soc_hw_params(struct snd_pcm_substream *substream,
+static int x9_tlv320ai23_soc_hw_params(struct snd_pcm_substream *substream,
 				       struct snd_pcm_hw_params *params)
 {
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
 	struct snd_soc_dai *codec_dai = rtd->codec_dai;
 	struct snd_soc_card *card = rtd->card;
 
+	int srate, mclk, err;
+
+	srate = params_rate(params);
+	mclk = 256 * srate;
+	/*TODO: need rearch mclk already be set to 12288000
+	Configure clk here.
+	*/
+
+	DEBUG_ITEM_PRT(mclk);
+	err = snd_soc_dai_set_sysclk(codec_dai, I2S_SCLK_MCLK, mclk,
+				     SND_SOC_CLOCK_IN);
+	if (err < 0) {
+		dev_err(card->dev, "codec_dai clock not set\n");
+		return err;
+	}
 
 	return 0;
 }
 
-static const struct snd_soc_ops x9_ref_hs_ops = {
-   // .hw_params = x9_ak4456_soc_hw_params,
+static const struct snd_soc_ops x9_ref_tlv320aic23_ops = {
+	.hw_params = x9_tlv320ai23_soc_hw_params,
 };
 
 static struct snd_soc_dai_link snd_x9_ref_soc_dai_links[] = {
@@ -159,18 +174,18 @@ static struct snd_soc_dai_link snd_x9_ref_soc_dai_links[] = {
 		.cpu_name = "30630000.i2s",
 		.cpu_dai_name = "snd-afe-sc-i2s-dai0",
 		.platform_name = "30630000.i2s",
-		.codec_name = "ak4556-adc-dac",
-		.codec_dai_name = "ak4556-hifi",
-		.init = x9_ref_hs_ak4556_init,
+		.codec_dai_name = "tlv320aic23-hifi",
+		.codec_name = "tlv320aic23-codec.3-001b",
+		.init = x9_ref_tlv320aic23_init,
 		.dai_fmt = SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_CBS_CFS,
-		.ops = &x9_ref_hs_ops,
+		.ops = &x9_ref_tlv320aic23_ops,
     },
 };
 
 /*Sound Card Driver
  * ------------------------------------------------------------------------*/
-static struct snd_soc_card x9_ref_hs_card = {
-    .name = "sd-x9-snd-card-hs",
+static struct snd_soc_card x9_ref_tlv320aic23_card = {
+    .name = "sd-x9-snd-card-tlv320aic23",
 
     .dai_link = snd_x9_ref_soc_dai_links,
     .num_links = ARRAY_SIZE(snd_x9_ref_soc_dai_links),
@@ -186,12 +201,12 @@ static int x9_gpio_probe(struct snd_soc_card *card)
 
 /*-Init Machine Driver
  * ---------------------------------------------------------------------*/
-#define SND_X9_MACH_DRIVER "x9-hs-ref"
+#define SND_X9_MACH_DRIVER "x9-hs-ref-tlv320aic23"
 
 /*ALSA machine driver probe functions.*/
-static int x9_ref_hs_probe(struct platform_device *pdev)
+static int x9_ref_tlv320aic23_probe(struct platform_device *pdev)
 {
-	struct snd_soc_card *card = &x9_ref_hs_card;
+	struct snd_soc_card *card = &x9_ref_tlv320aic23_card;
 	struct device *dev = &pdev->dev;
 
 	int ret;
@@ -219,55 +234,55 @@ static int x9_ref_hs_probe(struct platform_device *pdev)
 	return ret;
 }
 
-static int x9_ref_hs_remove(struct platform_device *pdev)
+static int x9_ref_tlv320aic23_remove(struct platform_device *pdev)
 {
 	snd_card_free(platform_get_drvdata(pdev));
-	dev_info(&pdev->dev, "%s x9_ref_hs_removed\n", __func__);
+	dev_info(&pdev->dev, "%s x9_ref_tlv320aic23_removed\n", __func__);
 	return 0;
 }
 #ifdef CONFIG_PM
 /*pm suspend operation */
-static int snd_x9_ref_hs_suspend(struct platform_device *pdev, pm_message_t state)
+static int snd_x9_ref_tlv320aic23_suspend(struct platform_device *pdev, pm_message_t state)
 {
 	dev_info(&pdev->dev, "%s snd_x9_suspend\n", __func__);
 	return 0;
 }
 /*pm resume operation */
-static int snd_x9_ref_hs_resume(struct platform_device *pdev)
+static int snd_x9_ref_tlv320aic23_resume(struct platform_device *pdev)
 {
 	dev_info(&pdev->dev, "%s snd_x9_resume\n", __func__);
 	return 0;
 }
 #endif
 
-static const struct of_device_id x9_ref_hs_dt_match[] = {
+static const struct of_device_id x9_ref_tlv320aic23_dt_match[] = {
     {
-	.compatible = "semidrive,x9-ref-hs",
+		.compatible = "semidrive,x9-ref-tlv320aic23",
     },
 };
-MODULE_DEVICE_TABLE(of, x9_ref_hs_dt_match);
+MODULE_DEVICE_TABLE(of, x9_ref_tlv320aic23_dt_match);
 
-static struct platform_driver x9_ref_hs_mach_driver = {
+static struct platform_driver x9_ref_tlv320aic23_mach_driver = {
     .driver =
 	{
 	    .name = SND_X9_MACH_DRIVER,
-	    .of_match_table = x9_ref_hs_dt_match,
+	    .of_match_table = x9_ref_tlv320aic23_dt_match,
 #ifdef CONFIG_PM
 	    .pm = &snd_soc_pm_ops,
 #endif
 	},
 
-    .probe = x9_ref_hs_probe,
-    .remove = x9_ref_hs_remove,
+    .probe = x9_ref_tlv320aic23_probe,
+    .remove = x9_ref_tlv320aic23_remove,
 #ifdef CONFIG_PM
-	.suspend = snd_x9_ref_hs_suspend,
-	.resume = snd_x9_ref_hs_resume,
+	.suspend = snd_x9_ref_tlv320aic23_suspend,
+	.resume = snd_x9_ref_tlv320aic23_resume,
 #endif
 };
 
-module_platform_driver(x9_ref_hs_mach_driver);
+module_platform_driver(x9_ref_tlv320aic23_mach_driver);
 
 MODULE_AUTHOR("Shao Yi <yi.shao@semidrive.com>");
 MODULE_DESCRIPTION("X9 ALSA SoC ref machine driver");
 MODULE_LICENSE("GPL");
-MODULE_ALIAS("platform:x9 ref hs alsa mach");
+MODULE_ALIAS("platform:x9 ref tlv320aic23 alsa mach");
