@@ -59,8 +59,7 @@ typedef enum {
 #define SYS_RPC_REQ_GET_PROPERTY	(SYS_RPC_REQ_BASE + 1)
 /* Here defined backlight RPC cmd */
 #define MOD_RPC_REQ_BASE			(0x3000)
-#define MOD_RPC_REQ_SET_BRIGHT		(MOD_RPC_REQ_BASE + 8)
-#define MOD_RPC_REQ_GET_BRIGHT		(MOD_RPC_REQ_BASE + 9)
+#define MOD_RPC_REQ_BL_IOCTL		(MOD_RPC_REQ_BASE + 8)
 /* Safe Touchscreen ioctl RPC cmd */
 #define MOD_RPC_REQ_STS_IOCTL		(MOD_RPC_REQ_BASE + 10)
 
