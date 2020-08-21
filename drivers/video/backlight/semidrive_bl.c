@@ -37,26 +37,36 @@ struct platform_rpmsg_bl_data {
 	unsigned int *levels;
 };
 
-#define RPMSG_BL_DEV			(0)
+enum backlight_op_type {
+	BL_OP_GET_BRIGHT,
+	BL_OP_SET_BRIGHT,
+};
 
-int rpmsg_rpc_call_trace(int dev, struct rpc_req_msg *req, struct rpc_ret_msg *result);
-int xenipc_rpc_trace(int dev, struct rpc_req_msg *req, struct rpc_ret_msg *result);
+/* Do not exceed 16 bytes so far */
+struct bl_ioctl_cmd {
+	u32 op;
+	union {
+		struct {
+			u16 a;
+			u16 b;
+		} s;
+		u8 brightness;
+		u8 data[8];
+	}u;
+};
 
 static int backlight_rpc_set_brightness(int brightness)
 {
 	struct rpc_ret_msg result = {0,};
 	struct rpc_req_msg request = {0,};
+	struct bl_ioctl_cmd *ctl = (struct bl_ioctl_cmd *) &request.param[0];
 	int ret = 0;
 
-	request.cmd = MOD_RPC_REQ_SET_BRIGHT;
-	request.param[0] = brightness;
+	request.cmd = MOD_RPC_REQ_BL_IOCTL;
+	ctl->op = BL_OP_SET_BRIGHT;
+	ctl->u.brightness = brightness;
 
-	if (xen_domain()) {
-		/* TODO: XEN domain IPC call */
-		ret = xenipc_rpc_trace(RPMSG_BL_DEV, &request, &result);
-	} else {
-		ret = rpmsg_rpc_call_trace(RPMSG_BL_DEV, &request, &result);
-	}
+	ret = semidrive_rpcall(&request, &result);
 
 	return ret;
 }
