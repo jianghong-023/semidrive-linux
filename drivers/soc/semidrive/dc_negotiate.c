@@ -16,11 +16,6 @@
 #if CONFIG_DC_NEGOTIABLE
 
 #define SYS_PROP_DC_STATUS			(4)
-#define RPMSG_RPC_DC_TIMEOUT		(500)
-#define RPMSG_DC_STATUS_DEV			(0)
-
-int rpmsg_rpc_call_trace(int dev, struct rpc_req_msg *req, struct rpc_ret_msg *result);
-int xenipc_rpc_trace(int dev, struct rpc_req_msg *req, struct rpc_ret_msg *result);
 
 static int rpc_get_dc_status(dc_state_t *val)
 {
@@ -31,13 +26,7 @@ static int rpc_get_dc_status(dc_state_t *val)
 	request.cmd = SYS_RPC_REQ_GET_PROPERTY;
 	request.param[0] = SYS_PROP_DC_STATUS;
 
-	if (xen_domain()) {
-		/* TODO: XEN domain IPC call */
-		ret = xenipc_rpc_trace(RPMSG_DC_STATUS_DEV, &request, &result);
-	} else {
-		ret = rpmsg_rpc_call_trace(RPMSG_DC_STATUS_DEV, &request, &result);
-	}
-
+	ret = semidrive_rpcall(&request, &result);
 	if (!ret && val) {
 		*val = result.result[0];
 	}
@@ -56,12 +45,7 @@ static int rpc_set_dc_status(dc_state_t val, bool block)
 	request.param[1] = val;
 	request.param[2] = block;
 
-	if (xen_domain()) {
-		/* TODO: XEN domain IPC call */
-		ret = xenipc_rpc_trace(RPMSG_DC_STATUS_DEV, &request, &result);
-	} else {
-		ret = rpmsg_rpc_call_trace(RPMSG_DC_STATUS_DEV, &request, &result);
-	}
+	ret = semidrive_rpcall(&request, &result);
 
 	return ret;
 }

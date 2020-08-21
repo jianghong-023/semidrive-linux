@@ -344,6 +344,19 @@ config TOUCHSCREEN_GOODIX
 	  To compile this driver as a module, choose M here: the
 	  module will be called goodix.
 
+config TOUCHSCREEN_SEMIDRIVE
+	tristate "Semidrive safety touchscreen"
+	depends on ARCH_SEMIDRIVE
+	depends on RPMSG_SEMIDRIVE
+	help
+	  Say Y here if you have the Semidrive safety touchscreen connected
+	  to your system.
+
+	  If unsure, say N.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called safetouch.
+
 config TOUCHSCREEN_DS941_DS948_GOODIX
         tristate "DS941_DS948_Goodix I2C touchscreen"
         depends on I2C
