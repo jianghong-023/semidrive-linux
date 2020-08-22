@@ -47,8 +47,8 @@ struct semidrive_sts_data {
 	u16 instance;
 };
 
-#define STS_MAX_HEIGHT		4096
-#define STS_MAX_WIDTH		4096
+#define STS_MAX_HEIGHT		800
+#define STS_MAX_WIDTH		1280
 #define STS_CONTACT_SIZE		8
 #define STS_MAX_CONTACTS		10
 #define STS_BUFFER_STATUS_READY		BIT(7)
@@ -239,6 +239,7 @@ static int semidrive_sts_ioctl(struct semidrive_sts_data *ts, int command,
 
 	ctl->op = command;
 	ctl->instance = ts->instance;
+	dev_err(&ts->pdev->dev, "%s():[%d]\n", __func__, ctl->instance);
 	ret = semidrive_rpcall(&request, &result);
 	if (ret < 0 || result.retcode < 0) {
 		dev_err(&ts->pdev->dev, "rpcall failed=%d %d\n", ret, result.retcode);
@@ -320,8 +321,9 @@ static int semidrive_read_version(struct semidrive_sts_data *ts)
 
 	ts->version = op_ret.msg.v.version;
 	ts->id = op_ret.msg.v.id;
+	ts->dev_type = op_ret.msg.v.dev_type;
 
-	dev_info(&ts->pdev->dev, "ID %d, version: %04x\n", ts->id, ts->version);
+	dev_err(&ts->pdev->dev, "ID %d, version: %04x, type: %d\n", ts->id, ts->version, ts->dev_type);
 
 	return 0;
 }
@@ -365,7 +367,6 @@ static int semidrive_register_input_dev(struct semidrive_sts_data *ts)
 
 	/* Capacitive Windows/Home button on some devices */
 	input_set_capability(ts->input_dev, EV_KEY, KEY_LEFTMETA);
-
 	ret = input_register_device(ts->input_dev);
 	if (ret) {
 		dev_err(&ts->pdev->dev, "Failed to register input device: %d", ret);
@@ -437,13 +438,13 @@ static int semidrive_sts_probe(struct platform_device *pdev)
 		dev_err(&pdev->dev, "Read version failed %d\n", ret);
 		return ret;
 	}
-
+/*
 	ret = of_property_read_u32(pdev->dev.of_node, "dev_type", &ts->dev_type);
 	if(ret < 0) {
 		dev_err(&pdev->dev, "Missing type, use default\n");
 		ts->dev_type = 0;
 	}
-
+*/
 	ret = semidrive_configure_dev(ts);
 
 	dev_err(&pdev->dev, "%s(): done ret=%d \n", __func__, ret);
