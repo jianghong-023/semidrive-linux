@@ -38,7 +38,7 @@
 #include <sound/jack.h>
 #include <linux/of_gpio.h>
 #include <sound/soc.h>
-
+#include <soc/semidrive/sdrv_boardinfo_hwid.h>
 /* -------------------------------- */
 
 /* definition of the chip-specific record  dma related ops*/
@@ -213,6 +213,13 @@ static int x9_ref_tlv320aic23_probe(struct platform_device *pdev)
 	struct snd_x9_chip_hs *chip;
 
 	dev_info(&pdev->dev, ": dev name =%s %s\n", pdev->name, __func__);
+	/*FIXME:  Notice: Next part configure probe action by hwid, it is out of control of DTB.      */
+	if((get_part_id(PART_BOARD_TYPE) != BOARD_TYPE_REF)||(get_part_id(PART_BOARD_ID_MAJ) != 1)||(get_part_id(PART_BOARD_ID_MIN) != 3))
+	{
+		/*If it is not ref A03 board. dump_all_part_id();*/
+		return -ENXIO;
+	}
+	/*FIXME-END:  -------------------------      */
 
 	DEBUG_FUNC_PRT;
 	card->dev = dev;
