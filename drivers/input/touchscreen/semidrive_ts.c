@@ -44,6 +44,7 @@ struct semidrive_sts_data {
 	u16 id;
 	u16 version;
 	u32 dev_type;	/* 0: main device, 1: aux device */
+	u16 instance;
 };
 
 #define STS_MAX_HEIGHT		4096
@@ -61,7 +62,8 @@ enum sts_op_type {
 
 /* Do not exceed 16 bytes so far */
 struct sts_ioctl_cmd {
-	u32 op;
+	u16 op;
+	u16 instance;
 	union {
 		struct {
 			u16 what;
@@ -73,7 +75,8 @@ struct sts_ioctl_cmd {
 
 /* Do not exceed 16 bytes so far */
 struct sts_ioctl_result {
-	u32 op;
+	u16 op;
+	u16 instance;
 	union {
 		/** used for get_version */
 		struct {
@@ -230,11 +233,12 @@ static int semidrive_sts_ioctl(struct semidrive_sts_data *ts, int command,
 {
 	struct rpc_ret_msg result = {0,};
 	struct rpc_req_msg request = {MOD_RPC_REQ_STS_IOCTL, 0};
-	struct sts_ioctl_cmd *op = (struct sts_ioctl_cmd *) &request.param[0];
+	struct sts_ioctl_cmd *ctl = (struct sts_ioctl_cmd *) &request.param[0];
 	struct sts_ioctl_result *rs = (struct sts_ioctl_result *) &result.result[0];
 	int ret = 0;
 
-	op->op = command;
+	ctl->op = command;
+	ctl->instance = ts->instance;
 	ret = semidrive_rpcall(&request, &result);
 	if (ret < 0 || result.retcode < 0) {
 		dev_err(&ts->pdev->dev, "rpcall failed=%d %d\n", ret, result.retcode);
@@ -414,6 +418,13 @@ static int semidrive_sts_probe(struct platform_device *pdev)
 
 	ts->pdev = pdev;
 	platform_set_drvdata(pdev, ts);
+
+	/* Read instance from dts */
+	ret = of_property_read_u16(pdev->dev.of_node, "touchscreen-id", &ts->instance);
+	if(ret < 0) {
+		dev_err(&pdev->dev, "Missing touchscreen id, use 0\n");
+		ts->instance = 0;
+	}
 
 	ret = semidrive_reset(ts);
 	if (ret) {
