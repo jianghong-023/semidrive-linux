@@ -876,13 +876,35 @@ static long vpu_ioctl(struct file *filp, u_int cmd, u_long arg)
 
             /* copy sram_info to user space;  note: two srams */
             if (copy_to_user((void __user *)arg, &(drive_data.sram[0]), sizeof(struct sram_info) * 2))
+                return -EFAULT;
+
+        }
+        break;
+
+        case VDI_IOCTL_MEMORY_CACHE_REFRESH: {
+            vpudrv_buffer_t buf = {0};
+
+            if (copy_from_user(&buf,  (void __user *)arg, sizeof(vpudrv_buffer_t))) {
+                pr_err("[VPUDRV-ERR]  copy user param error\n");
+                return -EFAULT;
+            }
+
+            if (buf.data_direction == DMA_TO_DEVICE)
+                dma_sync_single_for_device(vpucoda_device,buf.dma_addr,buf.size, DMA_TO_DEVICE);
+
+            else if (buf.data_direction == DMA_FROM_DEVICE)
+                dma_sync_single_for_cpu(vpucoda_device,buf.dma_addr,buf.size, DMA_FROM_DEVICE);
+
+            else {
+                pr_err("[VPUDRV-ERR] memory cache refresh direction %d error \n", buf.data_direction);
                 return -1;
+            }
 
         }
         break;
 
         default: {
-            pr_err("[VPUDRV] No such IOCTL, cmd is %d\n", cmd);
+            pr_err("[VPUDRV-ERR] No such IOCTL, cmd is %d\n", cmd);
         }
         break;
     }
