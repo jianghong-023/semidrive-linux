@@ -59,7 +59,7 @@
 
 /* x9 plat ignored following */
 #define VPU_REG_BASE_ADDR 0x306200000
-#define VPU_REG_SIZE (0x4000*MAX_NUM_VPU_CORE)
+#define VPU_REG_SIZE (0x4000)
 #ifdef VPU_SUPPORT_ISR
 #define VPU_IRQ_NUM   (84)
 #endif
@@ -119,7 +119,7 @@ struct coda_drive {
     uint32_t  scr_signal;
 };
 
-static struct coda_drive drive_data;
+static struct coda_drive drive_data = {0};
 
 /* x9 plat ignored following */
 #ifdef VPU_SUPPORT_RESERVED_VIDEO_MEMORY
@@ -138,7 +138,7 @@ static void vpu_clk_put(struct clk *clk);
 
 static vpudrv_buffer_t s_instance_pool = {0};
 static vpudrv_buffer_t s_common_memory = {0};
-static vpu_drv_context_t s_vpu_drv_context;
+static vpu_drv_context_t s_vpu_drv_context = {0};
 static int s_vpu_major;
 static struct cdev s_vpu_cdev;
 
@@ -165,8 +165,7 @@ static struct list_head s_vbp_head = LIST_HEAD_INIT(s_vbp_head);
 static struct list_head s_inst_list_head = LIST_HEAD_INIT(
             s_inst_list_head);
 
-
-static vpu_bit_firmware_info_t s_bit_firmware_info[MAX_NUM_VPU_CORE];
+static vpu_bit_firmware_info_t s_bit_firmware_info = {0};
 
 #ifdef CONFIG_PM
 /* implement to power management functions */
@@ -185,11 +184,11 @@ static vpu_bit_firmware_info_t s_bit_firmware_info[MAX_NUM_VPU_CORE];
 /* Product register */
 #define VPU_PRODUCT_CODE_REGISTER   (BIT_BASE + 0x1044)
 
-static u32  s_vpu_reg_store[MAX_NUM_VPU_CORE][64];
+static u32  s_vpu_reg_store[64] = {0};
 #endif
 
-#define ReadVpuRegister(addr)       *(volatile unsigned int *)(s_vpu_register.virt_addr + s_bit_firmware_info[core].reg_base_offset + addr)
-#define WriteVpuRegister(addr, val) *(volatile unsigned int *)(s_vpu_register.virt_addr + s_bit_firmware_info[core].reg_base_offset + addr) = (unsigned int)val
+#define ReadVpuRegister(addr)       *(volatile unsigned int *)(s_vpu_register.virt_addr + s_bit_firmware_info.reg_base_offset + addr)
+#define WriteVpuRegister(addr, val) *(volatile unsigned int *)(s_vpu_register.virt_addr + s_bit_firmware_info.reg_base_offset + addr) = (unsigned int)val
 #define WriteVpu(addr, val)         *(volatile unsigned int *)(addr) = (unsigned int)val;
 
 
@@ -299,8 +298,7 @@ static int vpu_free_instances(struct file *filp)
     void *vdi_mutexes_base;
     const int PTHREAD_MUTEX_T_DESTROY_VALUE = 0xdead10cc;
 
-    instance_pool_size_per_core = (s_instance_pool.size /
-                                   MAX_NUM_VPU_CORE); /* s_instance_pool.size  assigned to the size of all core once call VDI_IOCTL_GET_INSTANCE_POOL by user. */
+    instance_pool_size_per_core = s_instance_pool.size; /* s_instance_pool.size  assigned to the size of all core once call VDI_IOCTL_GET_INSTANCE_POOL by user. */
 
     list_for_each_entry_safe(vil, n, &s_inst_list_head, list) {
         if (vil->filp == filp) {
@@ -363,31 +361,23 @@ static int vpu_free_buffers(struct file *filp)
 static irqreturn_t vpu_irq_handler(int irq, void *dev_id)
 {
     vpu_drv_context_t *dev = (vpu_drv_context_t *) dev_id;
-
-    /* this can be removed. it also work in VPU_WaitInterrupt of API function */
-    int core;
     int product_code;
 
-    for (core = 0; core < MAX_NUM_VPU_CORE; core++) {
-        if (s_bit_firmware_info[core].size ==
-                0) { /* it means that we didn't get an information the current core from API layer. No core activated.*/
-            pr_info("[VPUDRV] :  s_bit_firmware_info[core].size is zero\n");
-            continue;
-        }
+    /* it means that we didn't get an information the current core from API layer. No core activated.*/
+    if (s_bit_firmware_info.size == 0) {
+        pr_err("[VPUDRV-ERR] s_bit_firmware_info.size is zero\n");
+    }
 
-        product_code = ReadVpuRegister(VPU_PRODUCT_CODE_REGISTER);
+    product_code = ReadVpuRegister(VPU_PRODUCT_CODE_REGISTER);
 
-        if (PRODUCT_CODE_CODA988(product_code)) {
-            if (ReadVpuRegister(BIT_INT_STS)) {
-                dev->interrupt_reason = ReadVpuRegister(BIT_INT_REASON);
-                WriteVpuRegister(BIT_INT_CLEAR, 0x1);
-            }
+    if (PRODUCT_CODE_CODA988(product_code)) {
+        if (ReadVpuRegister(BIT_INT_STS)) {
+            dev->interrupt_reason = ReadVpuRegister(BIT_INT_REASON);
+            WriteVpuRegister(BIT_INT_CLEAR, 0x1);
         }
-        else {
-            pr_err("[VPUDRV-ERR] Unknown product id : %08x\n", product_code);
-            continue;
-        }
-
+    }
+    else {
+        pr_err("[VPUDRV-ERR] Unknown product id : %08x\n", product_code);
     }
 
     if (dev->async_queue)
@@ -395,7 +385,6 @@ static irqreturn_t vpu_irq_handler(int irq, void *dev_id)
                     POLL_IN); /* notify the interrupt to user space */
 
     s_interrupt_flag = 1;
-
     wake_up_interruptible(&s_interrupt_wait_q);
 
     return IRQ_HANDLED;
@@ -927,7 +916,7 @@ static ssize_t vpu_write(struct file *filp, const char __user *buf,
         return -EFAULT;
     }
 
-    if (len == sizeof(vpu_bit_firmware_info_t))  {
+    if (len == sizeof(vpu_bit_firmware_info_t)) {
         vpu_bit_firmware_info_t *bit_firmware_info;
 
         bit_firmware_info = kmalloc(sizeof(vpu_bit_firmware_info_t),
@@ -948,13 +937,13 @@ static ssize_t vpu_write(struct file *filp, const char __user *buf,
                     bit_firmware_info->core_idx, (int) bit_firmware_info->reg_base_offset,
                     bit_firmware_info->size, bit_firmware_info->bit_code[0]);
 
-            if (bit_firmware_info->core_idx > MAX_NUM_VPU_CORE) {
-                pr_err("[VPUDRV-ERR] vpu_write coreIdx[%d] is exceeded than MAX_NUM_VPU_CORE[%d]\n",
-                        bit_firmware_info->core_idx, MAX_NUM_VPU_CORE);
+            if (bit_firmware_info->core_idx != CODA_CORE_ID) {
+                pr_err("[VPUDRV-ERR] vpu_write coreIdx[%d] \n",
+                        bit_firmware_info->core_idx);
                 return -ENODEV;
             }
 
-            memcpy((void *) &s_bit_firmware_info[bit_firmware_info->core_idx],
+            memcpy((void *) &s_bit_firmware_info,
                    bit_firmware_info, sizeof(vpu_bit_firmware_info_t));
             kfree(bit_firmware_info);
 
@@ -991,16 +980,6 @@ static int vpu_release(struct inode *inode, struct file *filp)
 #endif
                 s_instance_pool.base = 0;
             }
-
-#ifndef COMMON_MEMORY_USING_ION
-#if 0  // common memory buffer can not free unitl system power off
-            if (s_common_memory.base) {
-                pr_info("[VPUDRV] free common memory\n");
-                vpu_free_dma_buffer(&s_common_memory);
-                s_common_memory.base = 0;
-            }
-#endif
-#endif
         }
     }
 
@@ -1455,44 +1434,40 @@ static int vpu_remove(struct platform_device *pdev)
 
 #ifdef CONFIG_PM
 #define W4_MAX_CODE_BUF_SIZE     (512*1024)
-#define W4_CMD_INIT_VPU       (0x0001)
+#define W4_CMD_INIT_VPU          (0x0001)
 #define W4_CMD_SLEEP_VPU         (0x0400)
-#define W4_CMD_WAKEUP_VPU       (0x0800)
+#define W4_CMD_WAKEUP_VPU        (0x0800)
 
 
 static int vpu_suspend(struct platform_device *pdev,
                        pm_message_t state)
 {
     int i;
-    int core;
     unsigned long timeout = jiffies + HZ;   /* vpu wait timeout to 1sec */
     int product_code;
 
     pr_info("[VPUDRV] vpu_suspend\n");
-
     vpu_clk_enable(s_vpu_clk);
 
     if (s_vpu_open_ref_count > 0) {
-        for (core = 0; core < MAX_NUM_VPU_CORE; core++) {
-            if (s_bit_firmware_info[core].size == 0)
-                continue;
+        if (s_bit_firmware_info.size == 0) {
+            pr_err("[VPUDRV] vpu have no init\n");
+            goto DONE_SUSPEND;
+        }
+        product_code = ReadVpuRegister(VPU_PRODUCT_CODE_REGISTER);
 
-            product_code = ReadVpuRegister(VPU_PRODUCT_CODE_REGISTER);
-
-            if (PRODUCT_CODE_CODA988(product_code)) {
-                while (ReadVpuRegister(BIT_BUSY_FLAG)) {
-                    if (time_after(jiffies, timeout))
-                        goto DONE_SUSPEND;
-                }
-
-                for (i = 0; i < 64; i++)
-                    s_vpu_reg_store[core][i] = ReadVpuRegister(BIT_BASE + (0x100 +
-                                               (i * 4)));
+        if (PRODUCT_CODE_CODA988(product_code)) {
+            while (ReadVpuRegister(BIT_BUSY_FLAG)) {
+                if (time_after(jiffies, timeout))
+                    goto DONE_SUSPEND;
             }
-            else {
-                pr_err("[VPUDRV] Unknown product id : %08x\n", product_code);
-                goto DONE_SUSPEND;
-            }
+
+            for (i = 0; i < 64; i++)
+                s_vpu_reg_store[i] = ReadVpuRegister(BIT_BASE + (0x100 + (i * 4)));
+        }
+        else {
+            pr_err("[VPUDRV] Unknown product id : %08x\n", product_code);
+            goto DONE_SUSPEND;
         }
     }
 
@@ -1500,61 +1475,52 @@ static int vpu_suspend(struct platform_device *pdev,
     return 0;
 
 DONE_SUSPEND:
-
     vpu_clk_disable(s_vpu_clk);
-
     return -EAGAIN;
 
 }
 static int vpu_resume(struct platform_device *pdev)
 {
     int i;
-    int core;
     u32 val;
     unsigned long timeout = jiffies + HZ;   /* vpu wait timeout to 1sec */
     int product_code;
 
     pr_info("[VPUDRV] vpu_resume\n");
-
     vpu_clk_enable(s_vpu_clk);
 
-    for (core = 0; core < MAX_NUM_VPU_CORE; core++) {
+    if (s_bit_firmware_info.size == 0) {
+        pr_err("[VPUDRV-ERR] vpu have no init \n");
+        goto DONE_WAKEUP;
+    }
 
-        if (s_bit_firmware_info[core].size == 0) {
-            continue;
+    product_code = ReadVpuRegister(VPU_PRODUCT_CODE_REGISTER);
+
+    if (PRODUCT_CODE_CODA988(product_code)) {
+        WriteVpuRegister(BIT_CODE_RUN, 0);
+        /*---- LOAD BOOT CODE*/
+        for (i = 0; i < 512; i++) {
+            val = s_bit_firmware_info.bit_code[i];
+            WriteVpuRegister(BIT_CODE_DOWN, ((i << 16) | val));
         }
 
-        product_code = ReadVpuRegister(VPU_PRODUCT_CODE_REGISTER);
+        for (i = 0 ; i < 64 ; i++)
+            WriteVpuRegister(BIT_BASE + (0x100 + (i * 4)), s_vpu_reg_store[i]);
 
-        if (PRODUCT_CODE_CODA988(product_code)) {
-            WriteVpuRegister(BIT_CODE_RUN, 0);
-            /*---- LOAD BOOT CODE*/
-            for (i = 0; i < 512; i++) {
-                val = s_bit_firmware_info[core].bit_code[i];
-                WriteVpuRegister(BIT_CODE_DOWN, ((i << 16) | val));
-            }
+        WriteVpuRegister(BIT_BUSY_FLAG, 1);
+        WriteVpuRegister(BIT_CODE_RESET, 1);
+        WriteVpuRegister(BIT_CODE_RUN, 1);
 
-            for (i = 0 ; i < 64 ; i++)
-                WriteVpuRegister(BIT_BASE + (0x100 + (i * 4)),
-                                 s_vpu_reg_store[core][i]);
-
-            WriteVpuRegister(BIT_BUSY_FLAG, 1);
-            WriteVpuRegister(BIT_CODE_RESET, 1);
-            WriteVpuRegister(BIT_CODE_RUN, 1);
-
-            while (ReadVpuRegister(BIT_BUSY_FLAG)) {
-                if (time_after(jiffies, timeout))
-                    goto DONE_WAKEUP;
-            }
-
-        }
-        else {
-            pr_err("[VPUDRV-ERR] Unknown product id : %08x\n", product_code);
-            goto DONE_WAKEUP;
+        while (ReadVpuRegister(BIT_BUSY_FLAG)) {
+            if (time_after(jiffies, timeout))
+                goto DONE_WAKEUP;
         }
 
     }
-
+    else {
+        pr_err("[VPUDRV-ERR] Unknown product id : %08x\n", product_code);
+        goto DONE_WAKEUP;
+    }
 
     if (s_vpu_open_ref_count == 0)
         vpu_clk_disable(s_vpu_clk);

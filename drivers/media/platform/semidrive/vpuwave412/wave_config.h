@@ -18,11 +18,11 @@
 #define _WAVE_CONFIG_H_
 
 #define WAVE412_CODE                    0x4120
+#define WAVE_CORE_ID                    0x1
 
 #define PRODUCT_CODE_WAVE412(x) (x == WAVE412_CODE)
 #define MAX_INST_HANDLE_SIZE            48              /* DO NOT CHANGE THIS VALUE */
 #define MAX_NUM_INSTANCE                4
-#define MAX_NUM_VPU_CORE                1
 #define MAX_NUM_VCORE                   1
 
 /************************************************************************/
