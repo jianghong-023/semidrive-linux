@@ -755,9 +755,9 @@ free_ctrls:
 static void max96706_power(struct max96706_dev *sensor, bool enable)
 {
     gpiod_direction_output(sensor->pwdn_gpio, enable ? 1 : 0);
-    msleep(100);
+    msleep(10);
     gpiod_direction_output(sensor->poc_gpio, enable ? 1 : 0);
-    msleep(1);
+    msleep(100);
 }
 
 static int max96706_check_chip_id(struct max96706_dev *sensor)
@@ -907,7 +907,7 @@ static int max96706_initialization(struct max96706_dev *sensor)
     msleep(10);
 
     u16 reg;
-    u16 val8, val16, val32;
+    u16 val16;
 
     reg = 0x0;    //chip version, 0x0160
     val16 = 0;
@@ -932,6 +932,17 @@ static int max96706_initialization(struct max96706_dev *sensor)
     }
 
     dev_err(&client->dev, "0101, end msb. i=%d\n", i);
+
+
+    val = 0;
+    max96706_read_reg(sensor, 0x5, &val);
+    dev_err(&client->dev, "96706, reg=0x5, val=0x%x\n", val);
+    val |= 0x40;
+    max96706_write_reg(sensor, 0x5, val);
+    val = 0;
+    max96706_read_reg(sensor, 0x5, &val);
+    dev_err(&client->dev, "96706, reg=0x5, val=0x%x\n", val);
+
 
     sensor->link_count = link_count;
     return 0;
