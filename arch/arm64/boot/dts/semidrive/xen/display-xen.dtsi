@@ -1,8 +1,8 @@
 #include <dt-bindings/display/dpu-sdx9.h>
 
 /{
-    soc {
-                display: display@0 {
+	soc {
+		display: display@0 {
 			compatible = "semdrive,display-subsystem";
 			sdriv,crtc = <&crtc0>;
 			status = "disabled";
@@ -14,27 +14,89 @@
 			status = "disabled";
 		};
 
-                display2: display@2 {
+		display2: display@2 {
 			compatible = "semdrive,display-subsystem";
 			sdriv,crtc = <&crtc2>;
 			status = "disabled";
 		};
 
-                display3: display@3 {
+		display3: display@3 {
 			compatible = "semdrive,display-subsystem";
 			sdriv,crtc = <&crtc3>;
 			status = "disabled";
 		};
 
-		crtc0: crtc0@30440000 {
-			compatible = "semidrive,kunlun-crtc";
-			reg-names = "dc-base", "dp-base";
-			reg = <0x0 0x30db0000 0x0 0x10000>,
-				<0x0 0x30d80000 0x0 0x10000>;
-			interrupt-names = "dc-irq";
-			interrupts = <0 127 4>;
-			ctrl_unit = <1>; /*0b0001:dc, 0b0010:dp, 0b0011:dp+dc*/
+		dp1: dp1@30440000 {
+			compatible = "sdrv,dp";
+			reg = <DP1_BASE DPU_RANGE>;
+			interrupts = <0 DP1_IRQ 4>;
 			status = "disabled";
+			mlc-select = <0>;
+			sdrv,ip = "dp-r0p1";
+		};
+
+		dc1: dc1@30db0000 {
+			compatible = "sdrv,dc";
+			reg = <DC1_BASE DPU_RANGE>;
+			interrupts = <0 DC1_IRQ 4>;
+			status = "disabled";
+			sdrv,ip = "dc-r0p1";
+		};
+
+		dp2: dp2@30460000 {
+			compatible = "sdrv,dp";
+			reg = <DP2_BASE DPU_RANGE>;
+			interrupts = <0 DP2_IRQ 4>;
+			status = "disabled";
+			mlc-select = <1>;
+			sdrv,ip = "dp-r0p1";
+		};
+
+		dc2: dc2@30dc0000 {
+			compatible = "sdrv,dc";
+			reg = <DC2_BASE DPU_RANGE>;
+			interrupts = <0 DC2_IRQ 4>;
+			status = "disabled";
+			sdrv,ip = "dc-r0p1";
+		};
+
+		dp3: dp3@30480000 {
+			compatible = "sdrv,dp";
+			reg = <DP3_BASE DPU_RANGE>;
+			interrupts = <0 DP3_IRQ 4>;
+			mlc-select = <0>;
+			status = "disabled";
+			sdrv,ip = "dp-r0p1";
+		};
+
+		dc3: dc3@30dd0000 {
+			compatible = "sdrv,dc";
+			reg = <DC3_BASE DPU_RANGE>;
+			interrupts = <0 DC3_IRQ 4>;
+			status = "disabled";
+			sdrv,ip = "dc-r0p1";
+		};
+
+		dc4: dc4@30d90000 {
+			compatible = "sdrv,dc";
+			reg = <DC4_BASE DPU_RANGE>;
+			interrupts = <0 DC4_IRQ 4>;
+			status = "disabled";
+			sdrv,ip = "dc-r0p1";
+		};
+
+		dc5: dc5@30da0000 {
+			compatible = "sdrv,dc";
+			reg = <DC5_BASE DPU_RANGE>;
+			interrupts = <0 DC5_IRQ 4>;
+			status = "disabled";
+			sdrv,ip = "dc-r0p1";
+		};
+
+		crtc0: crtc0 {
+			compatible = "semidrive,kunlun-crtc";
+			dpc-master = <&dc1>;
+			display-mode = <1>; //1 single mode, 2: duplicate mode, 3: combine mode
 
 			crtc0_out: port {
 				crtc0_out_interface: endpoint@0 {
@@ -43,15 +105,10 @@
 			};
 		};
 
-		crtc1: crtc1@30460000 {
+		crtc1: crtc1 {
 			compatible = "semidrive,kunlun-crtc";
-			reg-names = "dc-base", "dp-base";
-			reg = <0x0 0x30dc0000 0x0 0x10000>,
-				<0x0 0x30d90000 0x0 0x10000>;
-			interrupt-names = "dc-irq";
-			interrupts = <0 129 4>;
-			ctrl_unit = <1>; /*0b0001:dc, 0b0010:dp, 0b0011:dp+dc*/
-			status = "disabled";
+			dpc-master = <&dc2>;
+			display-mode = <1>; //1 single mode, 2: duplicate mode, 3: combine mode
 
 			crtc1_out: port {
 				crtc1_out_interface: endpoint@0 {
@@ -60,15 +117,11 @@
 			};
 		};
 
-        crtc2: crtc2@30480000 {
+
+		crtc2: crtc2 {
 			compatible = "semidrive,kunlun-crtc";
-			reg-names = "dc-base", "dp-base";
-			reg = <0x0 0x30dd0000 0x0 0x10000>,
-				<0x0 0x30da0000 0x0 0x10000>;
-			interrupt-names = "dc-irq";
-			interrupts = <0 131 4>;
-			ctrl_unit = <1>; /*0b0001:dc, 0b0010:dp, 0b0011:dp+dc*/
-			status = "disabled";
+			dpc-master = <&dc3>;
+			display-mode = <1>; //1 single mode, 2: duplicate mode, 3: combine mode
 
 			crtc2_out: port {
 				crtc2_out_interface: endpoint@0 {
@@ -77,14 +130,10 @@
 			};
 		};
 
-        crtc3: crtc3@304a0000 {
+		crtc3: crtc3 {
 			compatible = "semidrive,kunlun-crtc";
-			reg-names = "dc-base", "dp-base";
-			reg = <0x0 0x30de0000 0x0 0x10000>;
-			interrupt-names = "dc-irq";
-			interrupts = <0 133 4>;
-			ctrl_unit = <1>; /*0b0001:dc, 0b0010:dp, 0b0011:dp+dc*/
-			status = "disabled";
+			dpc-master = <&dc4>;
+			display-mode = <1>; //1 single mode, 2: duplicate mode, 3: combine mode
 
 			crtc3_out: port {
 				crtc3_out_interface: endpoint@0 {
@@ -143,7 +192,7 @@
 			};
 		};
 
-                parallel2: parallel@2 {
+		parallel2: parallel@2 {
 			compatible = "semidrive, kunlun-display-parallel";
 			status = "disabled";
 
@@ -168,7 +217,7 @@
 			};
 		};
 
-                parallel3: parallel@3 {
+		parallel3: parallel@3 {
 			compatible = "semidrive, kunlun-display-parallel";
 			status = "disabled";
 
@@ -257,7 +306,7 @@
 			};
 		};
 
-                lvds2: lvds2@30680000 {
+		lvds2: lvds2@30680000 {
 			compatible = "semidrive, kunlun-display-lvds";
 			reg = <0x0 0x30c40000 0x0 0x50000>;
 			lvds-select = <3>;
@@ -288,7 +337,7 @@
 			};
 		};
 
-                lvds3: lvds3@306a0000 {
+		lvds3: lvds3@306a0000 {
 			compatible = "semidrive, kunlun-display-lvds";
 			reg = <0x0 0x30c40000 0x0 0x50000>;
 			lvds-select = <4>;
@@ -319,7 +368,7 @@
 			};
 		};
 
-                ptimings0: parallel-timings@0 {
+		ptimings0: parallel-timings@0 {
 			compatible = "semidrive,panel-simple";
 			status = "disabled";
 
@@ -347,7 +396,7 @@
 			};
 		};
 
-                ptimings2: parallel-timings@2 {
+		ptimings2: parallel-timings@2 {
 			compatible = "semidrive,panel-simple";
 			status = "disabled";
 
@@ -361,7 +410,7 @@
 			};
 		};
 
-                ptimings3: parallel-timings@3 {
+		ptimings3: parallel-timings@3 {
 			compatible = "semidrive,panel-simple";
 			status = "disabled";
 
@@ -374,5 +423,5 @@
 			dtimings3: display-timings {
 			};
 		};
-        };
+	};
 };
