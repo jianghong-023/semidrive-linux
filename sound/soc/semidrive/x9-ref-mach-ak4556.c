@@ -38,6 +38,7 @@
 #include <sound/jack.h>
 #include <linux/of_gpio.h>
 #include <sound/soc.h>
+#include <soc/semidrive/sdrv_boardinfo_hwid.h>
 
 /* -------------------------------- */
 
@@ -198,7 +199,16 @@ static int x9_ref_hs_probe(struct platform_device *pdev)
 	struct snd_x9_chip_hs *chip;
 
 	dev_info(&pdev->dev, ": dev name =%s %s\n", pdev->name, __func__);
-
+	/*FIXME:  Notice: Next part configure probe action by hwid, it is out of control of DTB.      */
+	/*Allow probe if board type isn't ref such as UNKNOWN */
+	if(get_part_id(PART_BOARD_TYPE) == BOARD_TYPE_REF){
+		if((get_part_id(PART_BOARD_ID_MAJ) != 1)||(get_part_id(PART_BOARD_ID_MIN) != 2))
+		{
+			/*If it is not ref A02 board.*/
+			return -ENXIO;
+		}
+	}
+	/*FIXME-END:  -------------------------      */
 	DEBUG_FUNC_PRT;
 	card->dev = dev;
 
