@@ -438,13 +438,7 @@ static int semidrive_sts_probe(struct platform_device *pdev)
 		dev_err(&pdev->dev, "Read version failed %d\n", ret);
 		return ret;
 	}
-/*
-	ret = of_property_read_u32(pdev->dev.of_node, "dev_type", &ts->dev_type);
-	if(ret < 0) {
-		dev_err(&pdev->dev, "Missing type, use default\n");
-		ts->dev_type = 0;
-	}
-*/
+
 	ret = semidrive_configure_dev(ts);
 
 	dev_err(&pdev->dev, "%s(): done ret=%d \n", __func__, ret);
