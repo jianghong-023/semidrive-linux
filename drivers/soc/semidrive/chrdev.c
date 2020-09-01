@@ -337,11 +337,21 @@ static const struct file_operations __maybe_unused sec_fops = {
 	.release	= release_dcf,
 };
 
+static const struct file_operations __maybe_unused vircan_fops = {
+	.llseek		= no_llseek,
+	.read		= read_dcf,
+	.write		= write_dcf,
+	.unlocked_ioctl = ioctl_dcf,
+	.open		= open_dcf,
+	.release	= release_dcf,
+};
+
 static struct dcf_device devlist[] = {
 	[1] = { "cluster",  0666, &cluster_fops, FMODE_UNSIGNED_OFFSET, SD_CLUSTER_EPT},
 	[2] = { "earlyapp", 0666, &avm_fops,     FMODE_UNSIGNED_OFFSET, SD_EARLYAPP_EPT},
 	[3] = { "ssystem",  0600, &sec_fops,     FMODE_UNSIGNED_OFFSET, SD_SSYSTEM_EPT},
 	[4] = { "ivi",      0666, &cluster_fops, FMODE_UNSIGNED_OFFSET, SD_IVI_EPT},
+	[5] = { "vircan",   0666, &vircan_fops,  FMODE_UNSIGNED_OFFSET, SD_VIRCAN_EPT},
 };
 
 static struct rpmsg_device_id rpmsg_bridge_id_table[] = {
@@ -349,6 +359,7 @@ static struct rpmsg_device_id rpmsg_bridge_id_table[] = {
 	{.name = "rpmsg-earlyapp"},
 	{.name = "rpmsg-ssystem"},
 	{.name = "rpmsg-ivi"},
+	{.name = "rpmsg-vircan"},
 	{},
 };
 
