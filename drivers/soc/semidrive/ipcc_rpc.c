@@ -48,12 +48,7 @@ int rpmsg_rpc_call(struct rpmsg_rpc_device *rpcdev, struct rpc_req_msg *req, str
 		return -EINVAL;
 	}
 
-	/* TODO: add real checksum later */
-	req->cksum = RPMSG_SANITY_TAG;
-
 	init_completion(&rpcdev->done);
-
-	/* TODO: we need to calculate checksum before sending */
 
 	/* send it */
 	ret = rpmsg_send(rpmsg_device->ept, req, sizeof(*req));
@@ -111,10 +106,10 @@ int rpmsg_rpc_call_trace(int dev, struct rpc_req_msg *req, struct rpc_ret_msg *r
 int rpmsg_rpc_ping(struct rpmsg_rpc_device *rpcdev)
 {
 	struct rpc_ret_msg result = {0,};
-	struct rpc_req_msg request = {0,};
+	struct rpc_req_msg request;
 	int ret;
 
-	request.cmd = RPMSG_RPC_REQ_PING;
+	DCF_INIT_RPC_REQ(request, RPMSG_RPC_REQ_PING);
 	ret = rpmsg_rpc_call(rpcdev, &request, &result, RPMSG_TEST_TIMEOUT);
 	if (ret < 0) {
 		dev_err(rpcdev->dev, "rpc: call_func:%x fail ret: %d\n", request.cmd, ret);
@@ -137,10 +132,10 @@ int rpmsg_rpc_ping(struct rpmsg_rpc_device *rpcdev)
 int rpmsg_rpc_gettimeofday(struct rpmsg_rpc_device *rpcdev)
 {
 	struct rpc_ret_msg result = {0,};
-	struct rpc_req_msg request = {0,};
+	struct rpc_req_msg request;
 	int ret;
 
-	request.cmd = RPMSG_RPC_REQ_GETTIMEOFDAY;
+	DCF_INIT_RPC_REQ(request, RPMSG_RPC_REQ_GETTIMEOFDAY);
 	ret = rpmsg_rpc_call(rpcdev, &request, &result, RPMSG_TEST_TIMEOUT);
 	if (ret < 0) {
 		dev_err(rpcdev->dev, "rpc: call-func:%x fail ret: %d\n", request.cmd, ret);

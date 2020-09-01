@@ -58,11 +58,11 @@ struct bl_ioctl_cmd {
 static int backlight_rpc_set_brightness(int brightness)
 {
 	struct rpc_ret_msg result = {0,};
-	struct rpc_req_msg request = {0,};
-	struct bl_ioctl_cmd *ctl = (struct bl_ioctl_cmd *) &request.param[0];
+	struct rpc_req_msg request;
+	struct bl_ioctl_cmd *ctl = DCF_RPC_PARAM(request, struct bl_ioctl_cmd);
 	int ret = 0;
 
-	request.cmd = MOD_RPC_REQ_BL_IOCTL;
+	DCF_INIT_RPC_REQ(request, MOD_RPC_REQ_BL_IOCTL);
 	ctl->op = BL_OP_SET_BRIGHT;
 	ctl->u.brightness = brightness;
 

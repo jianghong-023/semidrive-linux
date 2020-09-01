@@ -23,9 +23,7 @@ static int rpc_get_i2c_status(i2c_state_t *val)
 	struct rpc_req_msg request;
 	int ret = 0;
 
-	request.cmd = SYS_RPC_REQ_GET_PROPERTY;
-	request.param[0] = SYS_PROP_I2C_STATUS;
-
+	DCF_INIT_RPC_REQ1(request, SYS_RPC_REQ_GET_PROPERTY, SYS_PROP_I2C_STATUS);
 	ret = semidrive_rpcall(&request, &result);
 	if (!ret && val) {
 		*val = result.result[0];
@@ -40,11 +38,8 @@ static int rpc_set_i2c_status(i2c_state_t val, bool block)
 	struct rpc_req_msg request;
 	int ret = 0;
 
-	request.cmd = SYS_RPC_REQ_SET_PROPERTY;
-	request.param[0] = SYS_PROP_I2C_STATUS;
-	request.param[1] = val;
-	request.param[2] = block;
-
+	DCF_INIT_RPC_REQ4(request, SYS_RPC_REQ_SET_PROPERTY, SYS_PROP_I2C_STATUS,
+						val, block, 0);
 	ret = semidrive_rpcall(&request, &result);
 
 	return ret;

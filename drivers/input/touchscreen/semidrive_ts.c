@@ -232,11 +232,12 @@ static int semidrive_sts_ioctl(struct semidrive_sts_data *ts, int command,
 								struct sts_ioctl_result *data)
 {
 	struct rpc_ret_msg result = {0,};
-	struct rpc_req_msg request = {MOD_RPC_REQ_STS_IOCTL, 0};
-	struct sts_ioctl_cmd *ctl = (struct sts_ioctl_cmd *) &request.param[0];
+	struct rpc_req_msg request;
+	struct sts_ioctl_cmd *ctl = DCF_RPC_PARAM(request, struct sts_ioctl_cmd);
 	struct sts_ioctl_result *rs = (struct sts_ioctl_result *) &result.result[0];
 	int ret = 0;
 
+	DCF_INIT_RPC_REQ(request, MOD_RPC_REQ_STS_IOCTL);
 	ctl->op = command;
 	ctl->instance = ts->instance;
 	dev_err(&ts->pdev->dev, "%s():[%d]\n", __func__, ctl->instance);
