@@ -78,6 +78,10 @@ static int vdsp_send_mbox_msg(struct vdsp_ipc_device *vdsp)
 	sd_msghdr_t msg;
 	int ret;
 
+	if (!vdsp || !vdsp->mbox) {
+		return -ENODEV;
+	}
+
 	MB_MSG_INIT_VDSP_HEAD(&msg, MB_MSG_HDR_SZ);
 	ret = mbox_send_message(vdsp->mbox, &msg); // send no-content mail
 	if (ret < 0)
@@ -147,6 +151,7 @@ static int vdsp_ipc_probe(struct platform_device *pdev)
 	platform_set_drvdata(pdev, vdsp);
 	vdsp_ipc_dev = vdsp;
 
+	dev_info(&pdev->dev, "probed!\n");
 	return ret;
 
 fail_out:
