@@ -147,11 +147,11 @@ typedef enum {
 	I2C_STAT_MAX         = I2C_STAT_NORMAL,
 } i2c_state_t;
 
-#define SD_CLUSTER_EPT	(70)
-#define SD_IVI_EPT	(71)
-#define SD_SSYSTEM_EPT	(72)
+#define SD_CLUSTER_EPT		(70)
+#define SD_IVI_EPT		(71)
+#define SD_SSYSTEM_EPT		(72)
 #define SD_EARLYAPP_EPT	(80)
-#define SD_VIRCAN_EPT	(90)
+#define SD_VIRCAN_EPT		(90)
 
 #define SYS_RPC_REQ_BASE			(0x2000)
 #define SYS_RPC_REQ_SET_PROPERTY	(SYS_RPC_REQ_BASE + 0)
