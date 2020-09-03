@@ -10,6 +10,8 @@ dtb-$(CONFIG_ARCH_SEMIDRIVE_X9) += x9_high_ref_native_cluster.dtb
 dtb-$(CONFIG_ARCH_SEMIDRIVE_X9) += x9_high_ref_native_controlpanel.dtb
 dtb-$(CONFIG_ARCH_SEMIDRIVE_X9) += x9_high_ref_native_ivi_btwifi.dtb
 dtb-$(CONFIG_ARCH_SEMIDRIVE_X9) += x9_high-plus_ref_native_ivi.dtb
+dtb-$(CONFIG_ARCH_SEMIDRIVE_X9) += x9_high-plus_ref_native_ivi_serdes.dtb
+dtb-$(CONFIG_ARCH_SEMIDRIVE_X9) += x9_high-plus_ref_native_ivi_serdes_8g.dtb
 dtb-$(CONFIG_ARCH_SEMIDRIVE_X9) += x9_high-plus_ref_native_ivi_8g.dtb
 dtb-$(CONFIG_ARCH_SEMIDRIVE_X9) += x9_high-plus_ref_native_cluster.dtb
 dtb-$(CONFIG_ARCH_SEMIDRIVE_X9) += x9_high-plus_ref_native_cluster_8g.dtb
@@ -27,6 +29,7 @@ dtb-$(CONFIG_ARCH_SEMIDRIVE_X9) += x9_high_ref_native_ivi_avm.dtb
 dtb-$(CONFIG_ARCH_SEMIDRIVE_X9) += x9_high_ref_native_ivi_serdes_avm.dtb
 
 dtb-$(CONFIG_ARCH_SEMIDRIVE_X9) += x9_mid_ref_native_ivi.dtb
+dtb-$(CONFIG_ARCH_SEMIDRIVE_X9) += x9_mid_ref_native_ivi_serdes.dtb
 dtb-$(CONFIG_ARCH_SEMIDRIVE_X9) += x9_mid_ref_native_cluster.dtb
 dtb-$(CONFIG_ARCH_SEMIDRIVE_X9) += x9_mid_ref_native_controlpanel.dtb
 always		:= $(dtb-y)
