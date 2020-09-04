@@ -227,7 +227,9 @@ void dump_all_part_id(void)
 static int __init boardinfo_dump_init(void)
 {
 	char hwid[100] = {""};
-
+        if (xen_domain() && xen_initial_domain()) {
+            return 0;
+        }
 	pr_info("hwid:%s\n", get_hwid_friendly_name(hwid, 100));
 	return 0;
 }
