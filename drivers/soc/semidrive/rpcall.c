@@ -22,7 +22,7 @@ int semidrive_rpcall(struct rpc_req_msg *req, struct rpc_ret_msg *result)
 {
 	int ret = 0;
 
-	if (xen_domain()) {
+	if (xen_domain() && !xen_initial_domain()) {
 		/* TODO: XEN domain IPC call */
 		ret = xenipc_rpc_trace(RPMSG_DC_STATUS_DEV, req, result);
 	} else {
