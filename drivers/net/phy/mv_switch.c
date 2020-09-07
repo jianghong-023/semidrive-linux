@@ -87,6 +87,11 @@ struct mv_data {
 #define MV_5050_INTERNAL_PHY_PMA_PMD_REG	0x0834
 #define MV_5050_INTERNAL_PHY_PMA_PMD_DATA	0x8000
 
+#define MV_G9X_REF_5050_MDIO_ADDR		0x1f
+#define MV_5050_PORT8				0x8
+#define MV_5050_PORT8_PHY_CTRL_REG		0x1
+#define MV_5050_PORT8_PHY_CTRL_DATA		0xe03e
+
 static struct phy_device *mv_phy[2];
 static const struct file_operations mv_5050_fops;
 static const struct file_operations mv_5072_fops;
@@ -473,7 +478,11 @@ static int mv_probe(struct phy_device *phydev)
 	if (phydev->phy_id == MV_5050_PHYID) {
 		mv_misc = &mv_5050;
 		mv_phy[0] = phydev;
-		mv_5050_init(phydev);
+		if (phydev->mdio.addr == MV_G9X_REF_5050_MDIO_ADDR)
+			mv_write(phydev, MV_5050_PORT8, MV_5050_PORT8_PHY_CTRL_REG,
+					MV_5050_PORT8_PHY_CTRL_DATA);
+		else
+			mv_5050_init(phydev);
 	} else {
 		mv_misc = &mv_5072;
 		mv_phy[1] = phydev;
@@ -501,8 +510,8 @@ static int mv_config_init(struct phy_device *phydev)
 
 static int mv_config_aneg(struct phy_device *phydev)
 {
-	phydev->supported = SUPPORTED_100baseT_Full;
-	phydev->advertising = SUPPORTED_100baseT_Full;
+	phydev->supported = SUPPORTED_100baseT_Full | SUPPORTED_1000baseT_Full;
+	phydev->advertising = SUPPORTED_100baseT_Full | SUPPORTED_1000baseT_Full;
 	return 0;
 }
 
