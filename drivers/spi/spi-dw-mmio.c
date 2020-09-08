@@ -37,6 +37,7 @@ static int dw_spi_mmio_probe(struct platform_device *pdev)
 	struct resource *mem;
 	int ret;
 	int num_cs;
+	u32 scr_opmode;
 
 	dwsmmio = devm_kzalloc(&pdev->dev, sizeof(struct dw_spi_mmio),
 			GFP_KERNEL);
@@ -77,6 +78,10 @@ static int dw_spi_mmio_probe(struct platform_device *pdev)
 	device_property_read_u32(&pdev->dev, "num-cs", &num_cs);
 
 	dws->num_cs = num_cs;
+
+	if (!device_property_read_u32(&pdev->dev, "sdrv,scr_opmode", &scr_opmode))
+		dws->scr_opmode = scr_opmode;
+	dev_info(&pdev->dev, "scr opmode = %d\n", dws->scr_opmode);
 
 	if (pdev->dev.of_node) {
 		int i;

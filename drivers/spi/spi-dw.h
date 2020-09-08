@@ -53,6 +53,8 @@
 #define SPI_TMOD_RO			0x2		/* recv only */
 #define SPI_TMOD_EPROMREAD		0x3		/* eeprom read mode */
 
+#define SPI_SSTE_OFFSET			24
+
 #define SPI_SLVOE_OFFSET		10
 #define SPI_SRL_OFFSET			11
 #define SPI_CFS_OFFSET			12
@@ -112,6 +114,7 @@ struct dw_spi {
 	u32			reg_io_width;	/* DR I/O width in bytes */
 	u16			bus_num;
 	u16			num_cs;		/* supported slave numbers */
+	u32			scr_opmode;
 
 	/* Current message transfer state info */
 	size_t			len;
