@@ -16,8 +16,13 @@
 #include <linux/slab.h>
 #include <linux/delay.h>
 #include <linux/cpu.h>
+#include <linux/of.h>
 
-#define MIN_FREQ 100000000
+#define DEFAULT_MIN_FREQ 100000000
+#define DEFAULT_MAX_FREQ (~0UL)
+static u32 min_freq = DEFAULT_MIN_FREQ;
+static u32 max_freq = DEFAULT_MAX_FREQ;
+static unsigned int transition_delay_us = 0;
 static struct cpufreq_frequency_table *freq_table;
 
 static unsigned long	ref_freq;
@@ -38,9 +43,7 @@ static int sdrv_set_target(struct cpufreq_policy *policy, unsigned int index)
 	if (old_freq < new_freq)
 		loops_per_jiffy = cpufreq_scale(
 			loops_per_jiffy_ref, ref_freq, new_freq);
-	//if (new_freq > 24000 )
-	//	clk_set_rate(policy->clk, 24000000);
-	//pr_err("will set freq to %ld\n", new_freq);
+
 	clk_set_rate(policy->clk, new_freq * 1000);
 	if (new_freq < old_freq)
 		loops_per_jiffy = cpufreq_scale(
@@ -51,7 +54,7 @@ static int sdrv_set_target(struct cpufreq_policy *policy, unsigned int index)
 
 static int sdrv_cpufreq_driver_init(struct cpufreq_policy *policy)
 {
-	unsigned int freq, rate, min_freq;
+	unsigned int freq, rate, minfreq;
 	struct clk *cpuclk;
 	int retval, steps, i;
 
@@ -65,13 +68,14 @@ static int sdrv_cpufreq_driver_init(struct cpufreq_policy *policy)
 		goto out_err;
 	}
 
-	min_freq = (clk_round_rate(cpuclk, MIN_FREQ) + 500) / 1000;
-	freq = (clk_round_rate(cpuclk, ~0UL) + 500) / 1000;
+	minfreq = (clk_round_rate(cpuclk, min_freq)) / 1000;
+	freq = (clk_round_rate(cpuclk, max_freq)) / 1000;
 	policy->cpuinfo.transition_latency = 0;
+	policy->transition_delay_us = transition_delay_us;
 
-	printk("cpufreq get clk: min %ld max %ld\n", min_freq, freq);
+	printk("cpufreq get clk: min %d max %d\n", minfreq, freq);
 
-	steps = fls(freq / min_freq) + 1;
+	steps = fls(freq / minfreq) + 1;
 	freq_table = kzalloc(steps * sizeof(struct cpufreq_frequency_table),
 			GFP_KERNEL);
 	if (!freq_table) {
@@ -114,6 +118,30 @@ static struct cpufreq_driver sdrv_cpufreq_driver = {
 
 static int __init sdrv_cpufreq_init(void)
 {
-	return cpufreq_register_driver(&sdrv_cpufreq_driver);
+	struct device_node *np;
+
+	np = of_find_compatible_node(NULL, NULL, "semidrive,sdrv-cpufreq");
+	if (!np) {
+		pr_err("no cpufreq node\n");
+		return -ENODEV;
+	}
+	if (of_device_is_available(np))
+	{
+		if (of_property_read_u32(np, "min-freq", &min_freq) < 0) {
+			pr_err("no valid min-freq, set as default\n");
+			min_freq = DEFAULT_MIN_FREQ;
+		}
+		if (of_property_read_u32(np, "max-freq", &max_freq) < 0) {
+			pr_err("no valid max-freq, set as default\n");
+			max_freq = DEFAULT_MAX_FREQ;
+		}
+		if (of_property_read_u32(np, "trans-delay-us", &transition_delay_us) < 0) {
+			pr_err("no valid trans-delay-us, set as default\n");
+			transition_delay_us = 0;
+		}
+		pr_info("cpufreq: get prop min %ld, max %ld, delay %d\n", min_freq, max_freq, transition_delay_us);
+		return cpufreq_register_driver(&sdrv_cpufreq_driver);
+	}
+	return -ENODEV;
 }
 late_initcall(sdrv_cpufreq_init);
