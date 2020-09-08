@@ -1,6 +1,6 @@
 /* modified by lili semidrive begin */
 #if defined(PVRSRV_VZ_NUM_OSID) && (PVRSRV_VZ_NUM_OSID + 1U > 1U)
-#define RGX_FW_HEAP_SHIFT 22
+#define RGX_FW_HEAP_SHIFT 23
 #else
 #define RGX_FW_HEAP_SHIFT 25
 #endif
