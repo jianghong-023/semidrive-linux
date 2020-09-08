@@ -413,6 +413,7 @@ static struct dcf_device devlist[] = {
 	[3] = { "ssystem",  0600, &sec_fops,     FMODE_UNSIGNED_OFFSET, SD_SSYSTEM_EPT},
 	[4] = { "ivi",      0666, &cluster_fops, FMODE_UNSIGNED_OFFSET, SD_IVI_EPT},
 	[5] = { "vircan",   0666, &vircan_fops,  FMODE_UNSIGNED_OFFSET, SD_VIRCAN_EPT},
+	[6] = { "loopback", 0666, &cluster_fops, FMODE_UNSIGNED_OFFSET, SD_LOOPBACK_EPT},
 };
 
 static struct rpmsg_device_id rpmsg_bridge_id_table[] = {
@@ -421,6 +422,7 @@ static struct rpmsg_device_id rpmsg_bridge_id_table[] = {
 	{.name = "rpmsg-ssystem"},
 	{.name = "rpmsg-ivi"},
 	{.name = "rpmsg-vircan"},
+	{.name = "rpmsg-loopback"},
 	{},
 };
 
@@ -477,6 +479,7 @@ static int rpmsg_bridge_probe(struct rpmsg_device *rpdev)
 			dev->dev = device_create(dcf_class, &rpdev->dev, MKDEV(MAJOR(dcf_major), minor),
 						  dev, devlist[minor].name);
 
+			dev_set_drvdata(&rpdev->dev, dev);
 			dev_info(dev->dev, "device created!\n");
 			return 0;
 		}

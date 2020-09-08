@@ -147,6 +147,7 @@ typedef enum {
 	I2C_STAT_MAX         = I2C_STAT_NORMAL,
 } i2c_state_t;
 
+#define SD_LOOPBACK_EPT		(12)
 #define SD_CLUSTER_EPT		(70)
 #define SD_IVI_EPT		(71)
 #define SD_SSYSTEM_EPT		(72)
@@ -161,6 +162,8 @@ typedef enum {
 #define MOD_RPC_REQ_BL_IOCTL		(MOD_RPC_REQ_BASE + 8)
 /* Safe Touchscreen ioctl RPC cmd */
 #define MOD_RPC_REQ_STS_IOCTL		(MOD_RPC_REQ_BASE + 10)
+/* Here defined display controller cmd */
+#define MOD_RPC_REQ_DC_IOCTL		(MOD_RPC_REQ_BASE + 16)
 
 int semidrive_rpcall(struct rpc_req_msg *req, struct rpc_ret_msg *result);
 
