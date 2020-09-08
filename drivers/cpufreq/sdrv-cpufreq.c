@@ -17,7 +17,7 @@
 #include <linux/delay.h>
 #include <linux/cpu.h>
 
-#define MIN_FREQ 24000000
+#define MIN_FREQ 100000000
 static struct cpufreq_frequency_table *freq_table;
 
 static unsigned long	ref_freq;
