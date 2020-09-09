@@ -454,6 +454,7 @@ static int sd_pcie_establish_link(struct pcie_port *pp)
 	struct device *dev = sd_pcie->pcie->dev;
 	u32 reg_val;
 	int count = 0;
+	u32 exp_cap_off = 0x70;
 
 	if (sd_pcie_link_up(pcie))
 		return 0;
@@ -468,6 +469,11 @@ static int sd_pcie_establish_link(struct pcie_port *pp)
 	while (!sd_pcie_link_up(pcie)) {
 		usleep_range(LINK_WAIT_MIN, LINK_WAIT_MAX);
 		count++;
+
+		reg_val = dw_pcie_readl_dbi(pcie, exp_cap_off + PCI_EXP_LNKCTL);
+		reg_val |= PCI_EXP_LNKCTL_RL;
+		dw_pcie_writel_dbi(pcie, exp_cap_off + PCI_EXP_LNKCTL, reg_val);
+
 		if (count == 1000) {
 			dev_err(dev, "Link Fail\n");
 			return -EINVAL;
