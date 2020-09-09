@@ -479,12 +479,14 @@ static int sd_pcie_establish_link(struct pcie_port *pp)
 
 static int sd_pcie_host_init(struct pcie_port *pp)
 {
+	int ret =0;
 	struct dw_pcie *pcie = to_dw_pcie_from_pp(pp);
 	struct sd_pcie *sd_pcie = to_sd_pcie(pcie);
 
 	sd_pcie_core_init(sd_pcie);
-
-	sd_pcie_establish_link(pp);
+	ret = sd_pcie_establish_link(pp);
+	if (ret)
+		return ret;
 
 	if (IS_ENABLED(CONFIG_PCI_MSI))
 		dw_pcie_msi_init(pp);
