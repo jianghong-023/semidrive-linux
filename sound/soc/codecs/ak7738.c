@@ -3654,6 +3654,13 @@ static const struct snd_kcontrol_new dsp1out2_mixer_kctrl[] = {
 	SOC_DAPM_SINGLE("DSP1 IN4", AK7738_VIRT_107_DSP1OUT2_MIX, 3, 1, 0),
 	SOC_DAPM_SINGLE("DSP1 IN5", AK7738_VIRT_107_DSP1OUT2_MIX, 4, 1, 0),
 	SOC_DAPM_SINGLE("DSP1 IN6", AK7738_VIRT_107_DSP1OUT2_MIX, 5, 1, 0),
+	SOC_DAPM_SINGLE("DSP2 IN1", AK7738_VIRT_107_DSP1OUT2_MIX, 6, 1, 0),
+	SOC_DAPM_SINGLE("DSP2 IN2", AK7738_VIRT_107_DSP1OUT2_MIX, 7, 1, 0),
+/*  Next controller need expand register bits
+	SOC_DAPM_SINGLE("DSP2 IN3", AK7738_VIRT_107_DSP1OUT2_MIX, 8, 1, 0),
+	SOC_DAPM_SINGLE("DSP2 IN4", AK7738_VIRT_107_DSP1OUT2_MIX, 9, 1, 0),
+	SOC_DAPM_SINGLE("DSP2 IN5", AK7738_VIRT_107_DSP1OUT2_MIX, 10, 1, 0),
+	SOC_DAPM_SINGLE("DSP2 IN6", AK7738_VIRT_107_DSP1OUT2_MIX, 11, 1, 0), */
 };
 
 static const struct snd_kcontrol_new dsp1out3_mixer_kctrl[] = {
@@ -4090,6 +4097,8 @@ static const struct snd_soc_dapm_route ak7738_intercon[] = {
 	{"DSP1 OUT2 Mixer", "DSP1 IN4", "DSP1 IN4 Source Selector"},
 	{"DSP1 OUT2 Mixer", "DSP1 IN5", "DSP1 IN5 Source Selector"},
 	{"DSP1 OUT2 Mixer", "DSP1 IN6", "DSP1 IN6 Source Selector"},
+	{"DSP1 OUT2 Mixer", "DSP2 IN1", "DSP2 IN1 Source Selector"},
+	{"DSP1 OUT2 Mixer", "DSP2 IN2", "DSP2 IN2 Source Selector"},
 
 	{"DSP1 OUT3 Mixer", "DSP1 IN1", "DSP1 IN1 Source Selector"},
 	{"DSP1 OUT3 Mixer", "DSP1 IN2", "DSP1 IN2 Source Selector"},
@@ -5291,13 +5300,11 @@ static int ak7738_hw_params(struct snd_pcm_substream *substream,
 	struct ak7738_priv *ak7738 = snd_soc_codec_get_drvdata(codec);
 	int nSDNo;
 	int fsno, nmax;
-	int DIODLbit, addr, value;
-
-	akdbgprt("\t[AK7738] %s(%d)\n",__FUNCTION__,__LINE__);
+	int DIODLbit, addr, value, channels;
 
 	ak7738->fs = params_rate(params);
 
-	akdbgprt("\t[AK7738] %s fs=%d\n",__FUNCTION__, ak7738->fs );
+	akdbgprt("[AK7738] %s(%d) fs=%d  Audio format %u\n",__FUNCTION__,__LINE__, ak7738->fs,params_format(params) );
     mdelay(10);
 
 	DIODLbit = 2;
@@ -5331,20 +5338,21 @@ static int ak7738_hw_params(struct snd_pcm_substream *substream,
 
 	fsno = 0;
 	nmax = sizeof(sdfstab) / sizeof(sdfstab[0]);
-	akdbgprt("\t[AK7738] %s nmax = %d\n",__FUNCTION__, nmax);
+	channels = params_channels(params);
+	akdbgprt("[AK7738] %s nmax = %d channels = %d DIODLbit = %d\n",__FUNCTION__, nmax,channels,DIODLbit);
 
 	do {
 		if ( ak7738->fs <= sdfstab[fsno] ) break;
 		fsno++;
 	} while ( fsno < nmax );
-	akdbgprt("\t[AK7738] %s fsno = %d\n",__FUNCTION__, fsno);
+	akdbgprt("[AK7738] %s fsno = %d\n",__FUNCTION__, fsno);
 
 	if ( fsno == nmax ) {
 		pr_err("%s: not support Sampling Frequency : %d\n", __func__, ak7738->fs);
 		return -EINVAL;
 	}
 
-	akdbgprt("\t[AK7738] %s setSDClock\n",__FUNCTION__);
+	akdbgprt("[AK7738] %s setSDClock\n",__FUNCTION__);
     mdelay(10);
 
 	ak7738->SDfs[nSDNo] = fsno;
@@ -5379,7 +5387,7 @@ static int ak7738_set_dai_fmt(struct snd_soc_dai *dai, unsigned int fmt)
 	int nSDNo, value;
 	int rdata, addr, mask, shift;
 
-	akdbgprt("\t[AK7738] %s(%d)\n",__FUNCTION__,__LINE__);
+	akdbgprt("[AK7738] %s(%d)\n",__FUNCTION__,__LINE__);
 
 	switch (dai->id) {
 		case AIF_PORT1: nSDNo = 0; break;
@@ -5398,11 +5406,11 @@ static int ak7738_set_dai_fmt(struct snd_soc_dai *dai, unsigned int fmt)
     switch (fmt & SND_SOC_DAIFMT_MASTER_MASK) {
         case SND_SOC_DAIFMT_CBS_CFS:
 			msnbit = 0;
-			akdbgprt("\t[AK7738] CBS_CFS %s(Slave_nSDNo=%d)\n",__FUNCTION__,nSDNo);
+			akdbgprt("[AK7738] CBS_CFS %s(Slave_nSDNo=%d)\n",__FUNCTION__,nSDNo);
             break;
         case SND_SOC_DAIFMT_CBM_CFM:
 			msnbit = 1;
-			akdbgprt("\t[AK7738] CBM_CFM %s(Master_nSDNo=%d)\n",__FUNCTION__,nSDNo);
+			akdbgprt("[AK7738] CBM_CFM %s(Master_nSDNo=%d)\n",__FUNCTION__,nSDNo);
             break;
         case SND_SOC_DAIFMT_CBS_CFM:
         case SND_SOC_DAIFMT_CBM_CFS:
@@ -5427,6 +5435,7 @@ static int ak7738_set_dai_fmt(struct snd_soc_dai *dai, unsigned int fmt)
 
 	switch (fmt & SND_SOC_DAIFMT_FORMAT_MASK) {
 		case SND_SOC_DAIFMT_I2S:
+			akdbgprt("[AK7738] SND_SOC_DAIFMT_I2S %s(Slave_nSDNo=%d)\n",__FUNCTION__,nSDNo);
 			format = AK7738_LRIF_I2S_MODE; // 0
 			diolsb = 0;
 			diedge = ak7738->DIEDGEbit[nSDNo];
@@ -5459,6 +5468,7 @@ static int ak7738_set_dai_fmt(struct snd_soc_dai *dai, unsigned int fmt)
 			doslot = ak7738->DOSLbit[nSDNo];
 			break;
 		case SND_SOC_DAIFMT_DSP_B:
+			akdbgprt("[AK7738] SND_SOC_DAIFMT_DSP_B %s(Slave_nSDNo=%d)\n",__FUNCTION__,nSDNo);
 			format = AK7738_LRIF_PCM_LONG_MODE; // 7
 			diolsb = 0;
 			diedge = 1;
@@ -6380,6 +6390,7 @@ static struct snd_soc_dai_ops ak7738_dai_ops = {
 	.set_sysclk	= ak7738_set_dai_sysclk,
 	.set_fmt	= ak7738_set_dai_fmt,
 	.digital_mute = ak7738_set_dai_mute,
+	/*Add for tdm slot function here .set_tdm_slot =*/
 };
 
 struct snd_soc_dai_driver ak7738_dai[] = {
@@ -6446,14 +6457,14 @@ struct snd_soc_dai_driver ak7738_dai[] = {
 		.playback = {
 		       .stream_name = "AIF4 Playback",
 		       .channels_min = 1,
-		       .channels_max = 2,
+		       .channels_max = 8,
 		       .rates = AK7738_RATES,
 		       .formats = AK7738_DAC_FORMATS,
 		},
 		.capture = {
 		       .stream_name = "AIF4 Capture",
 		       .channels_min = 1,
-		       .channels_max = 2,
+		       .channels_max = 8,
 		       .rates = AK7738_RATES,
 		       .formats = AK7738_ADC_FORMATS,
 		},
