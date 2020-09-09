@@ -208,6 +208,7 @@ static int x9_ref_tlv320aic23_probe(struct platform_device *pdev)
 {
 	struct snd_soc_card *card = &x9_ref_tlv320aic23_card;
 	struct device *dev = &pdev->dev;
+	const char *dai_codec_name;
 
 	int ret;
 	struct snd_x9_chip_hs *chip;
@@ -223,6 +224,13 @@ static int x9_ref_tlv320aic23_probe(struct platform_device *pdev)
 
 	DEBUG_FUNC_PRT;
 	card->dev = dev;
+
+	ret = of_property_read_string(dev->of_node, "semidrive,codec-name", &dai_codec_name);
+	if (ret == 0)
+	{
+		dev_info(&pdev->dev, ":overwrite codec name =%s %s\n", pdev->name, dai_codec_name);
+		snd_x9_ref_soc_dai_links[0].codec_name = dai_codec_name;
+	}
 
 	/* Allocate chip data */
 	chip = devm_kzalloc(dev, sizeof(*chip), GFP_KERNEL);
