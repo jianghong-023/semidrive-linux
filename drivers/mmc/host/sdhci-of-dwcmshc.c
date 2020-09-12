@@ -13,6 +13,7 @@
 #include <linux/io.h>
 #include <linux/module.h>
 #include <linux/of.h>
+#include <linux/mmc/mmc.h>
 
 #include <soc/semidrive/sdrv_scr.h>
 #include "sdhci-pltfm.h"
@@ -20,18 +21,19 @@
 #define SDHCI_VENDOR_BASE_REG (0xE8)
 
 #define SDHCI_VENDER_EMMC_CTRL_REG (0x2C)
-
-
 #define SDHCI_IS_EMMC_CARD_MASK BIT(0)
+
+#define SDHCI_VENDER_AT_CTRL_REG (0x40)
+#define SDHCI_TUNE_CLK_STOP_EN_MASK BIT(16)
 
 #define DWC_MSHC_PTR_PHY_REGS 0x300
 #define DWC_MSHC_PHY_CNFG (DWC_MSHC_PTR_PHY_REGS + 0x0)
 #define PAD_SN_LSB 20
 #define PAD_SN_MASK 0xF
-#define PAD_SN_DEFAULT ((0xE & PAD_SN_MASK) << PAD_SN_LSB)
+#define PAD_SN_DEFAULT ((0x8 & PAD_SN_MASK) << PAD_SN_LSB)
 #define PAD_SP_LSB 16
 #define PAD_SP_MASK 0xF
-#define PAD_SP_DEFAULT ((0xE & PAD_SP_MASK) << PAD_SP_LSB)
+#define PAD_SP_DEFAULT ((0x9 & PAD_SP_MASK) << PAD_SP_LSB)
 #define PHY_PWRGOOD BIT(1)
 #define PHY_RSTN BIT(0)
 
@@ -126,7 +128,7 @@ static void dwcmshc_phy_pad_config(struct sdhci_host *host)
 
 static inline void dwcmshc_phy_delay_config(struct sdhci_host *host)
 {
-	sdhci_writeb(host, 0, DWC_MSHC_COMMDL_CNFG);
+	sdhci_writeb(host, 1, DWC_MSHC_COMMDL_CNFG);
 	sdhci_writeb(host, 0, DWC_MSHC_SDCLKDL_CNFG);
 	sdhci_writeb(host, 8, DWC_MSHC_SMPLDL_CNFG);
 	sdhci_writeb(host, 8, DWC_MSHC_ATDL_CNFG);
@@ -191,6 +193,9 @@ static int dwcmshc_phy_init(struct sdhci_host *host)
 	ktime_t timeout;
 	struct sdhci_pltfm_host *pltfm_host;
 	pltfm_host = sdhci_priv(host);
+
+	/* reset phy */
+	sdhci_writew(host, 0, DWC_MSHC_PHY_CNFG);
 
 	/* Disable the clock */
 	clk_disable_unprepare(pltfm_host->clk);
@@ -257,6 +262,18 @@ static void emmc_card_init(struct sdhci_host *host)
 	}
 }
 
+static inline void enable_tune_clk_stop(struct sdhci_host *host)
+{
+	u16 reg;
+	u16 vender_base;
+
+	/* read verder base register address */
+	vender_base = sdhci_readw(host, SDHCI_VENDOR_BASE_REG) & 0xFFF;
+
+	reg = sdhci_readw(host, vender_base + SDHCI_VENDER_AT_CTRL_REG);
+	reg |= SDHCI_TUNE_CLK_STOP_EN_MASK;
+	sdhci_writew(host, reg, vender_base + SDHCI_VENDER_AT_CTRL_REG);
+}
 
 static void dwcmshc_set_clock(struct sdhci_host *host, unsigned int clock)
 {
@@ -290,7 +307,6 @@ static void set_ddr_mode(struct sdhci_host *host, unsigned int ddr_mode)
 {
 	struct sdhci_pltfm_host *pltfm_host;
 	struct dwcmshc_priv *priv;
-	u32 value;
 
 	pltfm_host = sdhci_priv(host);
 	priv = sdhci_pltfm_priv(pltfm_host);
@@ -371,6 +387,79 @@ static unsigned int dwcmshc_get_max_clock(struct sdhci_host *host)
 	return host->mmc->f_max;
 }
 
+static int __dwcmshc_execute_tuning(struct sdhci_host *host, u32 opcode)
+{
+	int i;
+
+	/*
+	 * Issue opcode repeatedly till Execute Tuning is set to 0 or the number
+	 * of loops reaches tuning loop count.
+	 */
+	for (i = 0; i < host->tuning_loop_count; i++) {
+		u16 ctrl;
+
+		sdhci_send_tuning(host, opcode);
+
+		if (!host->tuning_done) {
+			pr_info("%s: Tuning timeout, falling back to fixed sampling clock\n",
+				mmc_hostname(host->mmc));
+			sdhci_abort_tuning(host, opcode);
+			return -ETIMEDOUT;
+		}
+
+		/* Spec does not require a delay between tuning cycles */
+		if (host->tuning_delay > 0)
+			mdelay(host->tuning_delay);
+
+		ctrl = sdhci_readw(host, SDHCI_HOST_CONTROL2);
+		if (!(ctrl & SDHCI_CTRL_EXEC_TUNING)) {
+			if (ctrl & SDHCI_CTRL_TUNED_CLK)
+				return 0; /* Success! */
+			break;
+		}
+	}
+
+	pr_info("%s: Tuning failed, falling back to fixed sampling clock\n",
+		mmc_hostname(host->mmc));
+	sdhci_reset_tuning(host);
+	return -EAGAIN;
+}
+
+static int dwcmshc_execute_tuning(struct sdhci_host *host, u32 opcode)
+{
+	u16 clk_ctrl;
+
+        if (host->flags & SDHCI_HS400_TUNING)
+		host->mmc->retune_period = 0;
+
+	if (host->tuning_delay < 0)
+		host->tuning_delay = opcode == MMC_SEND_TUNING_BLOCK;
+
+	sdhci_reset_tuning(host);
+	enable_tune_clk_stop(host);
+	dwcmshc_sdhci_reset(host, SDHCI_RESET_CMD | SDHCI_RESET_DATA);
+
+	/*
+	 * For avoid giltches, need disable the card clock before set
+	 * EXEC_TUNING bit.
+	 */
+	clk_ctrl = sdhci_readw(host, SDHCI_CLOCK_CONTROL);
+	clk_ctrl &= ~SDHCI_CLOCK_CARD_EN;
+	sdhci_writew(host, clk_ctrl, SDHCI_CLOCK_CONTROL);
+
+	sdhci_start_tuning(host);
+
+	/* enable the card clock */
+	clk_ctrl |= SDHCI_CLOCK_CARD_EN;
+	sdhci_writew(host, clk_ctrl, SDHCI_CLOCK_CONTROL);
+
+	host->tuning_err = __dwcmshc_execute_tuning(host, opcode);
+
+	sdhci_end_tuning(host);
+
+	return 0;
+}
+
 static const struct sdhci_ops sdhci_dwcmshc_ops = {
 	.set_clock		= dwcmshc_set_clock,
 	.set_power		= dwcmshc_set_power,
@@ -378,6 +467,7 @@ static const struct sdhci_ops sdhci_dwcmshc_ops = {
 	.set_uhs_signaling	= dwcmshc_set_uhs_signaling,
 	.get_max_clock		= dwcmshc_get_max_clock,
 	.reset			= dwcmshc_sdhci_reset,
+	.platform_execute_tuning = dwcmshc_execute_tuning,
 };
 
 static const struct sdhci_pltfm_data sdhci_dwcmshc_pdata = {
