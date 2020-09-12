@@ -144,7 +144,7 @@ static struct snd_soc_dai_driver xf6020_dai[] = {
 };
 
 static unsigned int xf6020_i2c_read(
-	struct i2c_client *client, u8 *reg, int reglen,u8 *data,int datalen)
+	struct i2c_client *client, u8 *reg, int reglen, void *data,int datalen)
 {
 	struct i2c_msg xfer[2];
 	int ret;
@@ -204,7 +204,7 @@ unsigned int xf6020_read_register(struct snd_soc_codec *codec,  unsigned int reg
 {
 	struct xf6020_data *xf6020 = snd_soc_codec_get_drvdata(codec);
 	int ret;
-	unsigned int rdata = 0;
+	u32 rdata = 0;
 	unsigned char tx[2], rx[4];
 	int	wlen, rlen;
 	printk("FUNC %s %d \n,", __func__, __LINE__);
@@ -220,7 +220,7 @@ unsigned int xf6020_read_register(struct snd_soc_codec *codec,  unsigned int reg
 	rlen = 4;
 	tx[0] = (unsigned char)(0xFF & (reg >> 8));
 	tx[1] = (unsigned char)(0xFF & reg);
-	ret = xf6020_i2c_read(xf6020->i2c, tx, wlen, &rdata, rlen);
+	ret = xf6020_i2c_read(xf6020->i2c, tx, wlen, (void *)&rdata, rlen);
 	if (ret < 0) {
 		x9dbgprt("[xf6020] %s error ret = %d \n", __FUNCTION__,__LINE__);
 		rdata = -EIO;
