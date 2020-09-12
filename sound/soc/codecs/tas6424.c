@@ -414,7 +414,7 @@ static void tas6424_fault_check_work(struct work_struct *work)
 	struct device *dev = tas6424->dev;
 	unsigned int reg;
 	int ret;
-	x9dbgprt("\t[tas5404] %s(%d)\n", __FUNCTION__,__LINE__);
+	x9dbgprt("[tas6424] %s(%d)\n", __FUNCTION__,__LINE__);
 	ret = regmap_read(tas6424->regmap, TAS6424_GLOB_FAULT1, &reg);
 	if (ret < 0) {
 		dev_err(dev, "failed to read FAULT1 register: %d\n", ret);
