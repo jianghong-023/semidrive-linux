@@ -371,6 +371,9 @@ void sdrv_restart(enum reboot_mode reboot_mode, const char *cmd)
 			} else {
 				pr_err("failed to save reboot reason\n");
 			}
+			ret = regmap_write(regmap, SDRV_REG_STATUS, 0);
+			if (ret)
+				pr_err("failed to clear status register\n");
 		}
 		of_node_put(args.np);
 	} else {
@@ -393,7 +396,7 @@ void sdrv_poweroff(void)
 	struct regmap *regmap;
 	struct device_node *regctl_node;
 	struct device *regctl_dev;
-	int ret;
+	int ret, val;
 
 	int reason = HALT_REASON_POR;
 
@@ -408,7 +411,17 @@ void sdrv_poweroff(void)
 		regctl_dev =  regctl_node->data;
 		regmap = dev_get_regmap(regctl_dev, NULL);
 		if (regmap) {
-			regmap_write(regmap, SDRV_REG_BOOTREASON, reason);
+			ret = regmap_read(regmap, SDRV_REG_BOOTREASON, &val);
+			if (!ret) {
+				val &= ~BOOT_REASON_MASK;
+				val |= reason;
+				regmap_write(regmap, SDRV_REG_BOOTREASON, val);
+			} else {
+				pr_err("failed to save reboot reason\n");
+			}
+			ret = regmap_write(regmap, SDRV_REG_STATUS, 0);
+			if (ret)
+				pr_err("failed to clean status register\n");
 		}
 		of_node_put(args.np);
 	} else {
