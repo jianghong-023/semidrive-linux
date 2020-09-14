@@ -817,7 +817,7 @@ int snd_afe_dai_trigger(struct snd_pcm_substream *substream, int cmd,
 		    !atomic_read(&afe->capturing)) {
 			afe_i2s_sc_stop(afe);
 		}
-
+		break;
 	default:
 		return -EINVAL;
 	}
