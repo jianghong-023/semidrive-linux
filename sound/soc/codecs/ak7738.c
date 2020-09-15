@@ -5460,6 +5460,7 @@ static int ak7738_set_dai_fmt(struct snd_soc_dai *dai, unsigned int fmt)
 			doslot = 3;
 			break;
 		case SND_SOC_DAIFMT_DSP_A:
+			akdbgprt("[AK7738] SND_SOC_DAIFMT_DSP_A %s(Slave_nSDNo=%d)\n",__FUNCTION__,nSDNo);
 			format = AK7738_LRIF_PCM_SHORT_MODE; // 6
 			diolsb = 0;
 			diedge = 1;
@@ -5484,8 +5485,12 @@ static int ak7738_set_dai_fmt(struct snd_soc_dai *dai, unsigned int fmt)
 	setSDMaster(codec, nSDNo, msnbit);
 	addr = AK7738_44_CLOCKFORMAT_SETTING1 + (nSDNo/2);
 	shift = 4 * ((nSDNo+1) % 2);
+	if(nSDNo == 4){
+		shift = 0;
+	}
 	value = (format << shift);
 	mask = 0xF << shift;
+
 	snd_soc_update_bits(codec, addr, mask, value);
 
 	/* set SDIO format */
@@ -6476,14 +6481,14 @@ struct snd_soc_dai_driver ak7738_dai[] = {
 		.playback = {
 		       .stream_name = "AIF5 Playback",
 		       .channels_min = 1,
-		       .channels_max = 2,
+		       .channels_max = 8,
 		       .rates = AK7738_RATES,
 		       .formats = AK7738_DAC_FORMATS,
 		},
 		.capture = {
 		       .stream_name = "AIF5 Capture",
 		       .channels_min = 1,
-		       .channels_max = 2,
+		       .channels_max = 8,
 		       .rates = AK7738_RATES,
 		       .formats = AK7738_ADC_FORMATS,
 		},
