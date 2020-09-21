@@ -61,7 +61,7 @@
 #define SND_RATE_MIN 8000
 #define SND_RATE_MAX 48000
 #define SND_CHANNELS_MIN 1
-#define SND_CHANNELS_MAX 2
+#define SND_CHANNELS_MAX 8
 
 enum {
 	I2S_SCLK_MCLK,

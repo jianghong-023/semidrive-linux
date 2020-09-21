@@ -818,6 +818,7 @@ int snd_afe_dai_trigger(struct snd_pcm_substream *substream, int cmd,
 			afe_i2s_sc_stop(afe);
 		}
 		break;
+
 	default:
 		return -EINVAL;
 	}
@@ -953,6 +954,70 @@ static int snd_afe_dai_set_fmt(struct snd_soc_dai *dai, unsigned int fmt)
 		regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_I2S_CTRL,
 				   BIT_CTRL_DATA_ORDER,
 				   (0 << I2S_CTRL_DATA_ORDER_FIELD_OFFSET));
+		break;
+	case SND_SOC_DAIFMT_DSP_A:
+		/*config sck polar*/
+		regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_I2S_CTRL,
+				   BIT_CTRL_SCK_POLAR,
+				   (1 << I2S_CTRL_SCK_POLAR_FIELD_OFFSET));
+
+		/*config ws polar*/
+		regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_I2S_CTRL,
+				   BIT_CTRL_WS_POLAR,
+				   (0 << I2S_CTRL_WS_POLAR_FIELD_OFFSET));
+
+		/*config word select mode*/
+		regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_I2S_CTRL,
+				   BIT_CTRL_WS_MODE,
+				   (0 << I2S_CTRL_WS_MODE_FIELD_OFFSET));
+
+		/*config ws singal delay*/
+		regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_I2S_CTRL,
+				   BIT_CTRL_DATA_WS_DEL,
+				   (1 << I2S_CTRL_DATA_WS_DEL_FIELD_OFFSET));
+
+		/*config data align:MSB*/
+		regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_I2S_CTRL,
+				   BIT_CTRL_DATA_ALIGN,
+				   (0 << I2S_CTRL_DATA_ALIGN_FIELD_OFFSET));
+
+		/*config data order:first send MSB */
+		regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_I2S_CTRL,
+				   BIT_CTRL_DATA_ORDER,
+				   (0 << I2S_CTRL_DATA_ORDER_FIELD_OFFSET));
+
+		break;
+	case SND_SOC_DAIFMT_DSP_B:
+		/*config sck polar*/
+		regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_I2S_CTRL,
+				   BIT_CTRL_SCK_POLAR,
+				   (1 << I2S_CTRL_SCK_POLAR_FIELD_OFFSET));
+
+		/*config ws polar*/
+		regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_I2S_CTRL,
+				   BIT_CTRL_WS_POLAR,
+				   (0 << I2S_CTRL_WS_POLAR_FIELD_OFFSET));
+
+		/*config word select mode*/
+		regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_I2S_CTRL,
+				   BIT_CTRL_WS_MODE,
+				   (0 << I2S_CTRL_WS_MODE_FIELD_OFFSET));
+
+		/*config ws singal delay*/
+		regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_I2S_CTRL,
+				   BIT_CTRL_DATA_WS_DEL,
+				   (0 << I2S_CTRL_DATA_WS_DEL_FIELD_OFFSET));
+
+		/*config data align:MSB*/
+		regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_I2S_CTRL,
+				   BIT_CTRL_DATA_ALIGN,
+				   (0 << I2S_CTRL_DATA_ALIGN_FIELD_OFFSET));
+
+		/*config data order:first send MSB */
+		regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_I2S_CTRL,
+				   BIT_CTRL_DATA_ORDER,
+				   (0 << I2S_CTRL_DATA_ORDER_FIELD_OFFSET));
+
 		break;
 	default:
 		return -EINVAL;
