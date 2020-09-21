@@ -87,6 +87,8 @@ struct goodix_ts_data {
 
 #define TP_USE_THREAD 0
 
+#define USE_RST_BYPASS 0
+
 static const unsigned long goodix_irq_flags[] = {
     IRQ_TYPE_EDGE_RISING,
     IRQ_TYPE_EDGE_FALLING,
@@ -238,7 +240,26 @@ static int du90ub948_i2c_write(struct goodix_ts_data *ts, u8 reg,
     return ret < 0 ? ret : (ret != 1 ? -EIO : 0);
 }
 
+static int du90ub948_gpio2_output(struct goodix_ts_data *ts, int val)
+{
+    u8 dreg, dval;
 
+    dreg = 0x1e;
+    dval = 0;
+    du90ub948_i2c_read(ts, dreg, &dval, 1);
+    dev_err(&ts->client->dev, "948 before reg=0x%x, val=0x%x\n", dreg, dval);
+    dval &= 0x0f;
+    if(val==1)
+        dval |= 0x90;
+    else
+        dval |= 0x10;
+    du90ub948_i2c_write(ts, dreg, &dval, 1);
+    dval = 0;
+    du90ub948_i2c_read(ts, dreg, &dval, 1);
+    dev_err(&ts->client->dev, "948 after reg=0x%x, val=0x%x\n", dreg, dval);
+
+    return 0;
+}
 static int du90ub941_948_gpio2_output(struct goodix_ts_data *ts)
 {
     u8 dreg, dval;
@@ -647,8 +668,6 @@ static int goodix_int_sync(struct goodix_ts_data *ts)
  *
  * @ts: goodix_ts_data pointer
  */
-
-
 static int goodix_reset(struct goodix_ts_data *ts)
 {
     int error;
@@ -659,8 +678,11 @@ static int goodix_reset(struct goodix_ts_data *ts)
     gpiod_direction_output(ts->gpiod_int, 0);
 #endif
     /* begin select I2C slave addr */
-    error = gpiod_direction_output(ts->gpiod_rst, 0);
-
+    #if USE_RST_BYPASS
+        error = gpiod_direction_output(ts->gpiod_rst, 0);
+    #else
+        error = du90ub948_gpio2_output(ts, 0);
+    #endif
     if (error)
         return error;
 
@@ -682,8 +704,11 @@ static int goodix_reset(struct goodix_ts_data *ts)
 //  msleep(200);
 
     dev_err(&ts->client->dev, "%s(): 104-reset high\n", __func__);
-    error = gpiod_direction_output(ts->gpiod_rst, 1);
-
+    #if USE_RST_BYPASS
+        error = gpiod_direction_output(ts->gpiod_rst, 1);
+    #else
+        error = du90ub948_gpio2_output(ts, 1);
+    #endif
     if (error)
         return error;
 
@@ -1115,18 +1140,12 @@ static int goodix_ts_probe(struct i2c_client *client,
     dev_err(&client->dev, "941 reg=0x%x, val=0x%x\n", dreg, dval);
 #endif
 
-
-
-
-
+    #if USE_RST_BYPASS
     du90ub941_948_gpio2_output(ts);
+    #endif
+
     du90ub941_948_gpio3_output(ts);
-
-
     msleep(10);
-
-
-
 
     if (ts->gpiod_int && ts->gpiod_rst) {
         /* reset the controller */
