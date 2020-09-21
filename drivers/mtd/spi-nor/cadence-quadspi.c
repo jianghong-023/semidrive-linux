@@ -124,6 +124,8 @@ struct cqspi_driver_platdata {
 /* Register map */
 #define CQSPI_REG_CONFIG			0x00
 #define CQSPI_REG_CONFIG_ENABLE_MASK		BIT(0)
+#define CQSPI_REG_CONFIG_RESET_PIN_MASK		BIT(5)
+#define CQSPI_REG_CONFIG_RESET_SELECT_MASK	BIT(6)
 #define CQSPI_REG_CONFIG_ENB_DIR_ACC_CTRL	BIT(7)
 #define CQSPI_REG_CONFIG_DECODE_MASK		BIT(9)
 #define CQSPI_REG_CONFIG_CHIPSELECT_LSB		10
@@ -1178,6 +1180,19 @@ static int cqspi_of_get_pdata(struct platform_device *pdev)
 	return 0;
 }
 
+static void cqspi_device_reset(struct cqspi_st *cqspi)
+{
+	u32 reg;
+
+	reg = readl(cqspi->iobase + CQSPI_REG_CONFIG);
+	reg |= CQSPI_REG_CONFIG_RESET_SELECT_MASK;
+	writel(reg, cqspi->iobase + CQSPI_REG_CONFIG);
+	reg |= CQSPI_REG_CONFIG_RESET_PIN_MASK;
+	writel(reg, cqspi->iobase + CQSPI_REG_CONFIG);
+	reg &= ~CQSPI_REG_CONFIG_RESET_PIN_MASK;
+	writel(reg, cqspi->iobase + CQSPI_REG_CONFIG);
+}
+
 static void cqspi_controller_init(struct cqspi_st *cqspi)
 {
 	u32 reg;
@@ -1210,6 +1225,8 @@ static void cqspi_controller_init(struct cqspi_st *cqspi)
 	writel(reg, cqspi->iobase + CQSPI_REG_CONFIG);
 
 	cqspi_controller_enable(cqspi, 1);
+
+	cqspi_device_reset(cqspi);
 }
 
 static void cqspi_request_mmap_dma(struct cqspi_st *cqspi)
