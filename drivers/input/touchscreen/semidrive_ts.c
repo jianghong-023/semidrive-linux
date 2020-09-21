@@ -37,6 +37,8 @@ struct semidrive_sts_data {
 	struct input_dev *input_dev;
 	int abs_x_max;
 	int abs_y_max;
+	int x_offset;
+	int y_offset;
 	bool swapped_x_y;
 	bool inverted_x;
 	bool inverted_y;
@@ -89,8 +91,10 @@ struct sts_ioctl_result {
 			u16 abs_x_max;
 			u16 abs_y_max;
 			u16 touch_num;
+			u16 x_offset;
+			u16 y_offset;
 		} gc;
-		u8 data[8];
+		u8 data[12];
 	} msg;
 };
 
@@ -117,6 +121,14 @@ semidrive_sts_report_touch(struct semidrive_sts_data *ts, u8 *coor_data)
 	int input_x = get_unaligned_le16(&coor_data[1]);
 	int input_y = get_unaligned_le16(&coor_data[3]);
 	int input_w = get_unaligned_le16(&coor_data[5]);
+
+	//dev_err(&ts->pdev->dev, "(%d %d)\n", input_x, input_y);
+	input_x -= ts->x_offset;
+	input_y -= ts->y_offset;
+	if((input_x<0) || (input_x>ts->abs_x_max))
+		return ;
+	if((input_y<0) || (input_y>ts->abs_y_max))
+		return ;
 
 	/* Inversions have to happen before axis swapping */
 	if (ts->inverted_x)
@@ -278,6 +290,7 @@ static void semidrive_read_config(struct semidrive_sts_data *ts)
 	int ret;
 
 	ret = semidrive_sts_ioctl(ts, STS_OP_GET_CONFIG, &op_ret);
+	dev_info(&ts->pdev->dev, "%s: ret=%d\n", __func__, ret);
 	if (ret) {
 		goto apply_default;
 	}
@@ -286,11 +299,13 @@ static void semidrive_read_config(struct semidrive_sts_data *ts)
 	ts->abs_y_max = op_ret.msg.gc.abs_y_max;
 	if (ts->swapped_x_y)
 		swap(ts->abs_x_max, ts->abs_y_max);
-
-	ts->max_touch_num = op_ret.msg.gc.touch_num;;
+	ts->x_offset = op_ret.msg.gc.x_offset;
+	ts->y_offset = op_ret.msg.gc.y_offset;
+	ts->max_touch_num = op_ret.msg.gc.touch_num;
 	if (!ts->abs_x_max || !ts->abs_y_max || !ts->max_touch_num) {
 		goto apply_default;
 	}
+	dev_err(&ts->pdev->dev, "(%d-%d)[%d]\n", ts->abs_x_max, ts->abs_y_max, ts->max_touch_num);
 
 	return;
 
@@ -301,6 +316,9 @@ apply_default:
 	if (ts->swapped_x_y)
 		swap(ts->abs_x_max, ts->abs_y_max);
 	ts->max_touch_num = STS_MAX_CONTACTS;
+	ts->x_offset = 0;
+	ts->y_offset = 0;
+	dev_err(&ts->pdev->dev, "(%d-%d)[%d]\n", ts->abs_x_max, ts->abs_y_max, ts->max_touch_num);
 }
 
 /**
