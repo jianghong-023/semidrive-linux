@@ -19,4 +19,12 @@ config SEMIDRIVE_SCR
 	help
 	  SemiDrive System Control Register driver.
 
+config SEMIDRIVE_SDPE_RPC
+	tristate "Semidrive SDPE Communication Channel"
+	depends on ARCH_SEMIDRIVE
+	depends on MAILBOX
+	depends on RPMSG_SEMIDRIVE
+	help
+	  This enables support for the shared memory regions for sdpe communication
+
 endmenu
