@@ -114,6 +114,7 @@ static struct cpufreq_driver sdrv_cpufreq_driver = {
 	.target_index	= sdrv_set_target,
 	.get		= cpufreq_generic_get,
 	.flags		= CPUFREQ_STICKY,
+	.attr		= cpufreq_generic_attr,
 };
 
 static int __init sdrv_cpufreq_init(void)
