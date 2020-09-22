@@ -924,8 +924,6 @@ static long vpu_ioctl(struct file *filp, u_int cmd, u_long arg)
         break;
 
         case VDI_IOCTL_DEVICE_SRAM_CFG: {
-
-            int ret = 0;
             uint32_t mode = 0;
 
             if (get_user(mode, (u32 __user *) arg)) {
@@ -944,9 +942,8 @@ static long vpu_ioctl(struct file *filp, u_int cmd, u_long arg)
                 pr_err("[VPUDRV-ERR]  scr config error, ret %d , mode %d \n", ret, mode);
                 return ret;
             }
-
-            return ret;
         }
+
         break;
 
         case VDI_IOCTL_DEVICE_GET_SRAM_INFO: {
@@ -1316,6 +1313,11 @@ static int vpu_probe(struct platform_device *pdev)
     if (pdev) {
         vpuwave_device = &(pdev->dev);
         res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "register");
+    }
+
+    if (0 != (vpu_hw_reset())) {
+        pr_err("[VPUDRV-ERR] vpu wave reset error\n");
+        return  -EFAULT;
     }
 
     if (res) {/* if platform driver is implemented */
