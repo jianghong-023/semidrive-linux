@@ -161,6 +161,19 @@ static inline void axi_chan_irq_disable(struct axi_dma_chan *chan, u32 irq_mask)
 	}
 }
 
+static inline bool axi_dma_reset(struct axi_dma_chip *chip)
+{
+	u32 cnt = 0;
+	axi_dma_iowrite32(chip, DMAC_RESET, 0x1);
+	/*Wait for reset success*/
+	while(axi_dma_ioread32(chip, DMAC_RESET)){
+		udelay(1);
+		cnt ++ ;
+		if(cnt > 100)
+			return false;
+	}
+	return true;
+}
 static inline void axi_chan_irq_set(struct axi_dma_chan *chan, u32 irq_mask)
 {
 	axi_chan_iowrite32(chan, CH_INTSTATUS_ENA, irq_mask);
@@ -1768,7 +1781,6 @@ static int dw_probe(struct platform_device *pdev)
 	struct dw_axi_dma_hcfg *hdata;
 	u32 i;
 	int ret;
-
 	chip = devm_kzalloc(&pdev->dev, sizeof(*chip), GFP_KERNEL);
 	if (!chip)
 		return -ENOMEM;
@@ -1796,6 +1808,11 @@ static int dw_probe(struct platform_device *pdev)
 	chip->regs = devm_ioremap_resource(chip->dev, mem);
 	if (IS_ERR(chip->regs))
 		return PTR_ERR(chip->regs);
+
+	if(axi_dma_reset(chip) != true){
+		dev_err(&pdev->dev, "Reset timeout. \n");
+		return EINVAL;
+	}
 
 	if (pdev->num_resources == 3) {
 		mux_mem = platform_get_resource(pdev, IORESOURCE_MEM, 1);
