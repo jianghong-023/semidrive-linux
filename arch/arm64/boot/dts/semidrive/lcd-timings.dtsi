@@ -1,6 +1,30 @@
 &dtimings0 {
 	native-mode = <&hd1280x720>;
 
+	s640x480: vesa_640x480@60 {
+		clock-frequency = <22260000>;
+		hactive = <640>;
+		vactive = <480>;
+		hback-porch = <20>;
+		hfront-porch = <20>;
+		vback-porch = <20>;
+		vfront-porch = <20>;
+		hsync-len = <20>;
+		vsync-len = <10>;
+	};
+
+	s1280x480: vesa_1280x480@60 {
+		clock-frequency = <42612000>;
+		hactive = <1280>;
+		vactive = <480>;
+		hback-porch = <20>;
+		hfront-porch = <20>;
+		vback-porch = <20>;
+		vfront-porch = <20>;
+		hsync-len = <20>;
+		vsync-len = <10>;
+	};
+
 	svga800x600: vesa_800x600@60 {
 		clock-frequency = <40000000>;
 		hactive = <800>;
