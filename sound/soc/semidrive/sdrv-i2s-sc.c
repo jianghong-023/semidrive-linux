@@ -88,6 +88,20 @@ static void sdrv_pcm_refill_fifo(struct sdrv_afe_i2s_sc *afe)
 	rcu_read_unlock();
 }
 
+/* reset i2s  */
+static void afe_i2s_reset(struct sdrv_afe_i2s_sc *afe)
+{
+	u32 ret, val;
+	/*Disable i2s*/
+	regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_I2S_CTRL,
+			   BIT_CTRL_I2S_EN,
+			   (0 << I2S_CTRL_I2S_EN_FIELD_OFFSET));
+
+	regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_I2S_CTRL,
+			   BIT_CTRL_I2S_EN,
+			   (0 << I2S_CTRL_SFR_RST_FIELD_OFFSET));
+
+}
 
 /* misc operation */
 
@@ -1292,16 +1306,6 @@ static int snd_afe_i2s_sc_probe(struct platform_device *pdev)
 		return ret;
 	DEBUG_ITEM_PRT(clk_get_rate(afe->mclk));
 
-	/* Get irq and setting */
-	irq_id = platform_get_irq(pdev, 0);
-	if (!irq_id) {
-		dev_err(afe->dev, "%s no irq\n", dev->of_node->name);
-		return -ENXIO;
-	}
-	DEBUG_ITEM_PRT(irq_id);
-
-	ret = devm_request_irq(afe->dev, irq_id, sdrv_i2s_sc_irq_handler, 0,
-			       pdev->name, (void *)afe);
 	/*  ret = devm_request_threaded_irq(&pdev->dev, irq_id, NULL,
 									sdrv_i2s_sc_irq_handler,
 									IRQF_SHARED
@@ -1330,6 +1334,20 @@ static int snd_afe_i2s_sc_probe(struct platform_device *pdev)
 		ret = PTR_ERR(afe->regmap);
 		goto err_disable;
 	}
+
+
+	afe_i2s_reset(afe);
+
+        /* Get irq and setting */
+        irq_id = platform_get_irq(pdev, 0);
+        if (!irq_id) {
+                dev_err(afe->dev, "%s no irq\n", dev->of_node->name);
+                return -ENXIO;
+        }
+        DEBUG_ITEM_PRT(irq_id);
+
+        ret = devm_request_irq(afe->dev, irq_id, sdrv_i2s_sc_irq_handler, 0,
+                               pdev->name, (void *)afe);
 
 	/* TODO: Set i2s sc default afet to full duplex mode. Next change by dts
 	 * setting. Change scr setting before, need check SCR_SEC_BASE + (0xC <<
