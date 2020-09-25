@@ -519,4 +519,13 @@ config PWM_ZX
 	  To compile this driver as a module, choose M here: the module
 	  will be called pwm-zx.
 
+config PWM_SD
+	tristate "SemiDrive PWM Support"
+	depends on PWM
+	help
+	  Generic PWM framework driver for SemiDrive SD family SoCs.
+
+	  To compile this driver as a module, choose M here: the module
+	  will be called pwm-sd.
+
 endif
