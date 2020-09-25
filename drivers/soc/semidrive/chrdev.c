@@ -31,7 +31,7 @@
 
 union dcf_ioctl_arg {
 	struct dcf_usercontext	context;
-	int b;
+	struct dcf_ioc_setproperty setprop;
 };
 
 struct dcf_device {
@@ -126,6 +126,21 @@ long dcf_dev_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 
 		break;
 	}
+	case DCF_IOC_SET_PROPERTY:
+	{
+		struct dcf_ioc_setproperty *setprop = &data.setprop;
+
+        semidrive_set_property(setprop->property_id, setprop->property_value);
+		break;
+	}
+	case DCF_IOC_GET_PROPERTY:
+	{
+		struct dcf_ioc_setproperty *setprop = &data.setprop;
+
+        semidrive_get_property(setprop->property_id, &setprop->property_value);
+		break;
+	}
+
 	default:
 		return -ENOTTY;
 	}
@@ -407,6 +422,14 @@ static const struct file_operations __maybe_unused vircan_fops = {
 	.release	= dcf_dev_release,
 };
 
+static const struct file_operations property_fops = {
+	.owner   = THIS_MODULE,
+	.unlocked_ioctl = dcf_dev_ioctl,
+	.open    = dcf_dev_open,
+	.release = dcf_dev_release,
+	.llseek	 = no_llseek,
+};
+
 static struct dcf_device devlist[] = {
 	[1] = { "cluster",  0666, &cluster_fops, FMODE_UNSIGNED_OFFSET, SD_CLUSTER_EPT},
 	[2] = { "earlyapp", 0666, &avm_fops,     FMODE_UNSIGNED_OFFSET, SD_EARLYAPP_EPT},
@@ -414,6 +437,7 @@ static struct dcf_device devlist[] = {
 	[4] = { "ivi",      0666, &cluster_fops, FMODE_UNSIGNED_OFFSET, SD_IVI_EPT},
 	[5] = { "vircan",   0666, &vircan_fops,  FMODE_UNSIGNED_OFFSET, SD_VIRCAN_EPT},
 	[6] = { "loopback", 0666, &cluster_fops, FMODE_UNSIGNED_OFFSET, SD_LOOPBACK_EPT},
+	[7] = { "property", 0600, &property_fops,FMODE_UNSIGNED_OFFSET, SD_PROPERTY_EPT},
 };
 
 static struct rpmsg_device_id rpmsg_bridge_id_table[] = {
@@ -423,6 +447,7 @@ static struct rpmsg_device_id rpmsg_bridge_id_table[] = {
 	{.name = "rpmsg-ivi"},
 	{.name = "rpmsg-vircan"},
 	{.name = "rpmsg-loopback"},
+	{.name = "rpmsg-property"},
 	{},
 };
 
