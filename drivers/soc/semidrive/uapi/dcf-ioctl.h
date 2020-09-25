@@ -34,14 +34,27 @@ struct dcf_usercontext {
 	__u32 reserved2;
 };
 
+struct dcf_ioc_setproperty {
+	__u32 property_id;
+	__u32 property_value;
+	__u32 reserved1;
+	__u32 reserved2;
+};
+
 #define DCF_IOC_MAGIC		'D'
 
 /**
  * DOC: DCF_IOC_SET_USER_ID - set user context and id
  *
  */
-#define DCF_IOC_SET_USER_CTX		_IOWR(DCF_IOC_MAGIC, 1,\
+#define DCF_IOC_SET_USER_CTX	_IOWR(DCF_IOC_MAGIC, 1,\
 					struct dcf_usercontext)
+
+#define DCF_IOC_SET_PROPERTY	_IOWR(DCF_IOC_MAGIC, 2,\
+					struct dcf_ioc_setproperty)
+
+#define DCF_IOC_GET_PROPERTY	_IOWR(DCF_IOC_MAGIC, 3,\
+					struct dcf_ioc_setproperty)
 
 #endif /* _UAPI_LINUX_DCF_IOC_H */
 
