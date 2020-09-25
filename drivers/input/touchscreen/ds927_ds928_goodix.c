@@ -52,6 +52,8 @@ struct goodix_ts_data {
     u32 dev_type;   /* 0: main device, 1: aux device */
     u8 addr_ds927;
     u8 addr_ds928;
+    int irq_channel;
+    int reset_channel;
     const char *cfg_name;
     struct completion firmware_loading_complete;
     unsigned long irq_flags;
@@ -86,6 +88,8 @@ struct goodix_ts_data {
 #define TRIGGER_LOC     6
 
 #define TP_USE_THREAD 0
+
+#define USE_RST_BYPASS 0
 
 static const unsigned long goodix_irq_flags[] = {
     IRQ_TYPE_EDGE_RISING,
@@ -322,6 +326,305 @@ static int du90ub927_928_gpio1_input(struct goodix_ts_data *ts)
     du90ub928_i2c_write(ts, dreg, &dval, 1);
 }
 
+static int du90ub927_928_gpio_output(struct goodix_ts_data *ts, int gpio)
+{
+    u8 dreg, dval;
+
+    switch (gpio) {
+        case 0:
+            dreg = 0x0d;
+            dval = 0;
+            du90ub927_i2c_read(ts, dreg, &dval, 1);
+            dev_err(&ts->client->dev, "927 before out reg=0x%x, val=0x%x\n", dreg,
+                    dval);
+            dval &= 0xf0;
+            dval |= 0x03;
+            du90ub927_i2c_write(ts, dreg, &dval, 1);
+            dval = 0;
+            du90ub927_i2c_read(ts, dreg, &dval, 1);
+            dev_err(&ts->client->dev, "927 after out reg=0x%x, val=0x%x\n", dreg,
+                    dval);
+
+            dreg = 0x1d;
+            dval = 0;
+            du90ub928_i2c_read(ts, dreg, &dval, 1);
+            dev_err(&ts->client->dev, "928 before out reg=0x%x, val=0x%x\n", dreg,
+                    dval);
+            dval &= 0xf0;
+            dval |= 0x05;
+            du90ub928_i2c_write(ts, dreg, &dval, 1);
+            dval = 0;
+            du90ub928_i2c_read(ts, dreg, &dval, 1);
+            dev_err(&ts->client->dev, "928 after out reg=0x%x, val=0x%x\n", dreg,
+                    dval);
+            break;
+
+        case 1:
+            dreg = 0x0e;
+            dval = 0;
+            du90ub927_i2c_read(ts, dreg, &dval, 1);
+            dev_err(&ts->client->dev, "927 before out reg=0x%x, val=0x%x\n", dreg,
+                    dval);
+            dval &= 0xf0;
+            dval |= 0x03;
+            du90ub927_i2c_write(ts, dreg, &dval, 1);
+            dval = 0;
+            du90ub927_i2c_read(ts, dreg, &dval, 1);
+            dev_err(&ts->client->dev, "927 after out reg=0x%x, val=0x%x\n", dreg,
+                    dval);
+
+            dreg = 0x1e;
+            dval = 0;
+            du90ub928_i2c_read(ts, dreg, &dval, 1);
+            dev_err(&ts->client->dev, "928 before out reg=0x%x, val=0x%x\n", dreg,
+                    dval);
+            dval &= 0xf0;
+            dval |= 0x05;
+            du90ub928_i2c_write(ts, dreg, &dval, 1);
+            dval = 0;
+            du90ub928_i2c_read(ts, dreg, &dval, 1);
+            dev_err(&ts->client->dev, "928 after out reg=0x%x, val=0x%x\n", dreg,
+                    dval);
+            break;
+
+        case 2:
+            dreg = 0x0e;
+            dval = 0;
+            du90ub927_i2c_read(ts, dreg, &dval, 1);
+            dev_err(&ts->client->dev, "927 before reg=0x%x, val=0x%x\n", dreg, dval);
+            dval &= 0x0f;
+            dval |= 0x30;
+            du90ub927_i2c_write(ts, dreg, &dval, 1);
+            dval = 0;
+            du90ub927_i2c_read(ts, dreg, &dval, 1);
+            dev_err(&ts->client->dev, "927 after reg=0x%x, val=0x%x\n", dreg, dval);
+
+            dreg = 0x1e;
+            dval = 0;
+            du90ub928_i2c_read(ts, dreg, &dval, 1);
+            dev_err(&ts->client->dev, "928 before reg=0x%x, val=0x%x\n", dreg, dval);
+            dval &= 0x0f;
+            dval |= 0x50;
+            du90ub928_i2c_write(ts, dreg, &dval, 1);
+            dval = 0;
+            du90ub928_i2c_read(ts, dreg, &dval, 1);
+            dev_err(&ts->client->dev, "928 after reg=0x%x, val=0x%x\n", dreg, dval);
+            break;
+
+        case 3:
+            dreg = 0x0f;
+            dval = 0;
+            du90ub927_i2c_read(ts, dreg, &dval, 1);
+            dev_err(&ts->client->dev, "927 before out reg=0x%x, val=0x%x\n", dreg,
+                    dval);
+            dval &= 0xf0;
+            dval |= 0x03;
+            du90ub927_i2c_write(ts, dreg, &dval, 1);
+            dval = 0;
+            du90ub927_i2c_read(ts, dreg, &dval, 1);
+            dev_err(&ts->client->dev, "927 after out reg=0x%x, val=0x%x\n", dreg,
+                    dval);
+
+            dreg = 0x1f;
+            dval = 0;
+            du90ub928_i2c_read(ts, dreg, &dval, 1);
+            dev_err(&ts->client->dev, "928 before out reg=0x%x, val=0x%x\n", dreg,
+                    dval);
+            dval &= 0xf0;
+            dval |= 0x05;
+            du90ub928_i2c_write(ts, dreg, &dval, 1);
+            dval = 0;
+            du90ub928_i2c_read(ts, dreg, &dval, 1);
+            dev_err(&ts->client->dev, "928 after out reg=0x%x, val=0x%x\n", dreg,
+                    dval);
+            break;
+
+        default:
+            dev_err(&ts->client->dev, "927 928 gpio is error: %d\n", gpio);
+            break;
+    }
+
+    return 0;
+}
+static int du90ub928_gpio_output_val(struct goodix_ts_data *ts, int gpio,
+                                     int val)
+{
+    u8 dreg, dval;
+
+    switch (gpio) {
+        case 0:
+            dreg = 0x1d;
+            dval = 0;
+            du90ub928_i2c_read(ts, dreg, &dval, 1);
+            dev_err(&ts->client->dev, "928 before out reg=0x%x, val=0x%x\n", dreg,
+                    dval);
+            dval &= 0xf0;
+
+            if (val == 1)
+                dval |= 0x09;
+            else
+                dval |= 0x01;
+
+            du90ub928_i2c_write(ts, dreg, &dval, 1);
+            dval = 0;
+            du90ub928_i2c_read(ts, dreg, &dval, 1);
+            dev_err(&ts->client->dev, "928 after out reg=0x%x, val=0x%x\n", dreg,
+                    dval);
+            break;
+
+        case 1:
+            dreg = 0x1e;
+            dval = 0;
+            du90ub928_i2c_read(ts, dreg, &dval, 1);
+            dev_err(&ts->client->dev, "928 before out reg=0x%x, val=0x%x\n", dreg,
+                    dval);
+            dval &= 0xf0;
+
+            if (val == 1)
+                dval |= 0x09;
+            else
+                dval |= 0x01;
+
+            du90ub928_i2c_write(ts, dreg, &dval, 1);
+            dval = 0;
+            du90ub928_i2c_read(ts, dreg, &dval, 1);
+            dev_err(&ts->client->dev, "928 after out reg=0x%x, val=0x%x\n", dreg,
+                    dval);
+            break;
+
+        case 2:
+            dreg = 0x1e;
+            dval = 0;
+            du90ub928_i2c_read(ts, dreg, &dval, 1);
+            dev_err(&ts->client->dev, "928 before reg=0x%x, val=0x%x\n", dreg, dval);
+            dval &= 0x0f;
+
+            if (val == 1)
+                dval |= 0x90;
+            else
+                dval |= 0x10;
+
+            du90ub928_i2c_write(ts, dreg, &dval, 1);
+            dval = 0;
+            du90ub928_i2c_read(ts, dreg, &dval, 1);
+            dev_err(&ts->client->dev, "928 after reg=0x%x, val=0x%x\n", dreg, dval);
+            break;
+
+        case 3:
+            dreg = 0x1f;
+            dval = 0;
+            du90ub928_i2c_read(ts, dreg, &dval, 1);
+            dev_err(&ts->client->dev, "928 before out reg=0x%x, val=0x%x\n", dreg,
+                    dval);
+            dval &= 0xf0;
+
+            if (val == 1)
+                dval |= 0x09;
+            else
+                dval |= 0x01;
+
+            du90ub928_i2c_write(ts, dreg, &dval, 1);
+            dval = 0;
+            du90ub928_i2c_read(ts, dreg, &dval, 1);
+            dev_err(&ts->client->dev, "928 after out reg=0x%x, val=0x%x\n", dreg,
+                    dval);
+            break;
+
+        default:
+            dev_err(&ts->client->dev, "928 gpio is error: %d\n", gpio);
+            break;
+    }
+
+    return 0;
+}
+
+static int du90ub927_928_gpio_input(struct goodix_ts_data *ts, int gpio)
+{
+    u8 dreg, dval;
+
+    switch (gpio) {
+        case 0:
+            dreg = 0x0d;
+            dval = 0;
+            du90ub927_i2c_read(ts, dreg, &dval, 1);
+            dev_err(&ts->client->dev, "927 in reg=0x%x, val=0x%x\n", dreg, dval);
+            dval &= 0xf0;
+            dval |= 0x05;
+            du90ub927_i2c_write(ts, dreg, &dval, 1);
+
+            dreg = 0x1d;
+            dval = 0;
+            du90ub928_i2c_read(ts, dreg, &dval, 1);
+            dev_err(&ts->client->dev, "928 in reg=0x%x, val=0x%x\n", dreg, dval);
+            dval &= 0xf0;
+            dval |= 0x03;
+            du90ub928_i2c_write(ts, dreg, &dval, 1);
+
+            break;
+
+        case 1:
+            dreg = 0x0e;
+            dval = 0;
+            du90ub927_i2c_read(ts, dreg, &dval, 1);
+            dev_err(&ts->client->dev, "927 in reg=0x%x, val=0x%x\n", dreg, dval);
+            dval &= 0xf0;
+            dval |= 0x05;
+            du90ub927_i2c_write(ts, dreg, &dval, 1);
+
+            dreg = 0x1e;
+            dval = 0;
+            du90ub928_i2c_read(ts, dreg, &dval, 1);
+            dev_err(&ts->client->dev, "928 in reg=0x%x, val=0x%x\n", dreg, dval);
+            dval &= 0xf0;
+            dval |= 0x03;
+            du90ub928_i2c_write(ts, dreg, &dval, 1);
+            break;
+
+        case 2:
+            dreg = 0x0e;
+            dval = 0;
+            du90ub927_i2c_read(ts, dreg, &dval, 1);
+            dev_err(&ts->client->dev, "927 in reg=0x%x, val=0x%x\n", dreg, dval);
+            dval &= 0x0f;
+            dval |= 0x50;
+            du90ub927_i2c_write(ts, dreg, &dval, 1);
+
+            dreg = 0x1e;
+            dval = 0;
+            du90ub928_i2c_read(ts, dreg, &dval, 1);
+            dev_err(&ts->client->dev, "928 in reg=0x%x, val=0x%x\n", dreg, dval);
+            dval &= 0x0f;
+            dval |= 0x30;
+            du90ub928_i2c_write(ts, dreg, &dval, 1);
+
+            break;
+
+        case 3:
+            dreg = 0x0f;
+            dval = 0;
+            du90ub927_i2c_read(ts, dreg, &dval, 1);
+            dev_err(&ts->client->dev, "927 in reg=0x%x, val=0x%x\n", dreg, dval);
+            dval &= 0xf0;
+            dval |= 0x05;
+            du90ub927_i2c_write(ts, dreg, &dval, 1);
+
+            dreg = 0x1f;
+            dval = 0;
+            du90ub928_i2c_read(ts, dreg, &dval, 1);
+            dev_err(&ts->client->dev, "928 in reg=0x%x, val=0x%x\n", dreg, dval);
+            dval &= 0xf0;
+            dval |= 0x03;
+            du90ub928_i2c_write(ts, dreg, &dval, 1);
+
+            break;
+
+        default:
+            dev_err(&ts->client->dev, "927 928 gpio is error: %d\n", gpio);
+            break;
+    }
+
+    return 0;
+}
 
 
 /**
@@ -613,7 +916,8 @@ static int goodix_int_sync(struct goodix_ts_data *ts)
         return error;
 
     msleep(50);             /* T5: 50ms */
-    du90ub927_928_gpio1_input(ts);
+    //du90ub927_928_gpio1_input(ts);
+    du90ub927_928_gpio_input(ts, ts->irq_channel);
     msleep(50);
 
     error = gpiod_direction_input(ts->gpiod_int);
@@ -634,14 +938,18 @@ static int goodix_int_sync(struct goodix_ts_data *ts)
 static int goodix_reset(struct goodix_ts_data *ts)
 {
     int error;
-#if 1
+#if 0
     gpiod_direction_output(ts->gpiod_rst, 1);
     gpiod_direction_output(ts->gpiod_int, 1);
     msleep(100);
     gpiod_direction_output(ts->gpiod_int, 0);
 #endif
     /* begin select I2C slave addr */
+#if USE_RST_BYPASS
     error = gpiod_direction_output(ts->gpiod_rst, 0);
+#else
+    error = du90ub928_gpio_output_val(ts, ts->reset_channel, 0);
+#endif
 
     if (error)
         return error;
@@ -663,8 +971,12 @@ static int goodix_reset(struct goodix_ts_data *ts)
     usleep_range(100, 2000);        /* T3: > 100us */
 //  msleep(200);
 
-    dev_err(&ts->client->dev, "%s(): 104-reset high\n", __func__);
+    dev_err(&ts->client->dev, "%s(): reset high\n", __func__);
+#if USE_RST_BYPASS
     error = gpiod_direction_output(ts->gpiod_rst, 1);
+#else
+    error = du90ub928_gpio_output_val(ts, ts->reset_channel, 1);
+#endif
 
     if (error)
         return error;
@@ -839,7 +1151,7 @@ static int goodix_i2c_test(struct i2c_client *client)
 {
     int retry = 0;
     int error;
-    u8 test;
+    u8 test = 0;
 
     while (retry++ < 2) {
         error = goodix_i2c_read(client, GOODIX_REG_CONFIG_DATA,
@@ -1049,10 +1361,29 @@ static int goodix_ts_probe(struct i2c_client *client,
     }
 
     ts->addr_ds928 = (u8)val;
+    dev_err(&client->dev, "ts->addr_ds927=0x%x, ts->addr_ds928=0x%x\n",
+            ts->addr_ds927, ts->addr_ds928);
 
 
+    val = 0;
+    error = of_property_read_u32(client->dev.of_node, "irq_channel", &val);
 
+    if (error < 0) {
+        dev_err(&client->dev, "Missing addr_ds948\n");
+    }
 
+    ts->irq_channel = val;
+
+    val = 0;
+    error = of_property_read_u32(client->dev.of_node, "reset_channel", &val);
+
+    if (error < 0) {
+        dev_err(&client->dev, "Missing addr_ds948\n");
+    }
+
+    ts->reset_channel = val;
+    dev_err(&client->dev, "ts->irq_channel=%d, ts->reset_channel=%d\n",
+            ts->irq_channel, ts->reset_channel);
 #if 1
 
     dreg = 0x03;
@@ -1109,10 +1440,11 @@ static int goodix_ts_probe(struct i2c_client *client,
     du90ub928_i2c_write(ts, dreg, &dval, 1);
 #endif
 
-
+#if USE_RST_BYPASS
     du90ub927_928_gpio2_output(ts);
-    du90ub927_928_gpio1_output(ts);
-
+#endif
+    //du90ub927_928_gpio1_output(ts);
+    du90ub927_928_gpio_output(ts, ts->irq_channel);
 
     msleep(10);
 
