@@ -836,7 +836,6 @@ static long vpu_ioctl(struct file *filp, u_int cmd, u_long arg)
         break;
 
         case VDI_IOCTL_DEVICE_SRAM_CFG: {
-            int ret = 0;
             uint32_t mode = 0;
 
             if (get_user(mode, (u32 __user *) arg)) {
@@ -855,8 +854,6 @@ static long vpu_ioctl(struct file *filp, u_int cmd, u_long arg)
                 pr_err("[VPUDRV-ERR]  scr config error, ret %d , mode %d \n", ret, mode);
                 return ret;
             }
-
-            return ret;
         }
 
         break;
@@ -1220,6 +1217,11 @@ static int vpu_probe(struct platform_device *pdev)
     if (pdev) {
         vpucoda_device = &(pdev->dev);
         res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "register");
+    }
+
+    if (0 != (vpu_hw_reset())) {
+        pr_err("[VPUDRV-ERR] vpu coda reset error\n");
+        return  -EFAULT;
     }
 
     dma_set_coherent_mask(vpucoda_device, DMA_BIT_MASK(32));
