@@ -19,7 +19,7 @@
 #include <linux/of.h>
 
 #define DEFAULT_MIN_FREQ 100000000
-#define DEFAULT_MAX_FREQ (~0UL)
+#define DEFAULT_MAX_FREQ (U32_MAX)
 static u32 min_freq = DEFAULT_MIN_FREQ;
 static u32 max_freq = DEFAULT_MAX_FREQ;
 static unsigned int transition_delay_us = 0;
