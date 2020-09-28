@@ -40,6 +40,7 @@ override PVR_LOADER :=
 override DEBUGLINK := 1
 override SUPPORT_PHYSMEM_TEST := 1
 override COMPRESS_DEBUG_SECTIONS := 1
+override PVR_DVFS := 1
 override undefine PDUMP
 override OPTIM := -O2
 override RGX_TIMECORR_CLOCK := sched
