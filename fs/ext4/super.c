@@ -55,11 +55,6 @@
 #define CREATE_TRACE_POINTS
 #include <trace/events/ext4.h>
 
-#include <asm/ptrace.h>
-
-#define DEBUG 1
-
-
 static struct ext4_lazy_init *ext4_li_info;
 static struct mutex ext4_li_mtx;
 static struct ratelimit_state ext4_mount_msg_ratelimit;
@@ -2290,21 +2285,9 @@ int ext4_group_desc_csum_verify(struct super_block *sb, __u32 block_group,
 void ext4_group_desc_csum_set(struct super_block *sb, __u32 block_group,
 			      struct ext4_group_desc *gdp)
 {
-	volatile __le16 bg_checksum;
-	struct ext4_sb_info *sbi = EXT4_SB(sb);
-
 	if (!ext4_has_group_desc_csum(sb))
 		return;
-	bg_checksum = gdp->bg_checksum;
 	gdp->bg_checksum = ext4_group_desc_csum(sb, block_group, gdp);
-
-	if(!strcmp(sbi->s_es->s_volume_name, "vendor")) {
-		if (bg_checksum != gdp->bg_checksum) {
-			pr_err("old bg checksum = 0x%04x, new bg checksum = 0x%04x\n", bg_checksum, gdp->bg_checksum);
-			//dump_stack();
-			BUG();
-		}
-	}
 }
 
 /* Called at mount-time, super-block is locked */
