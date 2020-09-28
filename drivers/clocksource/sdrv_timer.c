@@ -24,6 +24,8 @@
 
 #define TIMER_MAX_NUM 5
 #define PLAT_TIMER_INST 0 /*instance 0 as platform timer*/
+/*for op_mode*/
+#define OP_MODE_TIMER 0
 
 struct sdrv_timer_context_t {
 	sdrv_timer_t *tmr;
@@ -276,9 +278,7 @@ static int sd_timer_shutdown(struct clock_event_device *clk)
 }
 static void __init add_clockevent(struct device_node *event_timer)
 {
-	void __iomem *iobase;
 	struct sdrv_timer_context_t *tmr_ctx = soc_get_module_inst(PLAT_TIMER_INST);
-	u32 rate;
 	int ret;
 
 	tmr_ctx->ced.irq = tmr_ctx->irq;
@@ -337,10 +337,20 @@ static u64 notrace read_sched_clock(void)
 }
 static int __init sd_timer_init(struct device_node *timer)
 {
-	pr_info("%s: found clocksource timer\n", __func__);
-	add_clocksource(timer);
-	sched_clock_register(read_sched_clock, 64, sched_rate);
-	add_clockevent(timer);
+	u32 val = 0;
+	int ret;
+	ret = of_property_read_u32(timer, "op-mode", &val);
+	if (ret < 0) {
+		pr_info("op-mode is not config, default enable timer\n", val);
+		val = OP_MODE_TIMER;
+	}
+	if (OP_MODE_TIMER == val) //timer op-mode
+	{
+		pr_info("%s: found clocksource timer\n", __func__);
+		add_clocksource(timer);
+		sched_clock_register(read_sched_clock, 64, sched_rate);
+		add_clockevent(timer);
+	}
 	return 0;
 }
 
