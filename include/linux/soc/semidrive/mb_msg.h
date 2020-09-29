@@ -1,6 +1,18 @@
 /*
- * Copyright (c) 2019  Semidrive
+ * Copyright (C) Semidrive Semiconductor Ltd.
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, version 2 of the License.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
  */
+
+#ifndef __SD_MB_MSG_H__
+#define __SD_MB_MSG_H__
 
 #define MB_MSG_PROTO_DFT        (0)
 /* this msg is used for ROM code */
@@ -13,6 +25,7 @@
 /* used in mbox dts cell */
 #define MB_DST_ADDR(uid)		((uid >> 8) & 0xff)
 #define MB_RPROC_ID(uid )		(uid & 0xf)
+#define MB_OS_ID(uid)			(uid & 0xf0)
 
 typedef enum {
     IPCC_ADDR_INVALID           = 0x0,
@@ -32,8 +45,9 @@ typedef struct {
 	u16 protocol: 4;
 	u16 rproc   : 3;		/* processor id 0 ~ 7 */
 	u16 priority: 1;
-	u16 addr: 8;			/* receiver client address */
-	u16 dat_len;
+	u16 addr    : 8;		/* receiver client address */
+	u16 dat_len : 12;
+	u16 osid    : 4;
 	u8 data[0];
 } __attribute__((packed)) sd_msghdr_t;
 
@@ -89,3 +103,11 @@ inline static u32 mb_msg_payload_size(void *data)
 	return msg->dat_len - MB_MSG_HDR_SZ;
 }
 
+inline static u32 mb_msg_parse_rproc(void *data)
+{
+    sd_msghdr_t *msg = (sd_msghdr_t *)data;
+
+    return msg->rproc;
+}
+
+#endif //__SD_MB_MSG_H__

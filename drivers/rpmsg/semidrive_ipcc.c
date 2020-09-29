@@ -26,6 +26,7 @@
 #include <linux/slab.h>
 #include <linux/skbuff.h>
 #include <linux/mailbox_client.h>
+#include <linux/mailbox/semidrive-mailbox.h>
 #include <linux/soc/semidrive/mb_msg.h>
 #include "rpmsg_internal.h"
 
@@ -708,7 +709,7 @@ static void __mbox_rx_cb(struct mbox_client *client, void *mssg)
 		return;
 
 	tmp = skb_put(skb, len);
-	memcpy_fromio(tmp, mssg, len);
+	copy_from_mbox(tmp, mssg, len);
 
 	spin_lock(&vrp->queue_lock);
 	skb_queue_tail(&vrp->queue, skb);
@@ -912,7 +913,7 @@ static int rpmsg_ipcc_probe(struct platform_device *pdev)
 	return ret;
 
 fail_out:
-	if (vrp->mbox)
+	if (!IS_ERR_OR_NULL(vrp->mbox))
 		mbox_free_channel(vrp->mbox);
 
 	if (vrp->tx_buf_ptr)

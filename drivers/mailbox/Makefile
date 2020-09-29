@@ -37,4 +37,4 @@ obj-$(CONFIG_QCOM_APCS_IPC)	+= qcom-apcs-ipc-mailbox.o
 
 obj-$(CONFIG_TEGRA_HSP_MBOX)	+= tegra-hsp.o
 
-obj-$(CONFIG_SEMIDRIVE_MBOX)    += semidrive-mailbox.o
+obj-$(CONFIG_SEMIDRIVE_MBOX)    += semidrive-mailbox.o semidrive-mailbox-front.o semidrive-mailbox-back.o
