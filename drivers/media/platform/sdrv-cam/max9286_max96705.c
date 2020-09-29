@@ -658,9 +658,25 @@ static int max9286_initialization(struct max9286_dev *sensor)
     max9286_write_reg(sensor, 0x08, 0x2b);
     msleep(10);
 
+#if 0
     max9286_read_reg(sensor, 0x49, &val);
     link_status = val & 0xf;
     dev_err(&client->dev, "link_status=0x%x\n", link_status);
+#else
+
+    for (i = 0; i < 100; i++) {
+        val = 0;
+        max9286_read_reg(sensor, 0x49, &val);
+
+        if ((val & 0x0f) == 0x0f)
+            break;
+        else
+            msleep(10);
+    }
+
+    link_status = val & 0xf;
+    dev_err(&client->dev, "link_status=0x%x, i=%d\n", link_status, i);
+#endif
     max9286_write_reg(sensor, 0x0, (0xe0 | link_status));
     msleep(10);
 

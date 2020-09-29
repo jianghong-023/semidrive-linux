@@ -618,107 +618,50 @@ static int ar0132_initialization(struct ar0132_dev *sensor)
     u32 val32;
     u16 id;
     //u8 link_status = 0, link_count = 0;
-    //int i = 0;
+    int i = 0;
     //struct gpio_desc *gpiod;
 
-    dev_err(&client->dev, "116-B-%s()\n", __func__);
+    dev_err(&client->dev, "%s()\n", __func__);
 
-
-
-
-#if 0
-
-    id = 0xc814;    //raws
+#if 1
+    //cam format
+    id = 0xca9c;
+    val16 = 0;
     ap0101_read_reg16(sensor, id, &val16);
-    id = 0xc816;    //pclks
+    dev_err(&client->dev, "id=0x%x, val16=0x%x\n", id, val16);
+    val16 = 0x405;
+    ap0101_write_reg16(sensor, id, val16);
+    msleep(10);
+    val16 = 0;
     ap0101_read_reg16(sensor, id, &val16);
-    //val16 = 0x7c0;
-    //val16 = 0xce4;    //0x672*2
-    //ap0101_write_reg16(sensor, id, val16);
-
-
-    id = 0xc8a0;    //crop window width
-    ap0101_read_reg16(sensor, id, &val16);
-    id = 0xc8a2;    //crop window height
-    ap0101_read_reg16(sensor, id, &val16);
-
-    id = 0xc9b4;    // window width
-    ap0101_read_reg16(sensor, id, &val16);
-    id = 0xc9b6;    // window height
-    ap0101_read_reg16(sensor, id, &val16);
-
-    id = 0xc9bc;    // window width
-    ap0101_read_reg16(sensor, id, &val16);
-    id = 0xc9be;    // window height
-    ap0101_read_reg16(sensor, id, &val16);
-
-    id = 0xc9c4;    // window width
-    ap0101_read_reg16(sensor, id, &val16);
-    id = 0xc9c6;    // window height
-    ap0101_read_reg16(sensor, id, &val16);
-
-
-    id = 0xca90;    // output width
-    ap0101_read_reg16(sensor, id, &val16);
-    id = 0xca92;    // output height
-    ap0101_read_reg16(sensor, id, &val16);
-
-
-
-    //cam mode select
-    id = 0xc88c;
-    val8 = 0x2;     //test pattern
-    ap0101_write_reg8(sensor, id, val8);
-    msleep(1);
-
-    id = 0xc88f;
-    //val8 = 0x2;
-    val8 = 0x1;
-    ap0101_write_reg8(sensor, id, val8);
-    msleep(1);
-
-    id = 0xc890;    //R
-    //val32 = 0xfffff;
-    val32 = 0x0;
-    ap0101_write_reg32(sensor, id, val32);
-    id = 0xc894;    //G
-    val32 = 0x0;
-    //val32 = 0xfffff;
-    ap0101_write_reg32(sensor, id, val32);
-    id = 0xc898;    //B
-    //val32 = 0x0;
-    val32 = 0xfffff;
-    ap0101_write_reg32(sensor, id, val32);
-    msleep(1);
-
-    id = 0xc890;
-    ap0101_read_reg32(sensor, id, &val32);
-    id = 0xc894;
-    ap0101_read_reg32(sensor, id, &val32);
-    id = 0xc898;
-    ap0101_read_reg32(sensor, id, &val32);
+    dev_err(&client->dev, "2-id=0x%x, val16=0x%x\n", id, val16);
+#endif
 
     id = 0xfc00;
     val16 = 0x2800;     //enter: change-config
-    //val8=0x28;
-    //val8 = 0x40;          //enter: suspend
-    //val8 = 0x50;
     ap0101_write_reg16(sensor, id, val16);
-    //ap0101_write_reg_8(g_sensor, idx, id, val8);
-    msleep(1);
+    msleep(10);
 
     //command register
     // [15] 1/0, [14-0]: cmd
     id = 0x0040;
     val16 = 0x8100;
     ap0101_write_reg16(sensor, id, val16);
-    msleep(1);
-    id = 0x0040;
-    ap0101_read_reg16(sensor, id, &val16);
-    msleep(1);
+    msleep(10);
 
+    for (i = 0; i < 10; i++) {
+        id = 0x0040;
+        val16 = 0;
+        ap0101_read_reg16(sensor, id, &val16);
+
+        if (val16 == 0x0)
+            break;
+
+        msleep(10);
+    }
+
+    dev_err(&client->dev, "i=%d\n", i);
 #endif
-
 
     return 0;
 }
