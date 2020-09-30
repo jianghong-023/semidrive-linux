@@ -237,7 +237,7 @@ static void sdrv_restart_clocksource(struct clocksource *cs)
 	//        clocksource_to_sdrv_ctx(cs);
 	//start timer
 }
-static u32 sched_rate;
+static u32 sched_rate = 0;
 u32 kunlun_arch_timer_get_rate(void)
 {
 	if (sched_rate == 0)

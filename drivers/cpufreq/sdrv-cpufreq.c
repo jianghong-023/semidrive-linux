@@ -25,29 +25,14 @@ static u32 max_freq = DEFAULT_MAX_FREQ;
 static unsigned int transition_delay_us = 0;
 static struct cpufreq_frequency_table *freq_table;
 
-static unsigned long	ref_freq;
-static unsigned long	loops_per_jiffy_ref;
-
 static int sdrv_set_target(struct cpufreq_policy *policy, unsigned int index)
 {
-	unsigned long old_freq, new_freq;
+	unsigned long new_freq;
 
-	old_freq = policy->cur;
 	new_freq = freq_table[index].frequency;
 
-	if (!ref_freq) {
-		ref_freq = old_freq;
-		loops_per_jiffy_ref = loops_per_jiffy;
-	}
-
-	if (old_freq < new_freq)
-		loops_per_jiffy = cpufreq_scale(
-			loops_per_jiffy_ref, ref_freq, new_freq);
 
 	clk_set_rate(policy->clk, new_freq * 1000);
-	if (new_freq < old_freq)
-		loops_per_jiffy = cpufreq_scale(
-				loops_per_jiffy_ref, ref_freq, new_freq);
 
 	return 0;
 }
@@ -140,7 +125,7 @@ static int __init sdrv_cpufreq_init(void)
 			pr_err("no valid trans-delay-us, set as default\n");
 			transition_delay_us = 0;
 		}
-		pr_info("cpufreq: get prop min %ld, max %ld, delay %d\n", min_freq, max_freq, transition_delay_us);
+		pr_info("cpufreq: get prop min %d, max %d, delay %d\n", min_freq, max_freq, transition_delay_us);
 		return cpufreq_register_driver(&sdrv_cpufreq_driver);
 	}
 	return -ENODEV;
