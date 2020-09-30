@@ -165,7 +165,7 @@ config GPIO_DWAPB
 	  Say Y or M here to build support for the Synopsys DesignWare APB
 	  GPIO block.
 
-config SEMIDRIVE_GPIO
+config GPIO_SEMIDRIVE
         tristate "Semidrive GPIO driver"
         select GPIO_GENERIC
         select GENERIC_IRQ_CHIP

@@ -22,35 +22,9 @@
 #include <linux/platform_device.h>
 #include <linux/property.h>
 #include <linux/spinlock.h>
-#include <linux/platform_data/gpio-sdrv.h>
 #include <linux/slab.h>
 
 #include "gpiolib.h"
-
-/*  pin operation register */
-#define GPIO_CTRL_PIN_0		0x00
-#define GPIO_CTRL_PIN_1		0x10
-#define GPIO_CTRL_SIZE		(GPIO_CTRL_PIN_1 - GPIO_CTRL_PIN_0)
-#define GPIO_CTRL_PIN_X(n)    (((n)<=47) ? ((n)>=24 ? ((n)-24)*GPIO_CTRL_SIZE : ((n)+24)*GPIO_CTRL_SIZE) : ((n)*GPIO_CTRL_SIZE))
-#define GPIO_SET_PIN_X(n)	(GPIO_CTRL_PIN_X(n) +  0x4)
-#define GPIO_CLEAR_PIN_X(n)	(GPIO_CTRL_PIN_X(n) +  0x8)
-#define GPIO_TOGGLE_PIN_X(n)	(GPIO_CTRL_PIN_X(n) +  0xc)
-
-#define GPIO_CTRL_DIR_BIT				0
-#define GPIO_CTRL_DATA_IN_BIT			1
-#define GPIO_CTRL_DATA_OUT_BIT			2
-#define GPIO_CTRL_INT_EN_BIT			3
-#define GPIO_CTRL_INT_MASK_BIT			4
-#define GPIO_CTRL_INT_TYPE_BIT			5
-#define GPIO_CTRL_INT_POL_BIT			6
-#define GPIO_CTRL_INT_BOTH_EDGE_BIT		7
-#define GPIO_CTRL_INT_STATUS_BIT		8
-#define GPIO_CTRL_INT_STATUS_UNMASK_BIT	9
-#define GPIO_CTRL_INT_EDGE_CLR_BIT		10
-#define GPIO_CTRL_INT_LEV_SYNC_BIT		11
-#define GPIO_CTRL_INT_DEB_EN_BIT		12
-#define GPIO_CTRL_INT_CLK_SEL_BIT		13
-#define GPIO_CTRL_PCLK_ACTIVE_BIT		14
 
 /* port operation registers */
 #define GPIO_DIR_PORT_1		0x2000
@@ -159,22 +133,16 @@
 #define GPIO_INT_PCLK_ACTIVE_PORT_X(n) \
 	(GPIO_INT_PCLK_ACTIVE_PORT_1 + ((n) * GPIO_INT_PCLK_ACTIVE_PORT_SIZE))
 
-#define SEMIDRIVE_MAX_PORTS		5
+#define SEMIDRIVE_MAX_PORTS		6
 
-#define LAST(k, n) ((k) & ((1L<<(n))-1))
-#define MID(k, m, n) LAST((k>>m), ((n)-(m)+1))
-#define MIDMASK(m, n) ~(MID(0xffffffffu, m, n) << m)
-
-#define APB_SCR_SAF_BASE (0x3c200000u)
-#define APB_SCR_SAF_LEN	(0x200000)
-#define APB_SCR_SEC_BASE (0x38200000u)
-#define APB_SCR_SEC_LEN	(0x200000)
-
-/* used for store Register Port index */
-struct sdrv_gpio_port_idx {
-	u32 irq;
-	u32 port_idx;
-	u32 hwirq_start; /* dts gpio_ranges[2] % 32 */
+struct sdrv_port_property {
+	struct fwnode_handle *fwnode;
+	unsigned int	idx;
+	unsigned int	ngpio;
+	unsigned int	gpio_base;
+	unsigned int	irq;
+	bool		irq_shared;
+	unsigned int	gpio_ranges[4];
 };
 
 struct sdrv_gpio;
@@ -209,36 +177,19 @@ struct sdrv_gpio {
 	void __iomem		*regs;
 	struct sdrv_gpio_port	*ports;
 	unsigned int		nr_ports;
-	unsigned int		flags;
-
-	struct sdrv_gpio_port_idx	k_port_idx[5];
 };
-
-static inline u32
-gpio_reg_convert(struct sdrv_gpio *gpio, unsigned int offset)
-{
-	return offset;
-}
 
 static inline u32 sdrv_read(struct sdrv_gpio *gpio, unsigned int offset)
 {
-	struct gpio_chip *gc	= &gpio->ports[0].gc;
 	void __iomem *reg_base	= gpio->regs;
-	u32 val = 0;
-
-	val = gc->read_reg(reg_base + gpio_reg_convert(gpio, offset));
-
-	return val;
+	return readl(reg_base + offset);
 }
 
 static inline void sdrv_write(struct sdrv_gpio *gpio, unsigned int offset,
 			       u32 val)
 {
-	struct gpio_chip *gc	= &gpio->ports[0].gc;
 	void __iomem *reg_base	= gpio->regs;
-
-	gc->write_reg(reg_base + gpio_reg_convert(gpio, offset), val);
-
+	writel(val, reg_base + offset);
 }
 
 static int sdrv_gpio_to_irq(struct gpio_chip *gc, unsigned offset)
@@ -253,43 +204,33 @@ static int sdrv_gpio_to_irq(struct gpio_chip *gc, unsigned offset)
 
 static u32 sdrv_do_irq(struct sdrv_gpio_port *port)
 {
-	unsigned int reg_idx = 0;
-	unsigned int bit_idx = 0;
-	unsigned int hwirq = 0;
-	u32 irq_status = 0;
-	u32 ret = irq_status;
-	unsigned long reg_read;
-	unsigned long reg_mask_read;
+	unsigned int port_idx = 0;
+	int bit = 0;
+	unsigned long irq_status = 0;
+	unsigned long clear_int, reg_mask_read, ret = 1;
+	int gpio_irq;
 	struct sdrv_gpio *gpio = port->gpio;
 
-	reg_idx = port->idx;
+	port_idx = port->idx;
 
-	irq_status = sdrv_read(gpio, GPIO_INT_STATUS_PORT_X(reg_idx));
-	ret = irq_status;
-
-	bit_idx = fls(irq_status) - 1;
-	hwirq = bit_idx;
+	irq_status = sdrv_read(gpio, GPIO_INT_STATUS_PORT_X(port_idx));
+	reg_mask_read = sdrv_read(gpio, GPIO_INT_MASK_PORT_X(port_idx));
 
 	/* mask the port INT */
-	reg_mask_read = sdrv_read(gpio, GPIO_INT_MASK_PORT_X(reg_idx));
-	sdrv_write(gpio,  GPIO_INT_MASK_PORT_X(reg_idx), 0xffffffff);
+	sdrv_write(gpio,  GPIO_INT_MASK_PORT_X(port_idx), 0xffffffff);
 
-	/* clear INT */
-	reg_read = sdrv_read(gpio, GPIO_INT_EDGE_CLR_PORT_X(reg_idx));
-	sdrv_write(gpio,
-		GPIO_INT_EDGE_CLR_PORT_X(reg_idx),
-		(reg_read | BIT(bit_idx)));
-
-	while (irq_status) {
-		int irq_bit = fls(irq_status) - 1;
-		int gpio_irq = irq_find_mapping(port->domain, irq_bit);
-
-		generic_handle_irq(gpio_irq);
-		irq_status &= ~BIT(irq_bit);
+	for_each_set_bit(bit, &irq_status, 32) {
+		gpio_irq = irq_find_mapping(port->domain, bit);
+		clear_int = sdrv_read(gpio, GPIO_INT_EDGE_CLR_PORT_X(port_idx));
+		/* clear INT */
+		sdrv_write(gpio, GPIO_INT_EDGE_CLR_PORT_X(port_idx), clear_int | BIT(bit));
+		/* Invoke interrupt handler */
+		if (generic_handle_irq(gpio_irq))
+			ret = 0;
 	}
 
-	/* restore mask value */
-	sdrv_write(gpio,  GPIO_INT_MASK_PORT_X(reg_idx), reg_mask_read);
+	/* restore irq mask */
+	sdrv_write(gpio,  GPIO_INT_MASK_PORT_X(port_idx), reg_mask_read);
 
 	return ret;
 }
@@ -298,9 +239,7 @@ static void sdrv_irq_handler(struct irq_desc *desc)
 {
 	struct sdrv_gpio_port *port = irq_desc_get_handler_data(desc);
 	struct irq_chip *chip = irq_desc_get_chip(desc);
-
 	sdrv_do_irq(port);
-
 	if (chip->irq_eoi)
 		chip->irq_eoi(irq_desc_get_irq_data(desc));
 }
@@ -313,29 +252,25 @@ static void sdrv_irq_enable(struct irq_data *d)
 	struct gpio_chip *gc;
 	unsigned long flags;
 	u32 val;
-	unsigned int reg_idx = 0;
+	unsigned int reg_idx;
 	unsigned int bit_idx;
-	unsigned long reg_read;
 
 	reg_idx = port->idx;
-	bit_idx = d->hwirq + gpio->k_port_idx[reg_idx - 1].hwirq_start;
+	bit_idx = d->hwirq;
 
-	gc = &gpio->ports[reg_idx - 1].gc;
+	gc = &port->gc;
 
 	spin_lock_irqsave(&gc->bgpio_lock, flags);
 
-	val = sdrv_read(gpio, GPIO_INT_EN_PORT_X(reg_idx));
-	val |= BIT(bit_idx);
-
 	/* unmask */
-	sdrv_write(gpio,
-		GPIO_CLEAR_PIN_X((reg_idx * 32 + bit_idx)),
-		BIT(GPIO_CTRL_INT_MASK_BIT));
+	val = sdrv_read(gpio, GPIO_INT_MASK_PORT_X(reg_idx));
+	val &= ~BIT(bit_idx);
+	sdrv_write(gpio,  GPIO_INT_MASK_PORT_X(reg_idx), val);
 
 	/* INT EN */
+	val = sdrv_read(gpio, GPIO_INT_EN_PORT_X(reg_idx));
+	val |= BIT(bit_idx);
 	sdrv_write(gpio,  GPIO_INT_EN_PORT_X(reg_idx), val);
-
-	reg_read = sdrv_read(gpio, GPIO_CTRL_PIN_X((reg_idx * 32 + bit_idx)));
 
 	spin_unlock_irqrestore(&gc->bgpio_lock, flags);
 }
@@ -352,10 +287,9 @@ static void sdrv_irq_disable(struct irq_data *d)
 	unsigned int bit_idx;
 
 	reg_idx = port->idx;
-	bit_idx = d->hwirq + gpio->k_port_idx[reg_idx-1].hwirq_start;
+	bit_idx = d->hwirq;
 
-	gc = &gpio->ports[reg_idx - 1].gc;
-
+	gc = &port->gc;
 
 	spin_lock_irqsave(&gc->bgpio_lock, flags);
 	val = sdrv_read(gpio, GPIO_INT_EN_PORT_X(reg_idx));
@@ -370,11 +304,8 @@ static int sdrv_irq_reqres(struct irq_data *d)
 	struct sdrv_gpio_port *port = igc->private;
 	struct sdrv_gpio *gpio = port->gpio;
 	struct gpio_chip *gc;
-	unsigned int reg_idx = 0;
 
-	reg_idx = port->idx;
-	gc = &gpio->ports[reg_idx - 1].gc;
-
+	gc = &port->gc;
 
 	if (gpiochip_lock_as_irq(gc, irqd_to_hwirq(d))) {
 		dev_err(gpio->dev, "unable to lock HW IRQ %lu for IRQ\n",
@@ -388,12 +319,9 @@ static void sdrv_irq_relres(struct irq_data *d)
 {
 	struct irq_chip_generic *igc = irq_data_get_irq_chip_data(d);
 	struct sdrv_gpio_port *port = igc->private;
-	struct sdrv_gpio *gpio = port->gpio;
 	struct gpio_chip *gc;
-	unsigned int reg_idx = 0;
 
-	reg_idx = port->idx;
-	gc = &gpio->ports[reg_idx - 1].gc;
+	gc = &port->gc;
 
 	gpiochip_unlock_as_irq(gc, irqd_to_hwirq(d));
 }
@@ -405,12 +333,12 @@ static int sdrv_irq_set_type(struct irq_data *d, u32 type)
 	struct sdrv_gpio *gpio = port->gpio;
 	struct gpio_chip *gc;
 	unsigned long flags;
-	unsigned int reg_idx = 0;
+	unsigned int reg_idx = 0, val;
 	unsigned int bit_idx;
 
 	reg_idx = port->idx;
-	gc = &gpio->ports[reg_idx - 1].gc;
 
+	gc = &port->gc;
 
 	if (type & ~(IRQ_TYPE_EDGE_RISING | IRQ_TYPE_EDGE_FALLING |
 		     IRQ_TYPE_LEVEL_HIGH | IRQ_TYPE_LEVEL_LOW | IRQ_TYPE_EDGE_BOTH))
@@ -418,38 +346,72 @@ static int sdrv_irq_set_type(struct irq_data *d, u32 type)
 
 	spin_lock_irqsave(&gc->bgpio_lock, flags);
 
-	bit_idx = d->hwirq + gpio->k_port_idx[reg_idx-1].hwirq_start;
-
+	bit_idx = d->hwirq;
 
 	switch (type) {
 	case IRQ_TYPE_EDGE_BOTH:
-		sdrv_write(gpio, GPIO_SET_PIN_X((reg_idx * 32 + bit_idx)),
-			BIT(GPIO_CTRL_INT_TYPE_BIT) |
-			BIT(GPIO_CTRL_INT_BOTH_EDGE_BIT));
+		/* EDGE_BOTH */
+		val = sdrv_read(gpio, GPIO_INT_TYPE_PORT_X(reg_idx));
+		val &= ~BIT(bit_idx);
+		sdrv_write(gpio, GPIO_INT_TYPE_PORT_X(reg_idx), val);
+		val = sdrv_read(gpio, GPIO_INT_POL_PORT_X(reg_idx));
+		val &= ~BIT(bit_idx);
+		sdrv_write(gpio, GPIO_INT_POL_PORT_X(reg_idx), val);
+		val = sdrv_read(gpio, GPIO_INT_BOTH_EDGE_PORT_X(reg_idx));
+		val |= BIT(bit_idx);
+		sdrv_write(gpio, GPIO_INT_BOTH_EDGE_PORT_X(reg_idx), val);
 		break;
+
 	case IRQ_TYPE_EDGE_RISING:
-		sdrv_write(gpio, GPIO_SET_PIN_X((reg_idx * 32 + bit_idx)),
-			BIT(GPIO_CTRL_INT_TYPE_BIT));
-		sdrv_write(gpio, GPIO_SET_PIN_X((reg_idx * 32 + bit_idx)),
-			BIT(GPIO_CTRL_INT_POL_BIT));
+		/* EDGE + HIGH active */
+		val = sdrv_read(gpio, GPIO_INT_TYPE_PORT_X(reg_idx));
+		val |= BIT(bit_idx);
+		sdrv_write(gpio, GPIO_INT_TYPE_PORT_X(reg_idx), val);
+		val = sdrv_read(gpio, GPIO_INT_POL_PORT_X(reg_idx));
+		val |= BIT(bit_idx);
+		sdrv_write(gpio, GPIO_INT_POL_PORT_X(reg_idx), val);
+		val = sdrv_read(gpio, GPIO_INT_BOTH_EDGE_PORT_X(reg_idx));
+		val &= ~BIT(bit_idx);
+		sdrv_write(gpio, GPIO_INT_BOTH_EDGE_PORT_X(reg_idx), val);
 		break;
+
 	case IRQ_TYPE_EDGE_FALLING:
-		sdrv_write(gpio, GPIO_SET_PIN_X((reg_idx * 32 + bit_idx)),
-			BIT(GPIO_CTRL_INT_TYPE_BIT));
-		sdrv_write(gpio, GPIO_CLEAR_PIN_X((reg_idx * 32 + bit_idx)),
-			BIT(GPIO_CTRL_INT_POL_BIT));
+		/* EDGE + LOW active */
+		val = sdrv_read(gpio, GPIO_INT_TYPE_PORT_X(reg_idx));
+		val |= BIT(bit_idx);
+		sdrv_write(gpio, GPIO_INT_TYPE_PORT_X(reg_idx), val);
+		val = sdrv_read(gpio, GPIO_INT_POL_PORT_X(reg_idx));
+		val &= ~BIT(bit_idx);
+		sdrv_write(gpio, GPIO_INT_POL_PORT_X(reg_idx), val);
+		val = sdrv_read(gpio, GPIO_INT_BOTH_EDGE_PORT_X(reg_idx));
+		val &= ~BIT(bit_idx);
+		sdrv_write(gpio, GPIO_INT_BOTH_EDGE_PORT_X(reg_idx), val);
 		break;
+
 	case IRQ_TYPE_LEVEL_HIGH:
-		sdrv_write(gpio, GPIO_CLEAR_PIN_X((reg_idx * 32 + bit_idx)),
-			BIT(GPIO_CTRL_INT_TYPE_BIT));
-		sdrv_write(gpio, GPIO_SET_PIN_X((reg_idx * 32 + bit_idx)),
-			BIT(GPIO_CTRL_INT_POL_BIT));
+		/* LEVEL + HIGH active */
+		val = sdrv_read(gpio, GPIO_INT_TYPE_PORT_X(reg_idx));
+		val &= ~BIT(bit_idx);
+		sdrv_write(gpio, GPIO_INT_TYPE_PORT_X(reg_idx), val);
+		val = sdrv_read(gpio, GPIO_INT_POL_PORT_X(reg_idx));
+		val |= BIT(bit_idx);
+		sdrv_write(gpio, GPIO_INT_POL_PORT_X(reg_idx), val);
+		val = sdrv_read(gpio, GPIO_INT_BOTH_EDGE_PORT_X(reg_idx));
+		val &= ~BIT(bit_idx);
+		sdrv_write(gpio, GPIO_INT_BOTH_EDGE_PORT_X(reg_idx), val);
 		break;
+
 	case IRQ_TYPE_LEVEL_LOW:
-		sdrv_write(gpio, GPIO_CLEAR_PIN_X((reg_idx * 32 + bit_idx)),
-			BIT(GPIO_CTRL_INT_TYPE_BIT));
-		sdrv_write(gpio, GPIO_CLEAR_PIN_X((reg_idx * 32 + bit_idx)),
-			BIT(GPIO_CTRL_INT_POL_BIT));
+		/* LEVEL + LOW active */
+		val = sdrv_read(gpio, GPIO_INT_TYPE_PORT_X(reg_idx));
+		val &= ~BIT(bit_idx);
+		sdrv_write(gpio, GPIO_INT_TYPE_PORT_X(reg_idx), val);
+		val = sdrv_read(gpio, GPIO_INT_POL_PORT_X(reg_idx));
+		val &= ~BIT(bit_idx);
+		sdrv_write(gpio, GPIO_INT_POL_PORT_X(reg_idx), val);
+		val = sdrv_read(gpio, GPIO_INT_BOTH_EDGE_PORT_X(reg_idx));
+		val &= ~BIT(bit_idx);
+		sdrv_write(gpio, GPIO_INT_BOTH_EDGE_PORT_X(reg_idx), val);
 		break;
 	}
 
@@ -465,13 +427,12 @@ static int sdrv_gpio_set_debounce(struct gpio_chip *gc,
 {
 	struct sdrv_gpio_port *port = gpiochip_get_data(gc);
 	struct sdrv_gpio *gpio = port->gpio;
-	unsigned long flags, val_deb;
+	unsigned long flags, val_deb, mask;
 	unsigned int reg_idx = port->idx;
-	unsigned long mask = gc->pin2mask(gc,
-		offset + gpio->k_port_idx[reg_idx - 1].hwirq_start);
 
 	spin_lock_irqsave(&gc->bgpio_lock, flags);
 
+	mask = BIT(offset);
 
 	val_deb = sdrv_read(gpio, GPIO_INT_DEB_EN_PORT_X(reg_idx));
 	if (debounce)
@@ -489,10 +450,7 @@ static int sdrv_gpio_set_debounce(struct gpio_chip *gc,
 static int sdrv_gpio_set_config(struct gpio_chip *gc, unsigned offset,
 				 unsigned long config)
 {
-	struct sdrv_gpio_port *port = gpiochip_get_data(gc);
-	struct sdrv_gpio *gpio = port->gpio;
 	u32 debounce;
-
 
 	if (pinconf_to_config_param(config) != PIN_CONFIG_INPUT_DEBOUNCE) {
 		return -ENOTSUPP;
@@ -560,11 +518,8 @@ static void sdrv_configure_irqs(struct sdrv_gpio *gpio,
 		ct->chip.irq_request_resources = sdrv_irq_reqres;
 		ct->chip.irq_release_resources = sdrv_irq_relres;
 
-		ct->regs.ack =
-			gpio_reg_convert(gpio,
-			GPIO_INT_EDGE_CLR_PORT_X(port->idx));
-		ct->regs.mask =
-			gpio_reg_convert(gpio, GPIO_INT_MASK_PORT_X(port->idx));
+		ct->regs.ack = GPIO_INT_EDGE_CLR_PORT_X(port->idx);
+		ct->regs.mask = GPIO_INT_MASK_PORT_X(port->idx);
 		ct->type = IRQ_TYPE_LEVEL_MASK;
 	}
 
@@ -676,8 +631,6 @@ static int sdrv_gpio_add_port(struct sdrv_gpio *gpio,
 	if (pp->irq)
 		sdrv_configure_irqs(gpio, port, pp);
 
-	/* pass reg bit offset to gpiochip */
-	port->gc.offset = gpio->k_port_idx[offs].hwirq_start;
 	err = gpiochip_add_data(&port->gc, port);
 	if (err)
 		dev_err(gpio->dev, "failed to register gpiochip for port%d\n",
@@ -697,11 +650,11 @@ static void sdrv_gpio_unregister(struct sdrv_gpio *gpio)
 			gpiochip_remove(&gpio->ports[m].gc);
 }
 
-static struct sdrv_platform_data *
+static struct sdrv_port_property *
 sdrv_gpio_get_pdata(struct device *dev, struct sdrv_gpio *gpio)
 {
 	struct fwnode_handle *fwnode;
-	struct sdrv_platform_data *pdata;
+	struct sdrv_port_property *properties;
 	struct sdrv_port_property *pp;
 	int nports;
 	int i;
@@ -710,20 +663,15 @@ sdrv_gpio_get_pdata(struct device *dev, struct sdrv_gpio *gpio)
 	if (nports == 0)
 		return ERR_PTR(-ENODEV);
 
-
-	pdata = devm_kzalloc(dev, sizeof(*pdata), GFP_KERNEL);
-	if (!pdata)
+	properties = devm_kcalloc(dev, nports, sizeof(*pp), GFP_KERNEL);
+	if (!properties)
 		return ERR_PTR(-ENOMEM);
 
-	pdata->properties = devm_kcalloc(dev, nports, sizeof(*pp), GFP_KERNEL);
-	if (!pdata->properties)
-		return ERR_PTR(-ENOMEM);
-
-	pdata->nports = nports;
+	gpio->nr_ports = nports;
 
 	i = 0;
-	device_for_each_child_node(dev, fwnode)  {
-		pp = &pdata->properties[i++];
+	device_for_each_child_node(dev, fwnode) {
+		pp = &properties[i];
 		pp->fwnode = fwnode;
 
 		if (fwnode_property_read_u32(fwnode, "reg", &pp->idx) ||
@@ -747,16 +695,9 @@ sdrv_gpio_get_pdata(struct device *dev, struct sdrv_gpio *gpio)
 				pp->gpio_ranges[2], pp->gpio_ranges[3], i);
 		}
 
-		if (fwnode_property_read_u32(fwnode, "nr-gpios",
-					 &pp->ngpio)) {
-			dev_info(dev,
-				 "failed to get number of gpios for port%d\n",
-				 i);
-			pp->ngpio = 32;
-		}
+		pp->ngpio = pp->gpio_ranges[3];
 
-		if (dev->of_node &&
-			fwnode_property_read_bool(fwnode,
+		if (fwnode_property_read_bool(fwnode,
 						  "interrupt-controller")) {
 			pp->irq = irq_of_parse_and_map(to_of_node(fwnode), 0);
 			if (!pp->irq)
@@ -769,25 +710,19 @@ sdrv_gpio_get_pdata(struct device *dev, struct sdrv_gpio *gpio)
 
 		/*
 		 * dts "reg" is regsiter port index(0~4),
-		 * and hwirq_start is offset in 32 bits reg
 		 */
-		gpio->k_port_idx[i-1].irq = pp->irq;
-		gpio->k_port_idx[i-1].port_idx = i - 1;
-		gpio->k_port_idx[i-1].hwirq_start = pp->gpio_ranges[2] % 32;
-		dev_info(dev, "i[%d], irq[%u], port_idx[%u], hwirq_start[%u]\n",
-			i, gpio->k_port_idx[i-1].irq,
-			gpio->k_port_idx[i-1].port_idx,
-			gpio->k_port_idx[i-1].hwirq_start);
+		i++;
 	}
 
-	return pdata;
+	return properties;
 }
 
 static const struct of_device_id sdrv_of_match[] = {
-	{ .compatible = "semidrive,sdrv-gpio", .data = (void *)0},
+	{ .compatible = "semidrive,sdrv-gpio",},
 	{ /* Sentinel */ }
 };
 MODULE_DEVICE_TABLE(of, sdrv_of_match);
+
 
 static int sdrv_gpio_probe(struct platform_device *pdev)
 {
@@ -796,29 +731,26 @@ static int sdrv_gpio_probe(struct platform_device *pdev)
 	struct sdrv_gpio *gpio;
 	int err;
 	struct device *dev = &pdev->dev;
-	struct sdrv_platform_data *pdata = dev_get_platdata(dev);
-	const struct of_device_id *of_devid;
-
+	struct sdrv_port_property *properties;
 
 	gpio = devm_kzalloc(&pdev->dev, sizeof(*gpio), GFP_KERNEL);
 	if (!gpio)
 		return -ENOMEM;
 
-	if (!pdata) {
-		pdata = sdrv_gpio_get_pdata(dev, gpio);
-		if (IS_ERR(pdata)) {
-			dev_err(dev, "sdrv_gpio sdrv_gpio_get_pdata error!\n");
-			return PTR_ERR(pdata);
-		}
+
+	properties = sdrv_gpio_get_pdata(dev, gpio);
+	if (!properties) {
+		dev_err(dev, "sdrv_gpio sdrv_gpio_get_pdata error!\n");
+		return PTR_ERR(properties);
 	}
 
-	if (!pdata->nports) {
+
+	if (!gpio->nr_ports) {
 		dev_err(dev, "sdrv_gpio No ports found!\n");
 		return -ENODEV;
 	}
 
 	gpio->dev = &pdev->dev;
-	gpio->nr_ports = pdata->nports;
 
 	gpio->ports = devm_kcalloc(&pdev->dev, gpio->nr_ports,
 				   sizeof(*gpio->ports), GFP_KERNEL);
@@ -832,19 +764,8 @@ static int sdrv_gpio_probe(struct platform_device *pdev)
 		return PTR_ERR(gpio->regs);
 	}
 
-	gpio->flags = 0;
-	if (dev->of_node) {
-		dev_info(dev, "sdrv_gpio of_node found !\n");
-
-		of_devid = of_match_device(sdrv_of_match, dev);
-		if (of_devid) {
-			if (of_devid->data)
-				gpio->flags = (uintptr_t)of_devid->data;
-		}
-	}
-
 	for (i = 0; i < gpio->nr_ports; i++) {
-		err = sdrv_gpio_add_port(gpio, &pdata->properties[i], i);
+		err = sdrv_gpio_add_port(gpio, &properties[i], i);
 		if (err) {
 			dev_err(dev, "sdrv_gpio sdrv_gpio_add_port failed !\n");
 			goto out_unregister;
