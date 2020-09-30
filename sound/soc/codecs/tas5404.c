@@ -18,9 +18,9 @@
 #include <sound/soc-dapm.h>
 #include <sound/tlv.h>
 #include "tas5404.h"
-//#define TAS6424_DEBUG 1 // used at debug mode
+//#define TAS5404_DEBUG 1 // used at debug mode
 
-#ifdef TAS6424_DEBUG
+#ifdef TAS5404_DEBUG
 #define dev_prt dev_info
 #define x9dbgprt printk
 #else
@@ -30,7 +30,7 @@
 	} while (0)
 #endif
 /* Define how often to check (and clear) the fault status register (in ms) */
-#define TAS5404_FAULT_CHECK_INTERVAL 200
+#define TAS5404_FAULT_CHECK_INTERVAL 300
 
 static const char *const tas5404_supply_names[] = {
     /* "pvdd", Class-D amp output FETs supply. */
@@ -48,6 +48,7 @@ struct tas5404_data {
 	unsigned int last_warn2;
 	struct gpio_desc *standby_gpio;
 	struct gpio_desc *mute_gpio;
+	bool HIZ_flag;
 };
 
 /*
@@ -100,6 +101,7 @@ static int tas5404_mute(struct snd_soc_dai *dai, int mute)
 	ret = regmap_update_bits(tas5404->regmap, TAS5404_CTRL5,
 				 TAS5404_CTRL5_UNMUTE_BIT,
 				 mute << TAS5404_CTRL5_UNMUTE_OFFSET);
+
 	if (ret < 0){
 		dev_err(component->dev, "Cannot mute/un-mute channels TAS5404_CTRL5: %d\n", ret);
 	}
@@ -126,6 +128,7 @@ static int tas5404_power_off(struct snd_soc_codec *codec)
 	if (ret < 0){
 		dev_err(codec->dev, "Cannot set channels to HIZ for TAS5404_CTRL5: %d\n", ret);
 	}
+	tas5404->HIZ_flag = false;
 	cancel_delayed_work_sync(&tas5404->fault_check_work);
 	regcache_cache_only(tas5404->regmap, true);
 	regcache_mark_dirty(tas5404->regmap);
@@ -146,7 +149,7 @@ static int tas5404_power_on(struct snd_soc_codec *codec)
 	struct tas5404_data *tas5404 = snd_soc_codec_get_drvdata(codec);
 	int ret;
 	u8 chan_states;
-	int no_auto_diags = 0;
+
 	unsigned int reg_val;
 	dev_prt(codec->dev, "%s \n",__func__);
 	regcache_cache_only(tas5404->regmap, false);
@@ -181,22 +184,14 @@ static int tas5404_power_on(struct snd_soc_codec *codec)
 	}
 	/* chan_states = TAS5404_ALL_STATE_PLAY; */
 
-	/* Unmute channels  */
-	ret = regmap_update_bits(tas5404->regmap, TAS5404_CTRL5,
-				 TAS5404_CTRL5_ALL_CH_BIT,
-				 0x0 << TAS5404_CTRL5_UNMUTE_CH1);
-	if (ret < 0){
-		dev_err(codec->dev, "Cannot un-mute channels TAS5404_CTRL5: %d\n", ret);
-	}
+	tas5404->HIZ_flag = true;
 
 	schedule_delayed_work(&tas5404->fault_check_work,
 				      msecs_to_jiffies(TAS5404_FAULT_CHECK_INTERVAL));
 	/* any time we come out of HIZ, the output channels automatically run DC
-	 * load diagnostics if autodiagnotics are enabled. wait here until this
+	 * load diagnostics if auto diagnostics are enabled. wait here until this
 	 * completes.
 	 */
-	if (!no_auto_diags)
-		msleep(230);
 
 	return 0;
 }
@@ -263,7 +258,16 @@ static void tas5404_fault_check_work(struct work_struct *work)
 	struct device *dev = tas5404->dev;
 	unsigned int reg;
 	int ret;
-
+	if(tas5404->HIZ_flag == true){
+		/* Unmute channels after delay*/
+ 		ret = regmap_update_bits(tas5404->regmap, TAS5404_CTRL5,
+				 TAS5404_CTRL5_ALL_CH_BIT,
+				 0x0 << TAS5404_CTRL5_UNMUTE_CH1);
+		if (ret < 0){
+			dev_err(dev, "Cannot un-mute channels TAS5404_CTRL5: %d\n", ret);
+		}
+		tas5404->HIZ_flag = false;
+	}
 	ret = regmap_read(tas5404->regmap, TAS5404_FAULT_REG1, &reg);
 	if (ret < 0) {
 		dev_err(dev, "failed to read FAULT1 register: %d\n", ret);

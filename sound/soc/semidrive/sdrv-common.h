@@ -37,7 +37,7 @@
 		 __LINE__);
 
 #define DEBUG_ITEM_PRT(item)                                                   \
-	printk(KERN_INFO "SDRV_ALSA: %s:%-120i [%s]:0x%x(%d)\n", __func__,   \
+	printk(KERN_INFO "SDRV_ALSA: %s:%-20i [%s]:0x%x(%d)\n", __func__,      \
 	       __LINE__, #item, (unsigned int)item, (int)item);
 
 #define DEBUG_ITEM_PTR_PRT(item)                                                   \
@@ -47,9 +47,9 @@
 #define SDRV_I2S_SC_FIFO_SIZE (2048)
 
 /* defaults x9 sound card setting*/
-#define MAX_ABUF_SIZE (8 * 2 * SDRV_I2S_SC_FIFO_SIZE)
+#define MAX_ABUF_SIZE (8 * 2 * 2 * SDRV_I2S_SC_FIFO_SIZE)
 #define MIN_ABUF_SIZE (256)
-#define MAX_PERIOD_SIZE (4 * SDRV_I2S_SC_FIFO_SIZE)
+#define MAX_PERIOD_SIZE (8 * 2 * 2 * SDRV_I2S_SC_FIFO_SIZE)
 #define MIN_PERIOD_SIZE (2)
 #define MAX_PERIODS (4 * SDRV_I2S_SC_FIFO_SIZE)
 #define MIN_PERIODS (2)
@@ -60,8 +60,19 @@
 #define SND_RATE SNDRV_PCM_RATE_CONTINUOUS | SNDRV_PCM_RATE_8000_48000
 #define SND_RATE_MIN 8000
 #define SND_RATE_MAX 48000
-#define SND_CHANNELS_MIN 1
-#define SND_CHANNELS_MAX 8
+#define SND_CHANNEL_MONO 1  /* up to 1.0 */
+#define SND_CHANNEL_FOUR 2  /* up to 2.0 */
+#define SND_CHANNEL_TWO 4   /* up to 3.1 */
+#define SND_CHANNEL_SIX 6   /* up to 5.1 */
+#define SND_CHANNEL_EIGHT 8 /* up to 7.1 */
+#define SND_CHANNELS_MIN SND_CHANNEL_MONO
+#define SND_CHANNELS_MAX SND_CHANNEL_EIGHT
+
+#define SND_CHANNEL_MONO 1  /* up to 1.0 */
+#define SND_CHANNEL_FOUR 2  /* up to 2.0 */
+#define SND_CHANNEL_TWO 4   /* up to 3.1 */
+#define SND_CHANNEL_SIX 6   /* up to 5.1 */
+#define SND_CHANNEL_EIGHT 8 /* up to 7.1 */
 
 enum {
 	I2S_SCLK_MCLK,
@@ -123,6 +134,12 @@ struct sdrv_afe_i2s_sc {
 	/* In full-duplex playing and capturing flag */
 	atomic_t playing;
 	atomic_t capturing;
+	/*TDM Related code*/
+	unsigned slot_width;
+	unsigned slots;
+	unsigned tx_slot_mask;
+	unsigned rx_slot_mask;
+	bool tdm_initialized;
 };
 
 /* x9 i2s mc audio front end structure */

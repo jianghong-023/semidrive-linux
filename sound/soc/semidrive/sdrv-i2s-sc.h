@@ -438,10 +438,12 @@ const static uint8_t ChnWidthTable[] = {8, 12, 16, 18, 20, 24, 28, 32};
 #define BIT_TDM_CTRL_CH2_EN (BIT_(18))
 #define BIT_TDM_CTRL_CH1_EN (BIT_(17))
 #define BIT_TDM_CTRL_CH0_EN (BIT_(16))
+#define BIT_TDM_CTRL_CH_EN (0xFF00)
 #define BIT_TDM_CTRL_CHN_NO_3 (BIT_(4))
 #define BIT_TDM_CTRL_CHN_NO_2 (BIT_(3))
 #define BIT_TDM_CTRL_CHN_NO_1 (BIT_(2))
 #define BIT_TDM_CTRL_CHN_NO_0 (BIT_(1))
+#define BIT_TDM_CTRL_CHN_NUMB (BIT_(1)|BIT_(2)|BIT_(3)|BIT_(4))
 #define BIT_TDM_CTRL_TDM_EN (BIT_(0))
 
 //--------------------------------------------------------------------------
@@ -547,5 +549,7 @@ const static uint8_t ChnWidthTable[] = {8, 12, 16, 18, 20, 24, 28, 32};
 #define BIT_TDM_FD_DIR_CH2_TXEN (BIT_(2))
 #define BIT_TDM_FD_DIR_CH1_TXEN (BIT_(1))
 #define BIT_TDM_FD_DIR_CH0_TXEN (BIT_(0))
+#define BIT_TDM_FD_DIR_CH_RX_EN (0xFFFF0000)
+#define BIT_TDM_FD_DIR_CH_TX_EN (0xFFFF)
 
 #endif /* SDRV_I2S_SC_H__ */

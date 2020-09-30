@@ -91,7 +91,6 @@ static void sdrv_pcm_refill_fifo(struct sdrv_afe_i2s_sc *afe)
 /* reset i2s  */
 static void afe_i2s_reset(struct sdrv_afe_i2s_sc *afe)
 {
-	u32 ret, val;
 	/*Disable i2s*/
 	regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_I2S_CTRL,
 			   BIT_CTRL_I2S_EN,
@@ -103,6 +102,26 @@ static void afe_i2s_reset(struct sdrv_afe_i2s_sc *afe)
 
 }
 
+/*debug function for dumpping register setting */
+static void afe_i2s_sc_dump_reg(struct sdrv_afe_i2s_sc *afe)
+{
+	u32 ret, val;
+	ret = regmap_read(afe->regmap, REG_CDN_I2SSC_REGS_I2S_CTRL, &val);
+	dev_info(afe->dev, "DUMP %d REG_CDN_I2SSC_REGS_I2S_CTRL 0x%x:(0x%x)\n",
+		__LINE__, REG_CDN_I2SSC_REGS_I2S_CTRL, val);
+	ret = regmap_read(afe->regmap, REG_CDN_I2SSC_REGS_FIFO_AEMPTY, &val);
+	dev_info(afe->dev,
+		"DUMP %d REG_CDN_I2SSC_REGS_FIFO_AEMPTY 0x%x: (0x%x)\n",
+		__LINE__, REG_CDN_I2SSC_REGS_FIFO_AEMPTY, val);
+	ret = regmap_read(afe->regmap, REG_CDN_I2SSC_REGS_FIFO_AFULL, &val);
+	dev_info(afe->dev,
+		"DUMP %d REG_CDN_I2SSC_REGS_FIFO_AFULL 0x%x: (0x%x)\n",
+		__LINE__, REG_CDN_I2SSC_REGS_FIFO_AFULL, val);
+	ret = regmap_read(afe->regmap, REG_CDN_I2SSC_REGS_I2S_SRES, &val);
+	dev_info(afe->dev, "DUMP %d REG_CDN_I2SSC_REGS_I2S_SRES 0x%x: (0x%x)\n",
+		__LINE__, REG_CDN_I2SSC_REGS_I2S_SRES, val);
+
+}
 /* misc operation */
 
 static void afe_i2s_sc_config(struct sdrv_afe_i2s_sc *afe)
@@ -124,6 +143,7 @@ static void afe_i2s_sc_config(struct sdrv_afe_i2s_sc *afe)
 			   (0 << I2S_CTRL_FIFO_RST_FIELD_OFFSET));
 
 	if (true == afe->is_full_duplex) {
+
 		/*Reset full duplex FIFO reset*/
 		regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_I2S_CTRL_FDX,
 				   BIT_CTRL_FDX_FIFO_RST,
@@ -207,6 +227,9 @@ static void afe_i2s_sc_config(struct sdrv_afe_i2s_sc *afe)
 	ret = regmap_read(afe->regmap, REG_CDN_I2SSC_REGS_I2S_SRES, &val);
 	dev_dbg(afe->dev, "DUMP %d REG_CDN_I2SSC_REGS_I2S_SRES 0x%x: (0x%x)\n",
 		__LINE__, REG_CDN_I2SSC_REGS_I2S_SRES, val);
+	ret = regmap_read(afe->regmap, REG_CDN_I2SSC_REGS_TDM_FD_DIR, &val);
+	dev_dbg(afe->dev, "DUMP %d REG_CDN_I2SSC_REGS_TDM_FD_DIR 0x%x: (0x%x)\n",
+		__LINE__, REG_CDN_I2SSC_REGS_TDM_FD_DIR, val);
 }
 
 static void afe_i2s_sc_start_capture(struct sdrv_afe_i2s_sc *afe)
@@ -259,6 +282,11 @@ static void afe_i2s_sc_stop_capture(struct sdrv_afe_i2s_sc *afe)
 	regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_I2S_CTRL_FDX,
 			   BIT_CTRL_FDX_RI2S_MASK,
 			   (0 << I2S_CTRL_I2S_EN_FIELD_OFFSET));
+	/*TDM slot setting*/
+	afe->rx_slot_mask = 0;
+	regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_TDM_FD_DIR,
+				BIT_TDM_FD_DIR_CH_RX_EN,
+				(afe->rx_slot_mask  << TDM_FD_DIR_CH0_RXEN_FIELD_OFFSET));
 }
 
 static void afe_i2s_sc_start_playback(struct sdrv_afe_i2s_sc *afe)
@@ -318,6 +346,11 @@ static void afe_i2s_sc_stop_playback(struct sdrv_afe_i2s_sc *afe)
 	regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_I2S_CTRL,
 			   BIT_CTRL_INTREQ_MASK,
 			   (0 << I2S_CTRL_INTREQ_MASK_FIELD_OFFSET));
+	/*TDM slot setting*/
+ 	afe->tx_slot_mask = 0;
+	regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_TDM_FD_DIR,
+				BIT_TDM_FD_DIR_CH_TX_EN,
+				(afe->tx_slot_mask << TDM_FD_DIR_CH0_TXEN_FIELD_OFFSET));
 }
 
 static void afe_i2s_sc_stop(struct sdrv_afe_i2s_sc *afe)
@@ -327,6 +360,12 @@ static void afe_i2s_sc_stop(struct sdrv_afe_i2s_sc *afe)
 	regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_I2S_CTRL,
 			   BIT_CTRL_I2S_EN,
 			   (0 << I2S_CTRL_I2S_EN_FIELD_OFFSET));
+/* 	TODO: 	disable TDM mode ?
+	regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_TDM_CTRL,
+				   BIT_TDM_CTRL_TDM_EN,
+				   (1 << TDM_CTRL_TDM_EN_FIELD_OFFSET));
+	TODO: 	clear status ?
+				    */
 
 	regcache_sync(afe->regmap);
 
@@ -462,7 +501,7 @@ static int sdrv_snd_pcm_trigger(struct snd_pcm_substream *substream, int cmd)
 			afe_i2s_sc_start_capture(afe);
 			atomic_set(&afe->capturing, 1);
 		}
-
+		regcache_sync(afe->regmap);
 		return 0;
 
 	case SNDRV_PCM_TRIGGER_STOP:
@@ -479,7 +518,7 @@ static int sdrv_snd_pcm_trigger(struct snd_pcm_substream *substream, int cmd)
 		    !atomic_read(&afe->capturing)) {
 			afe_i2s_sc_stop(afe);
 		}
-
+		regcache_sync(afe->regmap);
 		return 0;
 	}
 	return -EINVAL;
@@ -658,8 +697,57 @@ int snd_afe_dai_startup(struct snd_pcm_substream *substream,
 		DEBUG_ITEM_PRT(afe->is_full_duplex);
 	}
 	snd_soc_dai_set_dma_data(dai, substream, afe);
-	afe_i2s_sc_config(afe);
+
 	return 0;
+}
+
+static int ch_mask[]={0x0,0x1,0x3,0x7,0xf,0x1f,0x3f,0x7f,0xff};
+
+static void snd_afe_dai_ch_cfg(struct sdrv_afe_i2s_sc *afe, int stream, unsigned ch_numb)
+{
+	int ret, val;
+	int channel_numb ;
+
+	afe->slots = max(ch_numb,afe->slots);
+	afe->slot_width = AFE_I2S_CHN_WIDTH;
+	dev_info(afe->dev, "%s:%i : afe->slots (0x%x) ch_numb(0x%x) afe->slot_width(0x%x) \n", __func__,
+	       __LINE__,afe->slots , ch_numb, afe->slot_width);
+	/* Enable tdm mode */
+
+
+	if(stream == SNDRV_PCM_STREAM_PLAYBACK){
+		afe->tx_slot_mask = ch_mask[ch_numb];
+		regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_TDM_FD_DIR,
+				   BIT_TDM_FD_DIR_CH_TX_EN,
+				   (ch_mask[ch_numb] << TDM_FD_DIR_CH0_TXEN_FIELD_OFFSET));
+
+	}else if(stream == SNDRV_PCM_STREAM_CAPTURE){
+
+		afe->rx_slot_mask = ch_mask[ch_numb];
+		regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_TDM_FD_DIR,
+				   BIT_TDM_FD_DIR_CH_RX_EN,
+				   (ch_mask[ch_numb]  << TDM_FD_DIR_CH0_RXEN_FIELD_OFFSET));
+
+	}else{
+		dev_err(afe->dev, "%s(%d) Don't support this stream: %d\n",
+				__func__,__LINE__,stream);
+	}
+
+	regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_TDM_CTRL,
+				   BIT_TDM_CTRL_CHN_NUMB,
+				   ((afe->slots-1) << TDM_CTRL_CHN_NO_FIELD_OFFSET));
+
+	/* Set enabled number  */
+	regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_TDM_CTRL,
+				   BIT_TDM_CTRL_CH_EN,
+				   (ch_mask[afe->slots] << TDM_CTRL_CH0_EN_FIELD_OFFSET));
+
+	regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_TDM_CTRL,
+				   BIT_TDM_CTRL_TDM_EN,
+				   (1 << TDM_CTRL_TDM_EN_FIELD_OFFSET));
+
+	//ret = regmap_read(afe->regmap, REG_CDN_I2SSC_REGS_TDM_CTRL, &val);
+	//dev_dbg(afe->dev, "DUMP REG_CDN_I2SSC_REGS_TDM_CTRL(0x%x)\n", val);
 }
 
 int snd_afe_dai_hw_params(struct snd_pcm_substream *substream,
@@ -681,48 +769,68 @@ int snd_afe_dai_hw_params(struct snd_pcm_substream *substream,
 	/* 	unsigned freq, ratio, level;
 		int err; */
 
-	DEBUG_FUNC_PRT
-	if (params_channels(hwparam) == 2) {
-		/*config data channel stereo*/
-		/* DEBUG_FUNC_PRT */
-		regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_I2S_CTRL,
-				   BIT_CTRL_AUDIO_MODE,
-				   (0 << I2S_CTRL_AUDIO_MODE_FIELD_OFFSET));
-		regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_I2S_CTRL,
-				   BIT_CTRL_MONO_MODE,
-				   (0 << I2S_CTRL_MONO_MODE_FIELD_OFFSET));
-	} else if (params_channels(hwparam) == 1) {
-		/*config data channel mono*/
+
+	if(afe->tdm_initialized == false){
+		if (params_channels(hwparam) == 2) {
+			/*config data channel stereo*/
+			/* DEBUG_FUNC_PRT */
+			/* Disable tdm mode */
+			regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_TDM_CTRL,
+				   BIT_TDM_CTRL_TDM_EN,
+				   (0 << TDM_CTRL_TDM_EN_FIELD_OFFSET));
+
+			regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_I2S_CTRL,
+					BIT_CTRL_AUDIO_MODE,
+					(0 << I2S_CTRL_AUDIO_MODE_FIELD_OFFSET));
+			regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_I2S_CTRL,
+					BIT_CTRL_MONO_MODE,
+					(0 << I2S_CTRL_MONO_MODE_FIELD_OFFSET));
+		} else if (params_channels(hwparam) == 1) {
+			/*config data channel mono
+			DEBUG_FUNC_PRT*/
+
+			/* Disable tdm mode */
+			regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_TDM_CTRL,
+				   BIT_TDM_CTRL_TDM_EN,
+				   (0 << TDM_CTRL_TDM_EN_FIELD_OFFSET));
+
+			regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_I2S_CTRL,
+					BIT_CTRL_AUDIO_MODE,
+					(1 << I2S_CTRL_AUDIO_MODE_FIELD_OFFSET));
+			regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_I2S_CTRL,
+					BIT_CTRL_MONO_MODE,
+					(0 << I2S_CTRL_MONO_MODE_FIELD_OFFSET));
+		} else {
+			/* Multi channels */
+			DEBUG_FUNC_PRT
+			snd_afe_dai_ch_cfg(afe, substream->stream, params_channels(hwparam));
+		}
+	}else{
+		/* Already set to tdm by snd_afe_set_dai_tdm_slot */
+
+		snd_afe_dai_ch_cfg(afe, substream->stream, params_channels(hwparam));
 		DEBUG_FUNC_PRT
-		regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_I2S_CTRL,
-				   BIT_CTRL_AUDIO_MODE,
-				   (1 << I2S_CTRL_AUDIO_MODE_FIELD_OFFSET));
-		regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_I2S_CTRL,
-				   BIT_CTRL_MONO_MODE,
-				   (0 << I2S_CTRL_MONO_MODE_FIELD_OFFSET));
-	} else {
-		/* Multi channels */
-		DEBUG_FUNC_PRT
-		return -EINVAL;
+
 	}
 	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
 		DEBUG_FUNC_PRT
-		regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_I2S_CTRL,
+		if (false == afe->is_full_duplex) {
+			regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_I2S_CTRL,
 				   BIT_CTRL_DIR_CFG,
 				   (1 << I2S_CTRL_DIR_CFG_FIELD_OFFSET));
-
+		}
 		/*set tx substream*/
 		afe->tx_substream = substream;
 	} else if (substream->stream == SNDRV_PCM_STREAM_CAPTURE) {
 		DEBUG_FUNC_PRT
-		regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_I2S_CTRL,
+		if (false == afe->is_full_duplex) {
+			regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_I2S_CTRL,
 				   BIT_CTRL_DIR_CFG,
 				   (0 << I2S_CTRL_DIR_CFG_FIELD_OFFSET));
-
+		}
 		/*set rx substream */
 		afe->rx_substream = substream;
 	} else {
-		/* Multi channels */
 		DEBUG_FUNC_PRT
 		return -EINVAL;
 	}
@@ -755,15 +863,23 @@ int snd_afe_dai_hw_params(struct snd_pcm_substream *substream,
 	}
 
 	/*Channel width fix to 32 */
-	regmap_write(afe->regmap, REG_CDN_I2SSC_REGS_I2S_SRATE,
-		     I2S_SC_SAMPLE_RATE_CALC(clk_get_rate(afe->clk_i2s), srate,
-					     channels,
-					     ChnWidthTable[AFE_I2S_CHN_WIDTH]) -
-			 1); // I2S_SC_SAMPLE_RATE_CALC(FPGA_I2S_CLOCK, srate,
-			     // channels, ChnWidthTable[7])
+	if(afe->tdm_initialized == false){
+		regmap_write(afe->regmap, REG_CDN_I2SSC_REGS_I2S_SRATE,
+			     I2S_SC_SAMPLE_RATE_CALC(clk_get_rate(afe->clk_i2s), srate,
+						     channels,
+						     ChnWidthTable[AFE_I2S_CHN_WIDTH]) -
+				 1);
+	}
+	else{
+		regmap_write(afe->regmap, REG_CDN_I2SSC_REGS_I2S_SRATE,
+			     I2S_SC_SAMPLE_RATE_CALC(clk_get_rate(afe->clk_i2s), srate,
+						     afe->slots,
+						     ChnWidthTable[AFE_I2S_CHN_WIDTH]) -
+				 1);
+	}
 	/*  regcache_sync(afe->regmap); */
 
-	ret = regmap_read(afe->regmap, REG_CDN_I2SSC_REGS_I2S_CTRL, &val);
+/* 	ret = regmap_read(afe->regmap, REG_CDN_I2SSC_REGS_I2S_CTRL, &val);
 	dev_dbg(afe->dev, "DUMP %d REG_CDN_I2SSC_REGS_I2S_CTRL(0x%x)\n",
 		__LINE__, val);
 	ret = regmap_read(afe->regmap, REG_CDN_I2SSC_REGS_I2S_SRES, &val);
@@ -774,11 +890,11 @@ int snd_afe_dai_hw_params(struct snd_pcm_substream *substream,
 		__LINE__, val);
 	ret = regmap_read(afe->regmap, REG_CDN_I2SSC_REGS_I2S_SRATE, &val);
 	dev_dbg(afe->dev, "DUMP %d REG_CDN_I2SSC_REGS_I2S_SRATE(0x%x)\n",
-		__LINE__, val);
-	dev_dbg(
+		__LINE__, val); */
+	dev_info(
 	    afe->dev,
-	    "%s srate: %u, channels: %u, sample_size: %u, period_size: %u\n",
-	    __func__, srate, channels, sample_size, period_size);
+	    "%s clk%u srate: %u, channels: %u, sample_size: %u, period_size: %u, stream %u\n",
+	    __func__,clk_get_rate(afe->clk_i2s), srate, channels, sample_size, period_size,substream->stream);
 
 	return snd_soc_runtime_set_dai_fmt(rtd, rtd->dai_link->dai_fmt);
 }
@@ -799,9 +915,8 @@ int snd_afe_dai_trigger(struct snd_pcm_substream *substream, int cmd,
 {
 
 	struct sdrv_afe_i2s_sc *afe = snd_soc_dai_get_drvdata(dai);
-	DEBUG_FUNC_PRT
-	printk(KERN_INFO "%s:%i ------cmd(%d)--------------\n", __func__,
-	       __LINE__, cmd);
+	printk(KERN_INFO "%s:%i ------cmd(%d)stream(%d)--------------\n", __func__,
+	       __LINE__, cmd,substream->stream );
 	switch (cmd) {
 	case SNDRV_PCM_TRIGGER_START:
 	case SNDRV_PCM_TRIGGER_PAUSE_RELEASE:
@@ -829,6 +944,8 @@ int snd_afe_dai_trigger(struct snd_pcm_substream *substream, int cmd,
 		}
 		if (!atomic_read(&afe->playing) &&
 		    !atomic_read(&afe->capturing)) {
+			printk(KERN_INFO "%s:%i -----i2s stop----------\n", __func__,
+	       __LINE__, cmd,substream->stream );
 			afe_i2s_sc_stop(afe);
 		}
 		break;
@@ -841,13 +958,19 @@ int snd_afe_dai_trigger(struct snd_pcm_substream *substream, int cmd,
 int snd_afe_dai_hw_free(struct snd_pcm_substream *substream,
 			struct snd_soc_dai *dai)
 {
-	DEBUG_FUNC_PRT
+	struct sdrv_afe_i2s_sc *afe = snd_soc_dai_get_drvdata(dai);
+	DEBUG_ITEM_PRT(substream->stream);
+
+	if((afe->tx_slot_mask == 0 )&&
+		(afe->rx_slot_mask == 0)){
+		DEBUG_FUNC_PRT
+	}
 	return 0;
 }
 void snd_afe_dai_shutdown(struct snd_pcm_substream *substream,
 			  struct snd_soc_dai *dai)
 {
-	DEBUG_FUNC_PRT
+	DEBUG_ITEM_PRT(substream->stream);
 	/* disable main clk  end of playback or capture*/
 }
 
@@ -1044,10 +1167,91 @@ static int snd_afe_dai_set_fmt(struct snd_soc_dai *dai, unsigned int fmt)
 	return 0;
 }
 
+static int snd_afe_set_dai_tdm_slot(struct snd_soc_dai *dai,
+	unsigned int tx_mask, unsigned int rx_mask, int slots, int slot_width)
+{
+	struct sdrv_afe_i2s_sc *afe = snd_soc_dai_get_drvdata(dai);
+	int channel_numb ;
+	dev_info(afe->dev, "%s:%i : tx_mask(0x%x) rx_mask(0x%x) slots(%d) slot_width(%d) \n", __func__,
+	       __LINE__,tx_mask,rx_mask,slots,slot_width);
+
+	/* Enable tdm mode */
+	regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_TDM_CTRL,
+				   BIT_TDM_CTRL_TDM_EN,
+				   (1 << TDM_CTRL_TDM_EN_FIELD_OFFSET));
+
+	regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_TDM_FD_DIR,
+				   BIT_TDM_FD_DIR_CH_TX_EN,
+				   (tx_mask << TDM_FD_DIR_CH0_TXEN_FIELD_OFFSET));
+
+	regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_TDM_FD_DIR,
+				   BIT_TDM_FD_DIR_CH_RX_EN,
+				   (rx_mask << TDM_FD_DIR_CH0_RXEN_FIELD_OFFSET));
+
+	if (slots <= 4){
+		DEBUG_FUNC_PRT
+		slots = 4;
+		/* Enable tdm channel */
+		regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_TDM_CTRL,
+				   BIT_TDM_CTRL_CHN_NUMB,
+				   (3 << TDM_CTRL_CHN_NO_FIELD_OFFSET));
+		/* Set enabled number  */
+		regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_TDM_CTRL,
+				   BIT_TDM_CTRL_CH_EN,
+				   (0xf << TDM_CTRL_CH0_EN_FIELD_OFFSET));
+
+	}else if ( slots <= 8 ){
+		DEBUG_FUNC_PRT
+		slots = 8;
+		/* Enable tdm channel */
+		regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_TDM_CTRL,
+				   BIT_TDM_CTRL_CHN_NUMB,
+				   (7 << TDM_CTRL_CHN_NO_FIELD_OFFSET));
+		/* Set enabled number  */
+		regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_TDM_CTRL,
+				   BIT_TDM_CTRL_CH_EN,
+				   (0xff << TDM_CTRL_CH0_EN_FIELD_OFFSET));
+	}else if ( slots <= 16 ){
+		DEBUG_FUNC_PRT
+		slots = 16;
+		/* Enable tdm channel */
+		regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_TDM_CTRL,
+				   BIT_TDM_CTRL_CHN_NUMB,
+				   (15 << TDM_CTRL_CHN_NO_FIELD_OFFSET));
+		/* Set enabled number  */
+		regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_TDM_CTRL,
+				   BIT_TDM_CTRL_CH_EN,
+				   (0xffff << TDM_CTRL_CH0_EN_FIELD_OFFSET));
+	}
+	else{
+		return -EINVAL;
+	}
+
+/*  	if (true == afe->is_full_duplex) {
+		regmap_write(afe->regmap, REG_CDN_I2SSC_REGS_I2S_SRES_FDR, slot_width -1);
+		regmap_write(afe->regmap, REG_CDN_I2SSC_REGS_I2S_SRES, slot_width -1);
+	} else {
+		regmap_write(afe->regmap, REG_CDN_I2SSC_REGS_I2S_SRES, slot_width -1);
+	}  */
+	afe->slot_width = slot_width;
+	afe->slots = slots;
+	afe->tx_slot_mask = tx_mask;
+	afe->rx_slot_mask = rx_mask;
+	/*Audio will use tdm */
+	afe->tdm_initialized = true;
+	int ret, val;
+	ret = regmap_read(afe->regmap, REG_CDN_I2SSC_REGS_TDM_CTRL, &val);
+	dev_info(afe->dev, "DUMP REG_CDN_I2SSC_REGS_TDM_CTRL(0x%x)\n", val);
+		ret = regmap_read(afe->regmap, REG_CDN_I2SSC_REGS_TDM_FD_DIR, &val);
+	dev_info(afe->dev, "DUMP REG_CDN_I2SSC_REGS_TDM_FD_DIR(0x%x)\n", val);
+	return 0;
+}
+
 static struct snd_soc_dai_ops snd_afe_dai_ops = {
     .startup = snd_afe_dai_startup,
     .shutdown = snd_afe_dai_shutdown,
     .hw_params = snd_afe_dai_hw_params,
+    .set_tdm_slot	= snd_afe_set_dai_tdm_slot,
     .hw_free = snd_afe_dai_hw_free,
     .prepare = snd_afe_dai_prepare,
     .trigger = snd_afe_dai_trigger,
@@ -1093,7 +1297,7 @@ static struct snd_soc_dai_driver snd_afe_dais[] = {
 		.formats = SND_FORMATS,
 		.rates = SNDRV_PCM_RATE_8000_48000,
 		.channels_min = 1,
-		.channels_max = 2,
+		.channels_max = 8,
 	    },
 	.capture =
 	    {
@@ -1101,7 +1305,7 @@ static struct snd_soc_dai_driver snd_afe_dais[] = {
 		.formats = SND_FORMATS,
 		.rates = SNDRV_PCM_RATE_8000_48000,
 		.channels_min = 1,
-		.channels_max = 2,
+		.channels_max = 8,
 	    },
 	.ops = &snd_afe_dai_ops,
     },
@@ -1115,7 +1319,7 @@ static struct snd_soc_dai_driver snd_afe_dais[] = {
 		.formats = SND_FORMATS,
 		.rates = SNDRV_PCM_RATE_8000_48000,
 		.channels_min = 1,
-		.channels_max = 2,
+		.channels_max = 8,
 	    },
 	.capture =
 	    {
@@ -1123,7 +1327,7 @@ static struct snd_soc_dai_driver snd_afe_dais[] = {
 		.formats = SND_FORMATS,
 		.rates = SNDRV_PCM_RATE_8000_48000,
 		.channels_min = 1,
-		.channels_max = 2,
+		.channels_max = 8,
 	    },
 	.ops = &snd_afe_dai_ops,
     },
@@ -1279,12 +1483,11 @@ static int snd_afe_i2s_sc_probe(struct platform_device *pdev)
 	dev_info(dev, "Probed.\n");
 
 	afe = devm_kzalloc(dev, sizeof(struct sdrv_afe_i2s_sc), GFP_KERNEL);
-	if (afe == NULL)
+	if (afe == NULL){
 		return -ENOMEM;
-
+	}
 	afe->pdev = pdev;
 	afe->dev = dev;
-
 	platform_set_drvdata(pdev, afe);
 
 	/* get i2s sc clock FPGA 0x30300000u IRQ_GIC4_I2S_SC1_INTERRUPT_NUM 90
@@ -1334,20 +1537,19 @@ static int snd_afe_i2s_sc_probe(struct platform_device *pdev)
 		ret = PTR_ERR(afe->regmap);
 		goto err_disable;
 	}
-
-
 	afe_i2s_reset(afe);
 
-        /* Get irq and setting */
-        irq_id = platform_get_irq(pdev, 0);
-        if (!irq_id) {
-                dev_err(afe->dev, "%s no irq\n", dev->of_node->name);
-                return -ENXIO;
-        }
-        DEBUG_ITEM_PRT(irq_id);
+		/* Get irq and setting */
+	irq_id = platform_get_irq(pdev, 0);
+	if (!irq_id) {
+		regmap_exit(afe->regmap);
+		dev_err(afe->dev, "%s no irq\n", dev->of_node->name);
+		return -ENXIO;
+	}
+	DEBUG_ITEM_PRT(irq_id);
 
-        ret = devm_request_irq(afe->dev, irq_id, sdrv_i2s_sc_irq_handler, 0,
-                               pdev->name, (void *)afe);
+	ret = devm_request_irq(afe->dev, irq_id, sdrv_i2s_sc_irq_handler, 0,
+			       pdev->name, (void *)afe);
 
 	/* TODO: Set i2s sc default afet to full duplex mode. Next change by dts
 	 * setting. Change scr setting before, need check SCR_SEC_BASE + (0xC <<
@@ -1359,6 +1561,7 @@ static int snd_afe_i2s_sc_probe(struct platform_device *pdev)
 	if (!ret) {
 		/* semidrive,full-duplex is 0 set to half duplex mode.  */
 		if (value == 0) {
+			regmap_exit(afe->regmap);
 			dev_err(&pdev->dev, "Don't suppport set to half duplex mode. Please set scr register in ssystem \n");
 			goto err_disable;
 		}
@@ -1395,10 +1598,12 @@ static int snd_afe_i2s_sc_probe(struct platform_device *pdev)
 					      snd_afe_dais,
 					      ARRAY_SIZE(snd_afe_dais));
 	if (ret < 0) {
+		regmap_exit(afe->regmap);
 		dev_err(&pdev->dev, "couldn't register component\n");
 		goto err_disable;
 	}
-
+	afe->tdm_initialized = false;
+	afe_i2s_sc_config(afe);
 	return 0;
 err_disable:
 	/* pm_runtime_disable(&pdev->dev); */
