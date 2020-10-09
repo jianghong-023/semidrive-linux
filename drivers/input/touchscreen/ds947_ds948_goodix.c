@@ -1383,9 +1383,17 @@ static int goodix_ts_probe(struct i2c_client *client,
 
 #if 1
 
+    dreg = 0x1e;
+    dval = 0;
+    du90ub947_i2c_read(ts, dreg, &dval, 1);
+    dev_err(&client->dev, "947 reg=0x%x, val=0x%x\n", dreg, dval);
+    dval = 0x1;
+    du90ub947_i2c_write(ts, dreg, &dval, 1);
+
     dreg = 0x03;
     dval = 0;
     du90ub947_i2c_read(ts, dreg, &dval, 1);
+    dev_err(&client->dev, "947 reg=0x%x, val=0x%x\n", dreg, dval);
     dval |= 0x8;
     du90ub947_i2c_write(ts, dreg, &dval, 1);
 
@@ -1446,7 +1454,7 @@ static int goodix_ts_probe(struct i2c_client *client,
     msleep(10);
 
 
-    if (ts->gpiod_int && ts->gpiod_rst) {
+    if (ts->gpiod_int /*&& ts->gpiod_rst*/) {
         /* reset the controller */
         dev_err(&client->dev, "%s(): call reset\n", __func__);
         error = goodix_reset(ts);
