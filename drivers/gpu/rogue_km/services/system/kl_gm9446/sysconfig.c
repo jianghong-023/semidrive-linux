@@ -27,6 +27,7 @@
 #include <linux/dma-mapping.h>
 #include <linux/property.h>
 #include <linux/clk.h>
+#include <linux/delay.h>
 #endif
 #include "rgx_bvnc_defs_km.h"
 #include "interrupt_support.h"
@@ -172,7 +173,27 @@ PVRSRV_DEVICE_CONFIG *getDevConfig(void)
 {
 	return gpsDevConfig;
 }
+struct clk * gpsCoreClock = NULL;
 
+static void SetFrequency(unsigned long freq)
+{
+	int ret;
+
+	if (IS_ERR_OR_NULL(gpsCoreClock))
+	{
+		pr_err("no gpsCoreClock\n");
+		return;
+	}
+
+	ret = clk_set_rate(gpsCoreClock, freq);
+
+	return;
+}
+
+static void SetVoltage(int volt)
+{
+	pr_err("SetVoltage does nothing\n");
+}
 
 PVRSRV_ERROR SysDevInit(void *pvOSDevice, PVRSRV_DEVICE_CONFIG **ppsDevConfig)
 {
@@ -188,9 +209,9 @@ PVRSRV_ERROR SysDevInit(void *pvOSDevice, PVRSRV_DEVICE_CONFIG **ppsDevConfig)
 	IMG_UINT32 uiClk;
 	IMG_UINT32 uiOsId = -1;
 	struct platform_device *psDev;
-	struct clk * coreClock;
 	struct resource *psDevMemRes = NULL;
 	PVRSRV_ERROR err;
+	IMG_UINT32 rate = 0;
 
 	psDev = to_platform_device((struct device *)pvOSDevice);
 
@@ -271,17 +292,17 @@ PVRSRV_ERROR SysDevInit(void *pvOSDevice, PVRSRV_DEVICE_CONFIG **ppsDevConfig)
 	device_property_read_u32(&psDev->dev, "clock-frequency", &uiClk);
 
 	/* If there is separate gpucoreclk, get the rate from it. */
-	coreClock = devm_clk_get(&psDev->dev, "gpucoreclk");
-	if (IS_ERR(coreClock) && PTR_ERR(coreClock) != -EPROBE_DEFER)
-		coreClock = devm_clk_get(&psDev->dev, NULL);
-	if (IS_ERR(coreClock) && PTR_ERR(coreClock) == -EPROBE_DEFER)
+	gpsCoreClock = devm_clk_get(&psDev->dev, "gpucoreclk");
+	if (IS_ERR(gpsCoreClock) && PTR_ERR(gpsCoreClock) != -EPROBE_DEFER)
+		gpsCoreClock = devm_clk_get(&psDev->dev, NULL);
+	if (IS_ERR(gpsCoreClock) && PTR_ERR(gpsCoreClock) == -EPROBE_DEFER)
 		return -EPROBE_DEFER;
-	if (!IS_ERR_OR_NULL(coreClock)) {
-		err = clk_prepare_enable(coreClock);
+	if (!IS_ERR_OR_NULL(gpsCoreClock)) {
+		err = clk_prepare_enable(gpsCoreClock);
 		if (err)
 			dev_warn(&psDev->dev, "could not enable optional gpucoreclk: %d\n", err);
 		else
-			uiClk  = clk_get_rate(coreClock);
+			uiClk  = clk_get_rate(gpsCoreClock);
 	}
 
 	/* If no clock rate is defined, fail. */
@@ -327,6 +348,20 @@ PVRSRV_ERROR SysDevInit(void *pvOSDevice, PVRSRV_DEVICE_CONFIG **ppsDevConfig)
 	/* Setup other system specific stuff */
 #if defined(SUPPORT_ION)
 	IonInit(NULL);
+#endif
+#ifdef PVR_DVFS
+	psDevConfig->sDVFS.sDVFSDeviceCfg.bIdleReq = IMG_TRUE;
+	psDevConfig->sDVFS.sDVFSDeviceCfg.pfnSetFrequency = (PFN_SYS_DEV_DVFS_SET_FREQUENCY)SetFrequency;
+	psDevConfig->sDVFS.sDVFSDeviceCfg.pfnSetVoltage = (PFN_SYS_DEV_DVFS_SET_VOLTAGE)SetVoltage;
+	if (IS_ERR_OR_NULL(gpsCoreClock)) {
+		psDevConfig->sDVFS.sDVFSDeviceCfg.ui32PollMs = 0;
+	} else {
+		psDevConfig->sDVFS.sDVFSDeviceCfg.ui32PollMs = SD_DVFS_SWITCH_INTERVAL;
+	}
+
+	psDevConfig->sDVFS.sDVFSGovernorCfg.ui32UpThreshold = 90;
+	psDevConfig->sDVFS.sDVFSGovernorCfg.ui32DownDifferential = 10;
+
 #endif
 
 	*ppsDevConfig = psDevConfig;
