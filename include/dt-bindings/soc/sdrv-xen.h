@@ -41,4 +41,11 @@
 #define SDRV_SID_CSI1         0x81
 #define SDRV_SID_CSI2         0x82
 
+#define SDRV_SID_PCIE0        0x90
+
+#define SDRV_SID_PCIE1        0xa0
+
+/* vm dtb */
+#define GUEST_PHANDLE_GIC (65000)
+
 #endif
