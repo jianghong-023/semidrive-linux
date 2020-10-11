@@ -974,6 +974,7 @@ static int goodix_reset(struct goodix_ts_data *ts)
             (ts->client->addr == 0x14));
     /* HIGH: 0x28/0x29, LOW: 0xBA/0xBB */
     error = gpiod_direction_output(ts->gpiod_int, (ts->client->addr == 0x14));
+    error = du90ub948_gpio_output_val(ts, ts->irq_channel, (ts->client->addr == 0x14));
 
     if (error)
         return error;
@@ -993,6 +994,8 @@ static int goodix_reset(struct goodix_ts_data *ts)
 
     usleep_range(6000, 10000);      /* T4: > 5ms */
 
+    if(ts->client->addr == 0x14)
+		error = du90ub948_gpio_output_val(ts, ts->irq_channel, 0);
 
     /* end select I2C slave addr */
 //  error = gpiod_direction_input(ts->gpiod_rst);
