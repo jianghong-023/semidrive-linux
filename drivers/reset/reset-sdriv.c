@@ -479,4 +479,8 @@ static struct platform_driver sdriv_reset_driver = {
 	},
 };
 
-builtin_platform_driver(sdriv_reset_driver);
+static int __init sdrv_rstgen_init(void)
+{
+	return platform_driver_register(&sdriv_reset_driver);
+}
+arch_initcall(sdrv_rstgen_init);

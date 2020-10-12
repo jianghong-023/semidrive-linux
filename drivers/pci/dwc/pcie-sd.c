@@ -28,6 +28,7 @@
 #include <linux/regmap.h>
 #include <linux/resource.h>
 #include <linux/types.h>
+#include <linux/reset.h>
 
 #include "pcie-designware.h"
 
@@ -178,6 +179,34 @@ static int sd_pcie_get_clk(struct sd_pcie *sd_pcie,
 	sd_pcie->phy_pclk = devm_clk_get(dev, "pcie_phy_pclk");
 	if (IS_ERR(sd_pcie->phy_pclk))
 		return PTR_ERR(sd_pcie->phy_pclk);
+
+	return 0;
+}
+
+static int pcie_rstgen_reset(struct device *device)
+{
+	struct reset_control *pcie_rst;
+	int status;
+
+	pcie_rst = devm_reset_control_get(device, "pcie-reset");
+	if (IS_ERR(pcie_rst)) {
+		dev_err(device, "Missing controller reset\n");
+		return -1;
+	}
+
+	status = reset_control_status(pcie_rst);
+	dev_info(device, "Before reset, PCIe rstgen status is %d\n", status);
+
+	if (reset_control_reset(pcie_rst)) {
+		reset_control_put(pcie_rst);
+		dev_err(device, "rstgen reset PCIe failed\n");
+		return -1;
+	}
+
+	status = reset_control_status(pcie_rst);
+	dev_info(device, "After reset, PCIe rstgen status is %d\n", status);
+
+	reset_control_put(pcie_rst);
 
 	return 0;
 }
@@ -546,6 +575,10 @@ static int sd_pcie_probe(struct platform_device *pdev)
 		dev_err(dev, "NULL node\n");
 		return -EINVAL;
 	}
+
+	ret = pcie_rstgen_reset(dev);
+	if (ret)
+		return ret;
 
 	sd_pcie = devm_kzalloc(dev, sizeof(struct sd_pcie), GFP_KERNEL);
 	if (!sd_pcie)
