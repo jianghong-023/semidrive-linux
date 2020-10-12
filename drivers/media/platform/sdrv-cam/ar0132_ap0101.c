@@ -635,7 +635,6 @@ static int ar0132_initialization(struct ar0132_dev *sensor)
     val16 = 0;
     ap0101_read_reg16(sensor, id, &val16);
     dev_err(&client->dev, "2-id=0x%x, val16=0x%x\n", id, val16);
-#endif
 
     id = 0xfc00;
     val16 = 0x2800;     //enter: change-config
