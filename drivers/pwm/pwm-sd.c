@@ -301,8 +301,13 @@ static int sd_pwd_cpt_ret(uint32_t *rise, uint32_t rise_len, uint32_t *fall,
 			break;
 	}
 
-	if (j == fall_len)
-		ret = -1;
+	if (j == fall_len){
+		result->period = 0;
+		result->duty_cycle = 0;
+
+		return ret;
+	}
+
 	high = fall[j] - rise[i - 1];
 	cycle = rise[i] - rise[i - 1];
 	dev_info(pc->dev, "high:%#08x, cycle:%#08x \n", high, cycle);
