@@ -293,6 +293,8 @@ static IMG_BOOL RGXAckHwIrq(PVRSRV_RGXDEV_INFO *psDevInfo,
 	else
 	{
 		/* spurious interrupt */
+		pr_err("met spurious interrupt, clear it, status:0x%x, mask:0x%x", ui32IRQStatus, ui32IRQStatusEventMsk);
+		OSWriteHWReg32(psDevInfo->pvRegsBaseKM, ui32IRQClearReg, ui32IRQClearMask);
 		return IMG_FALSE;
 	}
 }

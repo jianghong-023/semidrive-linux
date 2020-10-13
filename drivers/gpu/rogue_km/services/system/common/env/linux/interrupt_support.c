@@ -70,7 +70,7 @@ static irqreturn_t SystemISRWrapper(int irq, void *dev_id)
 		PVR_DPF((PVR_DBG_ERROR, "%s: Missing interrupt data", __func__));
 	}
 
-	return IRQ_NONE;
+	return IRQ_HANDLED;
 }
 
 PVRSRV_ERROR OSInstallSystemLISR(IMG_HANDLE *phLISR,
