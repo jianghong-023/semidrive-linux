@@ -192,7 +192,7 @@ static void SetFrequency(unsigned long freq)
 
 static void SetVoltage(int volt)
 {
-	pr_err("SetVoltage does nothing\n");
+	PVR_UNREFERENCED_PARAMETER(volt);
 }
 
 PVRSRV_ERROR SysDevInit(void *pvOSDevice, PVRSRV_DEVICE_CONFIG **ppsDevConfig)

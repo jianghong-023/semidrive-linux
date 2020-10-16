@@ -4749,7 +4749,6 @@ PVRSRV_ERROR IMG_CALLCONV RGXPollForGPCommandCompletion(PVRSRV_DEVICE_NODE  *psD
 		PVR_DPF((PVR_DBG_ERROR, "%s: Failed! Error(%s) CPU linear address(%p) Expected value(%u)",
 		                        __func__, PVRSRVGetErrorString(eError),
 								pui32LinMemAddr, ui32Value));
-		PVRSRVDebugRequest(psDevNode, DEBUG_REQUEST_VERBOSITY_MAX, NULL, NULL);
 	}
 
 	return eError;
