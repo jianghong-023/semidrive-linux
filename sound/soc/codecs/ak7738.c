@@ -3645,6 +3645,8 @@ static const struct snd_kcontrol_new dsp1out1_mixer_kctrl[] = {
 	SOC_DAPM_SINGLE("DSP1 IN4", AK7738_VIRT_106_DSP1OUT1_MIX, 3, 1, 0),
 	SOC_DAPM_SINGLE("DSP1 IN5", AK7738_VIRT_106_DSP1OUT1_MIX, 4, 1, 0),
 	SOC_DAPM_SINGLE("DSP1 IN6", AK7738_VIRT_106_DSP1OUT1_MIX, 5, 1, 0),
+	SOC_DAPM_SINGLE("DSP2 IN1", AK7738_VIRT_106_DSP1OUT1_MIX, 6, 1, 0),
+	SOC_DAPM_SINGLE("DSP2 IN2", AK7738_VIRT_106_DSP1OUT1_MIX, 7, 1, 0),
 };
 
 static const struct snd_kcontrol_new dsp1out2_mixer_kctrl[] = {
@@ -4090,6 +4092,8 @@ static const struct snd_soc_dapm_route ak7738_intercon[] = {
 	{"DSP1 OUT1 Mixer", "DSP1 IN4", "DSP1 IN4 Source Selector"},
 	{"DSP1 OUT1 Mixer", "DSP1 IN5", "DSP1 IN5 Source Selector"},
 	{"DSP1 OUT1 Mixer", "DSP1 IN6", "DSP1 IN6 Source Selector"},
+	{"DSP1 OUT1 Mixer", "DSP2 IN1", "DSP2 IN1 Source Selector"},
+	{"DSP1 OUT1 Mixer", "DSP2 IN2", "DSP2 IN2 Source Selector"},
 
 	{"DSP1 OUT2 Mixer", "DSP1 IN1", "DSP1 IN1 Source Selector"},
 	{"DSP1 OUT2 Mixer", "DSP1 IN2", "DSP1 IN2 Source Selector"},
@@ -5460,13 +5464,13 @@ static int ak7738_set_dai_fmt(struct snd_soc_dai *dai, unsigned int fmt)
 			doslot = 3;
 			break;
 		case SND_SOC_DAIFMT_DSP_A:
-			akdbgprt("[AK7738] SND_SOC_DAIFMT_DSP_A %s(Slave_nSDNo=%d)\n",__FUNCTION__,nSDNo);
 			format = AK7738_LRIF_PCM_SHORT_MODE; // 6
 			diolsb = 0;
 			diedge = 1;
 			doedge = 1;
 			dislot = ak7738->DISLbit[nSDNo];
 			doslot = ak7738->DOSLbit[nSDNo];
+			akdbgprt("[AK7738] SND_SOC_DAIFMT_DSP_A %s(Slave_nSDNo=%d) dislot(%d) doslot(%d)\n",__FUNCTION__,nSDNo,dislot,doslot);
 			break;
 		case SND_SOC_DAIFMT_DSP_B:
 			akdbgprt("[AK7738] SND_SOC_DAIFMT_DSP_B %s(Slave_nSDNo=%d)\n",__FUNCTION__,nSDNo);
@@ -6405,14 +6409,14 @@ struct snd_soc_dai_driver ak7738_dai[] = {
 		.playback = {
 		       .stream_name = "AIF1 Playback",
 		       .channels_min = 1,
-		       .channels_max = 2,
+		       .channels_max = 8,
 		       .rates = AK7738_RATES,
 		       .formats = AK7738_DAC_FORMATS,
 		},
 		.capture = {
 		       .stream_name = "AIF1 Capture",
 		       .channels_min = 1,
-		       .channels_max = 2,
+		       .channels_max = 8,
 		       .rates = AK7738_RATES,
 		       .formats = AK7738_ADC_FORMATS,
 		},
@@ -6424,14 +6428,14 @@ struct snd_soc_dai_driver ak7738_dai[] = {
 		.playback = {
 		       .stream_name = "AIF2 Playback",
 		       .channels_min = 1,
-		       .channels_max = 2,
+		       .channels_max = 8,
 		       .rates = AK7738_RATES,
 		       .formats = AK7738_DAC_FORMATS,
 		},
 		.capture = {
 		       .stream_name = "AIF2 Capture",
 		       .channels_min = 1,
-		       .channels_max = 2,
+		       .channels_max = 8,
 		       .rates = AK7738_RATES,
 		       .formats = AK7738_ADC_FORMATS,
 		},
@@ -6443,14 +6447,14 @@ struct snd_soc_dai_driver ak7738_dai[] = {
 		.playback = {
 		       .stream_name = "AIF3 Playback",
 		       .channels_min = 1,
-		       .channels_max = 2,
+		       .channels_max = 8,
 		       .rates = AK7738_RATES,
 		       .formats = AK7738_DAC_FORMATS,
 		},
 		.capture = {
 		       .stream_name = "AIF3 Capture",
 		       .channels_min = 1,
-		       .channels_max = 2,
+		       .channels_max = 8,
 		       .rates = AK7738_RATES,
 		       .formats = AK7738_ADC_FORMATS,
 		},
