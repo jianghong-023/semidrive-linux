@@ -499,13 +499,21 @@ static int rpmsg_bridge_probe(struct rpmsg_device *rpdev)
 		pstr = strnstr(rpdev->id.name, devlist[minor].name, RPMSG_NAME_SIZE);
 		if (pstr) {
 			dev = &devlist[minor];
+			if (dev->dev) {
+				pr_err("Error already open device %s\n", dev->name);
+				return -EALREADY;
+			}
 			dev->rpdev = rpdev;
 			dev->minor = minor;
 			dev->dev = device_create(dcf_class, &rpdev->dev, MKDEV(MAJOR(dcf_major), minor),
 						  dev, devlist[minor].name);
 
+			if (IS_ERR(dev->dev)) {
+				pr_err("Error creating device %s\n", dev->name);
+				return PTR_ERR(dev->dev);
+			}
 			dev_set_drvdata(&rpdev->dev, dev);
-			dev_info(dev->dev, "device created!\n");
+			dev_info(&rpdev->dev, "device %s created!\n", dev->name);
 			return 0;
 		}
 	}
