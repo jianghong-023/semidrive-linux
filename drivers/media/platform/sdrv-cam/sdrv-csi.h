@@ -153,6 +153,9 @@ struct csi_core {
 	void __iomem *base;
 	u32 irq;
 	u32 host_id;	/* host ip id */
+	u32 sync;
+	u32 img_sync;
+	u32 img_cnt;
 	struct mutex lock;
 
 	struct v4l2_device v4l2_dev;

@@ -28,7 +28,6 @@
 #include <media/v4l2-fwnode.h>
 #include <media/v4l2-subdev.h>
 
-
 #include "sdrv-csi.h"
 #include "sdrv-mipi-csi2.h"
 
@@ -43,70 +42,68 @@
 #define AP0101_SLAVE_ID 0x5d
 #define AP0101_DEV_INDEX -4
 
-
 enum max9286_mode_id {
-    MAX9286_MODE_720P_1280_720 = 0,
-    MAX9286_NUM_MODES,
+	MAX9286_MODE_720P_1280_720 = 0,
+	MAX9286_NUM_MODES,
 };
 
 enum max9286_frame_rate {
-    MAX9286_25_FPS = 0,
-    MAX9286_NUM_FRAMERATES,
+	MAX9286_25_FPS = 0,
+	MAX9286_NUM_FRAMERATES,
 };
 
 struct max9286_pixfmt {
-    u32 code;
-    u32 colorspace;
+	u32 code;
+	u32 colorspace;
 };
 
 static const struct max9286_pixfmt max9286_formats[] = {
-    { MEDIA_BUS_FMT_YUYV8_2X8, V4L2_COLORSPACE_SRGB, },
+	{MEDIA_BUS_FMT_YUYV8_2X8, V4L2_COLORSPACE_SRGB,},
 };
 
 static const int max9286_framerates[] = {
-    [MAX9286_25_FPS] = 25,
+	[MAX9286_25_FPS] = 25,
 };
 
 struct max9286_ctrls {
-    struct v4l2_ctrl_handler handler;
-    struct {
-        struct v4l2_ctrl *auto_exp;
-        struct v4l2_ctrl *exposure;
-    };
-    struct {
-        struct v4l2_ctrl *auto_wb;
-        struct v4l2_ctrl *blue_balance;
-        struct v4l2_ctrl *red_balance;
-    };
-    struct {
-        struct v4l2_ctrl *auto_gain;
-        struct v4l2_ctrl *gain;
-    };
-    struct v4l2_ctrl *brightness;
-    struct v4l2_ctrl *light_freq;
-    struct v4l2_ctrl *saturation;
-    struct v4l2_ctrl *contrast;
-    struct v4l2_ctrl *hue;
-    struct v4l2_ctrl *test_pattern;
-    struct v4l2_ctrl *hflip;
-    struct v4l2_ctrl *vflip;
+	struct v4l2_ctrl_handler handler;
+	struct {
+		struct v4l2_ctrl *auto_exp;
+		struct v4l2_ctrl *exposure;
+	};
+	struct {
+		struct v4l2_ctrl *auto_wb;
+		struct v4l2_ctrl *blue_balance;
+		struct v4l2_ctrl *red_balance;
+	};
+	struct {
+		struct v4l2_ctrl *auto_gain;
+		struct v4l2_ctrl *gain;
+	};
+	struct v4l2_ctrl *brightness;
+	struct v4l2_ctrl *light_freq;
+	struct v4l2_ctrl *saturation;
+	struct v4l2_ctrl *contrast;
+	struct v4l2_ctrl *hue;
+	struct v4l2_ctrl *test_pattern;
+	struct v4l2_ctrl *hflip;
+	struct v4l2_ctrl *vflip;
 };
 
 enum max9286_downsize_mode {
-    SUBSAMPLING,
-    SCALING,
+	SUBSAMPLING,
+	SCALING,
 };
 
-
 struct max9286_mode_info {
-    enum max9286_mode_id id;
-    enum max9286_downsize_mode dn_mode;
-    u32 hact;
-    u32 htot;
-    u32 vact;
-    u32 vtot;
-    //const struct reg_value *reg_data;
-    //u32 reg_data_size;
+	enum max9286_mode_id id;
+	enum max9286_downsize_mode dn_mode;
+	u32 hact;
+	u32 htot;
+	u32 vact;
+	u32 vtot;
+	//const struct reg_value *reg_data;
+	//u32 reg_data_size;
 };
 
 #define MIPI_CSI2_SENS_VC0_PAD_SOURCE   0
@@ -115,887 +112,894 @@ struct max9286_mode_info {
 #define MIPI_CSI2_SENS_VC3_PAD_SOURCE   3
 #define MIPI_CSI2_SENS_VCX_PADS_NUM     4
 
-
 struct max9286_dev {
-    struct i2c_client *i2c_client;
-    unsigned short addr_9286;
-    unsigned short addr_96705;
-    struct v4l2_subdev sd;
+	struct i2c_client *i2c_client;
+	unsigned short addr_9286;
+	unsigned short addr_96705;
+	struct v4l2_subdev sd;
 #if 1
-    struct media_pad pads[MIPI_CSI2_SENS_VCX_PADS_NUM];
+	struct media_pad pads[MIPI_CSI2_SENS_VCX_PADS_NUM];
 #else
-    struct media_pad pad;
+	struct media_pad pad;
 #endif
-    struct v4l2_fwnode_endpoint ep; /* the parsed DT endpoint info */
+	struct v4l2_fwnode_endpoint ep;	/* the parsed DT endpoint info */
 
-    struct gpio_desc *reset_gpio;
-    struct gpio_desc *pwdn_gpio;
-    bool   upside_down;
-    uint32_t link_count;
-    /* lock to protect all members below */
-    struct mutex lock;
+	struct gpio_desc *reset_gpio;
+	struct gpio_desc *pwdn_gpio;
+	bool upside_down;
+	uint32_t link_count;
+	/* lock to protect all members below */
+	struct mutex lock;
 
-    int power_count;
+	int power_count;
 
-    struct v4l2_mbus_framefmt fmt;
-    bool pending_fmt_change;
+	struct v4l2_mbus_framefmt fmt;
+	bool pending_fmt_change;
 
-    const struct max9286_mode_info *current_mode;
-    const struct max9286_mode_info *last_mode;
-    enum max9286_frame_rate current_fr;
+	const struct max9286_mode_info *current_mode;
+	const struct max9286_mode_info *last_mode;
+	enum max9286_frame_rate current_fr;
 
-    struct v4l2_fract frame_interval;
+	struct v4l2_fract frame_interval;
 
+	struct max9286_ctrls ctrls;
 
-    struct max9286_ctrls ctrls;
+	u32 prev_sysclk, prev_hts;
+	u32 ae_low, ae_high, ae_target;
 
-    u32 prev_sysclk, prev_hts;
-    u32 ae_low, ae_high, ae_target;
-
-    bool pending_mode_change;
-    bool streaming;
-    int sec_9286_shift;
+	bool pending_mode_change;
+	bool streaming;
+	int sec_9286_shift;
+	u32 sync;
 };
-
 
 static const struct max9286_mode_info
-    max9286_mode_data[MAX9286_NUM_FRAMERATES][MAX9286_NUM_MODES] = {
-    {
-        {
-            MAX9286_MODE_720P_1280_720, SUBSAMPLING,
-            1280, 1892, 720, 740,
-        },
-    },
+ max9286_mode_data[MAX9286_NUM_FRAMERATES][MAX9286_NUM_MODES] = {
+	{
+		{
+			MAX9286_MODE_720P_1280_720, SUBSAMPLING,
+			1280, 1892, 720, 740,
+		},
+	},
 };
-
-
 
 static inline struct max9286_dev *to_max9286_dev(struct v4l2_subdev *sd)
 {
-    return container_of(sd, struct max9286_dev, sd);
+	return container_of(sd, struct max9286_dev, sd);
 }
-
 
 static int max9286_write_reg(struct max9286_dev *sensor, u8 reg, u8 val)
 {
-    struct i2c_client *client = sensor->i2c_client;
-    struct i2c_msg msg;
-    u8 buf[2];
-    int ret;
+	struct i2c_client *client = sensor->i2c_client;
+	struct i2c_msg msg;
+	u8 buf[2];
+	int ret;
 
-    client->addr = sensor->addr_9286;
-    buf[0] = reg;
-    buf[1] = val;
-    //printk("%s: reg=0x%x, val=0x%x\n", __func__, reg, val);
-    msg.addr = client->addr;
-    msg.flags = client->flags;
-    msg.buf = buf;
-    msg.len = sizeof(buf);
+	client->addr = sensor->addr_9286;
+	buf[0] = reg;
+	buf[1] = val;
+	//printk("%s: reg=0x%x, val=0x%x\n", __func__, reg, val);
+	msg.addr = client->addr;
+	msg.flags = client->flags;
+	msg.buf = buf;
+	msg.len = sizeof(buf);
 
-    ret = i2c_transfer(client->adapter, &msg, 1);
+	ret = i2c_transfer(client->adapter, &msg, 1);
 
-    if (ret < 0) {
-        dev_err(&client->dev, "%s: error: reg=0x%x, val=0x%x\n",
-                __func__, reg, val);
-        return ret;
-    }
+	if (ret < 0) {
+		dev_err(&client->dev, "%s: error: reg=0x%x, val=0x%x\n",
+			__func__, reg, val);
+		return ret;
+	}
 
-    return 0;
+	return 0;
 }
 
-static int max9286_read_reg(struct max9286_dev *sensor, u8 reg, u8 *val)
+static int max9286_read_reg(struct max9286_dev *sensor, u8 reg, u8 * val)
 {
-    struct i2c_client *client = sensor->i2c_client;
-    struct i2c_msg msg[2];
-    u8 buf[1];
-    int ret;
+	struct i2c_client *client = sensor->i2c_client;
+	struct i2c_msg msg[2];
+	u8 buf[1];
+	int ret;
 
-    client->addr = sensor->addr_9286;
-    buf[0] = reg;
+	client->addr = sensor->addr_9286;
+	buf[0] = reg;
 
-    msg[0].addr = client->addr;
-    msg[0].flags = client->flags;
-    msg[0].buf = buf;
-    msg[0].len = sizeof(buf);
+	msg[0].addr = client->addr;
+	msg[0].flags = client->flags;
+	msg[0].buf = buf;
+	msg[0].len = sizeof(buf);
 
-    msg[1].addr = client->addr;
-    msg[1].flags = client->flags | I2C_M_RD;
-    msg[1].buf = buf;
-    msg[1].len = 1;
+	msg[1].addr = client->addr;
+	msg[1].flags = client->flags | I2C_M_RD;
+	msg[1].buf = buf;
+	msg[1].len = 1;
 
-    ret = i2c_transfer(client->adapter, msg, 2);
+	ret = i2c_transfer(client->adapter, msg, 2);
 
-    if (ret < 0) {
-        dev_err(&client->dev, "%s: error: reg=0x%x\n",
-                __func__, reg);
-        return ret;
-    }
+	if (ret < 0) {
+		dev_err(&client->dev, "%s: error: reg=0x%x\n", __func__, reg);
+		return ret;
+	}
 
-    *val = buf[0];
-    return 0;
+	*val = buf[0];
+	return 0;
 }
 
 static int max96705_write_reg(struct max9286_dev *sensor, u8 idx, u8 reg,
-                              u8 val)
+			      u8 val)
 {
-    struct i2c_client *client = sensor->i2c_client;
-    struct i2c_msg msg;
-    u8 buf[2];
-    int ret;
-    client->addr = sensor->addr_96705;
-    buf[0] = reg;
-    buf[1] = val;
+	struct i2c_client *client = sensor->i2c_client;
+	struct i2c_msg msg;
+	u8 buf[2];
+	int ret;
+	client->addr = sensor->addr_96705;
+	buf[0] = reg;
+	buf[1] = val;
 
-    msg.addr = client->addr + idx;
-    msg.flags = client->flags;
-    msg.buf = buf;
-    msg.len = sizeof(buf);
-    //printk("%s: reg=0x%x, val=0x%x\n", __func__, reg, val);
-    ret = i2c_transfer(client->adapter, &msg, 1);
+	msg.addr = client->addr + idx;
+	msg.flags = client->flags;
+	msg.buf = buf;
+	msg.len = sizeof(buf);
+	//printk("%s: reg=0x%x, val=0x%x\n", __func__, reg, val);
+	ret = i2c_transfer(client->adapter, &msg, 1);
 
-    if (ret < 0) {
-        dev_err(&client->dev, "%s: error: reg=0x%x, val=0x%x\n",
-                __func__, reg, val);
-        return ret;
-    }
+	if (ret < 0) {
+		dev_err(&client->dev, "%s: error: reg=0x%x, val=0x%x\n",
+			__func__, reg, val);
+		return ret;
+	}
 
-    return 0;
+	return 0;
 }
 
 static int max96705_read_reg(struct max9286_dev *sensor, u8 idx, u8 reg,
-                             u8 *val)
+			     u8 * val)
 {
-    struct i2c_client *client = sensor->i2c_client;
-    struct i2c_msg msg[2];
-    u8 buf[1];
-    int ret;
-    client->addr = sensor->addr_96705;
-    buf[0] = reg;
+	struct i2c_client *client = sensor->i2c_client;
+	struct i2c_msg msg[2];
+	u8 buf[1];
+	int ret;
+	client->addr = sensor->addr_96705;
+	buf[0] = reg;
 
-    msg[0].addr = client->addr + idx;
-    msg[0].flags = client->flags;
-    msg[0].buf = buf;
-    msg[0].len = sizeof(buf);
+	msg[0].addr = client->addr + idx;
+	msg[0].flags = client->flags;
+	msg[0].buf = buf;
+	msg[0].len = sizeof(buf);
 
-    msg[1].addr = client->addr + idx;
-    msg[1].flags = client->flags | I2C_M_RD;
-    msg[1].buf = buf;
-    msg[1].len = 1;
+	msg[1].addr = client->addr + idx;
+	msg[1].flags = client->flags | I2C_M_RD;
+	msg[1].buf = buf;
+	msg[1].len = 1;
 
-    ret = i2c_transfer(client->adapter, msg, 2);
+	ret = i2c_transfer(client->adapter, msg, 2);
 
-    if (ret < 0) {
-        dev_err(&client->dev, "%s: error: reg=0x%x\n",
-                __func__, reg);
-        return ret;
-    }
+	if (ret < 0) {
+		dev_err(&client->dev, "%s: error: reg=0x%x\n", __func__, reg);
+		return ret;
+	}
 
-    *val = buf[0];
-    return 0;
+	*val = buf[0];
+	return 0;
 }
 
-
-
-static struct v4l2_subdev *max9286_get_interface_subdev(
-    struct v4l2_subdev *sd)
+static struct v4l2_subdev *max9286_get_interface_subdev(struct v4l2_subdev *sd)
 {
-    struct media_pad *source_pad, *remote_pad;
-    int ret;
+	struct media_pad *source_pad, *remote_pad;
+	int ret;
 
-    ret = sdrv_find_pad(sd, MEDIA_PAD_FL_SOURCE);
+	ret = sdrv_find_pad(sd, MEDIA_PAD_FL_SOURCE);
 
-    if (ret < 0)
-        return NULL;
+	if (ret < 0)
+		return NULL;
 
-    source_pad = &sd->entity.pads[ret];
+	source_pad = &sd->entity.pads[ret];
 
-    remote_pad = media_entity_remote_pad(source_pad);
+	remote_pad = media_entity_remote_pad(source_pad);
 
-    if (!remote_pad || !is_media_entity_v4l2_subdev(remote_pad->entity))
-        return NULL;
+	if (!remote_pad || !is_media_entity_v4l2_subdev(remote_pad->entity))
+		return NULL;
 
-    return media_entity_to_v4l2_subdev(remote_pad->entity);
+	return media_entity_to_v4l2_subdev(remote_pad->entity);
 }
-
 
 static int max9286_s_power(struct v4l2_subdev *sd, int on)
 {
-    struct max9286_dev *sensor = to_max9286_dev(sd);
-    struct v4l2_subdev *interface_sd = max9286_get_interface_subdev(sd);
-    struct sdrv_csi_mipi_csi2 *kcmc = v4l2_get_subdevdata(interface_sd);
+	struct max9286_dev *sensor = to_max9286_dev(sd);
+	struct v4l2_subdev *interface_sd = max9286_get_interface_subdev(sd);
+	struct sdrv_csi_mipi_csi2 *kcmc = v4l2_get_subdevdata(interface_sd);
 
-    kcmc->lane_count = sensor->link_count;
+	kcmc->lane_count = sensor->link_count;
 
-    return 0;
+	return 0;
 }
-
-
 
 static int max9286_enum_frame_size(struct v4l2_subdev *sd,
-                                   struct v4l2_subdev_pad_config *cfg,
-                                   struct v4l2_subdev_frame_size_enum *fse)
+				   struct v4l2_subdev_pad_config *cfg,
+				   struct v4l2_subdev_frame_size_enum *fse)
 {
-    if (fse->pad != 0)
-        return -EINVAL;
+	struct max9286_dev *sensor = to_max9286_dev(sd);
 
-    if (fse->index >= MAX9286_NUM_MODES)
-        return -EINVAL;
+	if (fse->pad != 0)
+		return -EINVAL;
 
-    fse->min_width =
-        max9286_mode_data[0][fse->index].hact;
-    fse->max_width = fse->min_width;
-    fse->min_height =
-        max9286_mode_data[0][fse->index].vact;
-    fse->max_height = fse->min_height;
-    return 0;
+	if (fse->index >= MAX9286_NUM_MODES)
+		return -EINVAL;
+
+	fse->min_width = max9286_mode_data[0][fse->index].hact;
+	fse->max_width = fse->min_width;
+
+	if (sensor->sync == 0)
+		fse->min_height = max9286_mode_data[0][fse->index].vact;
+	else
+		fse->min_height = max9286_mode_data[0][fse->index].vact * 4;
+
+	fse->max_height = fse->min_height;
+	return 0;
 }
 
-static int max9286_enum_frame_interval(
-    struct v4l2_subdev *sd,
-    struct v4l2_subdev_pad_config *cfg,
-    struct v4l2_subdev_frame_interval_enum *fie)
+static int max9286_enum_frame_interval(struct v4l2_subdev *sd,
+				       struct v4l2_subdev_pad_config *cfg,
+				       struct v4l2_subdev_frame_interval_enum
+				       *fie)
 {
-    struct max9286_dev *sensor = to_max9286_dev(sd);
-    struct v4l2_fract tpf;
-    int ret;
+	struct max9286_dev *sensor = to_max9286_dev(sd);
+	struct v4l2_fract tpf;
+	int ret;
 
-    if (fie->pad != 0)
-        return -EINVAL;
+	if (fie->pad != 0)
+		return -EINVAL;
 
-    if (fie->index >= MAX9286_NUM_FRAMERATES)
-        return -EINVAL;
+	if (fie->index >= MAX9286_NUM_FRAMERATES)
+		return -EINVAL;
 
-    tpf.numerator = 1;
-    tpf.denominator = max9286_framerates[fie->index];
+	tpf.numerator = 1;
+	tpf.denominator = max9286_framerates[fie->index];
 
-    fie->interval = tpf;
+	fie->interval = tpf;
 
-    return 0;
+	return 0;
 }
 
 static int max9286_g_frame_interval(struct v4l2_subdev *sd,
-                                    struct v4l2_subdev_frame_interval *fi)
+				    struct v4l2_subdev_frame_interval *fi)
 {
-    struct max9286_dev *sensor = to_max9286_dev(sd);
+	struct max9286_dev *sensor = to_max9286_dev(sd);
 
-    mutex_lock(&sensor->lock);
-    fi->interval = sensor->frame_interval;
-    mutex_unlock(&sensor->lock);
+	mutex_lock(&sensor->lock);
+	fi->interval = sensor->frame_interval;
+	mutex_unlock(&sensor->lock);
 
-    return 0;
+	return 0;
 }
 
 static int max9286_s_frame_interval(struct v4l2_subdev *sd,
-                                    struct v4l2_subdev_frame_interval *fi)
+				    struct v4l2_subdev_frame_interval *fi)
 {
-    return 0;
+	return 0;
 }
 
 static int max9286_enum_mbus_code(struct v4l2_subdev *sd,
-                                  struct v4l2_subdev_pad_config *cfg,
-                                  struct v4l2_subdev_mbus_code_enum *code)
+				  struct v4l2_subdev_pad_config *cfg,
+				  struct v4l2_subdev_mbus_code_enum *code)
 {
-    if (code->pad != 0)
-        return -EINVAL;
+	if (code->pad != 0)
+		return -EINVAL;
 
-    if (code->index >= ARRAY_SIZE(max9286_formats))
-        return -EINVAL;
+	if (code->index >= ARRAY_SIZE(max9286_formats))
+		return -EINVAL;
 
-    code->code = max9286_formats[code->index].code;
+	code->code = max9286_formats[code->index].code;
 
-    return 0;
+	return 0;
 }
 
 static int max9286_s_stream(struct v4l2_subdev *sd, int enable)
 {
-    int i, idx;
-    u8 val;
+	int i, idx;
+	u8 val;
 
-    struct max9286_dev *sensor = to_max9286_dev(sd);
-    //int ret = 0;
-    //sensor->i2c_client->addr = sensor->addr_9286;
+	struct max9286_dev *sensor = to_max9286_dev(sd);
+	//int ret = 0;
+	//sensor->i2c_client->addr = sensor->addr_9286;
 
-    if (enable == 1) {
-        //csienable=1
-        max9286_write_reg(sensor, 0x15, 0x9b);
-    }
-    else if (enable == 0) {
-        //csienable=0
-        max9286_write_reg(sensor, 0x15, 0x13);
-    }
+	if (enable == 1) {
+		//csienable=1
+		max9286_write_reg(sensor, 0x15, 0x9b);
+	} else if (enable == 0) {
+		//csienable=0
+		max9286_write_reg(sensor, 0x15, 0x13);
+	}
 
-
-    return 0;
+	return 0;
 }
 
 static int max9286_get_fmt(struct v4l2_subdev *sd,
-                           struct v4l2_subdev_pad_config *cfg,
-                           struct v4l2_subdev_format *format)
+			   struct v4l2_subdev_pad_config *cfg,
+			   struct v4l2_subdev_format *format)
 {
-    struct max9286_dev *sensor = to_max9286_dev(sd);
-    struct v4l2_mbus_framefmt *fmt;
+	struct max9286_dev *sensor = to_max9286_dev(sd);
+	struct v4l2_mbus_framefmt *fmt;
 
-    if (format->pad != 0)
-        return -EINVAL;
+	if (format->pad != 0)
+		return -EINVAL;
 
-    mutex_lock(&sensor->lock);
+	mutex_lock(&sensor->lock);
 
-    fmt = &sensor->fmt;
+	fmt = &sensor->fmt;
 
-    format->format = *fmt;
+	format->format = *fmt;
 
-    mutex_unlock(&sensor->lock);
+	mutex_unlock(&sensor->lock);
 
-    return 0;
+	return 0;
 }
 
-
 static int max9286_set_fmt(struct v4l2_subdev *sd,
-                           struct v4l2_subdev_pad_config *cfg,
-                           struct v4l2_subdev_format *format)
+			   struct v4l2_subdev_pad_config *cfg,
+			   struct v4l2_subdev_format *format)
 {
-    return 0;
+	return 0;
 }
 
 static int max9286_s_ctrl(struct v4l2_ctrl *ctrl)
 {
-    return 0;
+	return 0;
 }
 
-
 static const struct v4l2_subdev_core_ops max9286_core_ops = {
-    .s_power = max9286_s_power,
+	.s_power = max9286_s_power,
 };
 
 static const struct v4l2_subdev_video_ops max9286_video_ops = {
-    .g_frame_interval = max9286_g_frame_interval,
-    .s_frame_interval = max9286_s_frame_interval,
-    .s_stream = max9286_s_stream,
+	.g_frame_interval = max9286_g_frame_interval,
+	.s_frame_interval = max9286_s_frame_interval,
+	.s_stream = max9286_s_stream,
 };
 
 static const struct v4l2_subdev_pad_ops max9286_pad_ops = {
-    .enum_mbus_code = max9286_enum_mbus_code,
-    .get_fmt = max9286_get_fmt,
-    .set_fmt = max9286_set_fmt,
-    .enum_frame_size = max9286_enum_frame_size,
-    .enum_frame_interval = max9286_enum_frame_interval,
+	.enum_mbus_code = max9286_enum_mbus_code,
+	.get_fmt = max9286_get_fmt,
+	.set_fmt = max9286_set_fmt,
+	.enum_frame_size = max9286_enum_frame_size,
+	.enum_frame_interval = max9286_enum_frame_interval,
 };
 
 static const struct v4l2_subdev_ops max9286_subdev_ops = {
-    .core = &max9286_core_ops,
-    .video = &max9286_video_ops,
-    .pad = &max9286_pad_ops,
+	.core = &max9286_core_ops,
+	.video = &max9286_video_ops,
+	.pad = &max9286_pad_ops,
 };
 
 static const struct v4l2_ctrl_ops max9286_ctrl_ops = {
-    .s_ctrl = max9286_s_ctrl,
+	.s_ctrl = max9286_s_ctrl,
 };
 
 static const char *const test_pattern_menu[] = {
-    "Disabled",
-    "Color bars",
+	"Disabled",
+	"Color bars",
 };
-
 
 static int max9286_init_controls(struct max9286_dev *sensor)
 {
-    const struct v4l2_ctrl_ops *ops = &max9286_ctrl_ops;
-    struct max9286_ctrls *ctrls = &sensor->ctrls;
-    struct v4l2_ctrl_handler *hdl = &ctrls->handler;
-    int ret;
+	const struct v4l2_ctrl_ops *ops = &max9286_ctrl_ops;
+	struct max9286_ctrls *ctrls = &sensor->ctrls;
+	struct v4l2_ctrl_handler *hdl = &ctrls->handler;
+	int ret;
 
-    v4l2_ctrl_handler_init(hdl, 32);
+	v4l2_ctrl_handler_init(hdl, 32);
 
-    /* we can use our own mutex for the ctrl lock */
-    hdl->lock = &sensor->lock;
+	/* we can use our own mutex for the ctrl lock */
+	hdl->lock = &sensor->lock;
 
-    /* Auto/manual white balance */
-    ctrls->auto_wb = v4l2_ctrl_new_std(hdl, ops,
-                                       V4L2_CID_AUTO_WHITE_BALANCE,
-                                       0, 1, 1, 1);
-    ctrls->blue_balance = v4l2_ctrl_new_std(hdl, ops, V4L2_CID_BLUE_BALANCE,
-                                            0, 4095, 1, 0);
-    ctrls->red_balance = v4l2_ctrl_new_std(hdl, ops, V4L2_CID_RED_BALANCE,
-                                           0, 4095, 1, 0);
-    /* Auto/manual exposure */
-    ctrls->auto_exp = v4l2_ctrl_new_std_menu(hdl, ops,
-                      V4L2_CID_EXPOSURE_AUTO,
-                      V4L2_EXPOSURE_MANUAL, 0,
-                      V4L2_EXPOSURE_AUTO);
-    ctrls->exposure = v4l2_ctrl_new_std(hdl, ops, V4L2_CID_EXPOSURE,
-                                        0, 65535, 1, 0);
-    /* Auto/manual gain */
-    ctrls->auto_gain = v4l2_ctrl_new_std(hdl, ops, V4L2_CID_AUTOGAIN,
-                                         0, 1, 1, 1);
-    ctrls->gain = v4l2_ctrl_new_std(hdl, ops, V4L2_CID_GAIN,
-                                    0, 1023, 1, 0);
+	/* Auto/manual white balance */
+	ctrls->auto_wb = v4l2_ctrl_new_std(hdl, ops,
+					   V4L2_CID_AUTO_WHITE_BALANCE,
+					   0, 1, 1, 1);
+	ctrls->blue_balance = v4l2_ctrl_new_std(hdl, ops, V4L2_CID_BLUE_BALANCE,
+						0, 4095, 1, 0);
+	ctrls->red_balance = v4l2_ctrl_new_std(hdl, ops, V4L2_CID_RED_BALANCE,
+					       0, 4095, 1, 0);
+	/* Auto/manual exposure */
+	ctrls->auto_exp = v4l2_ctrl_new_std_menu(hdl, ops,
+						 V4L2_CID_EXPOSURE_AUTO,
+						 V4L2_EXPOSURE_MANUAL, 0,
+						 V4L2_EXPOSURE_AUTO);
+	ctrls->exposure = v4l2_ctrl_new_std(hdl, ops, V4L2_CID_EXPOSURE,
+					    0, 65535, 1, 0);
+	/* Auto/manual gain */
+	ctrls->auto_gain = v4l2_ctrl_new_std(hdl, ops, V4L2_CID_AUTOGAIN,
+					     0, 1, 1, 1);
+	ctrls->gain = v4l2_ctrl_new_std(hdl, ops, V4L2_CID_GAIN, 0, 1023, 1, 0);
 
-    ctrls->saturation = v4l2_ctrl_new_std(hdl, ops, V4L2_CID_SATURATION,
-                                          0, 255, 1, 64);
-    ctrls->hue = v4l2_ctrl_new_std(hdl, ops, V4L2_CID_HUE,
-                                   0, 359, 1, 0);
-    ctrls->contrast = v4l2_ctrl_new_std(hdl, ops, V4L2_CID_CONTRAST,
-                                        0, 255, 1, 0);
-    ctrls->test_pattern =
-        v4l2_ctrl_new_std_menu_items(hdl, ops, V4L2_CID_TEST_PATTERN,
-                                     ARRAY_SIZE(test_pattern_menu) - 1,
-                                     0, 0, test_pattern_menu);
-    ctrls->hflip = v4l2_ctrl_new_std(hdl, ops, V4L2_CID_HFLIP,
-                                     0, 1, 1, 0);
-    ctrls->vflip = v4l2_ctrl_new_std(hdl, ops, V4L2_CID_VFLIP,
-                                     0, 1, 1, 0);
+	ctrls->saturation = v4l2_ctrl_new_std(hdl, ops, V4L2_CID_SATURATION,
+					      0, 255, 1, 64);
+	ctrls->hue = v4l2_ctrl_new_std(hdl, ops, V4L2_CID_HUE, 0, 359, 1, 0);
+	ctrls->contrast = v4l2_ctrl_new_std(hdl, ops, V4L2_CID_CONTRAST,
+					    0, 255, 1, 0);
+	ctrls->test_pattern =
+	    v4l2_ctrl_new_std_menu_items(hdl, ops, V4L2_CID_TEST_PATTERN,
+					 ARRAY_SIZE(test_pattern_menu) - 1,
+					 0, 0, test_pattern_menu);
+	ctrls->hflip = v4l2_ctrl_new_std(hdl, ops, V4L2_CID_HFLIP, 0, 1, 1, 0);
+	ctrls->vflip = v4l2_ctrl_new_std(hdl, ops, V4L2_CID_VFLIP, 0, 1, 1, 0);
 
-    ctrls->light_freq =
-        v4l2_ctrl_new_std_menu(hdl, ops,
-                               V4L2_CID_POWER_LINE_FREQUENCY,
-                               V4L2_CID_POWER_LINE_FREQUENCY_AUTO, 0,
-                               V4L2_CID_POWER_LINE_FREQUENCY_50HZ);
+	ctrls->light_freq =
+	    v4l2_ctrl_new_std_menu(hdl, ops,
+				   V4L2_CID_POWER_LINE_FREQUENCY,
+				   V4L2_CID_POWER_LINE_FREQUENCY_AUTO, 0,
+				   V4L2_CID_POWER_LINE_FREQUENCY_50HZ);
 
-    if (hdl->error) {
-        ret = hdl->error;
-        goto free_ctrls;
-    }
+	if (hdl->error) {
+		ret = hdl->error;
+		goto free_ctrls;
+	}
 
-    ctrls->gain->flags |= V4L2_CTRL_FLAG_VOLATILE;
-    ctrls->exposure->flags |= V4L2_CTRL_FLAG_VOLATILE;
+	ctrls->gain->flags |= V4L2_CTRL_FLAG_VOLATILE;
+	ctrls->exposure->flags |= V4L2_CTRL_FLAG_VOLATILE;
 
-    v4l2_ctrl_auto_cluster(3, &ctrls->auto_wb, 0, false);
-    v4l2_ctrl_auto_cluster(2, &ctrls->auto_gain, 0, true);
-    v4l2_ctrl_auto_cluster(2, &ctrls->auto_exp, 1, true);
+	v4l2_ctrl_auto_cluster(3, &ctrls->auto_wb, 0, false);
+	v4l2_ctrl_auto_cluster(2, &ctrls->auto_gain, 0, true);
+	v4l2_ctrl_auto_cluster(2, &ctrls->auto_exp, 1, true);
 
-    sensor->sd.ctrl_handler = hdl;
-    return 0;
+	sensor->sd.ctrl_handler = hdl;
+	return 0;
 
-free_ctrls:
-    v4l2_ctrl_handler_free(hdl);
-    return ret;
+ free_ctrls:
+	v4l2_ctrl_handler_free(hdl);
+	return ret;
 }
-
 
 static void max9286_power(struct max9286_dev *sensor, bool enable)
 {
-    gpiod_direction_output(sensor->pwdn_gpio, enable ? 1 : 0);
-    msleep(1);
+	gpiod_direction_output(sensor->pwdn_gpio, enable ? 1 : 0);
+	msleep(1);
 }
 
 static int max9286_check_chip_id(struct max9286_dev *sensor)
 {
-    struct i2c_client *client = sensor->i2c_client;
-    int ret = 0;
-    u8 chip_id = 0;
+	struct i2c_client *client = sensor->i2c_client;
+	int ret = 0;
+	u8 chip_id = 0;
 
-    //max9286_power(sensor, 1);
+	//max9286_power(sensor, 1);
 
-    ret = max9286_read_reg(sensor, 0x1e, &chip_id);
+	ret = max9286_read_reg(sensor, 0x1e, &chip_id);
 
-    if (ret) {
-        dev_err(&client->dev, "%s: failed to read chip identifier\n",
-                __func__);
-        //goto power_off;
-    }
+	if (ret) {
+		dev_err(&client->dev, "%s: failed to read chip identifier\n",
+			__func__);
+		//goto power_off;
+	}
 
-    if (chip_id != MAX9286_DEVICE_ID) {
-        dev_err(&client->dev,
-                "%s: wrong chip identifier, expected 0x%x(max9286), got 0x%x\n",
-                __func__, MAX9286_DEVICE_ID, chip_id);
-        ret = -ENXIO;
-    }
-
+	if (chip_id != MAX9286_DEVICE_ID) {
+		dev_err(&client->dev,
+			"%s: wrong chip identifier, expected 0x%x(max9286), got 0x%x\n",
+			__func__, MAX9286_DEVICE_ID, chip_id);
+		ret = -ENXIO;
+	}
 //power_off:
 //  max9286_power(sensor, 0);
 
-    return ret;
+	return ret;
 }
-
 
 static int max9286_initialization(struct max9286_dev *sensor)
 {
-    struct i2c_client *client = sensor->i2c_client;
-    int ret = 0;
-    u8 val;
-    u8 link_status = 0, link_count = 0;
-    int i = 0;
+	struct i2c_client *client = sensor->i2c_client;
+	int ret = 0;
+	u8 val;
+	u8 link_status = 0, link_count = 0;
+	int i = 0;
 #if 0
-    struct gpio_desc *gpiod;
+	struct gpio_desc *gpiod;
 
+	gpiod = devm_gpiod_get_optional(&client->dev, "pwdn", GPIOD_IN);
 
-    gpiod = devm_gpiod_get_optional(&client->dev, "pwdn", GPIOD_IN);
+	if (IS_ERR(gpiod)) {
+		ret = PTR_ERR(gpiod);
 
-    if (IS_ERR(gpiod)) {
-        ret = PTR_ERR(gpiod);
+		if (ret != -EPROBE_DEFER)
+			dev_err(&client->dev, "Failed to get %s GPIO: %d\n",
+				"pwdn", ret);
 
-        if (ret != -EPROBE_DEFER)
-            dev_err(&client->dev, "Failed to get %s GPIO: %d\n",
-                    "pwdn", ret);
+		return ret;
+	}
 
-        return ret;
-    }
-
-    gpiod_direction_output(gpiod, 1);
-    msleep(1);
+	gpiod_direction_output(gpiod, 1);
+	msleep(1);
 #endif
 
+	//csienable=0
+	max9286_write_reg(sensor, 0x15, 0x13);
+	msleep(10);
 
-    //csienable=0
-    max9286_write_reg(sensor, 0x15, 0x13);
-    msleep(10);
+	//him enable
+	max9286_write_reg(sensor, 0x1c, 0xf4);
+	msleep(10);
 
-    //him enable
-    max9286_write_reg(sensor, 0x1c, 0xf4);
-    msleep(10);
+	//yuv10 to yuv8
+	//enable dbl
+	max9286_write_reg(sensor, 0x12, 0xf3);
+	msleep(10);
 
-    //yuv10 to yuv8
-    //enable dbl
-    max9286_write_reg(sensor, 0x12, 0xf3);
-    msleep(10);
+	max9286_write_reg(sensor, 0x0c, 0x91);
+	msleep(10);
 
-    max9286_write_reg(sensor, 0x0c, 0x91);
-    msleep(10);
-
-    //fs, manual pclk
-    max9286_write_reg(sensor, 0x06, 0x00);
-    max9286_write_reg(sensor, 0x07, 0xf2);
-    max9286_write_reg(sensor, 0x08, 0x2b);
-    msleep(10);
+	//fs, manual pclk
+	max9286_write_reg(sensor, 0x06, 0x00);
+	max9286_write_reg(sensor, 0x07, 0xf2);
+	max9286_write_reg(sensor, 0x08, 0x2b);
+	msleep(10);
 
 #if 0
-    max9286_read_reg(sensor, 0x49, &val);
-    link_status = val & 0xf;
-    dev_err(&client->dev, "link_status=0x%x\n", link_status);
+	max9286_read_reg(sensor, 0x49, &val);
+	link_status = val & 0xf;
+	dev_err(&client->dev, "link_status=0x%x\n", link_status);
 #else
 
-    for (i = 0; i < 100; i++) {
-        val = 0;
-        max9286_read_reg(sensor, 0x49, &val);
+	for (i = 0; i < 100; i++) {
+		val = 0;
+		max9286_read_reg(sensor, 0x49, &val);
 
-        if ((val & 0x0f) == 0x0f)
-            break;
-        else
-            msleep(10);
-    }
+		if ((val & 0x0f) == 0x0f)
+			break;
+		else
+			msleep(10);
+	}
 
-    link_status = val & 0xf;
-    dev_err(&client->dev, "link_status=0x%x, i=%d\n", link_status, i);
+	link_status = val & 0xf;
+	dev_err(&client->dev, "link_status=0x%x, i=%d\n", link_status, i);
 #endif
-    max9286_write_reg(sensor, 0x0, (0xe0 | link_status));
-    msleep(10);
+	max9286_write_reg(sensor, 0x0, (0xe0 | link_status));
+	msleep(10);
 
-    //internal fs, debug for output
-    max9286_write_reg(sensor, 0x1, 0x40);
-    msleep(10);
+	//internal fs, debug for output
+	max9286_write_reg(sensor, 0x1, 0x40);
+	msleep(10);
 
-    //63, 64 for csi data output
-    max9286_write_reg(sensor, 0x63, 0x0);
-    msleep(10);
-    max9286_write_reg(sensor, 0x64, 0x0);
-    msleep(10);
+	//63, 64 for csi data output
+	max9286_write_reg(sensor, 0x63, 0x0);
+	msleep(10);
+	max9286_write_reg(sensor, 0x64, 0x0);
+	msleep(10);
 
-    //auto mask
-    max9286_write_reg(sensor, 0x69, 0x30);
-    msleep(10);
+	//auto mask
+	max9286_write_reg(sensor, 0x69, 0x30);
+	msleep(10);
 
-    max9286_write_reg(sensor, 0x19, 0x80);
-    msleep(10);
+	max9286_write_reg(sensor, 0x19, 0x80);
+	msleep(10);
 
-    val = 0;
+	val = 0;
 
-    for (i = 0; i < MAX_SENSOR_NUM; i++) {
+	for (i = 0; i < MAX_SENSOR_NUM; i++) {
 
-        if (((1 << i) & link_status) == 0)
-            continue;
+		if (((1 << i) & link_status) == 0)
+			continue;
 
-        link_count++;
-        //Enable Link control channel
-        val |= (0x11 << i);
-        //sensor->i2c_client->addr = sensor->addr_9286;
-        max9286_write_reg(sensor, 0x0A, val);
-        msleep(10);
+		link_count++;
+		//Enable Link control channel
+		val |= (0x11 << i);
+		//sensor->i2c_client->addr = sensor->addr_9286;
+		max9286_write_reg(sensor, 0x0A, val);
+		msleep(10);
 
-        dev_err(&client->dev, "reg=0x%x, aid=0x%x\n", val,
-                (MAX96705_SLAVE_ID + MAX96705_DEV_INDEX + sensor->sec_9286_shift + i));
-        //Set MAX9271 new address for link 0
-        //sensor->i2c_client->addr = sensor->addr_96705;
+		dev_err(&client->dev, "reg=0x%x, aid=0x%x\n", val,
+			(MAX96705_SLAVE_ID + MAX96705_DEV_INDEX +
+			 sensor->sec_9286_shift + i));
+		//Set MAX9271 new address for link 0
+		//sensor->i2c_client->addr = sensor->addr_96705;
 
+		max96705_write_reg(sensor, 0, 0x00,
+				   (MAX96705_SLAVE_ID + MAX96705_DEV_INDEX +
+				    sensor->sec_9286_shift + i) << 1);
+		msleep(10);
 
-        max96705_write_reg(sensor, 0, 0x00,
-                           (MAX96705_SLAVE_ID + MAX96705_DEV_INDEX + sensor->sec_9286_shift + i) <<
-                           1);
-        msleep(10);
+		//enable dbl, hven
+		max96705_write_reg(sensor,
+				   MAX96705_DEV_INDEX + sensor->sec_9286_shift +
+				   i, 0x7, 0x84);
+		msleep(10);
 
-        //enable dbl, hven
-        max96705_write_reg(sensor, MAX96705_DEV_INDEX + sensor->sec_9286_shift + i,
-                           0x7, 0x84);
-        msleep(10);
+		//vs delay
+		max96705_write_reg(sensor,
+				   MAX96705_DEV_INDEX + sensor->sec_9286_shift +
+				   i, 0x43, 0x25);
+		msleep(10);
+		max96705_write_reg(sensor,
+				   MAX96705_DEV_INDEX + sensor->sec_9286_shift +
+				   i, 0x45, 0x01);
+		msleep(10);
+		max96705_write_reg(sensor,
+				   MAX96705_DEV_INDEX + sensor->sec_9286_shift +
+				   i, 0x47, 0x26);
+		msleep(10);
 
+		//max96705_write_reg(sensor, i, 0x4d, 0xcc);
 
-        //vs delay
-        max96705_write_reg(sensor, MAX96705_DEV_INDEX + sensor->sec_9286_shift + i,
-                           0x43, 0x25);
-        msleep(10);
-        max96705_write_reg(sensor, MAX96705_DEV_INDEX + sensor->sec_9286_shift + i,
-                           0x45, 0x01);
-        msleep(10);
-        max96705_write_reg(sensor, MAX96705_DEV_INDEX + sensor->sec_9286_shift + i,
-                           0x47, 0x26);
-        msleep(10);
+		max96705_write_reg(sensor,
+				   MAX96705_DEV_INDEX + sensor->sec_9286_shift +
+				   i, 0x20, 0x07);
+		max96705_write_reg(sensor,
+				   MAX96705_DEV_INDEX + sensor->sec_9286_shift +
+				   i, 0x21, 0x06);
+		max96705_write_reg(sensor,
+				   MAX96705_DEV_INDEX + sensor->sec_9286_shift +
+				   i, 0x22, 0x05);
+		max96705_write_reg(sensor,
+				   MAX96705_DEV_INDEX + sensor->sec_9286_shift +
+				   i, 0x23, 0x04);
+		max96705_write_reg(sensor,
+				   MAX96705_DEV_INDEX + sensor->sec_9286_shift +
+				   i, 0x24, 0x03);
+		max96705_write_reg(sensor,
+				   MAX96705_DEV_INDEX + sensor->sec_9286_shift +
+				   i, 0x25, 0x02);
+		max96705_write_reg(sensor,
+				   MAX96705_DEV_INDEX + sensor->sec_9286_shift +
+				   i, 0x26, 0x01);
+		max96705_write_reg(sensor,
+				   MAX96705_DEV_INDEX + sensor->sec_9286_shift +
+				   i, 0x27, 0x00);
+		msleep(10);
 
-        //max96705_write_reg(sensor, i, 0x4d, 0xcc);
+		max96705_write_reg(sensor,
+				   MAX96705_DEV_INDEX + sensor->sec_9286_shift +
+				   i, 0x30, 0x17);
+		max96705_write_reg(sensor,
+				   MAX96705_DEV_INDEX + sensor->sec_9286_shift +
+				   i, 0x31, 0x16);
+		max96705_write_reg(sensor,
+				   MAX96705_DEV_INDEX + sensor->sec_9286_shift +
+				   i, 0x32, 0x15);
+		max96705_write_reg(sensor,
+				   MAX96705_DEV_INDEX + sensor->sec_9286_shift +
+				   i, 0x33, 0x14);
+		max96705_write_reg(sensor,
+				   MAX96705_DEV_INDEX + sensor->sec_9286_shift +
+				   i, 0x34, 0x13);
+		max96705_write_reg(sensor,
+				   MAX96705_DEV_INDEX + sensor->sec_9286_shift +
+				   i, 0x35, 0x12);
+		max96705_write_reg(sensor,
+				   MAX96705_DEV_INDEX + sensor->sec_9286_shift +
+				   i, 0x36, 0x11);
+		max96705_write_reg(sensor,
+				   MAX96705_DEV_INDEX + sensor->sec_9286_shift +
+				   i, 0x37, 0x10);
+		msleep(10);
 
-        max96705_write_reg(sensor, MAX96705_DEV_INDEX + sensor->sec_9286_shift + i,
-                           0x20, 0x07);
-        max96705_write_reg(sensor, MAX96705_DEV_INDEX + sensor->sec_9286_shift + i,
-                           0x21, 0x06);
-        max96705_write_reg(sensor, MAX96705_DEV_INDEX + sensor->sec_9286_shift + i,
-                           0x22, 0x05);
-        max96705_write_reg(sensor, MAX96705_DEV_INDEX + sensor->sec_9286_shift + i,
-                           0x23, 0x04);
-        max96705_write_reg(sensor, MAX96705_DEV_INDEX + sensor->sec_9286_shift + i,
-                           0x24, 0x03);
-        max96705_write_reg(sensor, MAX96705_DEV_INDEX + sensor->sec_9286_shift + i,
-                           0x25, 0x02);
-        max96705_write_reg(sensor, MAX96705_DEV_INDEX + sensor->sec_9286_shift + i,
-                           0x26, 0x01);
-        max96705_write_reg(sensor, MAX96705_DEV_INDEX + sensor->sec_9286_shift + i,
-                           0x27, 0x00);
-        msleep(10);
+		max96705_write_reg(sensor,
+				   MAX96705_DEV_INDEX + sensor->sec_9286_shift +
+				   i, 0x9,
+				   (AP0101_SLAVE_ID + AP0101_DEV_INDEX +
+				    sensor->sec_9286_shift + i) << 1);
+		max96705_write_reg(sensor,
+				   MAX96705_DEV_INDEX + sensor->sec_9286_shift +
+				   i, 0xa, AP0101_SLAVE_ID << 1);
+		msleep(10);
+	}
 
-        max96705_write_reg(sensor, MAX96705_DEV_INDEX + sensor->sec_9286_shift + i,
-                           0x30, 0x17);
-        max96705_write_reg(sensor, MAX96705_DEV_INDEX + sensor->sec_9286_shift + i,
-                           0x31, 0x16);
-        max96705_write_reg(sensor, MAX96705_DEV_INDEX + sensor->sec_9286_shift + i,
-                           0x32, 0x15);
-        max96705_write_reg(sensor, MAX96705_DEV_INDEX + sensor->sec_9286_shift + i,
-                           0x33, 0x14);
-        max96705_write_reg(sensor, MAX96705_DEV_INDEX + sensor->sec_9286_shift + i,
-                           0x34, 0x13);
-        max96705_write_reg(sensor, MAX96705_DEV_INDEX + sensor->sec_9286_shift + i,
-                           0x35, 0x12);
-        max96705_write_reg(sensor, MAX96705_DEV_INDEX + sensor->sec_9286_shift + i,
-                           0x36, 0x11);
-        max96705_write_reg(sensor, MAX96705_DEV_INDEX + sensor->sec_9286_shift + i,
-                           0x37, 0x10);
-        msleep(10);
-
-        max96705_write_reg(sensor, MAX96705_DEV_INDEX + sensor->sec_9286_shift + i,
-                           0x9, (AP0101_SLAVE_ID + AP0101_DEV_INDEX + sensor->sec_9286_shift + i) <<
-                           1);
-        max96705_write_reg(sensor, MAX96705_DEV_INDEX + sensor->sec_9286_shift + i,
-                           0xa, AP0101_SLAVE_ID << 1);
-        msleep(10);
-    }
-
-    sensor->link_count = link_count;
-    return 0;
+	sensor->link_count = link_count;
+	return 0;
 }
 
 static int max9286_probe(struct i2c_client *client,
-                         const struct i2c_device_id *id)
+			 const struct i2c_device_id *id)
 {
-    struct device *dev = &client->dev;
-    struct fwnode_handle *endpoint;
-    struct max9286_dev *sensor;
-    struct v4l2_mbus_framefmt *fmt;
-    u32 rotation;
-    u32 sec_9286;
-    int ret;
-    struct gpio_desc *gpiod;
+	struct device *dev = &client->dev;
+	struct fwnode_handle *endpoint;
+	struct max9286_dev *sensor;
+	struct v4l2_mbus_framefmt *fmt;
+	u32 rotation;
+	u32 sec_9286;
+	u32 sync;
+	int ret;
+	struct gpio_desc *gpiod;
 
-    sensor = devm_kzalloc(dev, sizeof(*sensor), GFP_KERNEL);
+	sensor = devm_kzalloc(dev, sizeof(*sensor), GFP_KERNEL);
 
-    if (!sensor)
-        return -ENOMEM;
+	if (!sensor)
+		return -ENOMEM;
 
-    sensor->i2c_client = client;
+	sensor->i2c_client = client;
 
-    sensor->addr_9286 = client->addr;
-    sensor->addr_96705 = 0x40;
+	sensor->addr_9286 = client->addr;
+	sensor->addr_96705 = 0x40;
 
+	/*
+	 * default init sequence initialize sensor to
+	 * YUV422 UYVY VGA@30fps
+	 */
+	fmt = &sensor->fmt;
+	fmt->code = MEDIA_BUS_FMT_UYVY8_2X8;
+	//fmt->code = MEDIA_BUS_FMT_RGB565_2X8_LE;
+	fmt->colorspace = V4L2_COLORSPACE_SRGB;
+	fmt->ycbcr_enc = V4L2_MAP_YCBCR_ENC_DEFAULT(fmt->colorspace);
+	fmt->quantization = V4L2_QUANTIZATION_FULL_RANGE;
+	fmt->xfer_func = V4L2_MAP_XFER_FUNC_DEFAULT(fmt->colorspace);
+	fmt->width = 640;
+	fmt->height = 480;
+	fmt->field = V4L2_FIELD_NONE;
+	sensor->frame_interval.numerator = 1;
 
-    /*
-     * default init sequence initialize sensor to
-     * YUV422 UYVY VGA@30fps
-     */
-    fmt = &sensor->fmt;
-    fmt->code = MEDIA_BUS_FMT_UYVY8_2X8;
-    //fmt->code = MEDIA_BUS_FMT_RGB565_2X8_LE;
-    fmt->colorspace = V4L2_COLORSPACE_SRGB;
-    fmt->ycbcr_enc = V4L2_MAP_YCBCR_ENC_DEFAULT(fmt->colorspace);
-    fmt->quantization = V4L2_QUANTIZATION_FULL_RANGE;
-    fmt->xfer_func = V4L2_MAP_XFER_FUNC_DEFAULT(fmt->colorspace);
-    fmt->width = 640;
-    fmt->height = 480;
-    fmt->field = V4L2_FIELD_NONE;
-    sensor->frame_interval.numerator = 1;
-
-
-    sensor->frame_interval.denominator = max9286_framerates[MAX9286_25_FPS];
-    sensor->current_fr = MAX9286_25_FPS;
-    sensor->current_mode =
-        &max9286_mode_data[MAX9286_25_FPS][MAX9286_MODE_720P_1280_720];
+	sensor->frame_interval.denominator = max9286_framerates[MAX9286_25_FPS];
+	sensor->current_fr = MAX9286_25_FPS;
+	sensor->current_mode =
+	    &max9286_mode_data[MAX9286_25_FPS][MAX9286_MODE_720P_1280_720];
 
 //  sensor->last_mode = sensor->current_mode;
 
-    sensor->ae_target = 52;
+	sensor->ae_target = 52;
 
-    /* optional indication of physical rotation of sensor */
-    ret = fwnode_property_read_u32(dev_fwnode(&client->dev), "rotation",
-                                   &rotation);
+	ret = fwnode_property_read_u32(dev_fwnode(&client->dev), "sync", &sync);
+	dev_err(&client->dev, "sync: %d, ret=%d\n", sync, ret);
 
-    if (!ret) {
-        switch (rotation) {
-            case 180:
-                sensor->upside_down = true;
+	if (ret < 0) {
+		sync = 0;
+	}
 
-            /* fall through */
-            case 0:
-                break;
+	sensor->sync = sync;
 
-            default:
-                dev_warn(dev, "%u degrees rotation is not supported, ignoring...\n",
-                         rotation);
-        }
-    }
+	/* optional indication of physical rotation of sensor */
+	ret = fwnode_property_read_u32(dev_fwnode(&client->dev), "rotation",
+				       &rotation);
 
-    endpoint = fwnode_graph_get_next_endpoint(dev_fwnode(&client->dev),
-               NULL);
+	if (!ret) {
+		switch (rotation) {
+		case 180:
+			sensor->upside_down = true;
 
-    if (!endpoint) {
-        dev_err(dev, "endpoint node not found\n");
-        return -EINVAL;
-    }
+			/* fall through */
+		case 0:
+			break;
 
-    ret = v4l2_fwnode_endpoint_parse(endpoint, &sensor->ep);
-    fwnode_handle_put(endpoint);
+		default:
+			dev_warn(dev,
+				 "%u degrees rotation is not supported, ignoring...\n",
+				 rotation);
+		}
+	}
 
-    if (ret) {
-        dev_err(dev, "Could not parse endpoint\n");
-        return ret;
-    }
+	endpoint = fwnode_graph_get_next_endpoint(dev_fwnode(&client->dev),
+						  NULL);
 
-    v4l2_i2c_subdev_init(&sensor->sd, client, &max9286_subdev_ops);
+	if (!endpoint) {
+		dev_err(dev, "endpoint node not found\n");
+		return -EINVAL;
+	}
 
-    sensor->sd.flags |= V4L2_SUBDEV_FL_HAS_DEVNODE;
-    sensor->sd.entity.function = MEDIA_ENT_F_CAM_SENSOR;
+	ret = v4l2_fwnode_endpoint_parse(endpoint, &sensor->ep);
+	fwnode_handle_put(endpoint);
+
+	if (ret) {
+		dev_err(dev, "Could not parse endpoint\n");
+		return ret;
+	}
+
+	v4l2_i2c_subdev_init(&sensor->sd, client, &max9286_subdev_ops);
+
+	sensor->sd.flags |= V4L2_SUBDEV_FL_HAS_DEVNODE;
+	sensor->sd.entity.function = MEDIA_ENT_F_CAM_SENSOR;
 #if 1
-    sensor->pads[MIPI_CSI2_SENS_VC0_PAD_SOURCE].flags = MEDIA_PAD_FL_SOURCE;
-    sensor->pads[MIPI_CSI2_SENS_VC1_PAD_SOURCE].flags = MEDIA_PAD_FL_SOURCE;
-    sensor->pads[MIPI_CSI2_SENS_VC2_PAD_SOURCE].flags = MEDIA_PAD_FL_SOURCE;
-    sensor->pads[MIPI_CSI2_SENS_VC3_PAD_SOURCE].flags = MEDIA_PAD_FL_SOURCE;
-    ret = media_entity_pads_init(&sensor->sd.entity,
-                                 MIPI_CSI2_SENS_VCX_PADS_NUM, sensor->pads);
+	sensor->pads[MIPI_CSI2_SENS_VC0_PAD_SOURCE].flags = MEDIA_PAD_FL_SOURCE;
+	sensor->pads[MIPI_CSI2_SENS_VC1_PAD_SOURCE].flags = MEDIA_PAD_FL_SOURCE;
+	sensor->pads[MIPI_CSI2_SENS_VC2_PAD_SOURCE].flags = MEDIA_PAD_FL_SOURCE;
+	sensor->pads[MIPI_CSI2_SENS_VC3_PAD_SOURCE].flags = MEDIA_PAD_FL_SOURCE;
+	ret = media_entity_pads_init(&sensor->sd.entity,
+				     MIPI_CSI2_SENS_VCX_PADS_NUM, sensor->pads);
 #else
-    sensor->pad.flags = MEDIA_PAD_FL_SOURCE;
-    ret = media_entity_pads_init(&sensor->sd.entity, 1, &sensor->pad);
+	sensor->pad.flags = MEDIA_PAD_FL_SOURCE;
+	ret = media_entity_pads_init(&sensor->sd.entity, 1, &sensor->pad);
 #endif
 
-    if (ret)
-        return ret;
+	if (ret)
+		return ret;
 
+	//struct gpio_desc *gpiod;
+	gpiod = devm_gpiod_get_optional(&client->dev, "pwdn", GPIOD_IN);
 
-    //struct gpio_desc *gpiod;
-    gpiod = devm_gpiod_get_optional(&client->dev, "pwdn", GPIOD_IN);
+	if (IS_ERR(gpiod)) {
+		ret = PTR_ERR(gpiod);
 
-    if (IS_ERR(gpiod)) {
-        ret = PTR_ERR(gpiod);
+		if (ret != -EPROBE_DEFER)
+			dev_err(&client->dev, "Failed to get %s GPIO: %d\n",
+				"pwdn", ret);
 
-        if (ret != -EPROBE_DEFER)
-            dev_err(&client->dev, "Failed to get %s GPIO: %d\n",
-                    "pwdn", ret);
+		return ret;
+	}
 
-        return ret;
-    }
+	sensor->pwdn_gpio = gpiod;
+	//gpiod_direction_output(gpiod, 1);
+	//msleep(1);
 
-    sensor->pwdn_gpio = gpiod;
-    //gpiod_direction_output(gpiod, 1);
-    //msleep(1);
+	//struct gpio_desc *gpiod;
+	gpiod = devm_gpiod_get_optional(&client->dev, "vin", GPIOD_IN);
 
+	if (IS_ERR(gpiod)) {
+		ret = PTR_ERR(gpiod);
 
-    //struct gpio_desc *gpiod;
-    gpiod = devm_gpiod_get_optional(&client->dev, "vin", GPIOD_IN);
+		if (ret != -EPROBE_DEFER)
+			dev_err(&client->dev, "Failed to get %s GPIO: %d\n",
+				"vin", ret);
 
-    if (IS_ERR(gpiod)) {
-        ret = PTR_ERR(gpiod);
+		printk("%s: get vin gpio fail\n", __func__);
+		//return ret;
+	} else {
+		gpiod_direction_output(gpiod, 1);
+		msleep(1);
+	}
 
-        if (ret != -EPROBE_DEFER)
-            dev_err(&client->dev, "Failed to get %s GPIO: %d\n",
-                    "vin", ret);
+	ret = fwnode_property_read_u32(dev_fwnode(&client->dev), "sec_9286",
+				       &sec_9286);
+	dev_err(&client->dev, "sec_9286: %d, ret=%d\n", sec_9286, ret);
 
-        printk("%s: get vin gpio fail\n", __func__);
-        //return ret;
-    }
-    else {
-        gpiod_direction_output(gpiod, 1);
-        msleep(1);
-    }
+	if (!ret) {
+		if (sec_9286 == 1)
+			sensor->sec_9286_shift = -4;
+		else
+			sensor->sec_9286_shift = 0;
+	} else {
+		sensor->sec_9286_shift = 0;
+	}
 
-    ret = fwnode_property_read_u32(dev_fwnode(&client->dev), "sec_9286",
-                                   &sec_9286);
-    dev_err(&client->dev, "sec_9286: %d, ret=%d\n", sec_9286, ret);
+	max9286_power(sensor, 1);
+	max9286_check_chip_id(sensor);
 
-    if (!ret) {
-        if (sec_9286 == 1)
-            sensor->sec_9286_shift = -4;
-        else
-            sensor->sec_9286_shift = 0;
-    }
-    else {
-        sensor->sec_9286_shift = 0;
-    }
+	max9286_initialization(sensor);
 
-    max9286_power(sensor, 1);
-    max9286_check_chip_id(sensor);
+	ret = v4l2_async_register_subdev(&sensor->sd);
 
-    max9286_initialization(sensor);
+	if (ret)
+		goto free_ctrls;
 
-    ret = v4l2_async_register_subdev(&sensor->sd);
+	return 0;
 
-    if (ret)
-        goto free_ctrls;
-
-    return 0;
-
-free_ctrls:
+ free_ctrls:
 //  v4l2_ctrl_handler_free(&sensor->ctrls.handler);
-entity_cleanup:
-    mutex_destroy(&sensor->lock);
-    media_entity_cleanup(&sensor->sd.entity);
-    return ret;
+ entity_cleanup:
+	mutex_destroy(&sensor->lock);
+	media_entity_cleanup(&sensor->sd.entity);
+	return ret;
 }
 
 static int max9286_remove(struct i2c_client *client)
 {
-    struct v4l2_subdev *sd = i2c_get_clientdata(client);
-    struct max9286_dev *sensor = to_max9286_dev(sd);
+	struct v4l2_subdev *sd = i2c_get_clientdata(client);
+	struct max9286_dev *sensor = to_max9286_dev(sd);
 
-    v4l2_async_unregister_subdev(&sensor->sd);
-    mutex_destroy(&sensor->lock);
-    media_entity_cleanup(&sensor->sd.entity);
-    v4l2_ctrl_handler_free(&sensor->ctrls.handler);
+	v4l2_async_unregister_subdev(&sensor->sd);
+	mutex_destroy(&sensor->lock);
+	media_entity_cleanup(&sensor->sd.entity);
+	v4l2_ctrl_handler_free(&sensor->ctrls.handler);
 
-    return 0;
+	return 0;
 }
 
 static const struct i2c_device_id max9286_id[] = {
-    {"max9286", 0},
-    {},
+	{"max9286", 0},
+	{},
 };
+
 MODULE_DEVICE_TABLE(i2c, max9286_id);
 
 static const struct of_device_id max9286_dt_ids[] = {
-    { .compatible = "max,max9286" },
-    { /* sentinel */ }
+	{.compatible = "max,max9286"},
+	{ /* sentinel */ }
 };
+
 MODULE_DEVICE_TABLE(of, max9286_dt_ids);
 
 static struct i2c_driver max9286_i2c_driver = {
-    .driver = {
-        .name  = "max9286",
-        .of_match_table = max9286_dt_ids,
-    },
-    .id_table = max9286_id,
-    .probe    = max9286_probe,
-    .remove   = max9286_remove,
+	.driver = {
+		   .name = "max9286",
+		   .of_match_table = max9286_dt_ids,
+		   },
+	.id_table = max9286_id,
+	.probe = max9286_probe,
+	.remove = max9286_remove,
 };
 
 module_i2c_driver(max9286_i2c_driver);
