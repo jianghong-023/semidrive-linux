@@ -1,10 +1,10 @@
 &dtimings0 {
 	native-mode = <&hd1280x720>;
 
-	s640x480: vesa_640x480@60 {
+	s640x600: vesa_640x600@60 {
 		clock-frequency = <22260000>;
 		hactive = <640>;
-		vactive = <480>;
+		vactive = <600>;
 		hback-porch = <20>;
 		hfront-porch = <20>;
 		vback-porch = <20>;
@@ -13,10 +13,10 @@
 		vsync-len = <10>;
 	};
 
-	s1280x480: vesa_1280x480@60 {
+	s1280x600: vesa_1280x600@60 {
 		clock-frequency = <42612000>;
 		hactive = <1280>;
-		vactive = <480>;
+		vactive = <600>;
 		hback-porch = <20>;
 		hfront-porch = <20>;
 		vback-porch = <20>;
@@ -160,10 +160,10 @@
 &dtimings1 {
 	native-mode = <&hd1280x720_1>;
 
-	s640x480_1: vesa_640x480@60 {
+	s640x600_1: vesa_640x600@60 {
 		clock-frequency = <22260000>;
 		hactive = <640>;
-		vactive = <480>;
+		vactive = <600>;
 		hback-porch = <20>;
 		hfront-porch = <20>;
 		vback-porch = <20>;
@@ -172,10 +172,10 @@
 		vsync-len = <10>;
 	};
 
-	s1280x480_1: vesa_1280x480@60 {
+	s1280x600_1: vesa_1280x600@60 {
 		clock-frequency = <42612000>;
 		hactive = <1280>;
-		vactive = <480>;
+		vactive = <600>;
 		hback-porch = <20>;
 		hfront-porch = <20>;
 		vback-porch = <20>;
@@ -184,7 +184,7 @@
 		vsync-len = <10>;
 	};
 
-	svga800x600_1: vesa_800x600@60 {
+        svga800x600_1: vesa_800x600@60 {
 		clock-frequency = <40000000>;
 		hactive = <800>;
 		vactive = <600>;
@@ -319,10 +319,10 @@
 &dtimings2 {
 	native-mode = <&hd1280x720_2>;
 
-	s640x480_2: vesa_640x480@60 {
+	s640x600_2: vesa_640x600@60 {
 		clock-frequency = <22260000>;
 		hactive = <640>;
-		vactive = <480>;
+		vactive = <600>;
 		hback-porch = <20>;
 		hfront-porch = <20>;
 		vback-porch = <20>;
@@ -331,10 +331,10 @@
 		vsync-len = <10>;
 	};
 
-	s1280x480_2: vesa_1280x480@60 {
+	s1280x600_2: vesa_1280x600@60 {
 		clock-frequency = <42612000>;
 		hactive = <1280>;
-		vactive = <480>;
+		vactive = <600>;
 		hback-porch = <20>;
 		hfront-porch = <20>;
 		vback-porch = <20>;
@@ -478,10 +478,10 @@
 &dtimings3 {
 	native-mode = <&hd1280x720_3>;
 
-	s640x480_3: vesa_640x480@60 {
+	s640x600_3: vesa_640x600@60 {
 		clock-frequency = <22260000>;
 		hactive = <640>;
-		vactive = <480>;
+		vactive = <600>;
 		hback-porch = <20>;
 		hfront-porch = <20>;
 		vback-porch = <20>;
@@ -490,10 +490,10 @@
 		vsync-len = <10>;
 	};
 
-	s1280x480_3: vesa_1280x480@60 {
+	s1280x600_3: vesa_1280x600@60 {
 		clock-frequency = <42612000>;
 		hactive = <1280>;
-		vactive = <480>;
+		vactive = <600>;
 		hback-porch = <20>;
 		hfront-porch = <20>;
 		vback-porch = <20>;
