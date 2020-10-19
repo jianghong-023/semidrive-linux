@@ -49,6 +49,7 @@ struct tas5404_data {
 	struct gpio_desc *standby_gpio;
 	struct gpio_desc *mute_gpio;
 	bool HIZ_flag;
+	ktime_t unmute_start;
 };
 
 /*
@@ -87,7 +88,6 @@ static int tas5404_mute(struct snd_soc_dai *dai, int mute)
 {
 	struct snd_soc_component *component = dai->component;
 	struct tas5404_data *tas5404 = snd_soc_component_get_drvdata(component);
-	unsigned int val;
 	int ret;
 
 	dev_prt(component->dev, "%s() mute=%d\n", __func__, mute);
@@ -148,7 +148,6 @@ static int tas5404_power_on(struct snd_soc_codec *codec)
 {
 	struct tas5404_data *tas5404 = snd_soc_codec_get_drvdata(codec);
 	int ret;
-	u8 chan_states;
 
 	unsigned int reg_val;
 	dev_prt(codec->dev, "%s \n",__func__);
@@ -182,10 +181,10 @@ static int tas5404_power_on(struct snd_soc_codec *codec)
 	if (ret < 0){
 		dev_err(codec->dev, "Cannot un-mute channels TAS5404_CTRL5: %d\n", ret);
 	}
-	/* chan_states = TAS5404_ALL_STATE_PLAY; */
-
+	tas5404->unmute_start = ktime_get();
+	dev_dbg(codec->dev, "tas5404 --set HIZ %lli\n", tas5404->unmute_start);
+	mdelay(20);
 	tas5404->HIZ_flag = true;
-
 	schedule_delayed_work(&tas5404->fault_check_work,
 				      msecs_to_jiffies(TAS5404_FAULT_CHECK_INTERVAL));
 	/* any time we come out of HIZ, the output channels automatically run DC
@@ -260,13 +259,20 @@ static void tas5404_fault_check_work(struct work_struct *work)
 	int ret;
 	if(tas5404->HIZ_flag == true){
 		/* Unmute channels after delay*/
- 		ret = regmap_update_bits(tas5404->regmap, TAS5404_CTRL5,
+		ktime_t diff = ktime_sub(ktime_get(), tas5404->unmute_start);
+		dev_dbg(dev, "tas5404 --clear HIZ diff %lli\n", ktime_to_ms(diff));
+		if (ktime_to_ms(diff) < TAS5404_FAULT_CHECK_INTERVAL) {
+			goto out;
+		}
+
+		ret = regmap_update_bits(tas5404->regmap, TAS5404_CTRL5,
 				 TAS5404_CTRL5_ALL_CH_BIT,
 				 0x0 << TAS5404_CTRL5_UNMUTE_CH1);
 		if (ret < 0){
 			dev_err(dev, "Cannot un-mute channels TAS5404_CTRL5: %d\n", ret);
 		}
 		tas5404->HIZ_flag = false;
+
 	}
 	ret = regmap_read(tas5404->regmap, TAS5404_FAULT_REG1, &reg);
 	if (ret < 0) {
@@ -514,7 +520,7 @@ static int tas5404_i2c_probe(struct i2c_client *client,
 	tas5404->regmap = devm_regmap_init_i2c(client, &tas5404_regmap_config);
 	if (IS_ERR(tas5404->regmap)) {
 		ret = PTR_ERR(tas5404->regmap);
-		dev_err(dev, "unable to allocate register map: %d\n", ret);
+		dev_dbg(dev, "unable to allocate register map: %d\n", ret);
 		return ret;
 	}
 
