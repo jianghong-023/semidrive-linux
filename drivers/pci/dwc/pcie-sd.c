@@ -191,7 +191,7 @@ static int pcie_rstgen_reset(struct device *device)
 	pcie_rst = devm_reset_control_get(device, "pcie-reset");
 	if (IS_ERR(pcie_rst)) {
 		dev_err(device, "Missing controller reset\n");
-		return -1;
+		return 0;
 	}
 
 	status = reset_control_status(pcie_rst);
@@ -205,8 +205,6 @@ static int pcie_rstgen_reset(struct device *device)
 
 	status = reset_control_status(pcie_rst);
 	dev_info(device, "After reset, PCIe rstgen status is %d\n", status);
-
-	reset_control_put(pcie_rst);
 
 	return 0;
 }
