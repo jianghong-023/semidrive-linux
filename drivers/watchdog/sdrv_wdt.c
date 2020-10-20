@@ -150,9 +150,6 @@ static int sdrv_wdt_start(struct watchdog_device *wdd)
 
 	unsigned int timeout = wdd->timeout;
 
-	if (sdrv_wdt_is_running(sdrv_wdt))
-		return 0;
-
 	/* set wdg_en_src in wdg_ctrl to 0x0 and clear wdg en src to 0x0 */
 	writel(0, wdt_ctl);
 
@@ -333,7 +330,8 @@ static struct watchdog_device sdrv_wtd_wdd = {
 static int sdrv_wdt_is_running(struct sdrv_wdt_priv *sdrv_wdt)
 {
 	void __iomem *wdt_ctl = sdrv_wdt->iobase;
-	return !!(readl(wdt_ctl) & WDG_CTRL_WDG_EN_STA_MASK);
+	return !!((readl(wdt_ctl) & WDG_CTRL_WDG_EN_STA_MASK)
+			&& (readl(wdt_ctl + 0x4) != readl(wdt_ctl + 0x1c)));
 }
 
 void sdrv_restart(enum reboot_mode reboot_mode, const char *cmd)
