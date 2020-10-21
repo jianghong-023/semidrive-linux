@@ -204,12 +204,7 @@ static void sts_coor_updated(struct mbox_client *client, void *mssg)
 		return;
 	}
 
-	if (xen_domain()) {
-		/* We are in dom0, call work to trigger frontend */
-		schedule_work(&ts->rx_work);
-	} else {
-		semidrive_process_events(ts, msghdr->data);
-	}
+	semidrive_process_events(ts, msghdr->data);
 
 	return;
 }
