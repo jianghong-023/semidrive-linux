@@ -21,100 +21,10 @@
 #include <linux/module.h>
 #include <linux/platform_device.h>
 #include <linux/pm_runtime.h>
-#include <linux/mailbox_controller.h>
+#include <linux/mailbox/semidrive-mailbox.h>
 #include <linux/soc/semidrive/mb_msg.h>
 #include "mb_regs.h"
 
-#define MB_MAX_RPROC		(8)
-#define MB_MAX_CHANS		(8)
-#define MB_MAX_NAMES		(16)
-#define MB_MAX_MSGS		(4)
-#define MB_BUF_LEN		(4096)
-#define MB_BANK_LEN		(MB_BUF_LEN/MB_MAX_MSGS)
-
-#define MB_MSG_REGs_PER_MSG     (3U)
-#define MB_MSG_REGs_PER_CPU     (MB_MSG_REGs_PER_MSG * 4)
-#define MB_MSGID_INVALID        (0xff)
-#define MB_ADDR_ANY             (0xdeadceefU)
-#define MB_TMH_RESET_VAL        0x02U
-
-#define MU_MASTERID_OFF         0x500U
-#define MU_TX_BUF_BASE          0x1000U
-#define MU_TX_BUF_SIZE          0x1000U
-#define MU_RX_BUF_BASE          0x2000U
-#define MU_RX_BUF_SIZE          MU_TX_BUF_SIZE
-#define MU_RX_BUF_OFF(cpu)      (MU_RX_BUF_SIZE * (cpu))
-
-#define CONFIG_MBOX_DUMP_HEX	(0)
-
-enum master_id {
-	MASTER_SAF_PLATFORM	= 0,
-	MASTER_SEC_PLATFORM	= 1,
-	MASTER_MP_PLATFORM	= 2,
-	MASTER_AP1			= 3,
-	MASTER_AP2			= 4,
-	MASTER_VDSP			= 5,
-};
-
-struct sd_mbox_tx_msg {
-	bool	used;
-	unsigned msg_id;
-	unsigned length;
-	bool	 use_buffer;
-	unsigned remote;
-	void __iomem *tmh;
-	void __iomem *tmc;
-	void __iomem *tx_buf;
-};
-
-struct sd_mbox_chan {
-	char chan_name[MB_MAX_NAMES];
-	struct sd_mbox_tx_msg *msg;
-	unsigned target;
-	unsigned actual_size;
-	unsigned protocol;
-	bool priority;
-	bool is_run;
-	void __iomem *rmh;
-	u32 cl_data;
-	u32 dest_addr;
-};
-
-typedef struct sd_mbox_device {
-	void __iomem *reg_base;
-	void __iomem *txb_base;
-	void __iomem *rxb_base;
-	int curr_cpu;
-	int irq;
-	spinlock_t msg_lock;
-	struct sd_mbox_tx_msg tmsg[MB_MAX_MSGS];
-	struct sd_mbox_chan mlink[MB_MAX_CHANS];
-	struct mbox_chan chan[MB_MAX_CHANS];
-	struct mbox_controller controller;
-	bool initialized;
-} sd_mbox_controller_t;
-
-#define FM_TMH0_MDP	(0xffU << 16U)
-#define FV_TMH0_MDP(v) \
-	(((v) << 16U) & FM_TMH0_MDP)
-
-#define FM_TMH0_TXMES_LEN	(0x7ffU << 0U)
-#define FV_TMH0_TXMES_LEN(v) \
-	(((v) << 0U) & FM_TMH0_TXMES_LEN)
-
-#define FM_TMH0_MID	(0xffU << 24U)
-#define FV_TMH0_MID(v) \
-	(((v) << 24U) & FM_TMH0_MID)
-
-#define BM_TMH0_TXUSE_MB	(0x01U << 11U)
-
-#define FM_TMH0_MBM	(0xfU << 12U)
-#define FV_TMH0_MBM(v) \
-	(((v) << 12U) & FM_TMH0_MBM)
-
-#ifndef addr_t
-typedef void __iomem * addr_t;
-#endif
 
 static inline u32 mu_get_rx_msg_len(struct sd_mbox_device *mu,
                                     int remote_proc, int msg_id)
@@ -204,7 +114,7 @@ static int sd_mu_fill_tmh(struct sd_mbox_chan *mlink)
 }
 
 /* write message to tx buffer */
-static u32 sd_mu_write_msg(struct sd_mbox_chan *mlink, void *data)
+u32 sd_mu_write_msg(struct sd_mbox_chan *mlink, void *data)
 {
 	struct sd_mbox_tx_msg *msg = mlink->msg;
 
@@ -263,7 +173,7 @@ static void sd_mu_cancel_msg(struct sd_mbox_tx_msg *msg)
 #endif
 }
 
-static void sd_mu_send_msg(struct sd_mbox_tx_msg *msg)
+void sd_mu_send_msg(struct sd_mbox_tx_msg *msg)
 {
 	writel(readl(msg->tmc) | BM_TMC0_TMC0_MSG_SEND, msg->tmc);
 #if CONFIG_MBOX_DUMP_HEX
@@ -272,7 +182,7 @@ static void sd_mu_send_msg(struct sd_mbox_tx_msg *msg)
 #endif
 }
 
-static bool sd_mu_is_msg_sending(struct sd_mbox_tx_msg *msg)
+bool sd_mu_is_msg_sending(struct sd_mbox_tx_msg *msg)
 {
 	return (!!(readl(msg->tmc) & BM_TMC0_TMC0_MSG_SEND));
 }
@@ -313,9 +223,9 @@ static int sd_mbox_send_data(struct mbox_chan *chan, void *data)
 	struct mbox_controller *mbox = chan->mbox;
 	struct sd_mbox_device *mbdev =
 		container_of(mbox, struct sd_mbox_device, controller);
+	unsigned long flags;
 	int prefer_msg;
 	int ret = 0;
-	unsigned long flags;
 
 	spin_lock_irqsave(&mbdev->msg_lock, flags);
 
@@ -324,22 +234,22 @@ static int sd_mbox_send_data(struct mbox_chan *chan, void *data)
 	mlink->protocol = mb_msg_parse_packet_proto(data);
 
 	if (mlink->actual_size > MB_BANK_LEN) {
-		dev_warn(mbox->dev, "msg len %d > expected %d, trim\n",
+		dev_warn(mbdev->dev, "msg len %d > expected %d, trim\n",
 					mlink->actual_size, MB_BANK_LEN);
 		mlink->actual_size = MB_BANK_LEN;
 	}
 	prefer_msg = (MB_MSG_PROTO_ROM == mlink->protocol) ? 1 : 0;
 	if (!mlink->msg) {
-        mlink->msg = sd_mu_alloc_msg(mbdev, prefer_msg, mlink->priority);
+		mlink->msg = sd_mu_alloc_msg(mbdev, prefer_msg, mlink->priority);
 		if (!mlink->msg) {
 			spin_unlock_irqrestore(&mbdev->msg_lock, flags);
-			dev_err(mbox->dev, "No msg available\n");
+			dev_err(mbdev->dev, "No msg available\n");
 			return -EBUSY;
 		}
 		mlink->msg->remote = mlink->target;
 	}
 
-	dev_dbg(mbox->dev, "mu: send_data to rproc: %d proto: %d length: %d msg: %d\n",
+	dev_dbg(mbdev->dev, "mu: send_data to rproc: %d proto: %d length: %d msg: %d\n",
 			mlink->target, mlink->protocol,
 			mlink->actual_size, mlink->msg->msg_id);
 	ret = sd_mu_fill_tmh(mlink);
@@ -350,7 +260,7 @@ static int sd_mbox_send_data(struct mbox_chan *chan, void *data)
 		sd_mu_send_msg(mlink->msg);
 	else {
 		/* if fail the send anyway, free this msg */
-		dev_err(mbox->dev, "mu: sendto rproc%d unexpected ret: %d\n",
+		dev_err(mbdev->dev, "mu: sendto rproc%d unexpected ret: %d\n",
 				mlink->target, ret);
 		sd_mu_free_msg(mbdev, mlink->msg);
 	}
@@ -423,18 +333,19 @@ inline static struct mbox_chan *find_used_chan_atomic(
 				return chan;
 		}
 		dev_info(mbox->dev, "mu: channel addr %d not found\n", dest);
-	} else
-		dev_info(mbox->dev, "mu: invalid addr from rproc%d\n", rproc);
-
-	/* if addr not matched, try to match processor */
-	for (idx = 0;idx < MB_MAX_CHANS; idx++) {
-		chan = &mbdev->chan[idx];
-		mlink = &mbdev->mlink[idx];
-		if (chan->cl && (rproc == mlink->target))
-			return chan;
 	}
 
-	dev_warn(mbox->dev, "mu: channel addr %d not found for rproc %d\n",
+	/* fallback to VDSP, a special case without address */
+	if (rproc == MASTER_VDSP) {
+		/* if addr not matched, try to match processor */
+		for (idx = 0;idx < MB_MAX_CHANS; idx++) {
+			chan = &mbdev->chan[idx];
+			mlink = &mbdev->mlink[idx];
+			if (chan->cl && (rproc == mlink->target))
+				return chan;
+		}
+	}
+	dev_warn(mbox->dev, "channel addr %d not found for rproc %d\n",
 			dest, rproc);
 
     return NULL;
@@ -448,7 +359,7 @@ static irqreturn_t sd_mbox_rx_interrupt(int irq, void *p)
 	unsigned int state, msg_id;
 	u32 remote_proc, mmask;
 	sd_msghdr_t *msg;
-	u32 dest;
+	u32 dest, src;
 	unsigned long flags;
 
 	if (!mbdev) {
@@ -478,6 +389,7 @@ static irqreturn_t sd_mbox_rx_interrupt(int irq, void *p)
 			msg = (sd_msghdr_t *) sd_mu_get_read_ptr(mbdev,
                                         remote_proc, msg_id);
 			dest = mu_get_msg_rmh2(mbdev, remote_proc, msg_id);
+			src = mu_get_msg_rmh1(mbdev, remote_proc, msg_id);
 
 			/* protocol default is callback user
 			 * otherwise is rom code test
@@ -496,6 +408,8 @@ static irqreturn_t sd_mbox_rx_interrupt(int irq, void *p)
 
 			if (chan)
 				mbox_chan_received_data(chan, (void *)msg);
+			else
+				mbox_back_received_data(msg, remote_proc, src, dest);
 
 			sd_mu_ack_msg(mbdev, remote_proc, msg_id);
 		}
@@ -545,6 +459,9 @@ static struct mbox_chan *sd_mbox_of_xlate(struct mbox_controller *mbox,
 		local_addr, remote_link, p->np->name);
 	return ERR_PTR(-ENOENT);
 }
+
+struct sd_mbox_device *g_mbdev;
+EXPORT_SYMBOL(g_mbdev);
 
 static int sd_mbox_probe(struct platform_device *pdev)
 {
@@ -629,7 +546,9 @@ static int sd_mbox_probe(struct platform_device *pdev)
 		dev_err(dev, "Failed to register mailboxes %d\n", err);
 		return err;
 	}
+	mbdev->dev = dev;
 	mbdev->initialized = true;
+	g_mbdev = mbdev;
 
 	dev_info(dev, "Semidrive Mailbox registered\n");
 	return 0;
