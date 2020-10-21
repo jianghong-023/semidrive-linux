@@ -198,7 +198,6 @@ static int pcie_rstgen_reset(struct device *device)
 	dev_info(device, "Before reset, PCIe rstgen status is %d\n", status);
 
 	if (reset_control_reset(pcie_rst)) {
-		reset_control_put(pcie_rst);
 		dev_err(device, "rstgen reset PCIe failed\n");
 		return -1;
 	}
