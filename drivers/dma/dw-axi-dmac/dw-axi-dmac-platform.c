@@ -24,7 +24,6 @@
 #include <linux/types.h>
 #include <linux/of.h>
 #include <linux/of_dma.h>
-
 #include "dw-axi-dmac.h"
 #include "../dmaengine.h"
 #include "../virt-dma.h"
@@ -194,16 +193,75 @@ static inline u32 axi_chan_irq_read(struct axi_dma_chan *chan)
 	return axi_chan_ioread32(chan, CH_INTSTATUS);
 }
 
-static inline void axi_chan_disable(struct axi_dma_chan *chan)
+static inline const char *axi_chan_name(struct axi_dma_chan *chan)
+{
+	return dma_chan_name(&chan->vc.chan);
+}
+
+static inline bool axi_chan_is_hw_enable(struct axi_dma_chan *chan)
 {
 	u32 val;
 
 	val = axi_dma_ioread32(chan->chip, DMAC_CHEN);
+
+	return !!(val & (BIT(chan->id) << DMAC_CHAN_EN_SHIFT));
+}
+
+static inline void axi_chan_disabled_check(struct axi_dma_chan *chan)
+{
+	u32 reg;
+	ktime_t start,diff;
+	start = ktime_get();
+	while (axi_chan_is_hw_enable(chan)) {
+		if ((chan->chip->dw->hdata->dma_abort_enable == true) &&
+		    (chan->direction == DMA_MEM_TO_DEV)) {
+			/*Switch to extra hs port*/
+			axi_dma_mux_iowrite32(chan->chip, DMAC_MUX_EN,
+					      0 << DMAC_MUX_EN_POS);
+			reg = (DMA_MUX_EXTRA_HS_PORT << DMAC_MUX_WR_HDSK_SHIFT);
+			axi_chan_mux_iowrite32(chan, DMAC_CHAN_MUX, reg);
+			axi_dma_mux_iowrite32(chan->chip, DMAC_MUX_EN,
+					      1 << DMAC_MUX_EN_POS);
+
+			/*Switch to extra slave id port*/
+			axi_dma_mux_iowrite32(chan->chip, DMAC_MUX_EN,
+					      0 << DMAC_MUX_EN_POS);
+			reg = (chan->dma_sconfig.slave_id
+			       << DMAC_MUX_WR_HDSK_SHIFT);
+			axi_chan_mux_iowrite32(chan, DMAC_CHAN_MUX, reg);
+			axi_dma_mux_iowrite32(chan->chip, DMAC_MUX_EN,
+					      1 << DMAC_MUX_EN_POS);
+		}else{
+			udelay(10);
+		}
+		diff = ktime_sub(ktime_get(), start);
+		if (ktime_to_ms(diff) > 300) {
+			dev_info(chan2dev(chan),
+				 "%s :BUG is non-idle after disabled "
+				 "and delay 300ms!!!\n",
+				 axi_chan_name(chan));
+			BUG_ON(axi_chan_is_hw_enable(chan));
+			break;
+		}
+	}
+	if (ktime_to_ms(diff) > 10) {
+		dev_info(chan2dev(chan),
+			 "%s :BUG is non-idle after disabled "
+			 "and delay %d ms!\n",
+			 axi_chan_name(chan), ktime_to_ms(diff));
+	}
+}
+
+static inline void axi_chan_disable(
+    struct axi_dma_chan *chan)
+{
+	u32 val;
+	val = axi_dma_ioread32(chan->chip, DMAC_CHEN);
 	val &= ~(BIT(chan->id) << DMAC_CHAN_EN_SHIFT);
 	val |= BIT(chan->id) << DMAC_CHAN_EN_WE_SHIFT;
 	axi_dma_iowrite32(chan->chip, DMAC_CHEN, val);
+	axi_chan_disabled_check(chan);
 }
-
 static inline void axi_chan_enable(struct axi_dma_chan *chan)
 {
 	u32 val;
@@ -215,14 +273,6 @@ static inline void axi_chan_enable(struct axi_dma_chan *chan)
 	axi_dma_iowrite32(chan->chip, DMAC_CHEN, val);
 }
 
-static inline bool axi_chan_is_hw_enable(struct axi_dma_chan *chan)
-{
-	u32 val;
-
-	val = axi_dma_ioread32(chan->chip, DMAC_CHEN);
-
-	return !!(val & (BIT(chan->id) << DMAC_CHAN_EN_SHIFT));
-}
 
 static u32 bytes2block(size_t max_blocks, size_t bytes, unsigned int width,
 		       size_t *len)
@@ -258,10 +308,7 @@ static u32 axi_chan_get_xfer_width(struct axi_dma_chan *chan, dma_addr_t src,
 	return __ffs(src | dst | len | BIT(max_width));
 }
 
-static inline const char *axi_chan_name(struct axi_dma_chan *chan)
-{
-	return dma_chan_name(&chan->vc.chan);
-}
+
 
 static struct axi_dma_desc *axi_desc_get(struct axi_dma_chan *chan)
 {
@@ -1199,6 +1246,16 @@ static int parse_device_properties(struct axi_dma_chip *chip)
 		chip->dw->hdata->axi_rw_burst_len = tmp - 1;
 	}
 
+	if (device_property_read_bool(dev, "sdrv,disabled-abort")) {
+		/*If find node 'sdrv,disabled-abort' for TO1.0 disable dma abort
+		 * function.*/
+		chip->dw->hdata->dma_abort_enable = false;
+	} else if (chip->dw->hdata->dma_mux_enable == false) {
+		/*No mux exist, don't enable abort */
+		chip->dw->hdata->dma_abort_enable = false;
+	} else {
+		chip->dw->hdata->dma_abort_enable = true;
+	}
 	return 0;
 }
 /****
@@ -1818,6 +1875,7 @@ static int dw_probe(struct platform_device *pdev)
 		mux_mem = platform_get_resource(pdev, IORESOURCE_MEM, 1);
 		chip->mux_regs = devm_ioremap_resource(chip->dev, mux_mem);
 		chip->dw->hdata->dma_mux_enable = true;
+
 		printk(KERN_DEBUG "DW AXI DMAC"
 				  ": enable mux irq(%d) num(%d) vaddr(0x%p) "
 				  "paddr(0x%llx) vaddr(0x%p) paddr(0x%llx)\n",
@@ -1894,8 +1952,9 @@ static int dw_probe(struct platform_device *pdev)
 	dw->dma.dst_addr_widths = AXI_DMA_BUSWIDTHS;
 	dw->dma.directions =
 	    BIT(DMA_DEV_TO_MEM) | BIT(DMA_MEM_TO_DEV) | BIT(DMA_MEM_TO_MEM);
-	dw->dma.residue_granularity = DMA_RESIDUE_GRANULARITY_DESCRIPTOR;//DMA_RESIDUE_GRANULARITY_BURST;
-	//DMA_RESIDUE_GRANULARITY_DESCRIPTOR;
+	dw->dma.residue_granularity =
+	    DMA_RESIDUE_GRANULARITY_DESCRIPTOR; // DMA_RESIDUE_GRANULARITY_BURST;
+	// DMA_RESIDUE_GRANULARITY_DESCRIPTOR;
 
 	dw->dma.dev = chip->dev;
 	dw->dma.device_tx_status = dma_chan_tx_status;

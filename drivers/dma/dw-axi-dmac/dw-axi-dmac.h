@@ -22,7 +22,7 @@
 #define DMAC_MAX_MASTERS 2
 #define DMAC_MAX_BLK_SIZE 0x200000
 /**
- * @brief designware axi dma hardware configration
+ * @brief designware axi dma hardware configuration
  *
  */
 struct dw_axi_dma_hcfg {
@@ -39,6 +39,8 @@ struct dw_axi_dma_hcfg {
 	bool restrict_axi_burst_len;
 	/*! dma mux flag  */
 	bool dma_mux_enable;
+	/*! dmac abort*/
+	bool dma_abort_enable;
 };
 
 /**
@@ -49,6 +51,7 @@ struct axi_dma_chan {
 	struct axi_dma_chip *chip;
 	void __iomem *chan_regs;
 	void __iomem *chan_mux_regs;
+
 	u8 id;
 	atomic_t descs_allocated;
 
@@ -230,6 +233,8 @@ static inline struct axi_dma_chan *dchan_to_axi_dma_chan(struct dma_chan *dchan)
 
 #define DMAC_CHAN_SUSP_SHIFT 16
 #define DMAC_CHAN_SUSP_WE_SHIFT 24
+
+#define DMA_MUX_EXTRA_HS_PORT 255
 
 /* CH_CTL_H */
 #define CH_CTL_H_ARLEN_EN BIT(6)
