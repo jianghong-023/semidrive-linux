@@ -710,14 +710,14 @@ dw_mipi_csi_parse_dt(struct platform_device *pdev,
     ret = of_property_read_u32(node, "data-lanes", &kcmc->hw.num_lanes);
 
     if (ret) {
-        dev_err(&pdev->dev, "Couldn't read data-lanes\n");
+        dev_info(&pdev->dev, "Couldn't read data-lanes\n");
         //return ret;
     }
 
     ret = of_property_read_u32(node, "output-type", &kcmc->hw.output_type);
 
     if (ret) {
-        dev_err(&pdev->dev, "Couldn't read output-type\n");
+        dev_info(&pdev->dev, "Couldn't read output-type\n");
         //return ret;
     }
 
@@ -726,7 +726,7 @@ dw_mipi_csi_parse_dt(struct platform_device *pdev,
     ret = of_property_read_u32(node, "ipi-mode", &kcmc->hw.ipi_mode);
 
     if (ret) {
-        dev_err(&pdev->dev, "Couldn't read ipi-mode\n");
+        dev_info(&pdev->dev, "Couldn't read ipi-mode\n");
         //return ret;
     }
 
@@ -742,7 +742,7 @@ dw_mipi_csi_parse_dt(struct platform_device *pdev,
                              &kcmc->hw.ipi_auto_flush);
 
     if (ret) {
-        dev_err(&pdev->dev, "Couldn't read ipi-auto-flush\n");
+        dev_info(&pdev->dev, "Couldn't read ipi-auto-flush\n");
         //return ret;
     }
 
@@ -751,7 +751,7 @@ dw_mipi_csi_parse_dt(struct platform_device *pdev,
                              &kcmc->hw.ipi_color_mode);
 
     if (ret) {
-        dev_err(&pdev->dev, "Couldn't read ipi-color-mode\n");
+        dev_info(&pdev->dev, "Couldn't read ipi-color-mode\n");
         //return ret;
     }
 
@@ -759,14 +759,14 @@ dw_mipi_csi_parse_dt(struct platform_device *pdev,
         of_property_read_u32(node, "virtual-channel", &kcmc->hw.virtual_ch);
 
     if (ret) {
-        dev_err(&pdev->dev, "Couldn't read virtual-channel\n");
+        dev_info(&pdev->dev, "Couldn't read virtual-channel\n");
         //return ret;
     }
 
     ret = of_property_read_u32(node, "lanerate", &kcmc->lanerate);
 
     if (ret) {
-        dev_err(&pdev->dev, "Couldn't read lanerate\n");
+        dev_info(&pdev->dev, "Couldn't read lanerate\n");
         //return ret;
     }
 
@@ -775,7 +775,7 @@ dw_mipi_csi_parse_dt(struct platform_device *pdev,
     ret = of_property_read_u32(node, "hsa", &kcmc->hw.hsa);
 
     if (ret) {
-        dev_err(&pdev->dev, "Couldn't read lanerate\n");
+        dev_info(&pdev->dev, "Couldn't read lanerate\n");
         //return ret;
     }
 
@@ -784,7 +784,7 @@ dw_mipi_csi_parse_dt(struct platform_device *pdev,
     ret = of_property_read_u32(node, "hbp", &kcmc->hw.hbp);
 
     if (ret) {
-        dev_err(&pdev->dev, "Couldn't read lanerate\n");
+        dev_info(&pdev->dev, "Couldn't read lanerate\n");
         //return ret;
     }
 
