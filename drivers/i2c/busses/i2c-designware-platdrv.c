@@ -281,14 +281,14 @@ static int dw_i2c_plat_probe(struct platform_device *pdev)
 	dev_info(&pdev->dev, "sync_enable=0x%x\n", sync_enable);
 	if (sync_enable == 1){
 		dev_err(&pdev->dev, "enter:\n");
-		while(1) {
+		for(i=0; i<20; i++) {	//timeout
 			ret1 = sd_get_i2c_status(&status);
 			dev_info(&pdev->dev, "status=%d, ret1=%d\n", status, ret1);
 			if (status>I2C_STAT_INITING)
 				break;
 			msleep(100);
 		}
-		dev_err(&pdev->dev, "exit: status=0x%x\n", status);
+		dev_err(&pdev->dev, "exit: status=0x%x, i=%d\n", status, i);
 	}
 #endif
 
