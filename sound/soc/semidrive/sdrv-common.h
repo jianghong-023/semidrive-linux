@@ -74,6 +74,15 @@
 #define SND_CHANNEL_SIX 6   /* up to 5.1 */
 #define SND_CHANNEL_EIGHT 8 /* up to 7.1 */
 
+#define SDRV_SPDIF_STATUS_FREE 0x0
+#define SDRV_SPDIF_STATUS_16_IN 0x01
+#define SDRV_SPDIF_STATUS_44_IN 0x02
+#define SDRV_SPDIF_STATUS_48_IN SDRV_SPDIF_STATUS_44_IN
+#define SDRV_SPDIF_STATUS_16_OUT 0x03
+#define SDRV_SPDIF_STATUS_44_OUT 0x04
+#define SDRV_SPDIF_STATUS_48_OUT 0x05
+#define SDRV_SPDFI_STATUS_UNDEFINED 0xff
+
 enum {
 	I2S_SCLK_MCLK,
 };
@@ -183,6 +192,37 @@ struct sdrv_afe_i2s_mc {
 
 	/* stream is slav mode  */
 	bool is_slave;
+};
+
+struct sdrv_afe_spdif {
+	struct platform_device *pdev;
+	struct device *dev;
+
+	/* address for ioremap audio hardware register */
+	void __iomem *regs;
+	/* TODO: Alloc a sram address, use this to for dma transfer  */
+	void __iomem *sram_address;
+
+	struct clk *clk;
+	struct clk *mclk;
+
+	struct snd_dmaengine_dai_dma_data capture_dma_data;
+	struct snd_dmaengine_dai_dma_data playback_dma_data;
+	char capture_dma_chan[4];
+	char playback_dma_chan[4];
+	struct snd_dmaengine_pcm_config dma_config;
+	struct regmap *regmap;
+	struct snd_pcm_substream __rcu *tx_substream;
+	struct snd_pcm_substream __rcu *rx_substream;
+	unsigned int tx_ptr; /* next frame index in the sample buffer */
+
+	/* FIFO level at which level interrupt occurs */
+	unsigned tx_fifo_low;
+
+	/* maximal FIFO level */
+	unsigned tx_fifo_high;
+	/* status code prevent flow conflict */
+	unsigned int spdif_status;
 };
 
 /* Define audio front end model */

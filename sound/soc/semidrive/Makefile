@@ -6,6 +6,9 @@ obj-$(CONFIG_SND_SDRV_AFE_I2S_SC) += snd-sdrv-i2s-sc.o
 snd-sdrv-i2s-mc-objs := sdrv-i2s-mc.o
 obj-$(CONFIG_SND_SDRV_AFE_I2S_MC) += snd-sdrv-i2s-mc.o
 
+snd-sdrv-spdif-objs := sdrv-spdif.o
+obj-$(CONFIG_SND_SDRV_AFE_SPDIF) += snd-sdrv-spdif.o
+
 snd-x9-fpga-mach-objs := x9-fpga-mach.o
 obj-$(CONFIG_SND_X9_FPGA_MACH) += snd-x9-fpga-mach.o
 
