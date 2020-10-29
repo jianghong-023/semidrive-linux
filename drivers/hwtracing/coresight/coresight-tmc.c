@@ -426,8 +426,11 @@ static int tmc_probe(struct amba_device *adev, const struct amba_id *id)
 		ret = PTR_ERR(drvdata->csdev);
 		goto out;
 	}
-
+#ifdef CONFIG_ARCH_SEMIDRIVE
+	drvdata->miscdev.name = "etf";
+#else
 	drvdata->miscdev.name = pdata->name;
+#endif
 	drvdata->miscdev.minor = MISC_DYNAMIC_MINOR;
 	drvdata->miscdev.fops = &tmc_fops;
 	ret = misc_register(&drvdata->miscdev);
