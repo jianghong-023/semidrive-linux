@@ -23,6 +23,12 @@ dtb-$(CONFIG_ARCH_SEMIDRIVE_X9) += x9_high-plus_ref_native_cluster_4k_8g.dtb
 dtb-$(CONFIG_ARCH_SEMIDRIVE_X9) += x9_high-plus_ref_native_ivi_4k_8g.dtb
 dtb-$(CONFIG_ARCH_SEMIDRIVE_X9) += x9_high-plus_ref_native_cluster_3sin1_8g.dtb
 dtb-$(CONFIG_ARCH_SEMIDRIVE_X9) += x9_high-plus_ref_native_ivi_serdes_3sin1_8g.dtb
+
+dtb-$(CONFIG_ARCH_SEMIDRIVE_X9) += x9_high-plus_ref_native_cluster_3sin1_8g.dtb
+dtb-$(CONFIG_ARCH_SEMIDRIVE_X9) += x9_high-plus_ref_native_cluster_4k_8g_bt.dtb
+dtb-$(CONFIG_ARCH_SEMIDRIVE_X9) += x9_high-plus_ref_native_cluster_8g_4kin1_bt.dtb
+dtb-$(CONFIG_ARCH_SEMIDRIVE_X9) += x9_high-plus_ref_native_cluster_8g_bt.dtb
+dtb-$(CONFIG_ARCH_SEMIDRIVE_X9) += x9_high-plus_ref_native_cluster_bt.dtb
 dtb-$(CONFIG_ARCH_SEMIDRIVE_V9) += v9f_ref.dtb
 dtb-$(CONFIG_ARCH_SEMIDRIVE_V9) += v9f_ref_7inch.dtb
 dtb-$(CONFIG_ARCH_SEMIDRIVE_V9) += v9ts_ref_a.dtb
