@@ -347,15 +347,30 @@ static void afe_i2s_sc_start_capture(struct sdrv_afe_i2s_sc *afe)
 
 static void afe_i2s_sc_stop_capture(struct sdrv_afe_i2s_sc *afe)
 {
+
+
+	if (true == afe->is_full_duplex) {
+
+		/*Reset full duplex FIFO reset*/
+		regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_I2S_CTRL_FDX,
+				   BIT_CTRL_FDX_FIFO_RST,
+				   (0 << I2S_CTRL_FDX_FIFO_RST_FIELD_OFFSET));
+	}else{
+		/*FIFO reset*/
+		regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_I2S_CTRL,
+				   BIT_CTRL_FIFO_RST,
+				   (0 << I2S_CTRL_FIFO_RST_FIELD_OFFSET));
+	}
+
 	/* Disable interrupt */
 	regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_I2S_CTRL_FDX,
 			   BIT_CTRL_FDX_RI2S_MASK,
 			   (0 << I2S_CTRL_I2S_EN_FIELD_OFFSET));
 	/*TDM slot setting*/
 	afe->rx_slot_mask = 0;
-	regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_TDM_FD_DIR,
-				BIT_TDM_FD_DIR_CH_RX_EN,
-				(afe->rx_slot_mask  << TDM_FD_DIR_CH0_RXEN_FIELD_OFFSET));
+	regmap_update_bits(
+	    afe->regmap, REG_CDN_I2SSC_REGS_TDM_FD_DIR, BIT_TDM_FD_DIR_CH_RX_EN,
+	    (afe->rx_slot_mask << TDM_FD_DIR_CH0_RXEN_FIELD_OFFSET));
 	regcache_sync(afe->regmap);
 }
 
@@ -419,6 +434,11 @@ static void afe_i2s_sc_start_playback(struct sdrv_afe_i2s_sc *afe)
 static void afe_i2s_sc_stop_playback(struct sdrv_afe_i2s_sc *afe)
 {
 
+	/*FIFO reset*/
+	regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_I2S_CTRL,
+			   BIT_CTRL_FIFO_RST,
+			   (0 << I2S_CTRL_FIFO_RST_FIELD_OFFSET));
+
 	/* Disable interrupt */
 	regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_I2S_CTRL,
 			   BIT_CTRL_INTREQ_MASK,
@@ -429,6 +449,7 @@ static void afe_i2s_sc_stop_playback(struct sdrv_afe_i2s_sc *afe)
 				BIT_TDM_FD_DIR_CH_TX_EN,
 				(afe->tx_slot_mask << TDM_FD_DIR_CH0_TXEN_FIELD_OFFSET));
 	regcache_sync(afe->regmap);
+
 }
 
 static void afe_i2s_sc_stop(struct sdrv_afe_i2s_sc *afe)
@@ -446,7 +467,7 @@ static void afe_i2s_sc_stop(struct sdrv_afe_i2s_sc *afe)
 				    */
 
 	regcache_sync(afe->regmap);
-
+	DEBUG_FUNC_PRT
 	ret = regmap_read(afe->regmap, REG_CDN_I2SSC_REGS_I2S_CTRL, &val);
 	dev_dbg(afe->dev, "DUMP %d REG_CDN_I2SSC_REGS_I2S_CTRL(0x%x)\n",
 		__LINE__, val);
