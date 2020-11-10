@@ -839,7 +839,7 @@ int sdrv_stream_video_register(struct kstream_video *video,
 		q->mem_ops = &vb2_dma_contig_memops;
 	q->ops = &sdrv_video_vb2_q_ops;
 	q->type = V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE;
-	q->io_modes = VB2_DMABUF | VB2_MMAP | VB2_READ;
+	q->io_modes = VB2_DMABUF | VB2_MMAP | VB2_READ | VB2_USERPTR;
 	q->timestamp_flags = V4L2_BUF_FLAG_TIMESTAMP_MONOTONIC;
 	q->buf_struct_size = sizeof(struct kstream_buffer);
 	q->dev = video->dev;
