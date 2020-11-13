@@ -1669,24 +1669,31 @@ struct snd_ctl_elem_value  *ucontrol)
 
     return 0;
 }
-
+static void set_dislbit(struct snd_soc_codec *codec, struct ak7738_priv *ak7738,
+			int port, int mode)
+{
+	int addr, value;
+	if (mode < 4) {
+		if (ak7738->DISLbit[port] != mode) {
+			ak7738->DISLbit[port] = mode;
+			addr = AK7738_48_SDIN1_FORMAT + 0;
+			value = mode << 4;
+			snd_soc_update_bits(codec, addr, 0x30, value);
+		}
+	} else {
+		akdbgprt(" [AK7738] %s Invalid Value selected!\n",
+			 __FUNCTION__);
+	}
+}
 static int set_sdin1_slot(
 struct snd_kcontrol       *kcontrol,
 struct snd_ctl_elem_value  *ucontrol)
 {
-    struct snd_soc_codec *codec = snd_soc_kcontrol_codec(kcontrol);
+	struct snd_soc_codec *codec = snd_soc_kcontrol_codec(kcontrol);
 	struct ak7738_priv *ak7738 = snd_soc_codec_get_drvdata(codec);
-    int    currMode = ucontrol->value.enumerated.item[0];
-
-	if (currMode < 4){
-	if ( ak7738->DISLbit[0] != currMode ) {
-		ak7738->DISLbit[0] = currMode;
-	}
-	}
-	else {
-	akdbgprt(" [AK7738] %s Invalid Value selected!\n",__FUNCTION__);
-	}
-    return 0;
+	int currMode = ucontrol->value.enumerated.item[0];
+	set_dislbit(codec, ak7738, 0, currMode);
+	return 0;
 }
 
 static int get_sdin2_slot(
@@ -1705,19 +1712,11 @@ static int set_sdin2_slot(
 struct snd_kcontrol       *kcontrol,
 struct snd_ctl_elem_value  *ucontrol)
 {
-    struct snd_soc_codec *codec = snd_soc_kcontrol_codec(kcontrol);
+	struct snd_soc_codec *codec = snd_soc_kcontrol_codec(kcontrol);
 	struct ak7738_priv *ak7738 = snd_soc_codec_get_drvdata(codec);
-    int    currMode = ucontrol->value.enumerated.item[0];
-
-	if (currMode < 4){
-	if ( ak7738->DISLbit[1] != currMode ) {
-		ak7738->DISLbit[1] = currMode;
-	}
-	}
-	else {
-	akdbgprt(" [AK7738] %s Invalid Value selected!\n",__FUNCTION__);
-	}
-    return 0;
+	int currMode = ucontrol->value.enumerated.item[0];
+	set_dislbit(codec, ak7738, 1, currMode);
+	return 0;
 }
 
 static int get_sdin3_slot(
@@ -1736,19 +1735,11 @@ static int set_sdin3_slot(
 struct snd_kcontrol       *kcontrol,
 struct snd_ctl_elem_value  *ucontrol)
 {
-    struct snd_soc_codec *codec = snd_soc_kcontrol_codec(kcontrol);
+	struct snd_soc_codec *codec = snd_soc_kcontrol_codec(kcontrol);
 	struct ak7738_priv *ak7738 = snd_soc_codec_get_drvdata(codec);
-    int    currMode = ucontrol->value.enumerated.item[0];
-
-	if (currMode < 4){
-	if ( ak7738->DISLbit[2] != currMode ) {
-		ak7738->DISLbit[2] = currMode;
-	}
-	}
-	else {
-	akdbgprt(" [AK7738] %s Invalid Value selected!\n",__FUNCTION__);
-	}
-    return 0;
+	int currMode = ucontrol->value.enumerated.item[0];
+	set_dislbit(codec, ak7738, 2, currMode);
+	return 0;
 }
 
 static int get_sdin4_slot(
@@ -1767,19 +1758,11 @@ static int set_sdin4_slot(
 struct snd_kcontrol       *kcontrol,
 struct snd_ctl_elem_value  *ucontrol)
 {
-    struct snd_soc_codec *codec = snd_soc_kcontrol_codec(kcontrol);
+	struct snd_soc_codec *codec = snd_soc_kcontrol_codec(kcontrol);
 	struct ak7738_priv *ak7738 = snd_soc_codec_get_drvdata(codec);
-    int    currMode = ucontrol->value.enumerated.item[0];
-
-	if (currMode < 4){
-	if ( ak7738->DISLbit[3] != currMode ) {
-		ak7738->DISLbit[3] = currMode;
-	}
-	}
-	else {
-	akdbgprt(" [AK7738] %s Invalid Value selected!\n",__FUNCTION__);
-	}
-    return 0;
+	int currMode = ucontrol->value.enumerated.item[0];
+	set_dislbit(codec, ak7738, 3, currMode);
+	return 0;
 }
 
 static int get_sdin5_slot(
@@ -1798,19 +1781,27 @@ static int set_sdin5_slot(
 struct snd_kcontrol       *kcontrol,
 struct snd_ctl_elem_value  *ucontrol)
 {
-    struct snd_soc_codec *codec = snd_soc_kcontrol_codec(kcontrol);
+	struct snd_soc_codec *codec = snd_soc_kcontrol_codec(kcontrol);
 	struct ak7738_priv *ak7738 = snd_soc_codec_get_drvdata(codec);
-    int    currMode = ucontrol->value.enumerated.item[0];
+	int currMode = ucontrol->value.enumerated.item[0];
+	set_dislbit(codec, ak7738, 4, currMode);
+	return 0;
+}
 
-	if (currMode < 4){
-	if ( ak7738->DISLbit[4] != currMode ) {
-		ak7738->DISLbit[4] = currMode;
+static void set_doslbit(struct snd_soc_codec *codec, struct ak7738_priv *ak7738, int port, int mode)
+{
+	int addr, value;
+	if (mode < 4) {
+		if (ak7738->DOSLbit[port] != mode) {
+			ak7738->DOSLbit[port] = mode;
+			addr = AK7738_4E_SDOUT1_FORMAT + 0;
+			value = mode << 4;
+			snd_soc_update_bits(codec, addr, 0x30, value);
+		}
+	} else {
+		akdbgprt(" [AK7738] %s Invalid Value selected!\n",
+			 __FUNCTION__);
 	}
-	}
-	else {
-	akdbgprt(" [AK7738] %s Invalid Value selected!\n",__FUNCTION__);
-	}
-    return 0;
 }
 
 static int get_sdout1_slot(
@@ -1829,19 +1820,11 @@ static int set_sdout1_slot(
 struct snd_kcontrol       *kcontrol,
 struct snd_ctl_elem_value  *ucontrol)
 {
-    struct snd_soc_codec *codec = snd_soc_kcontrol_codec(kcontrol);
+	struct snd_soc_codec *codec = snd_soc_kcontrol_codec(kcontrol);
 	struct ak7738_priv *ak7738 = snd_soc_codec_get_drvdata(codec);
-    int    currMode = ucontrol->value.enumerated.item[0];
-
-	if (currMode < 4){
-	if ( ak7738->DOSLbit[0] != currMode ) {
-		ak7738->DOSLbit[0] = currMode;
-	}
-	}
-	else {
-	akdbgprt(" [AK7738] %s Invalid Value selected!\n",__FUNCTION__);
-	}
-    return 0;
+	int currMode = ucontrol->value.enumerated.item[0];
+	set_doslbit(codec, ak7738, 0, currMode);
+	return 0;
 }
 
 static int get_sdout2_slot(
@@ -1860,19 +1843,11 @@ static int set_sdout2_slot(
 struct snd_kcontrol       *kcontrol,
 struct snd_ctl_elem_value  *ucontrol)
 {
-    struct snd_soc_codec *codec = snd_soc_kcontrol_codec(kcontrol);
+	struct snd_soc_codec *codec = snd_soc_kcontrol_codec(kcontrol);
 	struct ak7738_priv *ak7738 = snd_soc_codec_get_drvdata(codec);
-    int    currMode = ucontrol->value.enumerated.item[0];
-
-	if (currMode < 4){
-	if ( ak7738->DOSLbit[1] != currMode ) {
-		ak7738->DOSLbit[1] = currMode;
-	}
-	}
-	else {
-	akdbgprt(" [AK7738] %s Invalid Value selected!\n",__FUNCTION__);
-	}
-    return 0;
+	int currMode = ucontrol->value.enumerated.item[0];
+	set_doslbit(codec, ak7738, 1, currMode);
+	return 0;
 }
 
 static int get_sdout3_slot(
@@ -1891,19 +1866,11 @@ static int set_sdout3_slot(
 struct snd_kcontrol       *kcontrol,
 struct snd_ctl_elem_value  *ucontrol)
 {
-    struct snd_soc_codec *codec = snd_soc_kcontrol_codec(kcontrol);
+	struct snd_soc_codec *codec = snd_soc_kcontrol_codec(kcontrol);
 	struct ak7738_priv *ak7738 = snd_soc_codec_get_drvdata(codec);
-    int    currMode = ucontrol->value.enumerated.item[0];
-
-	if (currMode < 4){
-	if ( ak7738->DOSLbit[2] != currMode ) {
-		ak7738->DOSLbit[2] = currMode;
-	}
-	}
-	else {
-	akdbgprt(" [AK7738] %s Invalid Value selected!\n",__FUNCTION__);
-	}
-    return 0;
+	int currMode = ucontrol->value.enumerated.item[0];
+	set_doslbit(codec, ak7738, 2, currMode);
+	return 0;
 }
 
 static int get_sdout4_slot(
@@ -1922,19 +1889,11 @@ static int set_sdout4_slot(
 struct snd_kcontrol       *kcontrol,
 struct snd_ctl_elem_value  *ucontrol)
 {
-    struct snd_soc_codec *codec = snd_soc_kcontrol_codec(kcontrol);
+	struct snd_soc_codec *codec = snd_soc_kcontrol_codec(kcontrol);
 	struct ak7738_priv *ak7738 = snd_soc_codec_get_drvdata(codec);
-    int    currMode = ucontrol->value.enumerated.item[0];
-
-	if (currMode < 4){
-	if ( ak7738->DOSLbit[3] != currMode ) {
-		ak7738->DOSLbit[3] = currMode;
-	}
-	}
-	else {
-	akdbgprt(" [AK7738] %s Invalid Value selected!\n",__FUNCTION__);
-	}
-    return 0;
+	int currMode = ucontrol->value.enumerated.item[0];
+	set_doslbit(codec, ak7738, 3, currMode);
+	return 0;
 }
 
 static int get_sdout5_slot(
@@ -1953,19 +1912,11 @@ static int set_sdout5_slot(
 struct snd_kcontrol       *kcontrol,
 struct snd_ctl_elem_value  *ucontrol)
 {
-    struct snd_soc_codec *codec = snd_soc_kcontrol_codec(kcontrol);
+	struct snd_soc_codec *codec = snd_soc_kcontrol_codec(kcontrol);
 	struct ak7738_priv *ak7738 = snd_soc_codec_get_drvdata(codec);
-    int    currMode = ucontrol->value.enumerated.item[0];
-
-	if (currMode < 4){
-	if ( ak7738->DOSLbit[4] != currMode ) {
-		ak7738->DOSLbit[4] = currMode;
-	}
-	}
-	else {
-	akdbgprt(" [AK7738] %s Invalid Value selected!\n",__FUNCTION__);
-	}
-    return 0;
+	int currMode = ucontrol->value.enumerated.item[0];
+	set_doslbit(codec, ak7738, 4, currMode);
+	return 0;
 }
 
 static const struct soc_enum ak7738_sd6_ioformat_enum[] = {
@@ -6359,7 +6310,7 @@ static struct miscdevice ak7738_misc = {
 static int ak7738_set_bias_level(struct snd_soc_codec *codec,
 		enum snd_soc_bias_level level)
 {
-	akdbgprt("\t[AK7738] %s(%d)\n",__FUNCTION__,__LINE__);
+	akdbgprt("\t[AK7738] %s(%d)(%d)\n",__FUNCTION__,__LINE__,level);
 
 	switch (level) {
 	case SND_SOC_BIAS_ON:
