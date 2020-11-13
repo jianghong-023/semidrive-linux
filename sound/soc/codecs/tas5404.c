@@ -96,8 +96,24 @@ static int tas5404_mute(struct snd_soc_dai *dai, int mute)
 		gpiod_set_value_cansleep(tas5404->mute_gpio, mute);
 		return 0;
 	}
-
-	/* Unmute channels  */
+	/* Unmute(0) disable low-low mute(1) set low-low channels */
+	if(mute == 1){
+		ret = regmap_update_bits(tas5404->regmap, TAS5404_CTRL6,
+					TAS5404_CTRL6_ALL_CH_BIT,
+					TAS5404_CTRL6_ALL_CH_LOW_LOW);
+	}
+	else{
+		ret = regmap_update_bits(
+					tas5404->regmap, TAS5404_CTRL6, TAS5404_CTRL6_ALL_CH_BIT,
+					TAS5404_CTRL6_ALL_CH_LOW_LOW_DISABLED);
+	}
+	if (ret < 0) {
+		dev_err(component->dev,
+			"Cannot change channels low-low states for "
+			"TAS5404_CTRL6: %d\n",
+			ret);
+	}
+	/* Unmute(0) mute(1) channels  */
 	ret = regmap_update_bits(tas5404->regmap, TAS5404_CTRL5,
 				 TAS5404_CTRL5_UNMUTE_BIT,
 				 mute << TAS5404_CTRL5_UNMUTE_OFFSET);
@@ -127,6 +143,15 @@ static int tas5404_power_off(struct snd_soc_codec *codec)
 				 TAS5404_CTRL5_ALL_CH_HIZ);
 	if (ret < 0){
 		dev_err(codec->dev, "Cannot set channels to HIZ for TAS5404_CTRL5: %d\n", ret);
+	}
+	/*Set to low-low state to all channels*/
+	ret = regmap_update_bits(tas5404->regmap, TAS5404_CTRL6,
+				 TAS5404_CTRL6_ALL_CH_BIT,
+				 TAS5404_CTRL6_ALL_CH_LOW_LOW);
+	if (ret < 0) {
+		dev_err(codec->dev,
+			"Cannot set channels to low-low for TAS5404_CTRL6: %d\n",
+			ret);
 	}
 	tas5404->HIZ_flag = false;
 	cancel_delayed_work_sync(&tas5404->fault_check_work);
@@ -180,6 +205,17 @@ static int tas5404_power_on(struct snd_soc_codec *codec)
 				 0 << TAS5404_CTRL5_UNMUTE_OFFSET);
 	if (ret < 0){
 		dev_err(codec->dev, "Cannot un-mute channels TAS5404_CTRL5: %d\n", ret);
+	}
+
+	/*Clear low-low state to all channels*/
+	ret = regmap_update_bits(tas5404->regmap, TAS5404_CTRL6,
+				 TAS5404_CTRL6_ALL_CH_BIT,
+				 TAS5404_CTRL6_ALL_CH_LOW_LOW_DISABLED);
+	if (ret < 0) {
+		dev_err(
+		    codec->dev,
+		    "Cannot disable channels low-low states for TAS5404_CTRL6: %d\n",
+		    ret);
 	}
 	tas5404->unmute_start = ktime_get();
 	dev_dbg(codec->dev, "tas5404 --set HIZ %lli\n", tas5404->unmute_start);
@@ -593,6 +629,17 @@ static int tas5404_i2c_probe(struct i2c_client *client,
 		dev_err(dev, "Cannot read register TAS5404_FAULT_REG1: %d\n", ret);
 	}
 	x9dbgprt("\t[tas5404] %s(%d)\n", __FUNCTION__,__LINE__);
+
+	/*Set to low-low state to all channels*/
+	ret = regmap_update_bits(tas5404->regmap, TAS5404_CTRL6,
+				 TAS5404_CTRL6_ALL_CH_BIT,
+				 TAS5404_CTRL6_ALL_CH_LOW_LOW);
+	if (ret < 0) {
+		dev_err(dev,
+			"Cannot set channels to low-low for TAS5404_CTRL6: "
+			"%d\n",
+			ret);
+	}
 	return 0;
 }
 
