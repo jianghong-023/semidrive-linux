@@ -59,6 +59,20 @@
 #define TAS5404_CTRL5_RESET_BIT BIT(7)
 
 #define TAS5404_CTRL6			0x0d /* output state control */
+#define TAS5404_CTRL6_ALL_CH_LOW_LOW 0xF
+#define TAS5404_CTRL6_ALL_CH_LOW_LOW_DISABLED 0x0
+#define TAS5404_CTRL6_LOW_LOW_CH1 0 /*0: Set channel 1 to low-low mode*/
+#define TAS5404_CTRL6_LOW_LOW_CH1_BIT BIT(0)
+#define TAS5404_CTRL6_LOW_LOW_CH2 1 /*0: Set channel 2 to low-low mode*/
+#define TAS5404_CTRL6_LOW_LOW_CH2_BIT BIT(1)
+#define TAS5404_CTRL6_LOW_LOW_CH3 2 /*0: Set channel 3 to low-low mode*/
+#define TAS5404_CTRL6_LOW_LOW_CH3_BIT BIT(2)
+#define TAS5404_CTRL6_LOW_LOW_CH4 3 /*0: Set channel 4 to low-low mode*/
+#define TAS5404_CTRL6_LOW_LOW_CH4_BIT BIT(3)
+#define TAS5404_CTRL6_ALL_CH_BIT                                               \
+	(TAS5404_CTRL6_LOW_LOW_CH1_BIT | TAS5404_CTRL6_LOW_LOW_CH2_BIT |       \
+	 TAS5404_CTRL6_LOW_LOW_CH3_BIT | TAS5404_CTRL6_LOW_LOW_CH4_BIT)
+
 #define TAS5404_CTRL7			0x10 /* dc offset detect threshold selection */
 #define TAS5404_STAT_REG5		0x13 /* overtemperature shutdown and thermal foldback */
 #define TAS5404_MAX			TAS5404_STAT_REG5
