@@ -16,6 +16,10 @@ ifeq ($(CONFIG_BUFFER_SYNC),y)
 override SUPPORT_BUFFER_SYNC := 1
 endif
 
+ifeq ($(CONFIG_PM_DEVFREQ),y)
+override PVR_DVFS := 1
+endif
+
 override PVR_BUILD_TYPE := release
 override BUILD := release
 
@@ -40,7 +44,6 @@ override PVR_LOADER :=
 override DEBUGLINK := 1
 override SUPPORT_PHYSMEM_TEST := 1
 override COMPRESS_DEBUG_SECTIONS := 1
-override PVR_DVFS := 1
 override undefine PDUMP
 override OPTIM := -O2
 override RGX_TIMECORR_CLOCK := sched
