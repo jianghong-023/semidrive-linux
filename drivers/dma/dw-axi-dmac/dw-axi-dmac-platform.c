@@ -1953,7 +1953,7 @@ static int dw_probe(struct platform_device *pdev)
 	dw->dma.directions =
 	    BIT(DMA_DEV_TO_MEM) | BIT(DMA_MEM_TO_DEV) | BIT(DMA_MEM_TO_MEM);
 	dw->dma.residue_granularity =
-	    DMA_RESIDUE_GRANULARITY_DESCRIPTOR; // DMA_RESIDUE_GRANULARITY_BURST;
+	    DMA_RESIDUE_GRANULARITY_BURST; // DMA_RESIDUE_GRANULARITY_BURST;
 	// DMA_RESIDUE_GRANULARITY_DESCRIPTOR;
 
 	dw->dma.dev = chip->dev;
