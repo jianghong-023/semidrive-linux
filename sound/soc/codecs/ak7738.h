@@ -210,7 +210,8 @@
 #define AK7738_VIRT_110_DSP2OUT5_MIX       0x110
 #define AK7738_VIRT_111_DSP2OUT6_MIX       0x111
 
-#define AK7738_MAX_REGISTERS	(AK7738_VIRT_111_DSP2OUT6_MIX + 1)
+
+#define AK7738_MAX_REGISTERS (AK7738_VIRT_111_DSP2OUT6_MIX + 1)
 
 #define AK7738_VIRT_REGISTER    AK7738_VIRT_106_DSP1OUT1_MIX
 
@@ -341,6 +342,29 @@ enum {
 	AIF_PORT5,
 	NUM_AIF_DAIS,
 };
+/*Next section is based on DSP firmware, need modify them by different
+ * firmware.*/
+// Component: SFADER_2 (fader_mul2_1)
+#define AK7738_X9REF_FIRMWARE 1
+#ifdef AK7738_X9REF_FIRMWARE
+#define CRAM_ADDR_LEVEL_SFADER_2 0x0000
+#define CRAM_ADDR_ATT_TIME_SFADER_2 0x0001
+#define CRAM_ADDR_REL_TIME_SFADER_2 0x0003
 
+// Component: HPF2_1 (biquad2_1)
+#define CRAM_ADDR_BAND1_HPF2_1 0x0006
+
+// Component: SFADER_3 (fader_mul2_2)
+#define CRAM_ADDR_LEVEL_SFADER_3 0x0010
+#define CRAM_ADDR_ATT_TIME_SFADER_3 0x0011
+#define CRAM_ADDR_REL_TIME_SFADER_3 0x0013
+
+// Component: HPF2_2 (biquad2_2)
+#define CRAM_ADDR_BAND1_HPF2_2 0x0016
+
+// Component: SWITCH_1 (mixerl2_1)
+#define CRAM_ADDR_VOL_IN1_SWITCH_1 0x0020
+#define CRAM_ADDR_VOL_IN2_SWITCH_1 0x0021
+#endif
 #endif
 

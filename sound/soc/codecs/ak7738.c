@@ -89,6 +89,9 @@ struct ak7738_priv {
 	int DISLbit[NUM_SYNCDOMAIN];
 	int DOSLbit[NUM_SYNCDOMAIN];
 
+	/*Next section is added by user by dsp firmware*/
+	int DSP2Switch1;
+
 };
 
 struct _ak7738_pd_handler {
@@ -483,9 +486,12 @@ static const struct soc_enum ak7738_busclock_enum[] = {
     SOC_ENUM_SINGLE_EXT(ARRAY_SIZE(busclock_texts), busclock_texts),
 };
 
+static int ak7738_write_cram(
+    struct snd_soc_codec *codec, int nDSPNo, int addr, int len,
+    unsigned char
+	*cram_data);
 
-static int setBUSClock(
-struct snd_soc_codec *codec)
+static int setBUSClock(struct snd_soc_codec *codec)
 {
 	struct ak7738_priv *ak7738 = snd_soc_codec_get_drvdata(codec);
 	int value;
@@ -1676,7 +1682,7 @@ static void set_dislbit(struct snd_soc_codec *codec, struct ak7738_priv *ak7738,
 	if (mode < 4) {
 		if (ak7738->DISLbit[port] != mode) {
 			ak7738->DISLbit[port] = mode;
-			addr = AK7738_48_SDIN1_FORMAT + 0;
+			addr = AK7738_48_SDIN1_FORMAT + port;
 			value = mode << 4;
 			snd_soc_update_bits(codec, addr, 0x30, value);
 		}
@@ -1794,7 +1800,7 @@ static void set_doslbit(struct snd_soc_codec *codec, struct ak7738_priv *ak7738,
 	if (mode < 4) {
 		if (ak7738->DOSLbit[port] != mode) {
 			ak7738->DOSLbit[port] = mode;
-			addr = AK7738_4E_SDOUT1_FORMAT + 0;
+			addr = AK7738_4E_SDOUT1_FORMAT + port;
 			value = mode << 4;
 			snd_soc_update_bits(codec, addr, 0x30, value);
 		}
@@ -2959,297 +2965,435 @@ static const struct soc_enum ak7738_dit_statusbit_enum[] = {
 
 };
 
+/* Next section is for AK7738_X9REF_FIRMWARE special kcontrol */
+static int get_dsp2_switch1(struct snd_kcontrol *kcontrol,
+			    struct snd_ctl_elem_value *ucontrol)
+{
+	struct snd_soc_codec *codec = snd_soc_kcontrol_codec(kcontrol);
+	struct ak7738_priv *ak7738 = snd_soc_codec_get_drvdata(codec);
+	akdbgprt("\t%s dsp2_switch1 mode =%d\n", __FUNCTION__,
+		 ak7738->DSP2Switch1);
+	/* Get the current output routing */
+	ucontrol->value.enumerated.item[0] = ak7738->DSP2Switch1;
+	return 0;
+}
 
+static int set_dsp2_switch1(struct snd_kcontrol *kcontrol,
+			    struct snd_ctl_elem_value *ucontrol)
+{
+	struct snd_soc_codec *codec = snd_soc_kcontrol_codec(kcontrol);
+	struct ak7738_priv *ak7738 = snd_soc_codec_get_drvdata(codec);
+	int currMode = ucontrol->value.enumerated.item[0];
+	int dspNo = 2;
+	unsigned char cram_switch_enable[] = {0x20, 0x0, 0x0};
+	unsigned char cram_switch_disable[] = {0x0, 0x0, 0x0};
+	int ret;
+	akdbgprt("\t%s dsp2_switch1 mode =%d\n", __FUNCTION__, currMode);
 
-static const struct snd_kcontrol_new ak7738_snd_controls[] = {
-	SOC_SINGLE_TLV("MIC Input Volume L",
-			AK7738_5D_MICAMP_GAIN, 4, 0x0F, 0, mgnl_tlv),
-	SOC_SINGLE_TLV("MIC Input Volume R",
-			AK7738_5D_MICAMP_GAIN, 0, 0x0F, 0, mgnr_tlv),
+	if (currMode == 0) {
+		ret = ak7738_write_cram(
+		    codec, dspNo, CRAM_ADDR_VOL_IN1_SWITCH_1,
+		    sizeof(cram_switch_enable), cram_switch_enable);
+		akdbgprt("\t%s dsp2_switch1 ret =%d\n", __FUNCTION__, ret);
+		if (ret < 0)
+			return (-1);
+		akdbgprt("\t%s dsp2_switch1 ret =%d\n", __FUNCTION__,
+			 ret);
+		ret = ak7738_write_cram(
+		    codec, dspNo, CRAM_ADDR_VOL_IN2_SWITCH_1,
+		    sizeof(cram_switch_disable), cram_switch_disable);
+	} else {
+		ret = ak7738_write_cram(
+		    codec, dspNo, CRAM_ADDR_VOL_IN2_SWITCH_1,
+		    sizeof(cram_switch_enable), cram_switch_enable);
+		if (ret < 0)
+			return (-1);
+		ret = ak7738_write_cram(
+		    codec, dspNo, CRAM_ADDR_VOL_IN1_SWITCH_1,
+		    sizeof(cram_switch_disable), cram_switch_disable);
+	}
+	if (ret < 0)
+		return (-1);
 
-	SOC_SINGLE_TLV("ADC1 Digital Volume L",
-			AK7738_5F_ADC1_LCH_VOLUME, 0, 0xFF, 1, voladc_tlv),
-	SOC_SINGLE_TLV("ADC1 Digital Volume R",
-			AK7738_60_ADC1_RCH_VOLUME, 0, 0xFF, 1, voladc_tlv),
-	SOC_SINGLE_TLV("ADC2 Digital Volume L",
-			AK7738_61_ADC2_LCH_VOLUME, 0, 0xFF, 1, voladc_tlv),
-	SOC_SINGLE_TLV("ADC2 Digital Volume R",
-			AK7738_62_ADC2_RCH_VOLUME, 0, 0xFF, 1, voladc_tlv),
-	SOC_SINGLE_TLV("ADCM Digital Volume",
-			AK7738_63_ADCM_VOLUME, 0, 0xFF, 1, voladc_tlv),
+	ak7738->DSP2Switch1 = currMode;
 
-	SOC_SINGLE_TLV("DAC1 Digital Volume L",
-			AK7738_68_DAC1_LCH_VOLUME, 0, 0xFF, 1, voldac_tlv),
-	SOC_SINGLE_TLV("DAC1 Digital Volume R",
-			AK7738_69_DAC1_RCH_VOLUME, 0, 0xFF, 1, voldac_tlv),
-	SOC_SINGLE_TLV("DAC2 Digital Volume L",
-			AK7738_6A_DAC2_LCH_VOLUME, 0, 0xFF, 1, voldac_tlv),
-	SOC_SINGLE_TLV("DAC2 Digital Volume R",
-			AK7738_6B_DAC2_RCH_VOLUME, 0, 0xFF, 1, voldac_tlv),
+	return 0;
+}
+static const char *dsp2_switch1_txt[] = {"slot1", "slot5"};
 
-	SOC_SINGLE("ADC1 Mute", AK7738_67_ADC_MUTE_HPF, 6, 1, 0),
-	SOC_SINGLE("ADC2 Mute", AK7738_67_ADC_MUTE_HPF, 5, 1, 0),
-	SOC_SINGLE("ADCM Mute", AK7738_67_ADC_MUTE_HPF, 4, 1, 0),
+static const struct soc_enum ak7738_dsp_component_txt_enum[] = {
 
-	SOC_SINGLE("DAC1 Mute", AK7738_6E_DAC_MUTE_FILTER, 6, 1, 0),
-	SOC_SINGLE("DAC2 Mute", AK7738_6E_DAC_MUTE_FILTER, 5, 1, 0),
-
-	SOC_SINGLE("CLK Out Enable", AK7738_13_CLOKO_OUTPUT_SETTING, 3, 1, 0),
-	SOC_ENUM("CLK Out Select",  ak7738_clkosel_enum[0]),
-
-	SOC_ENUM("DSP1 Sync Domain", ak7738_sdsel_enum[0]),
-	SOC_ENUM("DSP2 Sync Domain", ak7738_sdsel_enum[1]),
-	SOC_ENUM("DSP1 Out1 Sync Domain", ak7738_sdsel_enum[2]),
-	SOC_ENUM("DSP1 Out2 Sync Domain", ak7738_sdsel_enum[3]),
-	SOC_ENUM("DSP1 Out3 Sync Domain", ak7738_sdsel_enum[4]),
-
-	SOC_ENUM("SDIN1 Sync Domain", ak7738_sdsel_enum[5]),
-	SOC_ENUM("SDIN2 Sync Domain", ak7738_sdsel_enum[6]),
-	SOC_ENUM("SDIN3 Sync Domain", ak7738_sdsel_enum[7]),
-	SOC_ENUM("SDIN4 Sync Domain", ak7738_sdsel_enum[8]),
-	SOC_ENUM("SDIN5 Sync Domain", ak7738_sdsel_enum[9]),
-	SOC_ENUM("SDIN6 Sync Domain", ak7738_sdsel_enum[10]),
-
-	SOC_ENUM("SRC1 Out Sync Domain", ak7738_sdsel_enum[11]),
-	SOC_ENUM("SRC2 Out Sync Domain", ak7738_sdsel_enum[12]),
-	SOC_ENUM("SRC3 Out Sync Domain", ak7738_sdsel_enum[13]),
-	SOC_ENUM("SRC4 Out Sync Domain", ak7738_sdsel_enum[14]),
-	SOC_ENUM("FSCONV1 Out Sync Domain", ak7738_sdsel_enum[15]),
-	SOC_ENUM("FSCONV2 Out Sync Domain", ak7738_sdsel_enum[16]),
-
-	SOC_ENUM("MIXA Sync Domain", ak7738_sdsel_enum[17]),
-	SOC_ENUM("MIXB Sync Domain", ak7738_sdsel_enum[18]),
-	SOC_ENUM("ADC1 Sync Domain", ak7738_sdsel_enum[19]),
-	SOC_ENUM("CODEC Sync Domain", ak7738_sdsel_enum[20]), 
-
-	SOC_ENUM("CODEC Sampling Frequency", ak7738_fsmode_enum[0]),
-	SOC_ENUM_EXT("LRCK1/BICK1 Master", ak7738_msnbit_enum[0], get_sd1_ms, set_sd1_ms),
-	SOC_ENUM_EXT("LRCK2/BICK2 Master", ak7738_msnbit_enum[0], get_sd2_ms, set_sd2_ms),
-	SOC_ENUM_EXT("LRCK3/BICK3 Master", ak7738_msnbit_enum[0], get_sd3_ms, set_sd3_ms),
-	SOC_ENUM_EXT("LRCK4/BICK4 Master", ak7738_msnbit_enum[0], get_sd4_ms, set_sd4_ms),
-	SOC_ENUM_EXT("LRCK5/BICK5 Master", ak7738_msnbit_enum[0], get_sd5_ms, set_sd5_ms),
-
-	SOC_ENUM("LRCK1/BICK1 Sync Domain", ak7738_portsdsel_enum[0]),
-	SOC_ENUM("LRCK2/BICK2 Sync Domain", ak7738_portsdsel_enum[1]),
-	SOC_ENUM("LRCK3/BICK3 Sync Domain", ak7738_portsdsel_enum[2]),
-	SOC_ENUM("LRCK4/BICK4 Sync Domain", ak7738_portsdsel_enum[3]),
-	SOC_ENUM("LRCK5/BICK5 Sync Domain", ak7738_portsdsel_enum[4]),
-
-	SOC_ENUM("DSP Master Clock", ak7738_mdiv_enum[0]),
-
-	SOC_ENUM_EXT("BUS Master Clock", ak7738_busclock_enum[0], get_bus_clock, set_bus_clock),
-
-	SOC_ENUM_EXT("Sync Domain 1 Clock Source", ak7738_sdcks_enum[0], get_sd1_cks, set_sd1_cks),
-	SOC_ENUM_EXT("Sync Domain 2 Clock Source", ak7738_sdcks_enum[0], get_sd2_cks, set_sd2_cks),
-	SOC_ENUM_EXT("Sync Domain 3 Clock Source", ak7738_sdcks_enum[0], get_sd3_cks, set_sd3_cks),
-	SOC_ENUM_EXT("Sync Domain 4 Clock Source", ak7738_sdcks_enum[0], get_sd4_cks, set_sd4_cks),
-	SOC_ENUM_EXT("Sync Domain 5 Clock Source", ak7738_sdcks_enum[0], get_sd5_cks, set_sd5_cks),
-	SOC_ENUM_EXT("Sync Domain 6 Clock Source", ak7738_sdcks_enum[0], get_sd6_cks, set_sd6_cks),
-	SOC_ENUM_EXT("Sync Domain 7 Clock Source", ak7738_sdcks_enum[0], get_sd7_cks, set_sd7_cks),
-
-	SOC_ENUM_EXT("Sync Domain 1 fs", ak7738_sd_fs_enum[0], get_sd1_fs, set_sd1_fs),
-	SOC_ENUM_EXT("Sync Domain 2 fs", ak7738_sd_fs_enum[0], get_sd2_fs, set_sd2_fs),
-	SOC_ENUM_EXT("Sync Domain 3 fs", ak7738_sd_fs_enum[0], get_sd3_fs, set_sd3_fs),
-	SOC_ENUM_EXT("Sync Domain 4 fs", ak7738_sd_fs_enum[0], get_sd4_fs, set_sd4_fs),
-	SOC_ENUM_EXT("Sync Domain 5 fs", ak7738_sd_fs_enum[0], get_sd5_fs, set_sd5_fs),
-	SOC_ENUM_EXT("Sync Domain 6 fs", ak7738_sd_fs_enum[0], get_sd6_fs, set_sd6_fs),
-	SOC_ENUM_EXT("Sync Domain 7 fs", ak7738_sd_fs_enum[0], get_sd7_fs, set_sd7_fs),
-
-	SOC_ENUM_EXT("Sync Domain 1 BICK", ak7738_sd_fs_enum[1], get_sd1_bick, set_sd1_bick),
-	SOC_ENUM_EXT("Sync Domain 2 BICK", ak7738_sd_fs_enum[1], get_sd2_bick, set_sd2_bick),
-	SOC_ENUM_EXT("Sync Domain 3 BICK", ak7738_sd_fs_enum[1], get_sd3_bick, set_sd3_bick),
-	SOC_ENUM_EXT("Sync Domain 4 BICK", ak7738_sd_fs_enum[1], get_sd4_bick, set_sd4_bick),
-	SOC_ENUM_EXT("Sync Domain 5 BICK", ak7738_sd_fs_enum[1], get_sd5_bick, set_sd5_bick),
-	SOC_ENUM_EXT("Sync Domain 6 BICK", ak7738_sd_fs_enum[1], get_sd6_bick, set_sd6_bick),
-	SOC_ENUM_EXT("Sync Domain 7 BICK", ak7738_sd_fs_enum[1], get_sd7_bick, set_sd7_bick),
-
-	SOC_ENUM_EXT("PLL Input Clock", ak7738_pllset_enum[0], get_pllinput, set_pllinput),
-	SOC_ENUM_EXT("XTI Frequency", ak7738_pllset_enum[1], get_xtifs, set_xtifs),
-
-	SOC_ENUM_EXT("SDIN2 TDMI Setting", ak7738_tdmin_enum[0], get_sdin2_tdm, set_sdin2_tdm),
-	SOC_ENUM_EXT("SDIN4 TDMI Setting", ak7738_tdmin_enum[0], get_sdin4_tdm, set_sdin4_tdm),
-
-	SOC_ENUM_EXT("SDIN1 Slot Length", ak7738_slotlen_enum[0], get_sdin1_slot, set_sdin1_slot),
-	SOC_ENUM_EXT("SDIN2 Slot Length", ak7738_slotlen_enum[0], get_sdin2_slot, set_sdin2_slot),
-	SOC_ENUM_EXT("SDIN3 Slot Length", ak7738_slotlen_enum[0], get_sdin3_slot, set_sdin3_slot),
-	SOC_ENUM_EXT("SDIN4 Slot Length", ak7738_slotlen_enum[0], get_sdin4_slot, set_sdin4_slot),
-	SOC_ENUM_EXT("SDIN5 Slot Length", ak7738_slotlen_enum[0], get_sdin5_slot, set_sdin5_slot),
-
-	SOC_ENUM_EXT("SDOUT1 Slot Length", ak7738_slotlen_enum[0], get_sdout1_slot, set_sdout1_slot),
-	SOC_ENUM_EXT("SDOUT2 Slot Length", ak7738_slotlen_enum[0], get_sdout2_slot, set_sdout2_slot),
-	SOC_ENUM_EXT("SDOUT3 Slot Length", ak7738_slotlen_enum[0], get_sdout3_slot, set_sdout3_slot),
-	SOC_ENUM_EXT("SDOUT4 Slot Length", ak7738_slotlen_enum[0], get_sdout4_slot, set_sdout4_slot),
-	SOC_ENUM_EXT("SDOUT5 Slot Length", ak7738_slotlen_enum[0], get_sdout5_slot, set_sdout5_slot),
-
-	SOC_ENUM("SDIN6 Slot Length", ak7738_sd6_ioformat_enum[0]),
-	SOC_ENUM("SDIN6 Word Length", ak7738_sd6_ioformat_enum[1]),
-	SOC_ENUM("SDOUT6 Slot Length", ak7738_sd6_ioformat_enum[2]),
-	SOC_ENUM("SDOUT6 Word Length", ak7738_sd6_ioformat_enum[3]),
-
-	SOC_ENUM("SDOUT1 Fast Mode Setting", ak7738_sdout_modeset_enum[0]),
-	SOC_ENUM("SDOUT2 Fast Mode Setting", ak7738_sdout_modeset_enum[1]),
-	SOC_ENUM("SDOUT3 Fast Mode Setting", ak7738_sdout_modeset_enum[2]),
-	SOC_ENUM("SDOUT4 Fast Mode Setting", ak7738_sdout_modeset_enum[3]),
-	SOC_ENUM("SDOUT5 Fast Mode Setting", ak7738_sdout_modeset_enum[4]),
-	SOC_ENUM("SDOUT6 Fast Mode Setting", ak7738_sdout_modeset_enum[5]),
-
-	SOC_ENUM("MixerA Input1 Data Change", ak7738_mixer_setting_enum[0]),
-	SOC_ENUM("MixerA Input2 Data Change", ak7738_mixer_setting_enum[1]),
-	SOC_ENUM("MixerA Input1 Level Adjust", ak7738_mixer_setting_enum[2]),
-	SOC_ENUM("MixerA Input2 Level Adjust", ak7738_mixer_setting_enum[3]),
-
-	SOC_ENUM("MixerB Input1 Data Change", ak7738_mixer_setting_enum[4]),
-	SOC_ENUM("MixerB Input2 Data Change", ak7738_mixer_setting_enum[5]),
-	SOC_ENUM("MixerB Input1 Level Adjust", ak7738_mixer_setting_enum[6]),
-	SOC_ENUM("MixerB Input2 Level Adjust", ak7738_mixer_setting_enum[7]),
-
-	SOC_SINGLE("Lch Mic DRC Enable", AK7738_5E_MICAMP_GAIN_CONTROL, 3, 1, 0),
-	SOC_SINGLE("Rch Mic DRC Enable", AK7738_5E_MICAMP_GAIN_CONTROL, 2, 1, 0),
-	SOC_SINGLE("Lch Mic ZeroCross Enable", AK7738_5E_MICAMP_GAIN_CONTROL, 1, 1, 0),
-	SOC_SINGLE("Rch Mic ZeroCross Enable", AK7738_5E_MICAMP_GAIN_CONTROL, 0, 1, 0),
-
-	SOC_ENUM("ADC Digital Filter Select", ak7738_adda_digfilsel_enum[0]),
-	SOC_ENUM("ADC Digital Volume Transition Time", ak7738_adda_trantime_enum[0]),
-	SOC_ENUM("DAC Digital Filter Select", ak7738_adda_digfilsel_enum[1]),
-	SOC_ENUM("DAC Digital Volume Transition Time", ak7738_adda_trantime_enum[1]),
-
-	SOC_SINGLE("ADC1 HPF Enable", AK7738_67_ADC_MUTE_HPF, 2, 1, 1),
-	SOC_SINGLE("ADC2 HPF Enable", AK7738_67_ADC_MUTE_HPF, 1, 1, 1),
-	SOC_SINGLE("ADCM HPF Enable", AK7738_67_ADC_MUTE_HPF, 0, 1, 1),
-
-	SOC_ENUM("DAC DSM Sampling Clock Setting", ak7738_dsm_ckset_enum[0]),
-
-	SOC_SINGLE("SRC1 Mute Enable", AK7738_70_SRC_MUTE_SETTING, 7, 1, 0),
-	SOC_SINGLE("SRC2 Mute Enable", AK7738_70_SRC_MUTE_SETTING, 6, 1, 0),
-	SOC_SINGLE("SRC3 Mute Enable", AK7738_70_SRC_MUTE_SETTING, 5, 1, 0),
-	SOC_SINGLE("SRC4 Mute Enable", AK7738_70_SRC_MUTE_SETTING, 4, 1, 0),
-
-	SOC_ENUM("SRC1 Mute Semi-Auto", ak7738_src_softmute_enum[0]),
-	SOC_ENUM("SRC2 Mute Semi-Auto", ak7738_src_softmute_enum[1]),
-	SOC_ENUM("SRC3 Mute Semi-Auto", ak7738_src_softmute_enum[2]),
-	SOC_ENUM("SRC4 Mute Semi-Auto", ak7738_src_softmute_enum[3]),
-
-	SOC_SINGLE("FSCONV1 Mute Enable", AK7738_71_FSCONV_MUTE_SETTING, 5, 1, 0),
-	SOC_SINGLE("FSCONV2 Mute Enable", AK7738_71_FSCONV_MUTE_SETTING, 4, 1, 0),
-	SOC_ENUM("FSCONV1 Mute Semi-Auto", ak7738_fsconv_mute_enum[0]),
-	SOC_ENUM("FSCONV2 Mute Semi-Auto", ak7738_fsconv_mute_enum[1]),
-	SOC_ENUM("FSCONV1 Input Data Valid Setting", ak7738_fsconv_valchanel_enum[0]),
-	SOC_ENUM("FSCONV2 Input Data Valid Setting", ak7738_fsconv_valchanel_enum[1]),
-
-	SOC_ENUM("SDOUT2 Pin Output Select", ak7738_outportsel_enum[0]),
-	SOC_ENUM("SDOUT3 Pin Output Select", ak7738_outportsel_enum[1]),
-	SOC_ENUM("SDOUT4 Pin Output Select", ak7738_outportsel_enum[2]),
-	SOC_ENUM("SDOUT5 Pin Output Select", ak7738_outportsel_enum[3]),
-	SOC_ENUM("SDOUT6 Pin Output Select", ak7738_outportsel_enum[4]),
-
-	SOC_ENUM("SDIN2 Pin Input Select", ak7738_inportsel_enum[0]),
-	SOC_ENUM("SDIN3 Pin Input Select", ak7738_inportsel_enum[1]),
-	SOC_ENUM("SDIN5 Pin Input Select", ak7738_inportsel_enum[2]),
-	SOC_ENUM("LRCK3 Pin Input Select", ak7738_inportsel_enum[3]),
-	SOC_ENUM("BICK3 Pin Input Select", ak7738_inportsel_enum[4]),
-
-	SOC_SINGLE("SRC1 FSIO Sync Enable", AK7738_6F_SRC_CLOCK_SETTING, 7, 1, 0),
-	SOC_SINGLE("SRC2 FSIO Sync Enable", AK7738_6F_SRC_CLOCK_SETTING, 6, 1, 0),
-	SOC_SINGLE("SRC3 FSIO Sync Enable", AK7738_6F_SRC_CLOCK_SETTING, 5, 1, 0),
-	SOC_SINGLE("SRC4 FSIO Sync Enable", AK7738_7C_STO_FLAG_SETTING2, 7, 1, 0),
-	SOC_ENUM("SRC Digital Filter Setting",ak7738_src_digfil_select_enum[0]),
-
-	SOC_SINGLE("DSP1 JX0 Enable", AK7738_7A_JX_SETTING, 7, 1, 0),
-	SOC_SINGLE("DSP1 JX1 Enable", AK7738_7A_JX_SETTING, 6, 1, 0),
-	SOC_SINGLE("DSP1 JX2 Enable", AK7738_7A_JX_SETTING, 5, 1, 0),
-	SOC_SINGLE("DSP1 JX3 Enable", AK7738_7A_JX_SETTING, 4, 1, 0),
-	SOC_SINGLE("DSP2 JX0 Enable", AK7738_7A_JX_SETTING, 3, 1, 0),
-	SOC_SINGLE("DSP2 JX1 Enable", AK7738_7A_JX_SETTING, 2, 1, 0),
-	SOC_SINGLE("DSP2 JX2 Enable", AK7738_7A_JX_SETTING, 1, 1, 0),
-	SOC_SINGLE("DSP2 JX3 Enable", AK7738_7A_JX_SETTING, 0, 1, 0),
-
-	SOC_SINGLE("CRC Error Out Setting", AK7738_7B_STO_FLAG_SETTING1, 7, 1, 0),
-	SOC_SINGLE("DSP1 WDT Error Out Setting", AK7738_7B_STO_FLAG_SETTING1, 2, 1, 1),
-	SOC_SINGLE("DSP2 WDT Error Out Setting", AK7738_7B_STO_FLAG_SETTING1, 1, 1, 1),
-	SOC_SINGLE("Sub DSP WDT Error Out Setting", AK7738_7B_STO_FLAG_SETTING1, 0, 1, 1),
-
-	SOC_SINGLE("PLL Lock Signal Out Setting", AK7738_7C_STO_FLAG_SETTING2, 6, 1, 0),
-	SOC_SINGLE("SRC1 Lock Signal Out Setting", AK7738_7C_STO_FLAG_SETTING2, 5, 1, 0),
-	SOC_SINGLE("SRC2 Lock Signal Out Setting", AK7738_7C_STO_FLAG_SETTING2, 4, 1, 0),
-	SOC_SINGLE("SRC3 Lock Signal Out Setting", AK7738_7C_STO_FLAG_SETTING2, 3, 1, 0),
-	SOC_SINGLE("SRC4 Lock Signal Out Setting", AK7738_7C_STO_FLAG_SETTING2, 2, 1, 0),
-	SOC_SINGLE("FSCONV1 Lock Signal Out Setting", AK7738_7C_STO_FLAG_SETTING2, 1, 1, 0),
-	SOC_SINGLE("FSCONV2 Lock Signal Out Setting", AK7738_7C_STO_FLAG_SETTING2, 0, 1, 0),
-
-	SOC_ENUM_EXT("SDOUT1 PAD Drive Mode", ak7738_pad_drive_enum[0], get_pad_drive_sd1, set_pad_drive_sd1),
-	SOC_ENUM_EXT("SDOUT2 PAD Drive Mode", ak7738_pad_drive_enum[0], get_pad_drive_sd2, set_pad_drive_sd2),
-	SOC_ENUM_EXT("SDOUT3 PAD Drive Mode", ak7738_pad_drive_enum[0], get_pad_drive_sd3, set_pad_drive_sd3),
-	SOC_ENUM_EXT("SDOUT4 PAD Drive Mode", ak7738_pad_drive_enum[0], get_pad_drive_sd4, set_pad_drive_sd4),
-	SOC_ENUM_EXT("LRCK1 PAD Drive Mode", ak7738_pad_drive_enum[0], get_pad_drive_lr1, set_pad_drive_lr1),
-	SOC_ENUM_EXT("LRCK2 PAD Drive Mode", ak7738_pad_drive_enum[0], get_pad_drive_lr2, set_pad_drive_lr2),
-	SOC_ENUM_EXT("LRCK3 PAD Drive Mode", ak7738_pad_drive_enum[0], get_pad_drive_lr3, set_pad_drive_lr3),
-	SOC_ENUM_EXT("LRCK4 PAD Drive Mode", ak7738_pad_drive_enum[0], get_pad_drive_lr4, set_pad_drive_lr4),
-	SOC_ENUM_EXT("BICK1 PAD Drive Mode", ak7738_pad_drive_enum[0], get_pad_drive_bk1, set_pad_drive_bk1),
-	SOC_ENUM_EXT("BICK2 PAD Drive Mode", ak7738_pad_drive_enum[0], get_pad_drive_bk2, set_pad_drive_bk2),
-	SOC_ENUM_EXT("BICK3 PAD Drive Mode", ak7738_pad_drive_enum[0], get_pad_drive_bk3, set_pad_drive_bk3),
-	SOC_ENUM_EXT("BICK4 PAD Drive Mode", ak7738_pad_drive_enum[0], get_pad_drive_bk4, set_pad_drive_bk4),
-
-	SOC_ENUM_EXT("DSP Firmware PRAM", ak7738_firmware_enum[0], get_DSP_write_pram, set_DSP_write_pram),
-	SOC_ENUM_EXT("DSP Firmware CRAM", ak7738_firmware_enum[1], get_DSP_write_cram, set_DSP_write_cram),
-	SOC_ENUM_EXT("DSP Firmware OFREG", ak7738_firmware_enum[2], get_DSP_write_ofreg, set_DSP_write_ofreg),
-
-	SOC_ENUM("PRAM Memory Assignment DSP1/2", ak7738_dsp_assign_enum[0]),
-	SOC_ENUM("CRAM Memory Assignment DSP1/2", ak7738_dsp_assign_enum[1]),
-	SOC_ENUM("DRAM Memory Assignment DSP1/2", ak7738_dsp_assign_enum[2]),
-	SOC_ENUM("DLRAM Memory Assignment DSP1/2", ak7738_dsp_assign_enum[3]),
-	SOC_ENUM("DSP1 RAM Clear Setting", ak7738_dsp_assign_enum[4]),
-	SOC_ENUM("DSP2 RAM Clear Setting", ak7738_dsp_assign_enum[5]),
-	SOC_ENUM("Sub DSP RAM Clear Setting", ak7738_dsp_assign_enum[6]),
-
-	SOC_ENUM("DSP1 DRAM Bank1 Addressing Mode", ak7738_dsp_addressing_enum[0]),
-	SOC_ENUM("DSP1 DRAM Bank0 Addressing Mode", ak7738_dsp_addressing_enum[1]),
-	SOC_ENUM("DSP2 DRAM Bank1 Addressing Mode", ak7738_dsp_addressing_enum[2]),
-	SOC_ENUM("DSP2 DRAM Bank0 Addressing Mode", ak7738_dsp_addressing_enum[3]),
-	SOC_ENUM("DSP1 DLRAM Bank1 Addressing Mode", ak7738_dsp_addressing_enum[4]),
-	SOC_ENUM("DSP2 DLRAM Bank1 Addressing Mode", ak7738_dsp_addressing_enum[5]),
-
-	SOC_ENUM("DSP1 DRAM Bank1 Size", ak7738_dsp_bank_size_enum[0]),
-	SOC_ENUM("DSP2 DRAM Bank1 Size", ak7738_dsp_bank_size_enum[1]),
-	SOC_ENUM("DSP1 DLRAM Bank1 Size", ak7738_dsp_bank_size_enum[2]),
-	SOC_ENUM("DSP2 DLRAM Bank1 Size", ak7738_dsp_bank_size_enum[3]),
-
-	SOC_ENUM("DSP1 DLRAM Bank0 Sampling Mode", ak7738_dlram_sampling_mode_enum[0]),
-	SOC_ENUM("DSP2 DLRAM Bank0 Sampling Mode", ak7738_dlram_sampling_mode_enum[1]),
-
-	SOC_ENUM("DSP1 DLRAM Pointer DLP0 Mode", ak7738_dlram_pointer_mode_enum[0]),
-	SOC_ENUM("DSP2 DLRAM Pointer DLP0 Mode", ak7738_dlram_pointer_mode_enum[1]),
-
-	SOC_ENUM("DSP1 FFT Wave Point", ak7738_dsp_wave_point_enum[0]),
-	SOC_ENUM("DSP2 FFT Wave Point", ak7738_dsp_wave_point_enum[1]),
-
-	SOC_SINGLE("DIT Validity Flag", AK7738_7E_DIT_STATUS_BIT1, 7, 1, 0),
-	SOC_ENUM("DIT Dither Setting", ak7738_dit_statusbit_enum[0]),
-	SOC_ENUM("DIT CGMS-A Setting", ak7738_dit_statusbit_enum[1]),
-	SOC_SINGLE("DIT with Pre-emphasis", AK7738_7E_DIT_STATUS_BIT1, 3, 1, 0),
-	SOC_SINGLE("DIT Copyright Protected Valid", AK7738_7E_DIT_STATUS_BIT1, 2, 1, 1),
-	SOC_ENUM("DIT Data Select", ak7738_dit_statusbit_enum[2]),
-	SOC_SINGLE("DIT Chanel Number Valid", AK7738_7E_DIT_STATUS_BIT1, 0, 1, 1),
-	SOC_ENUM("Category Code CS[8:14]", ak7738_dit_statusbit_enum[3]),
-	SOC_ENUM("Category Code CS[15]", ak7738_dit_statusbit_enum[4]),
-	SOC_ENUM("DIT Clock Accuracy", ak7738_dit_statusbit_enum[5]),
-	SOC_ENUM("DIT Sampling Frequency", ak7738_dit_statusbit_enum[6]),
-	SOC_ENUM("DIT Original Sampling Frequency", ak7738_dit_statusbit_enum[7]),
-	SOC_ENUM("DIT Data Bit Length", ak7738_dit_statusbit_enum[8]),
-
-
-#ifdef AK7738_DEBUG
-	SOC_ENUM_EXT("Reg Read", ak7738_test_enum[0], get_test_reg, set_test_reg),
-	SOC_SINGLE("CLK Reset", AK7738_01_STSCLOCK_SETTING2, 7, 1, 0),
-#endif
-
-	SOC_ENUM_EXT("DSP2 Connect to DSP1", ak7738_dsp_connect_enum[0], get_dsp2_dsp1, set_dsp2_dsp1),
-	SOC_ENUM_EXT("Sub DSP Connect to DSP1", ak7738_dsp_connect_enum[0], get_subdsp_dsp1, set_subdsp_dsp1),
+    SOC_ENUM_SINGLE_EXT(ARRAY_SIZE(dsp2_switch1_txt), dsp2_switch1_txt),
 
 };
 
-static const char *ak7738_micbias_select_texts[] =
-		{"LineIn", "MicBias"};
+static const struct snd_kcontrol_new ak7738_snd_controls[] = {
+    SOC_SINGLE_TLV("MIC Input Volume L", AK7738_5D_MICAMP_GAIN, 4, 0x0F, 0,
+		   mgnl_tlv),
+    SOC_SINGLE_TLV("MIC Input Volume R", AK7738_5D_MICAMP_GAIN, 0, 0x0F, 0,
+		   mgnr_tlv),
 
+    SOC_SINGLE_TLV("ADC1 Digital Volume L", AK7738_5F_ADC1_LCH_VOLUME, 0, 0xFF,
+		   1, voladc_tlv),
+    SOC_SINGLE_TLV("ADC1 Digital Volume R", AK7738_60_ADC1_RCH_VOLUME, 0, 0xFF,
+		   1, voladc_tlv),
+    SOC_SINGLE_TLV("ADC2 Digital Volume L", AK7738_61_ADC2_LCH_VOLUME, 0, 0xFF,
+		   1, voladc_tlv),
+    SOC_SINGLE_TLV("ADC2 Digital Volume R", AK7738_62_ADC2_RCH_VOLUME, 0, 0xFF,
+		   1, voladc_tlv),
+    SOC_SINGLE_TLV("ADCM Digital Volume", AK7738_63_ADCM_VOLUME, 0, 0xFF, 1,
+		   voladc_tlv),
+
+    SOC_SINGLE_TLV("DAC1 Digital Volume L", AK7738_68_DAC1_LCH_VOLUME, 0, 0xFF,
+		   1, voldac_tlv),
+    SOC_SINGLE_TLV("DAC1 Digital Volume R", AK7738_69_DAC1_RCH_VOLUME, 0, 0xFF,
+		   1, voldac_tlv),
+    SOC_SINGLE_TLV("DAC2 Digital Volume L", AK7738_6A_DAC2_LCH_VOLUME, 0, 0xFF,
+		   1, voldac_tlv),
+    SOC_SINGLE_TLV("DAC2 Digital Volume R", AK7738_6B_DAC2_RCH_VOLUME, 0, 0xFF,
+		   1, voldac_tlv),
+
+    SOC_SINGLE("ADC1 Mute", AK7738_67_ADC_MUTE_HPF, 6, 1, 0),
+    SOC_SINGLE("ADC2 Mute", AK7738_67_ADC_MUTE_HPF, 5, 1, 0),
+    SOC_SINGLE("ADCM Mute", AK7738_67_ADC_MUTE_HPF, 4, 1, 0),
+
+    SOC_SINGLE("DAC1 Mute", AK7738_6E_DAC_MUTE_FILTER, 6, 1, 0),
+    SOC_SINGLE("DAC2 Mute", AK7738_6E_DAC_MUTE_FILTER, 5, 1, 0),
+
+    SOC_SINGLE("CLK Out Enable", AK7738_13_CLOKO_OUTPUT_SETTING, 3, 1, 0),
+    SOC_ENUM("CLK Out Select", ak7738_clkosel_enum[0]),
+
+    SOC_ENUM("DSP1 Sync Domain", ak7738_sdsel_enum[0]),
+    SOC_ENUM("DSP2 Sync Domain", ak7738_sdsel_enum[1]),
+    SOC_ENUM("DSP1 Out1 Sync Domain", ak7738_sdsel_enum[2]),
+    SOC_ENUM("DSP1 Out2 Sync Domain", ak7738_sdsel_enum[3]),
+    SOC_ENUM("DSP1 Out3 Sync Domain", ak7738_sdsel_enum[4]),
+
+    SOC_ENUM("SDIN1 Sync Domain", ak7738_sdsel_enum[5]),
+    SOC_ENUM("SDIN2 Sync Domain", ak7738_sdsel_enum[6]),
+    SOC_ENUM("SDIN3 Sync Domain", ak7738_sdsel_enum[7]),
+    SOC_ENUM("SDIN4 Sync Domain", ak7738_sdsel_enum[8]),
+    SOC_ENUM("SDIN5 Sync Domain", ak7738_sdsel_enum[9]),
+    SOC_ENUM("SDIN6 Sync Domain", ak7738_sdsel_enum[10]),
+
+    SOC_ENUM("SRC1 Out Sync Domain", ak7738_sdsel_enum[11]),
+    SOC_ENUM("SRC2 Out Sync Domain", ak7738_sdsel_enum[12]),
+    SOC_ENUM("SRC3 Out Sync Domain", ak7738_sdsel_enum[13]),
+    SOC_ENUM("SRC4 Out Sync Domain", ak7738_sdsel_enum[14]),
+    SOC_ENUM("FSCONV1 Out Sync Domain", ak7738_sdsel_enum[15]),
+    SOC_ENUM("FSCONV2 Out Sync Domain", ak7738_sdsel_enum[16]),
+
+    SOC_ENUM("MIXA Sync Domain", ak7738_sdsel_enum[17]),
+    SOC_ENUM("MIXB Sync Domain", ak7738_sdsel_enum[18]),
+    SOC_ENUM("ADC1 Sync Domain", ak7738_sdsel_enum[19]),
+    SOC_ENUM("CODEC Sync Domain", ak7738_sdsel_enum[20]),
+
+    SOC_ENUM("CODEC Sampling Frequency", ak7738_fsmode_enum[0]),
+    SOC_ENUM_EXT("LRCK1/BICK1 Master", ak7738_msnbit_enum[0], get_sd1_ms,
+		 set_sd1_ms),
+    SOC_ENUM_EXT("LRCK2/BICK2 Master", ak7738_msnbit_enum[0], get_sd2_ms,
+		 set_sd2_ms),
+    SOC_ENUM_EXT("LRCK3/BICK3 Master", ak7738_msnbit_enum[0], get_sd3_ms,
+		 set_sd3_ms),
+    SOC_ENUM_EXT("LRCK4/BICK4 Master", ak7738_msnbit_enum[0], get_sd4_ms,
+		 set_sd4_ms),
+    SOC_ENUM_EXT("LRCK5/BICK5 Master", ak7738_msnbit_enum[0], get_sd5_ms,
+		 set_sd5_ms),
+
+    SOC_ENUM("LRCK1/BICK1 Sync Domain", ak7738_portsdsel_enum[0]),
+    SOC_ENUM("LRCK2/BICK2 Sync Domain", ak7738_portsdsel_enum[1]),
+    SOC_ENUM("LRCK3/BICK3 Sync Domain", ak7738_portsdsel_enum[2]),
+    SOC_ENUM("LRCK4/BICK4 Sync Domain", ak7738_portsdsel_enum[3]),
+    SOC_ENUM("LRCK5/BICK5 Sync Domain", ak7738_portsdsel_enum[4]),
+
+    SOC_ENUM("DSP Master Clock", ak7738_mdiv_enum[0]),
+
+    SOC_ENUM_EXT("BUS Master Clock", ak7738_busclock_enum[0], get_bus_clock,
+		 set_bus_clock),
+
+    SOC_ENUM_EXT("Sync Domain 1 Clock Source", ak7738_sdcks_enum[0],
+		 get_sd1_cks, set_sd1_cks),
+    SOC_ENUM_EXT("Sync Domain 2 Clock Source", ak7738_sdcks_enum[0],
+		 get_sd2_cks, set_sd2_cks),
+    SOC_ENUM_EXT("Sync Domain 3 Clock Source", ak7738_sdcks_enum[0],
+		 get_sd3_cks, set_sd3_cks),
+    SOC_ENUM_EXT("Sync Domain 4 Clock Source", ak7738_sdcks_enum[0],
+		 get_sd4_cks, set_sd4_cks),
+    SOC_ENUM_EXT("Sync Domain 5 Clock Source", ak7738_sdcks_enum[0],
+		 get_sd5_cks, set_sd5_cks),
+    SOC_ENUM_EXT("Sync Domain 6 Clock Source", ak7738_sdcks_enum[0],
+		 get_sd6_cks, set_sd6_cks),
+    SOC_ENUM_EXT("Sync Domain 7 Clock Source", ak7738_sdcks_enum[0],
+		 get_sd7_cks, set_sd7_cks),
+
+    SOC_ENUM_EXT("Sync Domain 1 fs", ak7738_sd_fs_enum[0], get_sd1_fs,
+		 set_sd1_fs),
+    SOC_ENUM_EXT("Sync Domain 2 fs", ak7738_sd_fs_enum[0], get_sd2_fs,
+		 set_sd2_fs),
+    SOC_ENUM_EXT("Sync Domain 3 fs", ak7738_sd_fs_enum[0], get_sd3_fs,
+		 set_sd3_fs),
+    SOC_ENUM_EXT("Sync Domain 4 fs", ak7738_sd_fs_enum[0], get_sd4_fs,
+		 set_sd4_fs),
+    SOC_ENUM_EXT("Sync Domain 5 fs", ak7738_sd_fs_enum[0], get_sd5_fs,
+		 set_sd5_fs),
+    SOC_ENUM_EXT("Sync Domain 6 fs", ak7738_sd_fs_enum[0], get_sd6_fs,
+		 set_sd6_fs),
+    SOC_ENUM_EXT("Sync Domain 7 fs", ak7738_sd_fs_enum[0], get_sd7_fs,
+		 set_sd7_fs),
+
+    SOC_ENUM_EXT("Sync Domain 1 BICK", ak7738_sd_fs_enum[1], get_sd1_bick,
+		 set_sd1_bick),
+    SOC_ENUM_EXT("Sync Domain 2 BICK", ak7738_sd_fs_enum[1], get_sd2_bick,
+		 set_sd2_bick),
+    SOC_ENUM_EXT("Sync Domain 3 BICK", ak7738_sd_fs_enum[1], get_sd3_bick,
+		 set_sd3_bick),
+    SOC_ENUM_EXT("Sync Domain 4 BICK", ak7738_sd_fs_enum[1], get_sd4_bick,
+		 set_sd4_bick),
+    SOC_ENUM_EXT("Sync Domain 5 BICK", ak7738_sd_fs_enum[1], get_sd5_bick,
+		 set_sd5_bick),
+    SOC_ENUM_EXT("Sync Domain 6 BICK", ak7738_sd_fs_enum[1], get_sd6_bick,
+		 set_sd6_bick),
+    SOC_ENUM_EXT("Sync Domain 7 BICK", ak7738_sd_fs_enum[1], get_sd7_bick,
+		 set_sd7_bick),
+
+    SOC_ENUM_EXT("PLL Input Clock", ak7738_pllset_enum[0], get_pllinput,
+		 set_pllinput),
+    SOC_ENUM_EXT("XTI Frequency", ak7738_pllset_enum[1], get_xtifs, set_xtifs),
+
+    SOC_ENUM_EXT("SDIN2 TDMI Setting", ak7738_tdmin_enum[0], get_sdin2_tdm,
+		 set_sdin2_tdm),
+    SOC_ENUM_EXT("SDIN4 TDMI Setting", ak7738_tdmin_enum[0], get_sdin4_tdm,
+		 set_sdin4_tdm),
+
+    SOC_ENUM_EXT("SDIN1 Slot Length", ak7738_slotlen_enum[0], get_sdin1_slot,
+		 set_sdin1_slot),
+    SOC_ENUM_EXT("SDIN2 Slot Length", ak7738_slotlen_enum[0], get_sdin2_slot,
+		 set_sdin2_slot),
+    SOC_ENUM_EXT("SDIN3 Slot Length", ak7738_slotlen_enum[0], get_sdin3_slot,
+		 set_sdin3_slot),
+    SOC_ENUM_EXT("SDIN4 Slot Length", ak7738_slotlen_enum[0], get_sdin4_slot,
+		 set_sdin4_slot),
+    SOC_ENUM_EXT("SDIN5 Slot Length", ak7738_slotlen_enum[0], get_sdin5_slot,
+		 set_sdin5_slot),
+
+    SOC_ENUM_EXT("SDOUT1 Slot Length", ak7738_slotlen_enum[0], get_sdout1_slot,
+		 set_sdout1_slot),
+    SOC_ENUM_EXT("SDOUT2 Slot Length", ak7738_slotlen_enum[0], get_sdout2_slot,
+		 set_sdout2_slot),
+    SOC_ENUM_EXT("SDOUT3 Slot Length", ak7738_slotlen_enum[0], get_sdout3_slot,
+		 set_sdout3_slot),
+    SOC_ENUM_EXT("SDOUT4 Slot Length", ak7738_slotlen_enum[0], get_sdout4_slot,
+		 set_sdout4_slot),
+    SOC_ENUM_EXT("SDOUT5 Slot Length", ak7738_slotlen_enum[0], get_sdout5_slot,
+		 set_sdout5_slot),
+
+    SOC_ENUM("SDIN6 Slot Length", ak7738_sd6_ioformat_enum[0]),
+    SOC_ENUM("SDIN6 Word Length", ak7738_sd6_ioformat_enum[1]),
+    SOC_ENUM("SDOUT6 Slot Length", ak7738_sd6_ioformat_enum[2]),
+    SOC_ENUM("SDOUT6 Word Length", ak7738_sd6_ioformat_enum[3]),
+
+    SOC_ENUM("SDOUT1 Fast Mode Setting", ak7738_sdout_modeset_enum[0]),
+    SOC_ENUM("SDOUT2 Fast Mode Setting", ak7738_sdout_modeset_enum[1]),
+    SOC_ENUM("SDOUT3 Fast Mode Setting", ak7738_sdout_modeset_enum[2]),
+    SOC_ENUM("SDOUT4 Fast Mode Setting", ak7738_sdout_modeset_enum[3]),
+    SOC_ENUM("SDOUT5 Fast Mode Setting", ak7738_sdout_modeset_enum[4]),
+    SOC_ENUM("SDOUT6 Fast Mode Setting", ak7738_sdout_modeset_enum[5]),
+
+    SOC_ENUM("MixerA Input1 Data Change", ak7738_mixer_setting_enum[0]),
+    SOC_ENUM("MixerA Input2 Data Change", ak7738_mixer_setting_enum[1]),
+    SOC_ENUM("MixerA Input1 Level Adjust", ak7738_mixer_setting_enum[2]),
+    SOC_ENUM("MixerA Input2 Level Adjust", ak7738_mixer_setting_enum[3]),
+
+    SOC_ENUM("MixerB Input1 Data Change", ak7738_mixer_setting_enum[4]),
+    SOC_ENUM("MixerB Input2 Data Change", ak7738_mixer_setting_enum[5]),
+    SOC_ENUM("MixerB Input1 Level Adjust", ak7738_mixer_setting_enum[6]),
+    SOC_ENUM("MixerB Input2 Level Adjust", ak7738_mixer_setting_enum[7]),
+
+    SOC_SINGLE("Lch Mic DRC Enable", AK7738_5E_MICAMP_GAIN_CONTROL, 3, 1, 0),
+    SOC_SINGLE("Rch Mic DRC Enable", AK7738_5E_MICAMP_GAIN_CONTROL, 2, 1, 0),
+    SOC_SINGLE("Lch Mic ZeroCross Enable", AK7738_5E_MICAMP_GAIN_CONTROL, 1, 1,
+	       0),
+    SOC_SINGLE("Rch Mic ZeroCross Enable", AK7738_5E_MICAMP_GAIN_CONTROL, 0, 1,
+	       0),
+
+    SOC_ENUM("ADC Digital Filter Select", ak7738_adda_digfilsel_enum[0]),
+    SOC_ENUM("ADC Digital Volume Transition Time",
+	     ak7738_adda_trantime_enum[0]),
+    SOC_ENUM("DAC Digital Filter Select", ak7738_adda_digfilsel_enum[1]),
+    SOC_ENUM("DAC Digital Volume Transition Time",
+	     ak7738_adda_trantime_enum[1]),
+
+    SOC_SINGLE("ADC1 HPF Enable", AK7738_67_ADC_MUTE_HPF, 2, 1, 1),
+    SOC_SINGLE("ADC2 HPF Enable", AK7738_67_ADC_MUTE_HPF, 1, 1, 1),
+    SOC_SINGLE("ADCM HPF Enable", AK7738_67_ADC_MUTE_HPF, 0, 1, 1),
+
+    SOC_ENUM("DAC DSM Sampling Clock Setting", ak7738_dsm_ckset_enum[0]),
+
+    SOC_SINGLE("SRC1 Mute Enable", AK7738_70_SRC_MUTE_SETTING, 7, 1, 0),
+    SOC_SINGLE("SRC2 Mute Enable", AK7738_70_SRC_MUTE_SETTING, 6, 1, 0),
+    SOC_SINGLE("SRC3 Mute Enable", AK7738_70_SRC_MUTE_SETTING, 5, 1, 0),
+    SOC_SINGLE("SRC4 Mute Enable", AK7738_70_SRC_MUTE_SETTING, 4, 1, 0),
+
+    SOC_ENUM("SRC1 Mute Semi-Auto", ak7738_src_softmute_enum[0]),
+    SOC_ENUM("SRC2 Mute Semi-Auto", ak7738_src_softmute_enum[1]),
+    SOC_ENUM("SRC3 Mute Semi-Auto", ak7738_src_softmute_enum[2]),
+    SOC_ENUM("SRC4 Mute Semi-Auto", ak7738_src_softmute_enum[3]),
+
+    SOC_SINGLE("FSCONV1 Mute Enable", AK7738_71_FSCONV_MUTE_SETTING, 5, 1, 0),
+    SOC_SINGLE("FSCONV2 Mute Enable", AK7738_71_FSCONV_MUTE_SETTING, 4, 1, 0),
+    SOC_ENUM("FSCONV1 Mute Semi-Auto", ak7738_fsconv_mute_enum[0]),
+    SOC_ENUM("FSCONV2 Mute Semi-Auto", ak7738_fsconv_mute_enum[1]),
+    SOC_ENUM("FSCONV1 Input Data Valid Setting",
+	     ak7738_fsconv_valchanel_enum[0]),
+    SOC_ENUM("FSCONV2 Input Data Valid Setting",
+	     ak7738_fsconv_valchanel_enum[1]),
+
+    SOC_ENUM("SDOUT2 Pin Output Select", ak7738_outportsel_enum[0]),
+    SOC_ENUM("SDOUT3 Pin Output Select", ak7738_outportsel_enum[1]),
+    SOC_ENUM("SDOUT4 Pin Output Select", ak7738_outportsel_enum[2]),
+    SOC_ENUM("SDOUT5 Pin Output Select", ak7738_outportsel_enum[3]),
+    SOC_ENUM("SDOUT6 Pin Output Select", ak7738_outportsel_enum[4]),
+
+    SOC_ENUM("SDIN2 Pin Input Select", ak7738_inportsel_enum[0]),
+    SOC_ENUM("SDIN3 Pin Input Select", ak7738_inportsel_enum[1]),
+    SOC_ENUM("SDIN5 Pin Input Select", ak7738_inportsel_enum[2]),
+    SOC_ENUM("LRCK3 Pin Input Select", ak7738_inportsel_enum[3]),
+    SOC_ENUM("BICK3 Pin Input Select", ak7738_inportsel_enum[4]),
+
+    SOC_SINGLE("SRC1 FSIO Sync Enable", AK7738_6F_SRC_CLOCK_SETTING, 7, 1, 0),
+    SOC_SINGLE("SRC2 FSIO Sync Enable", AK7738_6F_SRC_CLOCK_SETTING, 6, 1, 0),
+    SOC_SINGLE("SRC3 FSIO Sync Enable", AK7738_6F_SRC_CLOCK_SETTING, 5, 1, 0),
+    SOC_SINGLE("SRC4 FSIO Sync Enable", AK7738_7C_STO_FLAG_SETTING2, 7, 1, 0),
+    SOC_ENUM("SRC Digital Filter Setting", ak7738_src_digfil_select_enum[0]),
+
+    SOC_SINGLE("DSP1 JX0 Enable", AK7738_7A_JX_SETTING, 7, 1, 0),
+    SOC_SINGLE("DSP1 JX1 Enable", AK7738_7A_JX_SETTING, 6, 1, 0),
+    SOC_SINGLE("DSP1 JX2 Enable", AK7738_7A_JX_SETTING, 5, 1, 0),
+    SOC_SINGLE("DSP1 JX3 Enable", AK7738_7A_JX_SETTING, 4, 1, 0),
+    SOC_SINGLE("DSP2 JX0 Enable", AK7738_7A_JX_SETTING, 3, 1, 0),
+    SOC_SINGLE("DSP2 JX1 Enable", AK7738_7A_JX_SETTING, 2, 1, 0),
+    SOC_SINGLE("DSP2 JX2 Enable", AK7738_7A_JX_SETTING, 1, 1, 0),
+    SOC_SINGLE("DSP2 JX3 Enable", AK7738_7A_JX_SETTING, 0, 1, 0),
+
+    SOC_SINGLE("CRC Error Out Setting", AK7738_7B_STO_FLAG_SETTING1, 7, 1, 0),
+    SOC_SINGLE("DSP1 WDT Error Out Setting", AK7738_7B_STO_FLAG_SETTING1, 2, 1,
+	       1),
+    SOC_SINGLE("DSP2 WDT Error Out Setting", AK7738_7B_STO_FLAG_SETTING1, 1, 1,
+	       1),
+    SOC_SINGLE("Sub DSP WDT Error Out Setting", AK7738_7B_STO_FLAG_SETTING1, 0,
+	       1, 1),
+
+    SOC_SINGLE("PLL Lock Signal Out Setting", AK7738_7C_STO_FLAG_SETTING2, 6, 1,
+	       0),
+    SOC_SINGLE("SRC1 Lock Signal Out Setting", AK7738_7C_STO_FLAG_SETTING2, 5,
+	       1, 0),
+    SOC_SINGLE("SRC2 Lock Signal Out Setting", AK7738_7C_STO_FLAG_SETTING2, 4,
+	       1, 0),
+    SOC_SINGLE("SRC3 Lock Signal Out Setting", AK7738_7C_STO_FLAG_SETTING2, 3,
+	       1, 0),
+    SOC_SINGLE("SRC4 Lock Signal Out Setting", AK7738_7C_STO_FLAG_SETTING2, 2,
+	       1, 0),
+    SOC_SINGLE("FSCONV1 Lock Signal Out Setting", AK7738_7C_STO_FLAG_SETTING2,
+	       1, 1, 0),
+    SOC_SINGLE("FSCONV2 Lock Signal Out Setting", AK7738_7C_STO_FLAG_SETTING2,
+	       0, 1, 0),
+
+    SOC_ENUM_EXT("SDOUT1 PAD Drive Mode", ak7738_pad_drive_enum[0],
+		 get_pad_drive_sd1, set_pad_drive_sd1),
+    SOC_ENUM_EXT("SDOUT2 PAD Drive Mode", ak7738_pad_drive_enum[0],
+		 get_pad_drive_sd2, set_pad_drive_sd2),
+    SOC_ENUM_EXT("SDOUT3 PAD Drive Mode", ak7738_pad_drive_enum[0],
+		 get_pad_drive_sd3, set_pad_drive_sd3),
+    SOC_ENUM_EXT("SDOUT4 PAD Drive Mode", ak7738_pad_drive_enum[0],
+		 get_pad_drive_sd4, set_pad_drive_sd4),
+    SOC_ENUM_EXT("LRCK1 PAD Drive Mode", ak7738_pad_drive_enum[0],
+		 get_pad_drive_lr1, set_pad_drive_lr1),
+    SOC_ENUM_EXT("LRCK2 PAD Drive Mode", ak7738_pad_drive_enum[0],
+		 get_pad_drive_lr2, set_pad_drive_lr2),
+    SOC_ENUM_EXT("LRCK3 PAD Drive Mode", ak7738_pad_drive_enum[0],
+		 get_pad_drive_lr3, set_pad_drive_lr3),
+    SOC_ENUM_EXT("LRCK4 PAD Drive Mode", ak7738_pad_drive_enum[0],
+		 get_pad_drive_lr4, set_pad_drive_lr4),
+    SOC_ENUM_EXT("BICK1 PAD Drive Mode", ak7738_pad_drive_enum[0],
+		 get_pad_drive_bk1, set_pad_drive_bk1),
+    SOC_ENUM_EXT("BICK2 PAD Drive Mode", ak7738_pad_drive_enum[0],
+		 get_pad_drive_bk2, set_pad_drive_bk2),
+    SOC_ENUM_EXT("BICK3 PAD Drive Mode", ak7738_pad_drive_enum[0],
+		 get_pad_drive_bk3, set_pad_drive_bk3),
+    SOC_ENUM_EXT("BICK4 PAD Drive Mode", ak7738_pad_drive_enum[0],
+		 get_pad_drive_bk4, set_pad_drive_bk4),
+
+    SOC_ENUM_EXT("DSP Firmware PRAM", ak7738_firmware_enum[0],
+		 get_DSP_write_pram, set_DSP_write_pram),
+    SOC_ENUM_EXT("DSP Firmware CRAM", ak7738_firmware_enum[1],
+		 get_DSP_write_cram, set_DSP_write_cram),
+    SOC_ENUM_EXT("DSP Firmware OFREG", ak7738_firmware_enum[2],
+		 get_DSP_write_ofreg, set_DSP_write_ofreg),
+
+    SOC_ENUM("PRAM Memory Assignment DSP1/2", ak7738_dsp_assign_enum[0]),
+    SOC_ENUM("CRAM Memory Assignment DSP1/2", ak7738_dsp_assign_enum[1]),
+    SOC_ENUM("DRAM Memory Assignment DSP1/2", ak7738_dsp_assign_enum[2]),
+    SOC_ENUM("DLRAM Memory Assignment DSP1/2", ak7738_dsp_assign_enum[3]),
+    SOC_ENUM("DSP1 RAM Clear Setting", ak7738_dsp_assign_enum[4]),
+    SOC_ENUM("DSP2 RAM Clear Setting", ak7738_dsp_assign_enum[5]),
+    SOC_ENUM("Sub DSP RAM Clear Setting", ak7738_dsp_assign_enum[6]),
+
+    SOC_ENUM("DSP1 DRAM Bank1 Addressing Mode", ak7738_dsp_addressing_enum[0]),
+    SOC_ENUM("DSP1 DRAM Bank0 Addressing Mode", ak7738_dsp_addressing_enum[1]),
+    SOC_ENUM("DSP2 DRAM Bank1 Addressing Mode", ak7738_dsp_addressing_enum[2]),
+    SOC_ENUM("DSP2 DRAM Bank0 Addressing Mode", ak7738_dsp_addressing_enum[3]),
+    SOC_ENUM("DSP1 DLRAM Bank1 Addressing Mode", ak7738_dsp_addressing_enum[4]),
+    SOC_ENUM("DSP2 DLRAM Bank1 Addressing Mode", ak7738_dsp_addressing_enum[5]),
+
+    SOC_ENUM("DSP1 DRAM Bank1 Size", ak7738_dsp_bank_size_enum[0]),
+    SOC_ENUM("DSP2 DRAM Bank1 Size", ak7738_dsp_bank_size_enum[1]),
+    SOC_ENUM("DSP1 DLRAM Bank1 Size", ak7738_dsp_bank_size_enum[2]),
+    SOC_ENUM("DSP2 DLRAM Bank1 Size", ak7738_dsp_bank_size_enum[3]),
+
+    SOC_ENUM("DSP1 DLRAM Bank0 Sampling Mode",
+	     ak7738_dlram_sampling_mode_enum[0]),
+    SOC_ENUM("DSP2 DLRAM Bank0 Sampling Mode",
+	     ak7738_dlram_sampling_mode_enum[1]),
+
+    SOC_ENUM("DSP1 DLRAM Pointer DLP0 Mode", ak7738_dlram_pointer_mode_enum[0]),
+    SOC_ENUM("DSP2 DLRAM Pointer DLP0 Mode", ak7738_dlram_pointer_mode_enum[1]),
+
+    SOC_ENUM("DSP1 FFT Wave Point", ak7738_dsp_wave_point_enum[0]),
+    SOC_ENUM("DSP2 FFT Wave Point", ak7738_dsp_wave_point_enum[1]),
+
+    SOC_SINGLE("DIT Validity Flag", AK7738_7E_DIT_STATUS_BIT1, 7, 1, 0),
+    SOC_ENUM("DIT Dither Setting", ak7738_dit_statusbit_enum[0]),
+    SOC_ENUM("DIT CGMS-A Setting", ak7738_dit_statusbit_enum[1]),
+    SOC_SINGLE("DIT with Pre-emphasis", AK7738_7E_DIT_STATUS_BIT1, 3, 1, 0),
+    SOC_SINGLE("DIT Copyright Protected Valid", AK7738_7E_DIT_STATUS_BIT1, 2, 1,
+	       1),
+    SOC_ENUM("DIT Data Select", ak7738_dit_statusbit_enum[2]),
+    SOC_SINGLE("DIT Chanel Number Valid", AK7738_7E_DIT_STATUS_BIT1, 0, 1, 1),
+    SOC_ENUM("Category Code CS[8:14]", ak7738_dit_statusbit_enum[3]),
+    SOC_ENUM("Category Code CS[15]", ak7738_dit_statusbit_enum[4]),
+    SOC_ENUM("DIT Clock Accuracy", ak7738_dit_statusbit_enum[5]),
+    SOC_ENUM("DIT Sampling Frequency", ak7738_dit_statusbit_enum[6]),
+    SOC_ENUM("DIT Original Sampling Frequency", ak7738_dit_statusbit_enum[7]),
+    SOC_ENUM("DIT Data Bit Length", ak7738_dit_statusbit_enum[8]),
+
+#ifdef AK7738_DEBUG
+    SOC_ENUM_EXT("Reg Read", ak7738_test_enum[0], get_test_reg, set_test_reg),
+    SOC_SINGLE("CLK Reset", AK7738_01_STSCLOCK_SETTING2, 7, 1, 0),
+#endif
+
+    SOC_ENUM_EXT("DSP2 Connect to DSP1", ak7738_dsp_connect_enum[0],
+		 get_dsp2_dsp1, set_dsp2_dsp1),
+    SOC_ENUM_EXT("Sub DSP Connect to DSP1", ak7738_dsp_connect_enum[0],
+		 get_subdsp_dsp1, set_subdsp_dsp1),
+#ifdef AK7738_X9REF_FIRMWARE
+    SOC_ENUM_EXT("DSP2 SWITCH_1_SLOT1", ak7738_dsp_component_txt_enum[0],
+		 get_dsp2_switch1, set_dsp2_switch1),
+#endif
+};
+
+
+static const char *
+    ak7738_micbias_select_texts[] = {"LineIn", "MicBias"};
 
 static SOC_ENUM_SINGLE_VIRT_DECL(ak7738_micbias1_mux_enum, ak7738_micbias_select_texts);
 
@@ -5644,13 +5788,11 @@ static int ak7738_write_register(struct snd_soc_codec *codec,  unsigned int reg,
 	tx[1] = (unsigned char)(0xFF & (reg >> 8));
 	tx[2] = (unsigned char)(0xFF & reg);
 	tx[3] = value;
-
 #ifdef AK7738_I2C_IF
 	ret = i2c_master_send(ak7738->i2c, tx, wlen);
 #else
 	ret = spi_write(ak7738->spi, tx, wlen);
 #endif
-
 	return ret;
 }
 
@@ -6063,7 +6205,6 @@ unsigned char *cram_data)
 	}
 
 	ret = ak7738_writes(codec, tx, n);
-
 	if ( nDSPRun & nDSPbit ) {
 		tx[0] = COMMAND_WRITE_CRAM_EXEC + nDSPNo - 1;
 		tx[1] = 0;
@@ -6567,7 +6708,8 @@ static int ak7738_probe(struct snd_soc_codec *codec)
 
 	ak7738->nDSP2 = 0;
 	ak7738->nSubDSP = 0;
-
+	/*Next section is added by user by dsp firmware*/
+	ak7738->DSP2Switch1 = 0;
 	return ret;
 }
 
