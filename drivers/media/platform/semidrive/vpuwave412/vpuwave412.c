@@ -47,17 +47,10 @@
 
 /* if the driver want to use interrupt service from kernel ISR */
 #define VPU_SUPPORT_ISR
-
 #define VPU_SUPPORT_PLATFORM_DRIVER_REGISTER
-
-/* x9 plat no using this macro */
-//#define VPU_SUPPORT_RESERVED_VIDEO_MEMORY
-
 #define VPU_PLATFORM_DEVICE_NAME "vpu-wave412"
 #define VPU_CLK_NAME "vpuwaveclock"
 #define VPU_DEV_NAME "vpuwave"
-#define RSTGEN_VPU_WAVE_BASE_ADDR    0x34440000
-
 
 /* x9 plat ignored following */
 #define VPU_REG_BASE_ADDR 0x306200000
@@ -72,8 +65,69 @@
 # define  VM_RESERVED   (VM_DONTEXPAND | VM_DONTDUMP)
 #endif
 
-struct device *vpuwave_device = NULL;
+/* WAVE4 registers */
+#define W4_REG_BASE                 0x0000
+#define W4_VPU_BUSY_STATUS          (W4_REG_BASE + 0x0070)
+#define W4_VPU_INT_REASON_CLEAR     (W4_REG_BASE + 0x0034)
+#define W4_VPU_VINT_CLEAR           (W4_REG_BASE + 0x003C)
+#define W4_VPU_VPU_INT_STS          (W4_REG_BASE + 0x0044)
+#define W4_VPU_INT_REASON           (W4_REG_BASE + 0x004c)
+#define W4_RET_SUCCESS              (W4_REG_BASE + 0x0110)
+#define W4_RET_FAIL_REASON          (W4_REG_BASE + 0x0114)
 
+/* WAVE4 INIT, WAKEUP */
+#define W4_PO_CONF                  (W4_REG_BASE + 0x0000)
+#define W4_VCPU_CUR_PC              (W4_REG_BASE + 0x0004)
+#define W4_VPU_VINT_ENABLE          (W4_REG_BASE + 0x0048)
+#define W4_VPU_RESET_REQ            (W4_REG_BASE + 0x0050)
+#define W4_VPU_RESET_STATUS         (W4_REG_BASE + 0x0054)
+#define W4_VPU_REMAP_CTRL           (W4_REG_BASE + 0x0060)
+#define W4_VPU_REMAP_VADDR          (W4_REG_BASE + 0x0064)
+#define W4_VPU_REMAP_PADDR          (W4_REG_BASE + 0x0068)
+#define W4_VPU_REMAP_CORE_START     (W4_REG_BASE + 0x006C)
+
+#define W4_REMAP_CODE_INDEX          0
+enum {
+    W4_INT_INIT_VPU        = 0,
+    W4_INT_DEC_PIC_HDR     = 1,
+    W4_INT_FINI_SEQ        = 2,
+    W4_INT_DEC_PIC         = 3,
+    W4_INT_SET_FRAMEBUF    = 4,
+    W4_INT_FLUSH_DEC       = 5,
+    W4_INT_GET_FW_VERSION  = 8,
+    W4_INT_QUERY_DEC       = 9,
+    W4_INT_SLEEP_VPU       = 10,
+    W4_INT_WAKEUP_VPU      = 11,
+    W4_INT_CHANGE_INT      = 12,
+    W4_INT_CREATE_INSTANCE = 14,
+    W4_INT_BSBUF_EMPTY     = 15,   /*!<< Bitstream buffer empty */
+    W4_INT_ENC_SLICE_INT   = 15,
+};
+
+#define W4_HW_OPTION                (W4_REG_BASE + 0x0124)
+#define W4_CODE_SIZE                (W4_REG_BASE + 0x011C)
+/* Note: W4_INIT_CODE_BASE_ADDR should be aligned to 4KB */
+#define W4_ADDR_CODE_BASE           (W4_REG_BASE + 0x0118)
+#define W4_CODE_PARAM               (W4_REG_BASE + 0x0120)
+#define W4_INIT_VPU_TIME_OUT_CNT    (W4_REG_BASE + 0x0134)
+
+/* WAVE4 Wave4BitIssueCommand */
+#define W4_CORE_INDEX               (W4_REG_BASE + 0x0104)
+#define W4_INST_INDEX               (W4_REG_BASE + 0x0108)
+#define W4_COMMAND                  (W4_REG_BASE + 0x0100)
+#define W4_VPU_HOST_INT_REQ         (W4_REG_BASE + 0x0038)
+
+#define W4_MAX_CODE_BUF_SIZE         (512*1024)
+#define W4_CMD_INIT_VPU              (0x0001)
+#define W4_CMD_SLEEP_VPU             (0x0400)
+
+/* Product register */
+#define VPU_PRODUCT_CODE_REGISTER   (W4_REG_BASE + 0x1044)
+#define ReadVpuRegister(addr)       *(volatile unsigned int *)(s_vpu_register.virt_addr + s_bit_firmware_info.reg_base_offset + addr)
+#define WriteVpuRegister(addr, val) *(volatile unsigned int *)(s_vpu_register.virt_addr + s_bit_firmware_info.reg_base_offset + addr) = (unsigned int)val
+#define WriteVpu(addr, val)         *(volatile unsigned int *)(addr) = (unsigned int)val;
+
+struct device *vpuwave_device = NULL;
 typedef struct vpu_drv_context_t {
     struct fasync_struct *async_queue;
     unsigned long interrupt_reason;
@@ -127,16 +181,6 @@ struct wave_drive {
 };
 
 static struct wave_drive drive_data = {0};
-
-/* x9 plat ignored following */
-#ifdef VPU_SUPPORT_RESERVED_VIDEO_MEMORY
-#   define VPU_INIT_VIDEO_MEMORY_SIZE_IN_BYTE (62*1024*1024)
-#   define VPU_DRAM_PHYSICAL_BASE 0x86C00000
-#include "vmm.h"
-static video_mm_t s_vmem;
-static vpudrv_buffer_t s_video_memory = {0};
-#endif /*VPU_SUPPORT_RESERVED_VIDEO_MEMORY*/
-
 static int vpu_hw_reset(void);
 static void vpu_clk_disable(struct vpuwave_clk *clk);
 static int vpu_clk_enable(struct vpuwave_clk *clk);
@@ -149,10 +193,8 @@ static vpu_drv_context_t s_vpu_drv_context = {0};
 static int s_vpu_major;
 static struct cdev s_vpu_cdev;
 
-//static struct clk *s_vpu_clk;
 static struct vpuwave_clk  *s_vpu_clk = NULL;
 static int clk_reference = 0;
-
 static int s_vpu_open_ref_count;
 
 #ifdef VPU_SUPPORT_ISR
@@ -160,101 +202,15 @@ static int s_vpu_irq = VPU_IRQ_NUM;
 #endif
 
 static vpudrv_buffer_t s_vpu_register = {0};
-
 static int s_interrupt_flag;
 static wait_queue_head_t s_interrupt_wait_q;
-
 static spinlock_t s_vpu_lock = __SPIN_LOCK_UNLOCKED(s_vpu_lock);
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,36)
-static DECLARE_MUTEX(s_vpu_sem);
-#else
 static DEFINE_SEMAPHORE(s_vpu_sem);
-#endif
 static struct list_head s_vbp_head = LIST_HEAD_INIT(s_vbp_head);
 static struct list_head s_inst_list_head = LIST_HEAD_INIT(
             s_inst_list_head);
 
 static vpu_bit_firmware_info_t s_bit_firmware_info = {0};
-
-#ifdef CONFIG_PM
-/* implement to power management functions */
-#define BIT_BASE                    0x0000
-#define BIT_CODE_RUN                (BIT_BASE + 0x000)
-#define BIT_CODE_DOWN               (BIT_BASE + 0x004)
-#define BIT_INT_CLEAR               (BIT_BASE + 0x00C)
-#define BIT_INT_STS                 (BIT_BASE + 0x010)
-#define BIT_CODE_RESET              (BIT_BASE + 0x014)
-#define BIT_INT_REASON              (BIT_BASE + 0x174)
-#define BIT_BUSY_FLAG               (BIT_BASE + 0x160)
-#define BIT_RUN_COMMAND             (BIT_BASE + 0x164)
-#define BIT_RUN_INDEX               (BIT_BASE + 0x168)
-#define BIT_RUN_COD_STD             (BIT_BASE + 0x16C)
-
-/* WAVE4 registers */
-#define W4_REG_BASE                 0x0000
-#define W4_VPU_BUSY_STATUS          (W4_REG_BASE + 0x0070)
-#define W4_VPU_INT_REASON_CLEAR     (W4_REG_BASE + 0x0034)
-#define W4_VPU_VINT_CLEAR           (W4_REG_BASE + 0x003C)
-#define W4_VPU_VPU_INT_STS          (W4_REG_BASE + 0x0044)
-#define W4_VPU_INT_REASON           (W4_REG_BASE + 0x004c)
-
-#define W4_RET_SUCCESS              (W4_REG_BASE + 0x0110)
-#define W4_RET_FAIL_REASON          (W4_REG_BASE + 0x0114)
-
-/* WAVE4 INIT, WAKEUP */
-#define W4_PO_CONF                  (W4_REG_BASE + 0x0000)
-#define W4_VCPU_CUR_PC              (W4_REG_BASE + 0x0004)
-
-#define W4_VPU_VINT_ENABLE          (W4_REG_BASE + 0x0048)
-
-#define W4_VPU_RESET_REQ            (W4_REG_BASE + 0x0050)
-#define W4_VPU_RESET_STATUS         (W4_REG_BASE + 0x0054)
-
-#define W4_VPU_REMAP_CTRL           (W4_REG_BASE + 0x0060)
-#define W4_VPU_REMAP_VADDR          (W4_REG_BASE + 0x0064)
-#define W4_VPU_REMAP_PADDR          (W4_REG_BASE + 0x0068)
-#define W4_VPU_REMAP_CORE_START     (W4_REG_BASE + 0x006C)
-#define W4_VPU_BUSY_STATUS          (W4_REG_BASE + 0x0070)
-
-#define W4_REMAP_CODE_INDEX          0
-enum {
-    W4_INT_INIT_VPU        = 0,
-    W4_INT_DEC_PIC_HDR     = 1,
-    W4_INT_FINI_SEQ        = 2,
-    W4_INT_DEC_PIC         = 3,
-    W4_INT_SET_FRAMEBUF    = 4,
-    W4_INT_FLUSH_DEC       = 5,
-    W4_INT_GET_FW_VERSION  = 8,
-    W4_INT_QUERY_DEC       = 9,
-    W4_INT_SLEEP_VPU       = 10,
-    W4_INT_WAKEUP_VPU      = 11,
-    W4_INT_CHANGE_INT      = 12,
-    W4_INT_CREATE_INSTANCE = 14,
-    W4_INT_BSBUF_EMPTY     = 15,   /*!<< Bitstream buffer empty */
-    W4_INT_ENC_SLICE_INT   = 15,
-};
-
-#define W4_HW_OPTION                (W4_REG_BASE + 0x0124)
-#define W4_CODE_SIZE                (W4_REG_BASE + 0x011C)
-/* Note: W4_INIT_CODE_BASE_ADDR should be aligned to 4KB */
-#define W4_ADDR_CODE_BASE           (W4_REG_BASE + 0x0118)
-#define W4_CODE_PARAM               (W4_REG_BASE + 0x0120)
-#define W4_INIT_VPU_TIME_OUT_CNT    (W4_REG_BASE + 0x0134)
-
-/* WAVE4 Wave4BitIssueCommand */
-#define W4_CORE_INDEX               (W4_REG_BASE + 0x0104)
-#define W4_INST_INDEX               (W4_REG_BASE + 0x0108)
-#define W4_COMMAND                  (W4_REG_BASE + 0x0100)
-#define W4_VPU_HOST_INT_REQ         (W4_REG_BASE + 0x0038)
-
-/* Product register */
-#define VPU_PRODUCT_CODE_REGISTER   (BIT_BASE + 0x1044)
-#endif
-
-#define ReadVpuRegister(addr)       *(volatile unsigned int *)(s_vpu_register.virt_addr + s_bit_firmware_info.reg_base_offset + addr)
-#define WriteVpuRegister(addr, val) *(volatile unsigned int *)(s_vpu_register.virt_addr + s_bit_firmware_info.reg_base_offset + addr) = (unsigned int)val
-#define WriteVpu(addr, val)         *(volatile unsigned int *)(addr) = (unsigned int)val;
-
 
 //#define COMMON_MEMORY_USING_ION
 /**
@@ -306,18 +262,6 @@ static int vpu_alloc_dma_buffer(vpudrv_buffer_t *vb)
     if (!vb)
         return -1;
 
-#ifdef VPU_SUPPORT_RESERVED_VIDEO_MEMORY
-    vb->phys_addr = (unsigned long)vmem_alloc(&s_vmem, vb->size, 0);
-
-    if ((unsigned long)vb->phys_addr  == (unsigned long) -1) {
-        pr_err( "[VPUDRV-ERR] Physical memory allocation error size=%d\n",
-                 vb->size);
-        return -1;
-    }
-
-    vb->base = (unsigned long)(s_video_memory.base + (vb->phys_addr -
-                               s_video_memory.phys_addr));
-#else
     vb->base = (unsigned long)dma_alloc_coherent(vpuwave_device,
                PAGE_ALIGN(vb->size),
                (dma_addr_t *) (&vb->phys_addr), GFP_DMA | GFP_KERNEL);
@@ -328,7 +272,6 @@ static int vpu_alloc_dma_buffer(vpudrv_buffer_t *vb)
         return -1;
     }
 
-#endif
     return 0;
 }
 
@@ -337,21 +280,12 @@ static void vpu_free_dma_buffer(vpudrv_buffer_t *vb)
     if (!vb)
         return;
 
-#ifdef VPU_SUPPORT_RESERVED_VIDEO_MEMORY
-
-    if (vb->base)
-        vmem_free(&s_vmem, vb->phys_addr, 0);
-
-#else
-
     if (vb->base)
         dma_free_coherent(vpuwave_device, PAGE_ALIGN(vb->size),
                           (void *)vb->base,
                           vb->phys_addr);
 
         pr_info("[VPUDRV] vpu_free dma buffer wave device %p \n", vpuwave_device);
-
-#endif
 }
 
 static int vpu_free_instances(struct file *filp)
@@ -563,26 +497,6 @@ static long vpu_ioctl(struct file *filp, u_int cmd, u_long arg)
                 up(&s_vpu_sem);
             }
 
-        }
-        break;
-
-        case VDI_IOCTL_GET_RESERVED_VIDEO_MEMORY_INFO: {
-#ifdef VPU_SUPPORT_RESERVED_VIDEO_MEMORY
-            pr_info("[VPUDRV][+]VDI_IOCTL_GET_RESERVED_VIDEO_MEMORY_INFO\n");
-
-            if (s_video_memory.base != 0) {
-                ret = copy_to_user((void __user *)arg, &s_video_memory,
-                                   sizeof(vpudrv_buffer_t));
-
-                if (ret != 0)
-                    ret = -EFAULT;
-            }
-            else {
-                ret = -EFAULT;
-            }
-
-            pr_info("[VPUDRV][-]VDI_IOCTL_GET_RESERVED_VIDEO_MEMORY_INFO\n");
-#endif
         }
         break;
 
@@ -882,13 +796,6 @@ static long vpu_ioctl(struct file *filp, u_int cmd, u_long arg)
                 return -1;
 
             dma_buf_put(temp);
-/*
-            pr_info("get dma handle %d, dma buf addr %p, attachment %p, sgt %p\n",
-                    buf.buf_handle,
-                    (void *)buf.dma_addr,
-                    (void *)buf.attachment,
-                    (void *)buf.sgt);
-*/
         }
         break;
 
@@ -1424,31 +1331,7 @@ static int vpu_probe(struct platform_device *pdev)
 
 #endif
 
-#ifdef VPU_SUPPORT_RESERVED_VIDEO_MEMORY
-    s_video_memory.size = VPU_INIT_VIDEO_MEMORY_SIZE_IN_BYTE;
-    s_video_memory.phys_addr = VPU_DRAM_PHYSICAL_BASE;
-    s_video_memory.base = (unsigned long)ioremap_nocache(
-                              s_video_memory.phys_addr,
-                              PAGE_ALIGN(s_video_memory.size));
-
-    if (!s_video_memory.base) {
-        pr_err("[VPUDRV-ERR] :  fail to remap video memory physical phys_addr=0x%lx, base=0x%lx, size=%d\n",
-                s_video_memory.phys_addr, s_video_memory.base, (int)s_video_memory.size);
-        goto ERROR_PROVE_DEVICE;
-    }
-
-    if (vmem_init(&s_vmem, s_video_memory.phys_addr,
-                  s_video_memory.size) < 0) {
-        pr_err( "[VPUDRV-ERR] :  fail to init vmem system\n");
-        goto ERROR_PROVE_DEVICE;
-    }
-
-    pr_info("[VPUDRV] success to probe vpu device with reserved video memory phys_addr=0x%lx, base=0x%lx\n",
-            s_video_memory.phys_addr, s_video_memory.base);
-#else
     pr_info("[VPUDRV] success to probe vpu device with non reserved video memory\n");
-#endif
-
     return 0;
 
 ERROR_PROVE_DEVICE:
@@ -1491,16 +1374,6 @@ static int vpu_remove(struct platform_device *pdev)
         s_common_memory.base = 0;
     }
 
-#ifdef VPU_SUPPORT_RESERVED_VIDEO_MEMORY
-
-    if (s_video_memory.base) {
-        iounmap((void *)s_video_memory.base);
-        s_video_memory.base = 0;
-        vmem_exit(&s_vmem);
-    }
-
-#endif
-
     if (s_vpu_major > 0) {
         cdev_del(&s_vpu_cdev);
         unregister_chrdev_region(s_vpu_major, 1);
@@ -1508,10 +1381,10 @@ static int vpu_remove(struct platform_device *pdev)
     }
 
 #ifdef VPU_SUPPORT_ISR
-
-    if (s_vpu_irq)
+    if (s_vpu_irq) {
         free_irq(s_vpu_irq, &s_vpu_drv_context);
-
+        s_vpu_irq = 0;
+    }
 #endif
 
     if (s_vpu_register.virt_addr)
@@ -1528,11 +1401,6 @@ static int vpu_remove(struct platform_device *pdev)
 }
 
 #ifdef CONFIG_PM
-#define W4_MAX_CODE_BUF_SIZE     (512*1024)
-#define W4_CMD_INIT_VPU       (0x0001)
-#define W4_CMD_SLEEP_VPU         (0x0400)
-#define W4_CMD_WAKEUP_VPU       (0x0800)
-
 static void Wave4BitIssueCommand(u32 cmd)
 {
     WriteVpuRegister(W4_VPU_BUSY_STATUS, 1);
@@ -1763,8 +1631,6 @@ static void __exit vpu_exit(void)
     device_remove_file(vpuwave_device, &dev_attr_wave412_debug);
     platform_driver_unregister(&vpu_driver);
 
-#else /* VPU_SUPPORT_PLATFORM_DRIVER_REGISTER */
-
 #ifdef VPU_SUPPORT_CLOCK_CONTROL
     vpu_clk_disable(s_vpu_clk);
 #else
@@ -1786,16 +1652,6 @@ static void __exit vpu_exit(void)
         s_common_memory.base = 0;
     }
 
-#ifdef VPU_SUPPORT_RESERVED_VIDEO_MEMORY
-
-    if (s_video_memory.base) {
-        iounmap((void *)s_video_memory.base);
-        s_video_memory.base = 0;
-        vmem_exit(&s_vmem);
-    }
-
-#endif
-
     if (s_vpu_major > 0) {
         cdev_del(&s_vpu_cdev);
         unregister_chrdev_region(s_vpu_major, 1);
@@ -1803,10 +1659,10 @@ static void __exit vpu_exit(void)
     }
 
 #ifdef VPU_SUPPORT_ISR
-
-    if (s_vpu_irq)
+    if (s_vpu_irq) {
         free_irq(s_vpu_irq, &s_vpu_drv_context);
-
+        s_vpu_irq = 0;
+    }
 #endif
 
     if (s_vpu_register.virt_addr) {
