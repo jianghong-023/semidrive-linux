@@ -40,6 +40,7 @@
 #include <linux/of_gpio.h>
 #include <linux/regmap.h>
 
+
 #include "ak7738.h"
 #include "ak7738_dsp_code.h"
 
@@ -91,6 +92,7 @@ struct ak7738_priv {
 
 	/*Next section is added by user by dsp firmware*/
 	int DSP2Switch1;
+	int DSP1HFPVol;
 
 };
 
@@ -3027,6 +3029,80 @@ static const struct soc_enum ak7738_dsp_component_txt_enum[] = {
 
 };
 
+
+static const DECLARE_TLV_DB_SCALE(dsp_vol_tlv, 0, 255, 1);
+
+
+/* 255 ->11.5db 0.5dB steps */
+static int dsp_vol_to_param(int vol, char* param)
+{
+	if(vol > 255){
+		return -1;
+	}else if(vol < 0){
+		return -1;
+	} else if (vol == 0) {
+		/*0 -> set to mute.*/
+		param[0]=0;
+		param[1]=0;
+		param[2]=0;
+		akdbgprt(
+		    "\t%s dsp_vol_to_param mute, param 0x%x, 0x%x, 0x%x \n",
+		    __FUNCTION__, param[0], param[1], param[2]);
+		return 0;
+	}
+	param[0] = dsp_vol_table[vol * 3];
+	param[1] = dsp_vol_table[vol * 3 + 1];
+	param[2] = dsp_vol_table[vol * 3 + 2];
+	akdbgprt("\t%s dsp_vol_to_param 0x%x, param 0x%x, 0x%x, 0x%x \n",
+		 __FUNCTION__, vol, param[0], param[1], param[2]);
+	return 0;
+}
+
+static int dsp1_hfp_vol_set(struct snd_kcontrol *kcontrol,
+			    struct snd_ctl_elem_value *ucontrol)
+{
+	struct soc_mixer_control *mc =
+		(struct soc_mixer_control *)kcontrol->private_value;
+	struct snd_soc_codec *codec = snd_soc_kcontrol_codec(kcontrol);
+	struct ak7738_priv *ak7738 = snd_soc_codec_get_drvdata(codec);
+	unsigned char cram_vol[3] = {0x0, 0x0, 0x0};
+	int value = ucontrol->value.integer.value[0];
+	unsigned int reg = mc->reg;
+	int ret;
+
+	int max = mc->max;
+	if (value > max)
+		return -EINVAL;
+	int dspNo = 1;
+	ret = dsp_vol_to_param(value, cram_vol);
+	if (ret < 0)
+		return (-1);
+
+	ret = ak7738_write_cram(codec, dspNo, CRAM_ADDR_LEVEL_FADERSCO,
+				sizeof(cram_vol), cram_vol);
+
+	if (ret < 0)
+		return (-1);
+
+	ak7738->DSP1HFPVol = value;
+	return 0;
+}
+
+static int dsp1_hfp_vol_get(struct snd_kcontrol *kcontrol,
+			    struct snd_ctl_elem_value *ucontrol)
+{
+	struct soc_mixer_control *mc =
+	    (struct soc_mixer_control *)kcontrol->private_value;
+	struct snd_soc_codec *codec = snd_soc_kcontrol_codec(kcontrol);
+	struct ak7738_priv *ak7738 = snd_soc_codec_get_drvdata(codec);
+	int max = mc->max;
+	ucontrol->value.integer.value[0] = ak7738->DSP1HFPVol;
+	akdbgprt("\t%s dsp1_hfp_vol val =%d max=%d\n", __FUNCTION__,
+		 ak7738->DSP1HFPVol, max);
+
+	return 0;
+}
+
 static const struct snd_kcontrol_new ak7738_snd_controls[] = {
     SOC_SINGLE_TLV("MIC Input Volume L", AK7738_5D_MICAMP_GAIN, 4, 0x0F, 0,
 		   mgnl_tlv),
@@ -3388,6 +3464,8 @@ static const struct snd_kcontrol_new ak7738_snd_controls[] = {
 #ifdef AK7738_X9REF_FIRMWARE
     SOC_ENUM_EXT("DSP2 SWITCH_1_SLOT1", ak7738_dsp_component_txt_enum[0],
 		 get_dsp2_switch1, set_dsp2_switch1),
+    SOC_SINGLE_EXT_TLV("DSP1 HFP VOL", AK7738_VIRT_112_DSP1_HFP_VOL, 0, 0xFF, 0,
+		       dsp1_hfp_vol_get, dsp1_hfp_vol_set, dsp_vol_tlv),
 #endif
 };
 
@@ -6710,6 +6788,9 @@ static int ak7738_probe(struct snd_soc_codec *codec)
 	ak7738->nSubDSP = 0;
 	/*Next section is added by user by dsp firmware*/
 	ak7738->DSP2Switch1 = 0;
+	/*Max is 255 :12dB, default set to -10dB
+	Hal could overwrite it. */
+	ak7738->DSP1HFPVol = 211;
 	return ret;
 }
 
