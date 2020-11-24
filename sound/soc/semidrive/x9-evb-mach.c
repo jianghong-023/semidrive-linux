@@ -59,7 +59,6 @@ struct snd_x9_chip {
 	int jack_gpio;
 
 	unsigned int opened;
-	unsigned int spdif_status;
 	struct mutex audio_mutex;
 };
 
@@ -267,7 +266,27 @@ static struct snd_soc_dai_link snd_x9_evb_soc_dai_links[] = {
 	.codec_name = "tlv320aic23-codec.0-001a",
 	.init = x9_evb_tlv320aic23_init,
 	.dai_fmt = SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_CBS_CFS,
+    },
+#if 0 /* open if enable SPDIF device in dts */
+	{
+	.name = "x9_spdif1",
+	.stream_name = "x9 spdif",
+	.cpu_name = "30580000.spdif",
+	.platform_name = "30580000.spdif",
+	.cpu_dai_name = "snd_afe_spdif_dai0",
+	.codec_name = "snd-soc-dummy",
+	.codec_dai_name = "snd-soc-dummy-dai",
+    },
+    {
+	.name = "x9_spdif2",
+	.stream_name = "x9 spdif",
+	.cpu_name = "30590000.spdif",
+	.platform_name = "30590000.spdif",
+	.cpu_dai_name = "snd_afe_spdif_dai0",
+	.codec_name = "snd-soc-dummy",
+	.codec_dai_name = "snd-soc-dummy-dai",
     }
+#endif
 };
 
 /*Sound Card Driver
