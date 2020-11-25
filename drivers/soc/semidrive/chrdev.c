@@ -546,6 +546,10 @@ static int __init dcf_char_init(void)
 	int major;
 	int ret;
 
+	if (xen_domain())
+		return -ENODEV;
+
+	pr_info("initialize dcf platform driver!\n");
 	major = register_chrdev(0, "dcf", &dcf_chrdev_fops);
 	if (major < 0) {
 		pr_err("dcf: failed to register char dev region\n");
@@ -560,18 +564,12 @@ static int __init dcf_char_init(void)
 	}
 
 	dcf_class->devnode = dcf_devnode;
-
-	if (xen_domain()) {
-		/* TODO: XEN environment use vRPC as transportation */
-
-	} else {
-		/* Native environment use rpmsg channel as transportation */
-		ret = register_rpmsg_driver(&rpmsg_bridge_driver);
-		if (ret < 0) {
-			pr_err("dcf: failed to register rpmsg driver\n");
-			class_destroy(dcf_class);
-			unregister_chrdev(major, "dcf");
-		}
+	/* Native environment use rpmsg channel as transportation */
+	ret = register_rpmsg_driver(&rpmsg_bridge_driver);
+	if (ret < 0) {
+		pr_err("dcf: failed to register rpmsg driver\n");
+		class_destroy(dcf_class);
+		unregister_chrdev(major, "dcf");
 	}
 
 	return 0;
@@ -579,6 +577,10 @@ static int __init dcf_char_init(void)
 
 static void __exit dcf_char_exit(void)
 {
+	if (xen_domain())
+		return;
+
+	pr_info("unregister dcf platform driver!\n");
 	unregister_rpmsg_driver(&rpmsg_bridge_driver);
 	class_destroy(dcf_class);
 	unregister_chrdev(dcf_major, "dcf");
@@ -589,6 +591,6 @@ module_exit(dcf_char_exit);
 
 MODULE_AUTHOR("<ye.liu@semidrive.com>");
 MODULE_ALIAS("dcf:chrdev");
-MODULE_DESCRIPTION("Semidrive DCF User chardev driver");
+MODULE_DESCRIPTION("Semidrive DCF User Interface device");
 MODULE_LICENSE("GPL v2");
 

@@ -62,6 +62,24 @@ int semidrive_get_property(u32 id, u32 *val)
 }
 EXPORT_SYMBOL(semidrive_get_property);
 
+int semidrive_send(void *ept, void *data, int len)
+{
+	return 0;
+}
+EXPORT_SYMBOL(semidrive_send);
+
+int semidrive_trysend(void *ept, void *data, int len)
+{
+	return 0;
+}
+EXPORT_SYMBOL(semidrive_trysend);
+
+int semidrive_poll(void *ept, struct file *filp, poll_table *wait)
+{
+	return 0;
+}
+EXPORT_SYMBOL(semidrive_poll);
+
 MODULE_AUTHOR("ye.liu@semidrive.com");
 MODULE_ALIAS("rpmsg:rpcall");
 MODULE_DESCRIPTION("Semidrive RPC kernel helper");
