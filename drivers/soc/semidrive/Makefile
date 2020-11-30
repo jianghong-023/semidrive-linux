@@ -1,6 +1,8 @@
 obj-$(CONFIG_SEMIDRIVE_IPCC)	+= ipcc_rpc.o \
 								ipcc_rpmsg_sample.o \
 								rpcall.o \
+								rpcall-front.o \
+								rpcall-back.o \
 								dc_negotiate.o \
 								i2c_negotiate.o \
 								xenipc-front.o \

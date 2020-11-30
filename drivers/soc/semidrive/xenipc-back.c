@@ -132,7 +132,7 @@ err_deinit:
 	unbind_from_irqhandler(chan->xirq, chan);
 	chan->xirq = 0;
 err_unmap:
-	xenbus_unmap_ring_vfree(dev, &chan->back_ring);
+	xenbus_unmap_ring_vfree(dev, chan->back_ring.sring);
 err:
 	return err;
 }
@@ -187,7 +187,7 @@ static void backend_disconnect(struct xenipc_backend *be)
 		}
 
 		if (chan->back_ring.sring) {
-			xenbus_unmap_ring_vfree(be->dev, &chan->back_ring);
+			xenbus_unmap_ring_vfree(be->dev, chan->back_ring.sring);
 		}
 	}
 }

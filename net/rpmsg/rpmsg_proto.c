@@ -2,6 +2,7 @@
  * AF_RPMSG: Remote processor messaging sockets
  *
  * Copyright (C) 2011-2018 Texas Instruments Incorporated - http://www.ti.com/
+ * Copyright (C) 2020 Semidriver Semiconductor Inc.
  *
  * Ohad Ben-Cohen <ohad@wizery.com>
  * Robert Tivy <rtivy@ti.com>
@@ -35,8 +36,10 @@
 #include <linux/rpmsg/rpmsg_proto.h>
 #include <net/sock.h>
 #include <uapi/linux/rpmsg_socket.h>
+#include <linux/soc/semidrive/rpmsg_front.h>
 
 #define RPMSG_CB(skb)	(*(struct sockaddr_rpmsg *)&((skb)->cb))
+#define RPMSG_MAX_CHAN               (16)
 
 /* Maximum buffer size supported by virtio rpmsg transport.
  * Must match value as in drivers/rpmsg/virtio_rpmsg_bus.c
@@ -58,14 +61,14 @@ enum {
 	RPMSG_CLOSED,
 };
 
-/* A single-level radix-tree-based scheme is used to maintain the rpmsg
- * channels we're exposing to userland. The radix tree maps a rproc index
- * id to its published rpmsg-proto channel. Only a single rpmsg device is
- * supported at the moment from each remote processor. This can be easily
- * scaled to multiple devices using unique destination addresses but this
- *_will_ require additional semantic changes on bind() and connect().
- */
-static RADIX_TREE(rpmsg_channels, GFP_KERNEL);
+struct rpmsg_channel {
+	unsigned long vproc_id;
+	unsigned long address;
+	void *dev;
+
+};
+
+static struct rpmsg_channel rpmsg_channels[RPMSG_MAX_CHAN];
 
 /* Synchronization of access to the tree is achieved using a mutex,
  * because we're using non-atomic radix tree allocations.
@@ -81,12 +84,51 @@ static struct proto rpmsg_proto = {
 	.obj_size	= sizeof(struct rpmsg_socket),
 };
 
-/* Retrieve the rproc instance so that it can be used for retrieving
- * the processor id associated with the rpmsg channel.
- */
-static inline struct rproc *rpdev_to_rproc(struct rpmsg_device *rpdev)
+static struct rpmsg_device *rpmsg_device_lookup(unsigned long vproc_id,
+			unsigned long address)
 {
-	return rproc_get_by_child(&rpdev->dev);
+	int i;
+
+	for(i = 0; i < RPMSG_MAX_CHAN; i++) {
+		if (rpmsg_channels[i].vproc_id == vproc_id &&
+			rpmsg_channels[i].address == address)
+			return (struct rpmsg_device *)rpmsg_channels[i].dev;
+	}
+
+	return NULL;
+}
+
+static int rpmsg_device_insert(unsigned long vproc_id,
+			struct rpmsg_device *rpdev)
+{
+	int i;
+
+	for(i = 0; i < RPMSG_MAX_CHAN; i++) {
+		if (rpmsg_channels[i].address == 0) {
+			rpmsg_channels[i].address = rpdev->dst;
+			rpmsg_channels[i].dev = rpdev;
+			rpmsg_channels[i].vproc_id = vproc_id;
+			return 0;
+		}
+	}
+	return -ENOENT;
+}
+
+static int rpmsg_device_delete(unsigned long vproc_id, unsigned long address)
+{
+	int i;
+
+	for(i = 0; i < RPMSG_MAX_CHAN; i++) {
+		if (rpmsg_channels[i].vproc_id == vproc_id &&
+			rpmsg_channels[i].address == address) {
+			rpmsg_channels[i].vproc_id = 0;
+			rpmsg_channels[i].address = 0;
+			rpmsg_channels[i].dev = 0;
+			return 0;
+		}
+	}
+
+	return -ENODEV;
 }
 
 /* Retrieve the rproc id. The rproc id _relies_ on aliases being defined
@@ -147,7 +189,7 @@ static int rpmsg_sock_connect(struct socket *sock, struct sockaddr *addr,
 	mutex_lock(&rpmsg_channels_lock);
 
 	/* find the set of channels exposed by this remote processor */
-	rpdev = radix_tree_lookup(&rpmsg_channels, sa->vproc_id);
+	rpdev = rpmsg_device_lookup(sa->vproc_id, sa->addr);
 	if (!rpdev) {
 		err = -EINVAL;
 		goto out;
@@ -156,15 +198,21 @@ static int rpmsg_sock_connect(struct socket *sock, struct sockaddr *addr,
 	rpsk->rproc_id = sa->vproc_id;
 	rpsk->rpdev = rpdev;
 
-        chinfo.src = sa->addr;
-        chinfo.dst = RPMSG_ADDR_ANY;
-        endpt = rpmsg_create_ept(rpdev, rpmsg_sock_cb, sk, chinfo);
-        if (!endpt)
-                return -EINVAL;
+	/* echo endp is already allocated in the rpmsg device */
+	if (sa->addr == 30)
+		chinfo.src = RPMSG_ADDR_ANY;
+	else
+		chinfo.src = sa->addr;
 
-        rpsk->rpdev = rpdev;
-        rpsk->endpt = endpt;
-        rpsk->rproc_id = sa->vproc_id;
+	chinfo.dst = RPMSG_ADDR_ANY;
+	endpt = rpmsg_create_ept(rpdev, rpmsg_sock_cb, sk, chinfo);
+	if (!endpt) {
+		err = -ENODEV;
+		goto out;
+	}
+	rpsk->rpdev = rpdev;
+	rpsk->endpt = endpt;
+	rpsk->rproc_id = sa->vproc_id;
 
 	/* XXX take care of disconnection state too */
 	sk->sk_state = RPMSG_CONNECTED;
@@ -397,7 +445,7 @@ rpmsg_sock_bind(struct socket *sock, struct sockaddr *uaddr, int addr_len)
 	if (sk->sk_state != RPMSG_OPEN)
 		return -EINVAL;
 
-	rpdev = radix_tree_lookup(&rpmsg_channels, sa->vproc_id);
+	rpdev = rpmsg_device_lookup(sa->vproc_id, sa->addr);
 	if (!rpdev)
 		return -EINVAL;
 
@@ -439,6 +487,29 @@ static const struct proto_ops rpmsg_sock_ops = {
 	.getsockopt	= sock_no_getsockopt
 };
 
+/* This ops is for xenbus frontend */
+static const struct proto_ops rpmsg_front_ops = {
+	.family		= PF_RPMSG,
+	.owner		= THIS_MODULE,
+
+	.release	= rpmsg_front_release,
+	.connect	= rpmsg_front_connect,
+	.getname	= sock_no_getname,
+	.sendmsg	= rpmsg_front_sendmsg,
+	.recvmsg	= rpmsg_front_recvmsg,
+	.poll		= rpmsg_front_poll,
+	.bind		= rpmsg_front_bind,
+
+	.listen		= sock_no_listen,
+	.accept		= sock_no_accept,
+	.ioctl		= sock_no_ioctl,
+	.mmap		= sock_no_mmap,
+	.socketpair	= sock_no_socketpair,
+	.shutdown	= sock_no_shutdown,
+	.setsockopt	= sock_no_setsockopt,
+	.getsockopt	= sock_no_getsockopt
+};
+
 static void rpmsg_sock_destruct(struct sock *sk)
 {
 }
@@ -459,7 +530,11 @@ static int rpmsg_sock_create(struct net *net, struct socket *sock, int proto,
 		return -ENOMEM;
 
 	sock->state = SS_UNCONNECTED;
-	sock->ops = &rpmsg_sock_ops;
+
+	if (xen_domain() && !xen_initial_domain())
+		sock->ops = &rpmsg_front_ops;
+	else
+		sock->ops = &rpmsg_sock_ops;
 	sock_init_data(sock, sk);
 
 	sk->sk_destruct = rpmsg_sock_destruct;
@@ -470,6 +545,10 @@ static int rpmsg_sock_create(struct net *net, struct socket *sock, int proto,
 	rpsk = container_of(sk, struct rpmsg_socket, sk);
 	/* use RPMSG_LOCALHOST to serve as an invalid value */
 	rpsk->rproc_id = RPMSG_LOCALHOST;
+
+	/* frontend only for XEN Dom-U */
+	if (xen_domain() && !xen_initial_domain())
+		return rpmsg_front_socket(sock);
 
 	return 0;
 }
@@ -569,11 +648,11 @@ static int rpmsg_proto_probe(struct rpmsg_device *rpdev)
 	 * If not, associate id/device for later lookup in rpmsg_sock_bind().
 	 * Multiple devices per remote processor are not supported.
 	 */
-	vrp_dev = radix_tree_lookup(&rpmsg_channels, id);
+	vrp_dev = rpmsg_device_lookup(id, rpdev->dst);
 	if (!vrp_dev) {
-		ret = radix_tree_insert(&rpmsg_channels, id, rpdev);
+		ret = rpmsg_device_insert(id, rpdev);
 		if (ret) {
-			dev_err(dev, "radix_tree_insert failed: %d\n", ret);
+			dev_err(dev, "rpdev_insert failed: %d\n", ret);
 			goto out;
 		}
 	} else {
@@ -584,6 +663,8 @@ static int rpmsg_proto_probe(struct rpmsg_device *rpdev)
 
 out:
 	mutex_unlock(&rpmsg_channels_lock);
+
+	dev_info(dev, "probe rmpsg socket rpdev %s\n", rpdev->id.name);
 
 	return ret;
 }
@@ -601,7 +682,7 @@ static void rpmsg_proto_remove(struct rpmsg_device *rpdev)
 
 	mutex_lock(&rpmsg_channels_lock);
 
-	vrp_dev = radix_tree_lookup(&rpmsg_channels, id);
+	vrp_dev = rpmsg_device_lookup(id, rpdev->dst);
 	if (!vrp_dev) {
 		dev_err(dev, "can't find rpmsg device for rproc %d\n", id);
 		goto out;
@@ -609,7 +690,7 @@ static void rpmsg_proto_remove(struct rpmsg_device *rpdev)
 	if (vrp_dev != rpdev)
 		dev_err(dev, "can't match the stored rpdev for rproc %d\n", id);
 
-	if (!radix_tree_delete(&rpmsg_channels, id))
+	if (!rpmsg_device_delete(id, rpdev->dst))
 		dev_err(dev, "failed to delete rpdev for rproc %d\n", id);
 
 out:
@@ -618,6 +699,8 @@ out:
 
 static struct rpmsg_device_id rpmsg_proto_id_table[] = {
 	{ .name	= "ipcc-echo" },
+	{ .name	= "safety,vcan" },
+	{ .name = "safety,vi2c" },
 	{ },
 };
 MODULE_DEVICE_TABLE(rpmsg, rpmsg_proto_id_table);
@@ -646,10 +729,13 @@ static int __init rpmsg_proto_init(void)
 		goto proto_unreg;
 	}
 
-	ret = register_rpmsg_driver(&rpmsg_proto_driver);
-	if (ret) {
-		pr_err("register_rpmsg_driver failed: %d\n", ret);
-		goto sock_unreg;
+	/* for Native and XEN Dom-0 */
+	if (!xen_domain() || xen_initial_domain()) {
+		ret = register_rpmsg_driver(&rpmsg_proto_driver);
+		if (ret) {
+			pr_err("register_rpmsg_driver failed: %d\n", ret);
+			goto sock_unreg;
+		}
 	}
 
 	return 0;
@@ -663,7 +749,9 @@ proto_unreg:
 
 static void __exit rpmsg_proto_exit(void)
 {
-	unregister_rpmsg_driver(&rpmsg_proto_driver);
+	if (!xen_domain() || xen_initial_domain())
+		unregister_rpmsg_driver(&rpmsg_proto_driver);
+
 	sock_unregister(PF_RPMSG);
 	proto_unregister(&rpmsg_proto);
 }
