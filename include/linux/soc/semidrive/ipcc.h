@@ -6,6 +6,8 @@
 #ifndef __IPCC_HEAD_FILE__
 #define __IPCC_HEAD_FILE__
 
+#include <linux/poll.h>
+
 typedef enum {
 	COMM_MSG_INVALID = 0,
 	COMM_MSG_CORE,
@@ -171,6 +173,10 @@ typedef enum {
 int semidrive_rpcall(struct rpc_req_msg *req, struct rpc_ret_msg *result);
 int semidrive_get_property(u32 id, u32 *val);
 int semidrive_set_property(u32 id, u32 val);
+
+int semidrive_send(void *ept, void *data, int len);
+int semidrive_trysend(void *ept, void *data, int len);
+int semidrive_poll(void *ept, struct file *filp, poll_table *wait);
 
 int sd_close_dc(bool is_block);
 

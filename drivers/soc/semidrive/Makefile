@@ -6,7 +6,8 @@ obj-$(CONFIG_SEMIDRIVE_IPCC)	+= ipcc_rpc.o \
 								xenipc-front.o \
 								xenipc-back.o \
 								vdsp.o \
-								chrdev.o
+								chrdev.o \
+								chrdev-front.o
 
 obj-$(CONFIG_SEMIDRIVE_SCR)	+= sdrv_scr.o
 obj-$(CONFIG_ARCH_SEMIDRIVE)	+= sdrv_boardinfo_hwid.o
