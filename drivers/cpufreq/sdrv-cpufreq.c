@@ -20,14 +20,19 @@
 
 #define DEFAULT_MIN_FREQ 100000000
 #define DEFAULT_MAX_FREQ (U32_MAX)
+#define DEFAULT_DELAY_TIME 30	//second
 static u32 min_freq = DEFAULT_MIN_FREQ;
 static u32 max_freq = DEFAULT_MAX_FREQ;
 static unsigned int transition_delay_us = 0;
 static struct cpufreq_frequency_table *freq_table;
-
+static int start_time = DEFAULT_DELAY_TIME;
+static unsigned long dvfs_start_time=0;
 static int sdrv_set_target(struct cpufreq_policy *policy, unsigned int index)
 {
 	unsigned long new_freq;
+
+	if (start_time && time_before(jiffies, dvfs_start_time))
+		return 0;
 
 	new_freq = freq_table[index].frequency;
 
@@ -82,6 +87,7 @@ static int sdrv_cpufreq_driver_init(struct cpufreq_policy *policy)
 	retval = cpufreq_table_validate_and_show(policy, freq_table);
 	if (!retval) {
 		printk("cpufreq: sdrv CPU frequency driver\n");
+		dvfs_start_time = jiffies + (start_time * HZ);
 		return 0;
 	}
 
@@ -125,7 +131,12 @@ static int __init sdrv_cpufreq_init(void)
 			pr_err("no valid trans-delay-us, set as default\n");
 			transition_delay_us = 0;
 		}
-		pr_info("cpufreq: get prop min %d, max %d, delay %d\n", min_freq, max_freq, transition_delay_us);
+		if (of_property_read_u32(np, "start-time", &start_time) < 0) {
+			pr_err("no valid start-time, set as default\n");
+			start_time = DEFAULT_DELAY_TIME;
+		}
+		pr_info("cpufreq: get prop min %d, max %d, period %d us start delay %d s\n",
+			min_freq, max_freq, transition_delay_us, start_time);
 		return cpufreq_register_driver(&sdrv_cpufreq_driver);
 	}
 	return -ENODEV;
