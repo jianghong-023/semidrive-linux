@@ -124,8 +124,12 @@
 #define MAX_MSI_IRQS_PER_CTRL		32
 #define MAX_MSI_CTRLS			(MAX_MSI_IRQS / MAX_MSI_IRQS_PER_CTRL)
 #define MSI_REG_CTRL_BLOCK_SIZE		12
-#define MSI_DEF_NUM_VECTORS		32
 
+#ifdef CONFIG_SD_REMOTE_GIC
+#define MSI_DEF_NUM_VECTORS		64
+#else
+#define MSI_DEF_NUM_VECTORS		32
+#endif
 
 struct pcie_port;
 struct dw_pcie;
