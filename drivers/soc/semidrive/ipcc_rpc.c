@@ -48,6 +48,7 @@ int rpmsg_rpc_call(struct rpmsg_rpc_device *rpcdev, struct rpc_req_msg *req, str
 		return -EINVAL;
 	}
 
+	mutex_lock(&rpcdev->lock);
 	init_completion(&rpcdev->done);
 
 	/* send it */
@@ -78,6 +79,8 @@ int rpmsg_rpc_call(struct rpmsg_rpc_device *rpcdev, struct rpc_req_msg *req, str
 	dev_dbg(rpcdev->dev, "succeed to call RPC %d\n", req->cmd);
 
 err:
+	mutex_unlock(&rpcdev->lock);
+
 	return ret;
 }
 
@@ -261,6 +264,7 @@ static int rpmsg_rpcdev_probe(struct rpmsg_device *rpdev)
 	rpcdev->channel = rpdev->ept;
 	rpcdev->dev = &rpdev->dev;
 
+	mutex_init(&rpcdev->lock);
 	rpcdev->rpmsg_device = rpdev;
 	dev_set_drvdata(&rpdev->dev, rpcdev);
 
