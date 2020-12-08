@@ -57,6 +57,7 @@ struct kstream_mbus_format {
 struct kstream_pix_format {
 	u32 pixfmt;
 	u32 mbus_code;
+	u8 planes;
 	u8 bpp[3];
 	u8 pack_uv_odd;
 	u8 pack_uv_even;

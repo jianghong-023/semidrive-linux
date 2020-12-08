@@ -167,9 +167,24 @@ static const struct kstream_mbus_format mbus_fmts[] = {
 };
 
 const struct kstream_pix_format pix_fmts[] = {
+#if 1
+	{
+		.pixfmt = V4L2_PIX_FMT_YUYV, /* YUYV */
+		.mbus_code = MEDIA_BUS_FMT_YUYV8_2X8,
+		.planes = 1,
+		.bpp = {16},
+		.pack_uv_odd = 0x03,
+		.pack_uv_even = 0x03,
+		.pack_pix_odd = 0x03,
+		.pack_pix_even = 0x03,
+		.split = {0x53, 0x3F},
+		.pack = {0x42108, 0},
+	},
+#else
 	{
 		.pixfmt = V4L2_PIX_FMT_YUV420, /* YUV420 3 planes*/
 		.mbus_code = MEDIA_BUS_FMT_YUYV8_1_5X8,
+		.planes = 1,
 		.bpp = {8, 4, 4},
 		.pack_uv_odd = 0x01,
 		.pack_uv_even = 0x10,
@@ -181,6 +196,7 @@ const struct kstream_pix_format pix_fmts[] = {
 	{
 		.pixfmt = V4L2_PIX_FMT_YUYV, /* YUYV */
 		.mbus_code = MEDIA_BUS_FMT_YUYV8_2X8,
+		.planes = 1,
 		.bpp = {16},
 		.pack_uv_odd = 0x03,
 		.pack_uv_even = 0x03,
@@ -192,6 +208,7 @@ const struct kstream_pix_format pix_fmts[] = {
 	{
 		.pixfmt = V4L2_PIX_FMT_UYVY, /* UYVY */
 		.mbus_code = MEDIA_BUS_FMT_UYVY8_2X8,
+		.planes = 1,
 		.bpp = {16},
 		.pack_uv_odd = 0x03,
 		.pack_uv_even = 0x03,
@@ -203,6 +220,7 @@ const struct kstream_pix_format pix_fmts[] = {
 	{
 		.pixfmt = V4L2_PIX_FMT_NV16, /* YUYV  2 planes*/
 		.mbus_code = MEDIA_BUS_FMT_YUYV8_2X8,
+		.planes = 1,
 		.bpp = {8, 8},
 		.pack_uv_odd = 0x03,
 		.pack_uv_even = 0x03,
@@ -214,6 +232,7 @@ const struct kstream_pix_format pix_fmts[] = {
 	{
 		.pixfmt = V4L2_PIX_FMT_RGB565, /* RGB565 */
 		.mbus_code = MEDIA_BUS_FMT_RGB565_2X8_BE,
+		.planes = 1,
 		.bpp = {16},
 		.pack_uv_odd = 0x03,
 		.pack_uv_even = 0x03,
@@ -225,6 +244,7 @@ const struct kstream_pix_format pix_fmts[] = {
 	{
 		.pixfmt = V4L2_PIX_FMT_RGB24, /* RGB24 */
 		.mbus_code = MEDIA_BUS_FMT_RGB888_1X24,
+		.planes = 1,
 		.bpp = {24},
 		.pack_uv_odd = 0x03,
 		.pack_uv_even = 0x03,
@@ -233,6 +253,7 @@ const struct kstream_pix_format pix_fmts[] = {
 		.split = {0x0E53, 0x3F},
 		.pack = {0x2108, 0},
 	},
+#endif
 };
 
 const struct kstream_pix_format *kstream_get_kpfmt_by_mbus_code(unsigned int

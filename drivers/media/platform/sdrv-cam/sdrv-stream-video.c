@@ -195,9 +195,7 @@ static int __kstream_video_try_format(struct kstream_video *video,
 	pix_mp->pixelformat = kpf->pixfmt;
 	pix_mp->width = clamp_t(u32, width, 1, SDRV_IMG_X_MAX);
 	pix_mp->height = clamp_t(u32, height, 1, SDRV_IMG_Y_MAX);
-	pix_mp->num_planes =
-		strlen(kpf->bpp) / sizeof(kpf->bpp[0]);
-
+	pix_mp->num_planes = kpf->planes;
 	if(pix_mp->field == V4L2_FIELD_ANY)
 		pix_mp->field = V4L2_FIELD_NONE;
 	pix_mp->colorspace = V4L2_COLORSPACE_SRGB;
