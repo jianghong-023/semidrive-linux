@@ -82,7 +82,6 @@ static PHYS_HEAP_CONFIG gsPhysHeapConfigHostMemDevice[] =
 		&gsHostMemDevPhysHeapFuncs,
 		NULL,
 		0,
-		IMG_FALSE,
 		(IMG_HANDLE)&gsHostMemDevConfig[0],
 	}
 };

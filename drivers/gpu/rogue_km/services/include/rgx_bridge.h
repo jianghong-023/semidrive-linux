@@ -57,10 +57,11 @@ extern "C" {
 
 #include "common_rgxta3d_bridge.h"
 #include "common_rgxcmp_bridge.h"
-
 #include "common_rgxtq2_bridge.h"
+#if defined(SUPPORT_RGXTQ_BRIDGE)
 #include "common_rgxtq_bridge.h"
-#if !defined(EXCLUDE_RGXBREAKPOINT_BRIDGE)
+#endif
+#if defined(SUPPORT_USC_BREAKPOINT)
 #include "common_rgxbreakpoint_bridge.h"
 #endif
 #include "common_rgxfwdbg_bridge.h"
@@ -72,9 +73,7 @@ extern "C" {
 #include "common_rgxregconfig_bridge.h"
 #endif
 #include "common_rgxkicksync_bridge.h"
-
 #include "common_rgxsignals_bridge.h"
-
 
 /*
  * Bridge Cmd Ids
@@ -101,13 +100,22 @@ extern "C" {
 
 /* 128: RGX TQ interface functions */
 #define PVRSRV_BRIDGE_RGXTQ                      128UL
+/* The RGXTQ bridge is conditional since the definitions in this header file
+ * support both the rogue and volcanic servers, but the RGXTQ bridge is not
+ * required at all on the Volcanic architecture.
+ */
+#if defined(SUPPORT_RGXTQ_BRIDGE)
 #define PVRSRV_BRIDGE_RGXTQ_DISPATCH_FIRST       (PVRSRV_BRIDGE_DISPATCH_LAST + 1)
 #define PVRSRV_BRIDGE_RGXTQ_DISPATCH_LAST        (PVRSRV_BRIDGE_RGXTQ_DISPATCH_FIRST + PVRSRV_BRIDGE_RGXTQ_CMD_LAST)
+#else
+#define PVRSRV_BRIDGE_RGXTQ_DISPATCH_FIRST       0
+#define PVRSRV_BRIDGE_RGXTQ_DISPATCH_LAST        (PVRSRV_BRIDGE_DISPATCH_LAST)
+#endif
 
 /* 129: RGX Compute interface functions */
 #define PVRSRV_BRIDGE_RGXCMP                     129UL
-#	define PVRSRV_BRIDGE_RGXCMP_DISPATCH_FIRST   (PVRSRV_BRIDGE_RGXTQ_DISPATCH_LAST + 1)
-#	define PVRSRV_BRIDGE_RGXCMP_DISPATCH_LAST    (PVRSRV_BRIDGE_RGXCMP_DISPATCH_FIRST + PVRSRV_BRIDGE_RGXCMP_CMD_LAST)
+#define PVRSRV_BRIDGE_RGXCMP_DISPATCH_FIRST      (PVRSRV_BRIDGE_RGXTQ_DISPATCH_LAST + 1)
+#define PVRSRV_BRIDGE_RGXCMP_DISPATCH_LAST       (PVRSRV_BRIDGE_RGXCMP_DISPATCH_FIRST + PVRSRV_BRIDGE_RGXCMP_CMD_LAST)
 
 /* 130: RGX TA/3D interface functions */
 #define PVRSRV_BRIDGE_RGXTA3D                    130UL
@@ -116,7 +124,7 @@ extern "C" {
 
 /* 131: RGX Breakpoint interface functions */
 #define PVRSRV_BRIDGE_RGXBREAKPOINT                 131UL
-#if !defined(EXCLUDE_RGXBREAKPOINT_BRIDGE)
+#if defined(SUPPORT_USC_BREAKPOINT)
 #define PVRSRV_BRIDGE_RGXBREAKPOINT_DISPATCH_FIRST  (PVRSRV_BRIDGE_RGXTA3D_DISPATCH_LAST + 1)
 #define PVRSRV_BRIDGE_RGXBREAKPOINT_DISPATCH_LAST   (PVRSRV_BRIDGE_RGXBREAKPOINT_DISPATCH_FIRST + PVRSRV_BRIDGE_RGXBREAKPOINT_CMD_LAST)
 #else
@@ -164,7 +172,6 @@ extern "C" {
 #define PVRSRV_BRIDGE_RGXSIGNALS_DISPATCH_FIRST  (PVRSRV_BRIDGE_RGXKICKSYNC_DISPATCH_LAST + 1)
 #define PVRSRV_BRIDGE_RGXSIGNALS_DISPATCH_LAST   (PVRSRV_BRIDGE_RGXSIGNALS_DISPATCH_FIRST + PVRSRV_BRIDGE_RGXSIGNALS_CMD_LAST)
 
-
 #define PVRSRV_BRIDGE_RGXTQ2                     138UL
 #define PVRSRV_BRIDGE_RGXTQ2_DISPATCH_FIRST      (PVRSRV_BRIDGE_RGXSIGNALS_DISPATCH_LAST + 1)
 #define PVRSRV_BRIDGE_RGXTQ2_DISPATCH_LAST       (PVRSRV_BRIDGE_RGXTQ2_DISPATCH_FIRST + PVRSRV_BRIDGE_RGXTQ2_CMD_LAST)
@@ -176,7 +183,7 @@ extern "C" {
 
 static const IMG_UINT32 gui32RGXBridges =
 	  (1U << (PVRSRV_BRIDGE_RGXTQ - PVRSRV_BRIDGE_RGX_FIRST))
-#if defined(RGX_FEATURE_COMPUTE)
+#if defined(RGX_FEATURE_COMPUTE) || defined(__KERNEL__)
 	| (1U << (PVRSRV_BRIDGE_RGXCMP - PVRSRV_BRIDGE_RGX_FIRST))
 #endif
 	| (1U << (PVRSRV_BRIDGE_RGXTA3D - PVRSRV_BRIDGE_RGX_FIRST))
@@ -192,7 +199,7 @@ static const IMG_UINT32 gui32RGXBridges =
 	| (1U << (PVRSRV_BRIDGE_RGXREGCONFIG - PVRSRV_BRIDGE_RGX_FIRST))
 #endif
 	| (1U << (PVRSRV_BRIDGE_RGXKICKSYNC - PVRSRV_BRIDGE_RGX_FIRST))
-#if defined(RGX_FEATURE_SIGNAL_SNOOPING)
+#if defined(RGX_FEATURE_SIGNAL_SNOOPING) || defined(__KERNEL__)
 	| (1U << (PVRSRV_BRIDGE_RGXSIGNALS - PVRSRV_BRIDGE_RGX_FIRST))
 #endif
 	| (1U << (PVRSRV_BRIDGE_RGXTQ2 - PVRSRV_BRIDGE_RGX_FIRST));

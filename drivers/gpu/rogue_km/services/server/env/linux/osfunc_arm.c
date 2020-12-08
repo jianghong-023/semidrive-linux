@@ -2,7 +2,7 @@
 @File
 @Title          arm specific OS functions
 @Copyright      Copyright (c) Imagination Technologies Ltd. All Rights Reserved
-@Description    OS functions who's implementation are processor specific
+@Description    Processor specific OS functions
 @License        Dual MIT/GPLv2
 
 The contents of this file are subject to the MIT license as set out below.
@@ -42,7 +42,6 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */ /**************************************************************************/
 #include <linux/version.h>
 #include <linux/dma-mapping.h>
-#include <linux/spinlock.h>
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(3,15,0))
  #include <asm/system.h>
 #endif
@@ -54,83 +53,6 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "osfunc.h"
 #include "pvr_debug.h"
 
-
-
-#if defined(CONFIG_OUTER_CACHE)
-
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,16,0))
-
-	/* Since 3.16 the outer_xxx() functions require irqs to be disabled and no
-	 * other cache masters must operate on the outer cache. */
-	static DEFINE_SPINLOCK(gsCacheFlushLock);
-
-	#define OUTER_CLEAN_RANGE() { \
-		unsigned long uiLockFlags; \
-		\
-		spin_lock_irqsave(&gsCacheFlushLock, uiLockFlags); \
-		outer_clean_range(0, ULONG_MAX); \
-		spin_unlock_irqrestore(&gsCacheFlushLock, uiLockFlags); \
-	}
-
-	#define OUTER_FLUSH_ALL() { \
-		unsigned long uiLockFlags; \
-		\
-		spin_lock_irqsave(&gsCacheFlushLock, uiLockFlags); \
-		outer_flush_all(); \
-		spin_unlock_irqrestore(&gsCacheFlushLock, uiLockFlags); \
-	}
-
-#else /* (LINUX_VERSION_CODE >= KERNEL_VERSION(3,16,0)) */
-
-	/* No need to disable IRQs for older kernels */
-	#define OUTER_CLEAN_RANGE() outer_clean_range(0, ULONG_MAX)
-	#define OUTER_FLUSH_ALL()   outer_flush_all()
-#endif /*(LINUX_VERSION_CODE >= KERNEL_VERSION(3,16,0)) */
-
-#else /* CONFIG_OUTER_CACHE */
-
-	/* Don't do anything if we have no outer cache */
-	#define OUTER_CLEAN_RANGE()
-	#define OUTER_FLUSH_ALL()
-#endif /* CONFIG_OUTER_CACHE */
-
-static void per_cpu_cache_flush(void *arg)
-{
-	PVR_UNREFERENCED_PARAMETER(arg);
-	flush_cache_all();
-}
-
-PVRSRV_ERROR OSCPUOperation(PVRSRV_CACHE_OP uiCacheOp)
-{
-	PVRSRV_ERROR eError = PVRSRV_OK;
-
-	switch (uiCacheOp)
-	{
-		case PVRSRV_CACHE_OP_CLEAN:
-			on_each_cpu(per_cpu_cache_flush, NULL, 1);
-			OUTER_CLEAN_RANGE();
-			break;
-
-		case PVRSRV_CACHE_OP_INVALIDATE:
-		case PVRSRV_CACHE_OP_FLUSH:
-			on_each_cpu(per_cpu_cache_flush, NULL, 1);
-			OUTER_FLUSH_ALL();
-			break;
-
-		case PVRSRV_CACHE_OP_NONE:
-			break;
-
-		default:
-			PVR_DPF((PVR_DBG_ERROR,
-					"%s: Global cache operation type %d is invalid",
-					__func__, uiCacheOp));
-			eError = PVRSRV_ERROR_INVALID_PARAMS;
-			PVR_ASSERT(0);
-			break;
-	}
-
-	return eError;
-}
 
 static inline size_t pvr_dmac_range_len(const void *pvStart, const void *pvEnd)
 {
@@ -195,12 +117,12 @@ void OSCPUCacheInvalidateRangeKM(PVRSRV_DEVICE_NODE *psDevNode,
 #endif	/* (LINUX_VERSION_CODE >= KERNEL_VERSION(3,7,0)) */
 }
 
-PVRSRV_CACHE_OP_ADDR_TYPE OSCPUCacheOpAddressType(void)
+OS_CACHE_OP_ADDR_TYPE OSCPUCacheOpAddressType(void)
 {
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,7,0))
-	return PVRSRV_CACHE_OP_ADDR_TYPE_PHYSICAL;
+	return OS_CACHE_OP_ADDR_TYPE_PHYSICAL;
 #else
-	return PVRSRV_CACHE_OP_ADDR_TYPE_BOTH;
+	return OS_CACHE_OP_ADDR_TYPE_BOTH;
 #endif
 }
 

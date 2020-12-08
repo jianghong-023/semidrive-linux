@@ -42,7 +42,7 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */ /**************************************************************************/
 
-#if !defined (RGX_MIPS_H)
+#if !defined(RGX_MIPS_H)
 #define RGX_MIPS_H
 
 /*
@@ -54,8 +54,21 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #define RGXMIPSFW_LOG2_PAGE_SIZE_64K             (16)
 #define RGXMIPSFW_PAGE_SIZE_64K                  (0x1 << RGXMIPSFW_LOG2_PAGE_SIZE_64K)
 #define RGXMIPSFW_PAGE_MASK_64K                  (RGXMIPSFW_PAGE_SIZE_64K - 1)
-#define RGXMIPSFW_LOG2_PAGETABLE_PAGE_SIZE       (15)
+#define RGXMIPSFW_LOG2_PAGE_SIZE_256K            (18)
+#define RGXMIPSFW_PAGE_SIZE_256K                 (0x1 << RGXMIPSFW_LOG2_PAGE_SIZE_256K)
+#define RGXMIPSFW_PAGE_MASK_256K                 (RGXMIPSFW_PAGE_SIZE_256K - 1)
+#define RGXMIPSFW_LOG2_PAGE_SIZE_1MB             (20)
+#define RGXMIPSFW_PAGE_SIZE_1MB                  (0x1 << RGXMIPSFW_LOG2_PAGE_SIZE_1MB)
+#define RGXMIPSFW_PAGE_MASK_1MB                  (RGXMIPSFW_PAGE_SIZE_1MB - 1)
+#define RGXMIPSFW_LOG2_PAGE_SIZE_4MB             (22)
+#define RGXMIPSFW_PAGE_SIZE_4MB                  (0x1 << RGXMIPSFW_LOG2_PAGE_SIZE_4MB)
+#define RGXMIPSFW_PAGE_MASK_4MB                  (RGXMIPSFW_PAGE_SIZE_4MB - 1)
 #define RGXMIPSFW_LOG2_PTE_ENTRY_SIZE            (2)
+/* log2 page table sizes dependent on FW heap size and page size (for each OS) */
+#define RGXMIPSFW_LOG2_PAGETABLE_SIZE_4K         (RGX_FIRMWARE_HEAP_SHIFT - RGXMIPSFW_LOG2_PAGE_SIZE_4K + RGXMIPSFW_LOG2_PTE_ENTRY_SIZE)
+#define RGXMIPSFW_LOG2_PAGETABLE_SIZE_64K        (RGX_FIRMWARE_HEAP_SHIFT - RGXMIPSFW_LOG2_PAGE_SIZE_64K + RGXMIPSFW_LOG2_PTE_ENTRY_SIZE)
+/* Maximum number of page table pages (both Host and MIPS pages) */
+#define RGXMIPSFW_MAX_NUM_PAGETABLE_PAGES        (4)
 /* Total number of TLB entries */
 #define RGXMIPSFW_NUMBER_OF_TLB_ENTRIES          (16)
 /* "Uncached" caching policy */
@@ -176,6 +189,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 /* Data remap setup */
 #define RGXMIPSFW_DATA_REMAP_VIRTUAL_BASE        (0xBFC01000)
+#define RGXMIPSFW_DATA_CACHED_REMAP_VIRTUAL_BASE (0x9FC01000)
 #define RGXMIPSFW_DATA_REMAP_PHYS_ADDR_IN        (0x1FC01000)
 #define RGXMIPSFW_DATA_REMAP_LOG2_SEGMENT_SIZE   (12)
 #define RGXMIPSFW_BOOT_NMI_DATA_VIRTUAL_BASE     (RGXMIPSFW_DATA_REMAP_VIRTUAL_BASE)
@@ -188,20 +202,17 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 /* Permanent mappings setup */
 #define RGXMIPSFW_PT_VIRTUAL_BASE                (0xCF000000)
-#define RGXMIPSFW_REGISTERS_VIRTUAL_BASE         (0xCF400000)
+#define RGXMIPSFW_REGISTERS_VIRTUAL_BASE         (0xCF800000)
 #define RGXMIPSFW_STACK_VIRTUAL_BASE             (0xCF600000)
 
 
 /*
  * Bootloader configuration data
  */
-/* Bootloader configuration offset within the bootloader/NMI data page */
+/* Bootloader configuration offset (where RGXMIPSFW_BOOT_DATA lives)
+ * within the bootloader/NMI data page */
 #define RGXMIPSFW_BOOTLDR_CONF_OFFSET                         (0x0)
-/* Offsets of bootloader configuration parameters in 64-bit words */
-#define RGXMIPSFW_ROGUE_REGS_BASE_PHYADDR_OFFSET              (0x0)
-#define RGXMIPSFW_PAGE_TABLE_BASE_PHYADDR_OFFSET              (0x1)
-#define RGXMIPSFW_STACKPOINTER_PHYADDR_OFFSET                 (0x2)
-#define RGXMIPSFW_RESERVED_FUTURE_OFFSET                      (0x3)
+
 
 /*
  * NMI shared data
@@ -227,10 +238,21 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #define RGXMIPSFW_PRIVATE_DATA_OFFSET                         (0x800)
 
 
-/* The things that follow are excluded when compiling assembly sources*/
-#if !defined (RGXMIPSFW_ASSEMBLY_CODE)
+/* The things that follow are excluded when compiling assembly sources */
+#if !defined(RGXMIPSFW_ASSEMBLY_CODE)
 #include "img_types.h"
 #include "km/rgxdefs_km.h"
+
+typedef struct
+{
+	IMG_UINT64 ui64StackPhyAddr;
+	IMG_UINT64 ui64RegBase;
+	IMG_UINT64 aui64PTPhyAddr[RGXMIPSFW_MAX_NUM_PAGETABLE_PAGES];
+	IMG_UINT32 ui32PTLog2PageSize;
+	IMG_UINT32 ui32PTNumPages;
+	IMG_UINT32 ui32Reserved1;
+	IMG_UINT32 ui32Reserved2;
+} RGXMIPSFW_BOOT_DATA;
 
 #define RGXMIPSFW_GET_OFFSET_IN_DWORDS(offset)                (offset / sizeof(IMG_UINT32))
 #define RGXMIPSFW_GET_OFFSET_IN_QWORDS(offset)                (offset / sizeof(IMG_UINT64))
@@ -239,7 +261,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #define RGXMIPSFW_ARCHTYPE_VER_CLRMSK                         (0xFFFFE3FFU)
 #define RGXMIPSFW_ARCHTYPE_VER_SHIFT                          (10U)
 #define RGXMIPSFW_CORE_ID_VALUE                               (0x001U)
-#define RGXFW_PROCESSOR_MIPS		                          "MIPS"
+#define RGXFW_PROCESSOR_MIPS                                  "MIPS"
 
 /* microAptivAP cache line size */
 #define RGXMIPSFW_MICROAPTIVEAP_CACHELINE_SIZE                (16U)
@@ -247,7 +269,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 /* The SOCIF transactions are identified with the top 16 bits of the physical address emitted by the MIPS */
 #define RGXMIPSFW_WRAPPER_CONFIG_REGBANK_ADDR_ALIGN           (16U)
 
-/* Values to put in the MIPS selectors for performance counters*/
+/* Values to put in the MIPS selectors for performance counters */
 #define RGXMIPSFW_PERF_COUNT_CTRL_ICACHE_ACCESSES_C0          (9U)   /* Icache accesses in COUNTER0 */
 #define RGXMIPSFW_PERF_COUNT_CTRL_ICACHE_MISSES_C1            (9U)   /* Icache misses in COUNTER1 */
 
@@ -261,7 +283,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #define RGXMIPSFW_PERF_COUNT_CTRL_JTLB_DATA_MISSES_C1         (8U)  /* JTLB data misses in COUNTER1 */
 
 #define RGXMIPSFW_PERF_COUNT_CTRL_EVENT_SHIFT                 (5U)  /* Shift for the Event field in the MIPS perf ctrl registers */
-/* Additional flags for performance counters. See MIPS manual for further reference*/
+/* Additional flags for performance counters. See MIPS manual for further reference */
 #define RGXMIPSFW_PERF_COUNT_CTRL_COUNT_USER_MODE             (8U)
 #define RGXMIPSFW_PERF_COUNT_CTRL_COUNT_KERNEL_MODE           (2U)
 #define RGXMIPSFW_PERF_COUNT_CTRL_COUNT_EXL                   (1U)
@@ -301,76 +323,15 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #define RGXMIPSFW_C0_DEBUG_DM             (1 << 30)
 #define RGXMIPSFW_C0_DEBUG_DBD            (1 << 31)
 
-/* ELF format defines */
-#define ELF_PT_LOAD     (0x1U)   /* Program header identifier as Load */
-#define ELF_SHT_SYMTAB  (0x2U)   /* Section identifier as Symbol Table */
-#define ELF_SHT_STRTAB  (0x3U)   /* Section identifier as String Table */
-#define MAX_STRTAB_NUM  (0x8U)   /* Maximum number of string table in the firmware ELF file */
-
-
-/* Redefined structs of ELF format */
-typedef struct
-{
-	IMG_UINT8    ui32Eident[16];
-	IMG_UINT16   ui32Etype;
-	IMG_UINT16   ui32Emachine;
-	IMG_UINT32   ui32Eversion;
-	IMG_UINT32   ui32Eentry;
-	IMG_UINT32   ui32Ephoff;
-	IMG_UINT32   ui32Eshoff;
-	IMG_UINT32   ui32Eflags;
-	IMG_UINT16   ui32Eehsize;
-	IMG_UINT16   ui32Ephentsize;
-	IMG_UINT16   ui32Ephnum;
-	IMG_UINT16   ui32Eshentsize;
-	IMG_UINT16   ui32Eshnum;
-	IMG_UINT16   ui32Eshtrndx;
-} RGX_MIPS_ELF_HDR;
-
-
-typedef struct
-{
-	IMG_UINT32   ui32Stname;
-	IMG_UINT32   ui32Stvalue;
-	IMG_UINT32   ui32Stsize;
-	IMG_UINT8    ui32Stinfo;
-	IMG_UINT8    ui32Stother;
-	IMG_UINT16   ui32Stshndx;
-} RGX_MIPS_ELF_SYM;
-
-
-typedef struct
-{
-	IMG_UINT32   ui32Shname;
-	IMG_UINT32   ui32Shtype;
-	IMG_UINT32   ui32Shflags;
-	IMG_UINT32   ui32Shaddr;
-	IMG_UINT32   ui32Shoffset;
-	IMG_UINT32   ui32Shsize;
-	IMG_UINT32   ui32Shlink;
-	IMG_UINT32   ui32Shinfo;
-	IMG_UINT32   ui32Shaddralign;
-	IMG_UINT32   ui32Shentsize;
-} RGX_MIPS_ELF_SHDR;
-
-typedef struct
-{
-	IMG_UINT32   ui32Ptype;
-	IMG_UINT32   ui32Poffset;
-	IMG_UINT32   ui32Pvaddr;
-	IMG_UINT32   ui32Ppaddr;
-	IMG_UINT32   ui32Pfilesz;
-	IMG_UINT32   ui32Pmemsz;
-	IMG_UINT32   ui32Pflags;
-	IMG_UINT32   ui32Palign;
- } RGX_MIPS_ELF_PROGRAM_HDR;
-
+/* Macros to decode TLB entries */
 #define RGXMIPSFW_TLB_GET_MASK(PAGE_MASK)       (((PAGE_MASK) >> 13) & 0XFFFFU)
-#define RGXMIPSFW_TLB_GET_PAGE_SIZE(PAGE_MASK)  ((((PAGE_MASK) | 0x1FFF) + 1) >> 11)
+#define RGXMIPSFW_TLB_GET_PAGE_SIZE(PAGE_MASK)  ((((PAGE_MASK) | 0x1FFF) + 1) >> 11) /* page size in KB */
+#define RGXMIPSFW_TLB_GET_PAGE_MASK(PAGE_SIZE)  ((((PAGE_SIZE) << 11) - 1) & ~0x7FF) /* page size in KB */
 #define RGXMIPSFW_TLB_GET_VPN2(ENTRY_HI)        ((ENTRY_HI) >> 13)
 #define RGXMIPSFW_TLB_GET_COHERENCY(ENTRY_LO)   (((ENTRY_LO) >> 3) & 0x7U)
 #define RGXMIPSFW_TLB_GET_PFN(ENTRY_LO)         (((ENTRY_LO) >> 6) & 0XFFFFFU)
-#define RGXMIPSFW_TLB_GET_PA(ENTRY_LO)          (((ENTRY_LO) & 0x03FFFFC0) << 6)
+/* GET_PA uses a non-standard PFN mask for 36 bit addresses */
+#define RGXMIPSFW_TLB_GET_PA(ENTRY_LO)          (((IMG_UINT64)(ENTRY_LO) & RGXMIPSFW_ENTRYLO_PFN_MASK_ABOVE_32BIT) << 6)
 #define RGXMIPSFW_TLB_GET_INHIBIT(ENTRY_LO)     (((ENTRY_LO) >> 30) & 0x3U)
 #define RGXMIPSFW_TLB_GET_DGV(ENTRY_LO)         ((ENTRY_LO) & 0x7U)
 #define RGXMIPSFW_TLB_GLOBAL                    (1U)
@@ -410,7 +371,6 @@ typedef struct {
 	RGX_MIPS_REMAP_ENTRY asRemap[RGXMIPSFW_NUMBER_OF_REMAP_ENTRIES];
 } RGX_MIPS_STATE;
 
-#endif  /* RGXMIPSFW_ASSEMBLY_CODE */
+#endif /* RGXMIPSFW_ASSEMBLY_CODE */
 
-
-#endif /*RGX_MIPS_H*/
+#endif /* RGX_MIPS_H */

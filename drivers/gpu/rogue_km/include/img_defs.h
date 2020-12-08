@@ -150,19 +150,19 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #elif GCC_VERSION_AT_LEAST(4, 5) || has_clang_builtin(__builtin_unreachable)
 	#define unreachable(msg) \
 		do { \
-			assert(!msg); \
+			assert(!(msg)); \
 			__builtin_unreachable(); \
 		} while (0)
 #elif defined(_MSC_VER)
 	#define unreachable(msg) \
 		do { \
-			assert(!msg); \
+			assert(!(msg)); \
 			__assume(0); \
 		} while (0)
 #else
 	#define unreachable(msg) \
 		do { \
-			assert(!msg); \
+			assert(!(msg)); \
 			while (1); \
 		} while (0)
 #endif
@@ -259,7 +259,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 		#if defined(__mips)
 			/* do nothing */
 		#elif defined(UNDER_MSBUILD)
-			_CRTIMP __declspec(noreturn) void __cdecl abort(void);
+			/* do nothing */
 		#else
 			_CRTIMP void __cdecl abort(void);
 		#endif
@@ -270,7 +270,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 		#define IMG_INTERNAL
 		#define IMG_EXPORT
 		#define IMG_CALLCONV
-	#elif defined(LINUX) || defined(__METAG) || defined(__mips) || defined(__QNXNTO__)
+	#elif defined(LINUX) || defined(__METAG) || defined(__mips) || defined(__QNXNTO__) || defined(__riscv)
 		#define IMG_CALLCONV
 		#define C_CALLCONV
 
@@ -348,7 +348,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 	/* That one compiler that supports attributes but doesn't support
 	 * the printf attribute... */
 	#if defined(__GNUC__)
-		#define __printf(fmt, va)  __attribute__((format(printf, fmt, va)))
+		#define __printf(fmt, va)  __attribute__((format(printf, (fmt), (va))))
 	#else
 		#define __printf(fmt, va)
 	#endif /* defined(__GNUC__) */
@@ -401,11 +401,11 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 /* GCC builtins */
 #if defined(LINUX) && defined(__KERNEL__)
 	#include <linux/compiler.h>
-#elif defined(__GNUC__)
+#elif defined(__GNUC__) || defined(INTEGRITY_OS)
 
 /* Klocwork does not support __builtin_expect, which makes the actual condition
  * expressions hidden during analysis, affecting it negatively. */
-#if !defined(__KLOCWORK__) && !defined(DEBUG)
+#if !defined(__KLOCWORK__) && !defined(INTEGRITY_OS) && !defined(DEBUG)
 	#define likely(x)   __builtin_expect(!!(x), 1)
 	#define unlikely(x) __builtin_expect(!!(x), 0)
 #endif
@@ -413,7 +413,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 	/* Compiler memory barrier to prevent reordering */
 	#define barrier() __asm__ __volatile__("": : :"memory")
 #else
-	#define barrier() do { static_assert(0, "barrier() isn't supported by your compiler"); } while(0)
+	#define barrier() do { static_assert(0, "barrier() isn't supported by your compiler"); } while (0)
 #endif
 
 /* That one OS that defines one but not the other... */
@@ -433,15 +433,16 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #define BIT_ULL(b) (1ULL << (b))
 #endif
 
-#define BIT_SET(f, b)     BITMASK_SET((f),    BIT_ULL(b))
-#define BIT_UNSET(f, b)   BITMASK_UNSET((f),  BIT_ULL(b))
-#define BIT_TOGGLE(f, b)  BITMASK_TOGGLE((f), BIT_ULL(b))
-#define BIT_ISSET(f, b)   BITMASK_HAS((f),    BIT_ULL(b))
+#define BIT_SET(f, b)     BITMASK_SET((f),    BIT(b))
+#define BIT_UNSET(f, b)   BITMASK_UNSET((f),  BIT(b))
+#define BIT_TOGGLE(f, b)  BITMASK_TOGGLE((f), BIT(b))
+#define BIT_ISSET(f, b)   BITMASK_HAS((f),    BIT(b))
 
 #define BITMASK_SET(f, m)     (void) ((f) |= (m))
 #define BITMASK_UNSET(f, m)   (void) ((f) &= ~(m))
 #define BITMASK_TOGGLE(f, m)  (void) ((f) ^= (m))
 #define BITMASK_HAS(f, m)     (((f) & (m)) == (m)) /* the bits from the mask are all set */
+#define BITMASK_ANY(f, m)     (((f) & (m)) != 0U)  /* any bit from the mask is set */
 
 #ifndef MAX
 #define MAX(a ,b)	(((a) > (b)) ? (a) : (b))
@@ -455,6 +456,8 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #define CLAMP(min, max, n)  ((n) < (min) ? (min) : ((n) > (max) ? (max) : (n)))
 #endif
 
+#define SWAP(X, Y) (X) ^= (Y); (Y) ^= (X); (X) ^= (Y);
+
 
 #if defined(LINUX) && defined(__KERNEL__)
 	#include <linux/kernel.h>
@@ -464,6 +467,13 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 /* Get a structure's address from the address of a member */
 #define IMG_CONTAINER_OF(ptr, type, member) \
 	(type *) ((uintptr_t) (ptr) - offsetof(type, member))
+
+/* Get a new pointer with an offset (in bytes) from a base address, useful
+ * when traversing byte buffers and accessing data in buffers through struct
+ * pointers.
+ * Note, this macro is not equivalent to or replacing offsetof() */
+#define IMG_OFFSET_ADDR(addr, offset_in_bytes) \
+	(void*)(((IMG_UINT8*)(void*)(addr)) + (offset_in_bytes))
 
 /* The number of elements in a fixed-sized array */
 #ifndef ARRAY_SIZE
@@ -485,10 +495,10 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 	void operator=(const C&)
 #endif
 
-#if defined(SUPPORT_PVR_VALGRIND) && !defined(__METAG) && !defined(__mips)
+#if defined(SUPPORT_PVR_VALGRIND) && !defined(__METAG) && !defined(__mips) && !defined(__riscv)
 	#include "/usr/include/valgrind/memcheck.h"
 
-	#define VG_MARK_INITIALIZED(pvData,ui32Size)  VALGRIND_MAKE_MEM_DEFINED(pvData,ui32Size)
+	#define VG_MARK_INITIALIZED(pvData,ui32Size) VALGRIND_MAKE_MEM_DEFINED(pvData,ui32Size)
 	#define VG_MARK_NOACCESS(pvData,ui32Size) VALGRIND_MAKE_MEM_NOACCESS(pvData,ui32Size)
 	#define VG_MARK_ACCESS(pvData,ui32Size) VALGRIND_MAKE_MEM_UNDEFINED(pvData,ui32Size)
 #else
@@ -498,9 +508,9 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 	#	define PVR_MSC_SUPPRESS_4127
 	#endif
 
-	#define VG_MARK_INITIALIZED(pvData,ui32Size) PVR_MSC_SUPPRESS_4127 do { } while(0)
-	#define VG_MARK_NOACCESS(pvData,ui32Size) PVR_MSC_SUPPRESS_4127 do { } while(0)
-	#define VG_MARK_ACCESS(pvData,ui32Size) PVR_MSC_SUPPRESS_4127 do { } while(0)
+	#define VG_MARK_INITIALIZED(pvData,ui32Size) PVR_MSC_SUPPRESS_4127 do { } while (0)
+	#define VG_MARK_NOACCESS(pvData,ui32Size) PVR_MSC_SUPPRESS_4127 do { } while (0)
+	#define VG_MARK_ACCESS(pvData,ui32Size) PVR_MSC_SUPPRESS_4127 do { } while (0)
 #endif
 
 #define IMG_STRINGIFY_IMPL(x) # x

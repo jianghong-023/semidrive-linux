@@ -46,12 +46,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #include "rgx_fwif_sf.h"
 
-/*  The tuple pairs that will be generated using XMacros will be stored here.
- *   This macro definition must match the definition of SFids in rgx_fwif_sf.h */
-static const RGXKM_STID_FMT SFs[]= {
-#define X(a, b, c, d, e) { RGXFW_LOG_CREATESFID(a,b,e) , d },
-	RGXFW_LOG_SFIDLIST
-#undef X
-};
+extern const RGXKM_STID_FMT SFs[];
+extern const IMG_UINT32 g_ui32SFsCount;
 
 #endif /* _KM_TRACE_STRING_H_ */

@@ -236,9 +236,45 @@ IMG_PSPLAY_TREE PVRSRVDelete(IMG_UINT32 ui32Flags, IMG_PSPLAY_TREE psTree)
 		return psTmp;
 	}
 
-	/* the value was not present in the tree, so just return it as is (after the
-	 * splay) */
+	/* The value was not present in the tree, so just return it as is
+	 * (after the splay) */
 	return psTree;
 }
 
+/**
+ * This function picks up the appropriate node for the given flags
+ *
+ * @param ui32Flags the flags that must associated with the node.
+ * @param psTree current splay tree node.
+ * @return the resulting tree node after the search operation.
+ */
+IMG_INTERNAL
+IMG_PSPLAY_TREE PVRSRVFindNode(IMG_UINT32 ui32Flags, IMG_PSPLAY_TREE psTree)
+{
+	if (psTree == NULL)
+	{
+		return NULL;
+	}
 
+	while (psTree)
+	{
+		if (ui32Flags == psTree->ui32Flags)
+		{
+			return psTree;
+		}
+
+		if (ui32Flags < psTree->ui32Flags)
+		{
+			psTree = psTree->psLeft;
+			continue;
+		}
+
+		if (ui32Flags > psTree->ui32Flags)
+		{
+			psTree = psTree->psRight;
+			continue;
+		}
+	}
+
+	return NULL;
+}

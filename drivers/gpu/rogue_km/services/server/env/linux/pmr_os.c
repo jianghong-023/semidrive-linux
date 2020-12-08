@@ -126,7 +126,7 @@ static void MMapPMRClose(struct vm_area_struct *ps_vma)
 	PMR *psPMR = ps_vma->vm_private_data;
 
 #if defined(PVRSRV_ENABLE_PROCESS_STATS)
-#if	defined(PVRSRV_ENABLE_MEMORY_STATS)
+#if defined(PVRSRV_ENABLE_MEMORY_STATS)
 	{
 		uintptr_t vAddr = ps_vma->vm_start;
 
@@ -246,7 +246,7 @@ static INLINE int _OSMMapPMR(PVRSRV_DEVICE_NODE *psDevNode,
 #endif
 #else /* defined(ARM) */
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 5, 0))
-	sPFN =  pfn_to_pfn_t(((uintptr_t) pvVAddr) >> PAGE_SHIFT);
+	sPFN = pfn_to_pfn_t(((uintptr_t) pvVAddr) >> PAGE_SHIFT);
 #else
 	uiPFN = ((uintptr_t) pvVAddr) >> PAGE_SHIFT;
 	PVR_ASSERT(((IMG_UINT64)uiPFN << PAGE_SHIFT) == (IMG_UINT64)(uintptr_t)pvVAddr);
@@ -278,8 +278,8 @@ static INLINE int _OSMMapPMR(PVRSRV_DEVICE_NODE *psDevNode,
 			vm_fault_t vmf;
 
 			vmf = vmf_insert_mixed(ps_vma,
-								  	ps_vma->vm_start + uiOffset,
-								  	sPFN);
+									ps_vma->vm_start + uiOffset,
+									sPFN);
 			if (vmf & VM_FAULT_ERROR)
 			{
 				iStatus = vm_fault_to_errno(vmf, 0);
@@ -455,6 +455,7 @@ OSMMapPMRGeneric(PMR *psPMR, PMR_MMAP_DATA pOSMMapData)
 	/* Is this mmap targeting non order-zero pages or does it use pfn mappings?
 	 * If yes, don't use vm_insert_page */
 	uiLog2PageSize = PMR_GetLog2Contiguity(psPMR);
+
 #if defined(PMR_OS_USE_VM_INSERT_PAGE)
 	bUseVMInsertPage = (uiLog2PageSize == PAGE_SHIFT) && (PMR_GetType(psPMR) != PMR_TYPE_EXTMEM);
 #if defined(CONFIG_L4)
@@ -585,7 +586,8 @@ OSMMapPMRGeneric(PMR *psPMR, PMR_MMAP_DATA pOSMMapData)
 										sPAddr,
 										1<<uiLog2PageSize,
 										NULL,
-										OSGetCurrentClientProcessIDKM());
+										OSGetCurrentClientProcessIDKM()
+										DEBUG_MEMSTATS_VALUES);
 		}
 #undef PMR_OS_BAD_CPUADDR
 #endif
@@ -621,18 +623,18 @@ OSMMapPMRGeneric(PMR *psPMR, PMR_MMAP_DATA pOSMMapData)
 	return PVRSRV_OK;
 
 	/* Error exit paths follow */
- e3:
+e3:
 	if (pbValid != abValid)
 	{
 		OSFreeMem(pbValid);
 	}
- e2:
+e2:
 	if (psCpuPAddr != asCpuPAddr)
 	{
 		OSFreeMem(psCpuPAddr);
 	}
- e1:
+e1:
 	PMRUnlockSysPhysAddresses(psPMR);
- e0:
+e0:
 	return eError;
 }

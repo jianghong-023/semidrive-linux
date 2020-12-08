@@ -47,8 +47,9 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "pvrsrv_error.h"
 #include "rgx_fwif_km.h"
 #include "servicesext.h"
+#include "cache_ops.h"
 
-#if defined(PVR_DVFS) || defined(SUPPORT_PDVFS)
+#if defined(SUPPORT_LINUX_DVFS) || defined(SUPPORT_PDVFS)
 #include "pvr_dvfs.h"
 #endif
 
@@ -64,8 +65,15 @@ typedef enum _DRIVER_MODE_
 } PVRSRV_DRIVER_MODE;
 
 /*
- * All the heaps from which regular device memory allocations can be made in
- * terms of their locality to the respective device.
+ * This type defines location-oriented physical heap IDs which are used to
+ * help map to actual physical heaps (often far fewer) defined in the system
+ * layer. See  PVRSRV_DEVICE_CONFIG.aui32PhysHeapID[].
+ * These IDs are replicated in the Device Memory allocation flags to allow
+ * allocations to be made in terms of their locality to ensure the correct
+ * physical heap is accessed for the given system/platform configuration.
+ *
+ * EXTERNAL - This is used by some PMR import/export factories where the
+ *            physical memory heap is not managed by the pvrsrv driver.
  */
 typedef enum
 {
@@ -98,6 +106,13 @@ typedef IMG_UINT64
 (*PFN_SYS_DEV_SOC_TIMER_READ)(IMG_HANDLE hSysData);
 #endif
 
+typedef enum _PVRSRV_DEVICE_FABRIC_TYPE_
+{
+	PVRSRV_DEVICE_FABRIC_NONE = 0,
+	PVRSRV_DEVICE_FABRIC_ACELITE,
+	PVRSRV_DEVICE_FABRIC_FULLACE,
+} PVRSRV_DEVICE_FABRIC_TYPE;
+
 typedef IMG_UINT32
 (*PFN_SYS_DEV_CLK_FREQ_GET)(IMG_HANDLE hSysData);
 
@@ -122,7 +137,13 @@ typedef PVRSRV_ERROR
 
 typedef void (*PFN_SYS_DEV_FEAT_DEP_INIT)(PVRSRV_DEVICE_CONFIG *, IMG_UINT64);
 
-typedef PVRSRV_DRIVER_MODE (*PFN_SYS_DRIVER_MODE)(void);
+typedef void
+(*PFN_SYS_DEV_HOST_CACHE_MAINTENANCE)(IMG_HANDLE hSysData,
+									PVRSRV_CACHE_OP eRequestType,
+									void *pvVirtStart,
+									void *pvVirtEnd,
+									IMG_CPU_PHYADDR sCPUPhysStart,
+									IMG_CPU_PHYADDR sCPUPhysEnd);
 
 typedef enum _PVRSRV_TD_FW_MEM_REGION_
 {
@@ -133,6 +154,8 @@ typedef enum _PVRSRV_TD_FW_MEM_REGION_
 } PVRSRV_TD_FW_MEM_REGION;
 
 #if defined(SUPPORT_TRUSTED_DEVICE)
+
+#define TD_MAX_NUM_MIPS_PAGETABLE_PAGES (4U)
 
 typedef struct _PVRSRV_TD_FW_PARAMS_
 {
@@ -152,15 +175,16 @@ typedef struct _PVRSRV_TD_FW_PARAMS_
 			IMG_DEV_VIRTADDR sFWCorememDataDevVAddr;
 			RGXFWIF_DEV_VIRTADDR sFWCorememDataFWAddr;
 			IMG_UINT32 ui32NumThreads;
-			IMG_UINT32 ui32MainThreadID;
 		} sMeta;
 
 		struct
 		{
 			/* MIPS-only parameters */
 			IMG_DEV_PHYADDR sGPURegAddr;
-			IMG_DEV_PHYADDR sFWPageTableAddr;
+			IMG_DEV_PHYADDR asFWPageTableAddr[TD_MAX_NUM_MIPS_PAGETABLE_PAGES];
 			IMG_DEV_PHYADDR sFWStackAddr;
+			IMG_UINT32 ui32FWPageTableLog2PageSize;
+			IMG_UINT32 ui32FWPageTableNumPages;
 		} sMips;
 	} uFWP;
 } PVRSRV_TD_FW_PARAMS;
@@ -171,9 +195,9 @@ typedef PVRSRV_ERROR
 
 typedef struct _PVRSRV_TD_POWER_PARAMS_
 {
-	IMG_DEV_PHYADDR sPCAddr; /* META only used param */
+	IMG_DEV_PHYADDR sPCAddr;
 
-	/* MIPS only used fields */
+	/* MIPS-only fields */
 	IMG_DEV_PHYADDR sGPURegAddr;
 	IMG_DEV_PHYADDR sBootRemapAddr;
 	IMG_DEV_PHYADDR sCodeRemapAddr;
@@ -190,22 +214,11 @@ typedef PVRSRV_ERROR
 typedef PVRSRV_ERROR
 (*PFN_TD_RGXSTOP)(IMG_HANDLE hSysData);
 
-typedef struct _PVRSRV_TD_SECBUF_PARAMS_
-{
-	IMG_DEVMEM_SIZE_T uiSize;
-	IMG_DEVMEM_ALIGN_T uiAlign;
-	IMG_CPU_PHYADDR *psSecBufAddr;
-	IMG_UINT64 *pui64SecBufHandle;
-} PVRSRV_TD_SECBUF_PARAMS;
-
-typedef PVRSRV_ERROR
-(*PFN_TD_SECUREBUF_ALLOC)(IMG_HANDLE hSysData,
-						  PVRSRV_TD_SECBUF_PARAMS *psTDSecBufParams);
-
-typedef PVRSRV_ERROR
-(*PFN_TD_SECUREBUF_FREE)(IMG_HANDLE hSysData,
-						 IMG_UINT64 ui64SecBufHandle);
 #endif /* defined(SUPPORT_TRUSTED_DEVICE) */
+
+#if defined(SUPPORT_GPUVIRT_VALIDATION)
+typedef void (*PFN_SYS_DEV_VIRT_INIT)(IMG_UINT32[GPUVIRT_VALIDATION_NUM_REGIONS][GPUVIRT_VALIDATION_NUM_OS], IMG_UINT32[GPUVIRT_VALIDATION_NUM_REGIONS][GPUVIRT_VALIDATION_NUM_OS]);
+#endif /* defined(SUPPORT_GPUVIRT_VALIDATION) */
 
 struct _PVRSRV_DEVICE_CONFIG_
 {
@@ -265,8 +278,8 @@ struct _PVRSRV_DEVICE_CONFIG_
 	 *! the configuration could specify an LMA heap here (if desired).
 	 *!
 	 *! The third entry (aui32PhysHeapID[PVRSRV_DEVICE_PHYS_HEAP_FW_LOCAL])
-	 *! will be used for allocations where the PVRSRV_MEMALLOCFLAG_FW_LOCAL
-	 *! flag is set.
+	 *! will be used for allocations where the PVRSRV_FW_ALLOC_TYPE is
+	 *! FW_ALLOC_MAIN, FW_ALLOC_CONFIG or FW_ALLOC_RAW.
 	 *!
 	 *! The fourth entry (aui32PhysHeapID[PVRSRV_DEVICE_PHYS_HEAP_EXTERNAL])
 	 *! will be used for allocations that are imported into the driver and
@@ -276,10 +289,6 @@ struct _PVRSRV_DEVICE_CONFIG_
 	 *! should specify the same heap details in all entries.
 	 */
 	IMG_UINT32 aui32PhysHeapID[PVRSRV_DEVICE_PHYS_HEAP_LAST];
-
-	RGXFWIF_BIFTILINGMODE eBIFTilingMode;
-	IMG_UINT32 *pui32BIFTilingHeapConfigs;
-	IMG_UINT32 ui32BIFTilingHeapCount;
 
 	/*!
 	 *! Callbacks to change system device power state at the beginning and end
@@ -302,6 +311,13 @@ struct _PVRSRV_DEVICE_CONFIG_
 	 */
 	PFN_SYS_DEV_CHECK_MEM_ALLOC_SIZE pfnCheckMemAllocSize;
 
+	/*!
+	 *! Callback to perform host CPU cache maintenance. Might be needed for
+	 *! architectures which allow extensions such as RISC-V (optional).
+	 */
+	PFN_SYS_DEV_HOST_CACHE_MAINTENANCE pfnHostCacheMaintenance;
+	IMG_BOOL bHasPhysicalCacheMaintenance;
+
 #if defined(SUPPORT_TRUSTED_DEVICE)
 	/*!
 	 *! Callback to send FW image and FW boot time parameters to the trusted
@@ -318,19 +334,12 @@ struct _PVRSRV_DEVICE_CONFIG_
 	/*! Callbacks to ping the trusted device to securely run RGXStart/Stop() */
 	PFN_TD_RGXSTART pfnTDRGXStart;
 	PFN_TD_RGXSTOP pfnTDRGXStop;
-
-	/*! Callback to request allocation/freeing of secure buffers */
-	PFN_TD_SECUREBUF_ALLOC pfnTDSecureBufAlloc;
-	PFN_TD_SECUREBUF_FREE pfnTDSecureBufFree;
 #endif /* defined(SUPPORT_TRUSTED_DEVICE) */
 
 	/*! Function that does device feature specific system layer initialisation */
 	PFN_SYS_DEV_FEAT_DEP_INIT	pfnSysDevFeatureDepInit;
 
-	/*! Function returns system layer execution environment */
-	PFN_SYS_DRIVER_MODE			pfnSysDriverMode;
-
-#if defined(PVR_DVFS) || defined(SUPPORT_PDVFS)
+#if defined(SUPPORT_LINUX_DVFS) || defined(SUPPORT_PDVFS)
 	PVRSRV_DVFS sDVFS;
 #endif
 
@@ -338,8 +347,20 @@ struct _PVRSRV_DEVICE_CONFIG_
 	IMG_DEV_PHYADDR sAltRegsGpuPBase;
 #endif
 
-#if defined(SUPPORT_DEVICE_PA0_AS_VALID)
+	/*!
+	 *! Indicates if device physical address 0x0 might be used as GPU memory
+	 *! (e.g. LMA system or UMA system with CPU PA 0x0 reserved by the OS,
+	 *!  but CPU PA != device PA and device PA 0x0 available for the GPU)
+	 */
 	IMG_BOOL bDevicePA0IsValid;
+
+	/*!
+	 *! Function to initialize System-specific virtualization. If not supported
+	 *! this should be a NULL reference. Only present if
+	 *! SUPPORT_GPUVIRT_VALIDATION is defined.
+	 */
+#if defined(SUPPORT_GPUVIRT_VALIDATION)
+	PFN_SYS_DEV_VIRT_INIT		pfnSysDevVirtInit;
 #endif
 };
 

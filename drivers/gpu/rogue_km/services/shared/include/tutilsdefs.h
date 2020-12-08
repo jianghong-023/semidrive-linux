@@ -1,5 +1,5 @@
 /*************************************************************************/ /*!
-@File		tutilsdefs.h
+@File           tutilsdefs.h
 @Title          Testing utils bridge defines
 @Copyright      Copyright (c) Imagination Technologies Ltd. All Rights Reserved
 @Description    Shared structures and constants between client and server sides
@@ -41,8 +41,8 @@ COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
 IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */ /**************************************************************************/
-#ifndef __TUTILSDEFS_H__
-#define __TUTILSDEFS_H__
+#ifndef TUTILSDEFS_H
+#define TUTILSDEFS_H
 
 
 #include "pvrsrv_tlcommon.h"
@@ -71,19 +71,19 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 typedef struct _PVR_TL_TEST_CMD_SOURCE_START_IN_
 {
 	/* Stream name must always be first in struct */
-	IMG_CHAR 	pszStreamName[PRVSRVTL_MAX_STREAM_NAME_SIZE];
-	IMG_UINT16	uiStreamSizeInPages;	/* # of 4Kb pages */
-	IMG_UINT16	uiInterval;				/* in milliseconds */
-	IMG_UINT16  uiCallbackKicks;		/* 0 for no limit of timer call backs */
-	IMG_UINT16  uiEOSMarkerKicks;		/* Insert EOS Marker every N Kicks, 0 for none */
-	IMG_UINT16	uiPacketSizeInBytes;	/* 0 for random size between 1..255 size in bytes */
-	IMG_UINT32  uiStreamCreateFlags;	/* See TLStreamCreate() */
-	IMG_UINT16	uiStartDelay;           /* 0 for normal uiInterval delay, one off delay in ms */
-	IMG_BOOL	bDoNotDeleteStream;		/* When true the stream is not deleted on self
-	                                     * cleanup sources only the timers and other resources are */
-	IMG_BOOL	bDelayStreamCreate;	    /* When true the stream used in the source is created
-                                         * in the first kick. False for normal behaviour where
-                                         * the stream is created in the bridge source start context */
+	IMG_CHAR    pszStreamName[PRVSRVTL_MAX_STREAM_NAME_SIZE];
+	IMG_UINT16  uiStreamSizeInPages;  /* # of 4Kb pages */
+	IMG_UINT16  uiInterval;           /* in milliseconds */
+	IMG_UINT16  uiCallbackKicks;      /* 0 for no limit of timer call backs */
+	IMG_UINT16  uiEOSMarkerKicks;     /* Insert EOS Marker every N Kicks, 0 for none */
+	IMG_UINT16  uiPacketSizeInBytes;  /* 0 for random size between 1..255 size in bytes */
+	IMG_UINT32  uiStreamCreateFlags;  /* See TLStreamCreate() */
+	IMG_UINT16  uiStartDelay;         /* 0 for normal uiInterval delay, one off delay in ms */
+	IMG_BOOL    bDoNotDeleteStream;   /* When true the stream is not deleted on self
+	                                   * cleanup sources only the timers and other resources are */
+	IMG_BOOL    bDelayStreamCreate;   /* When true the stream used in the source is created
+	                                   * in the first kick. False for normal behaviour where
+	                                   * the stream is created in the bridge source start context */
 } PVR_TL_TEST_CMD_SOURCE_START_IN;
 
 
@@ -91,8 +91,8 @@ typedef struct _PVR_TL_TEST_CMD_SOURCE_START_IN_
 typedef struct _PVR_TL_TEST_CMD_SOURCE_STOP_IN_
 {
 	/* Stream name must always be first in struct */
-	IMG_CHAR 	pszStreamName[PRVSRVTL_MAX_STREAM_NAME_SIZE];
-	IMG_BOOL	bDoNotDeleteStream;
+	IMG_CHAR  pszStreamName[PRVSRVTL_MAX_STREAM_NAME_SIZE];
+	IMG_BOOL  bDoNotDeleteStream;
 } PVR_TL_TEST_CMD_SOURCE_STOP_IN;
 
 #define PVR_TL_TEST_CMD_SOURCE_START2	12	/* Uses two stage data submit */
@@ -108,16 +108,16 @@ typedef PVR_TL_TEST_CMD_SOURCE_START_IN PVR_TL_TEST_CMD_SOURCE_START2_IN;
 typedef struct _PVR_TL_TEST_CMD_STREAM_CREATE_IN_
 {
 	/* Stream name must always be first in struct */
-	IMG_CHAR 	pszStreamName[PRVSRVTL_MAX_STREAM_NAME_SIZE];
-	IMG_UINT16	uiStreamSizeInPages;
+	IMG_CHAR    pszStreamName[PRVSRVTL_MAX_STREAM_NAME_SIZE];
+	IMG_UINT16  uiStreamSizeInPages;
 	IMG_UINT32  uiStreamCreateFlags;
-	IMG_BOOL	bWithOpenCallback;
+	IMG_BOOL    bWithOpenCallback;
 } PVR_TL_TEST_CMD_STREAM_CREATE_IN;
 
 #define PVR_TL_TEST_CMD_STREAM_CLOSE	16
 typedef struct _PVR_TL_TEST_CMD_STREAM_NAME_IN_
 {
-	IMG_CHAR 	pszStreamName[PRVSRVTL_MAX_STREAM_NAME_SIZE];
+	IMG_CHAR  pszStreamName[PRVSRVTL_MAX_STREAM_NAME_SIZE];
 } PVR_TL_TEST_CMD_STREAM_NAME_IN;
 
 #define PVR_TL_TEST_CMD_STREAM_OPEN 17
@@ -195,8 +195,8 @@ typedef union _PVR_TL_TEST_CMD_IN_
 typedef struct _PVR_TL_TEST_CMD_CHECKPOINT_CREATE_IN_
 {
 	/* Checkpoint name must always be first in struct */
-	IMG_CHAR 	pszCheckpointName[PVRSRV_SYNC_NAME_LENGTH];
-	IMG_UINT16	uiStreamSizeInPages;
+	IMG_CHAR    pszCheckpointName[PVRSRV_SYNC_NAME_LENGTH];
+	IMG_UINT16  uiStreamSizeInPages;
 	IMG_UINT32  uiStreamCreateFlags;
 } PVR_TL_TEST_CMD_CHECKPOINT_CREATE_IN;
 
@@ -205,11 +205,25 @@ typedef struct _PVR_TL_TEST_CMD_CHECKPOINT_CREATE_IN_
 
 typedef struct _PVR_TL_TEST_CMD_STREAM_OPEN_COUNTER_IN_
 {
-	IMG_CHAR 	pszStreamName[PRVSRVTL_MAX_STREAM_NAME_SIZE];
-	IMG_UINT32	ui32Counter;
+	IMG_CHAR    pszStreamName[PRVSRVTL_MAX_STREAM_NAME_SIZE];
+	IMG_UINT32  ui32Counter;
 } PVR_TL_TEST_CMD_STREAM_OPEN_COUNTER_IN;
 
-#endif /* __TUTILSDEFS_H__ */
+/****************************************************************************
+ * KmallocThreshold IOCTL types
+ */
+
+#define PVR_TL_TEST_CMD_KMALLOC 39
+
+typedef struct _PVR_TL_TEST_CMD_KMALLOC_IN_
+{
+	IMG_UINT32 uiAllocCount;
+	IMG_UINT32 uiAllocSize;
+	IMG_UINT32 uiFailedAllocThreshold;
+	IMG_UINT32 uiFailedAllocFrequency;
+} PVR_TL_TEST_CMD_KMALLOC_IN;
+
+#endif /* TUTILSDEFS_H */
 
 /******************************************************************************
  End of file (tutilsdefs.h)

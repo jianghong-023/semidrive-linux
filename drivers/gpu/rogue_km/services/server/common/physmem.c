@@ -51,6 +51,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "pdump_physmem.h"
 #include "pdump_km.h"
 #include "rgx_heaps.h"
+#include "pvr_ricommon.h"
 
 #if defined(DEBUG)
 static IMG_UINT32 gPMRAllocFail;
@@ -64,6 +65,11 @@ MODULE_PARM_DESC(gPMRAllocFail, "When number of PMR allocs reaches "
 				 "means that alloc function will behave normally).");
 #endif /* defined(LINUX) */
 #endif /* defined(DEBUG) */
+
+#if defined(PVRSRV_ENABLE_PROCESS_STATS)
+#include "process_stats.h"
+#include "proc_stats.h"
+#endif
 
 PVRSRV_ERROR DevPhysMemAlloc(PVRSRV_DEVICE_NODE	*psDevNode,
                              IMG_UINT32 ui32MemSize,
@@ -89,19 +95,22 @@ PVRSRV_ERROR DevPhysMemAlloc(PVRSRV_DEVICE_NODE	*psDevNode,
 	PG_HANDLE *psMemHandle;
 	IMG_UINT64 uiMask;
 	IMG_DEV_PHYADDR sDevPhysAddr_int;
+	IMG_PID uiPid = 0;
 
 	psMemHandle = hMemHandle;
 
+#if defined(PVRSRV_ENABLE_PROCESS_STATS)
+	uiPid = psDevNode->eDevState == PVRSRV_DEVICE_STATE_INIT ?
+	        PVR_SYS_ALLOC_PID : OSGetCurrentClientProcessIDKM();
+#endif
+
 	/* Allocate the pages */
-	eError = psDevNode->pfnDevPxAlloc(psDevNode,
-	                                  TRUNCATE_64BITS_TO_SIZE_T(ui32MemSize),
-	                                  psMemHandle,
-	                                  &sDevPhysAddr_int);
-	if (PVRSRV_OK != eError)
-	{
-		PVR_DPF((PVR_DBG_ERROR,"Unable to allocate the pages"));
-		return eError;
-	}
+	eError = psDevNode->sDevMMUPxSetup.pfnDevPxAlloc(psDevNode,
+	                                                 TRUNCATE_64BITS_TO_SIZE_T(ui32MemSize),
+	                                                 psMemHandle,
+	                                                 &sDevPhysAddr_int,
+	                                                 uiPid);
+	PVR_LOG_RETURN_IF_ERROR(eError, "pfnDevPxAlloc:1");
 
 	/* Check to see if the page allocator returned pages with our desired
 	 * alignment, which is not unlikely
@@ -110,18 +119,15 @@ PVRSRV_ERROR DevPhysMemAlloc(PVRSRV_DEVICE_NODE	*psDevNode,
 	if (ui32Log2Align && (sDevPhysAddr_int.uiAddr & uiMask))
 	{
 		/* use over allocation instead */
-		psDevNode->pfnDevPxFree(psDevNode, psMemHandle);
+		psDevNode->sDevMMUPxSetup.pfnDevPxFree(psDevNode, psMemHandle);
 
 		ui32MemSize += (IMG_UINT32) uiMask;
-		eError = psDevNode->pfnDevPxAlloc(psDevNode,
-		                                  TRUNCATE_64BITS_TO_SIZE_T(ui32MemSize),
-		                                  psMemHandle,
-		                                  &sDevPhysAddr_int);
-		if (PVRSRV_OK != eError)
-		{
-			PVR_DPF((PVR_DBG_ERROR,"Unable to over-allocate the pages"));
-			return eError;
-		}
+		eError = psDevNode->sDevMMUPxSetup.pfnDevPxAlloc(psDevNode,
+		                                                 TRUNCATE_64BITS_TO_SIZE_T(ui32MemSize),
+		                                                 psMemHandle,
+		                                                 &sDevPhysAddr_int,
+		                                                 uiPid);
+		PVR_LOG_RETURN_IF_ERROR(eError, "pfnDevPxAlloc:2");
 
 		sDevPhysAddr_int.uiAddr += uiMask;
 		sDevPhysAddr_int.uiAddr &= ~uiMask;
@@ -148,15 +154,15 @@ PVRSRV_ERROR DevPhysMemAlloc(PVRSRV_DEVICE_NODE	*psDevNode,
 	if (bInitPage)
 	{
 		/*Map the page to the CPU VA space */
-		eError = psDevNode->pfnDevPxMap(psDevNode,
-		                                psMemHandle,
-		                                ui32MemSize,
-		                                &sDevPhysAddr_int,
-		                                &pvCpuVAddr);
+		eError = psDevNode->sDevMMUPxSetup.pfnDevPxMap(psDevNode,
+		                                               psMemHandle,
+		                                               ui32MemSize,
+		                                               &sDevPhysAddr_int,
+		                                               &pvCpuVAddr);
 		if (PVRSRV_OK != eError)
 		{
-			PVR_DPF((PVR_DBG_ERROR,"Unable to map the allocated page"));
-			psDevNode->pfnDevPxFree(psDevNode, psMemHandle);
+			PVR_DPF((PVR_DBG_ERROR, "Unable to map the allocated page"));
+			psDevNode->sDevMMUPxSetup.pfnDevPxFree(psDevNode, psMemHandle);
 			return eError;
 		}
 
@@ -164,20 +170,20 @@ PVRSRV_ERROR DevPhysMemAlloc(PVRSRV_DEVICE_NODE	*psDevNode,
 		OSDeviceMemSet(pvCpuVAddr, u8Value, ui32MemSize);
 
 		/*Map the page to the CPU VA space */
-		eError = psDevNode->pfnDevPxClean(psDevNode,
-		                                  psMemHandle,
-		                                  0,
-		                                  ui32MemSize);
+		eError = psDevNode->sDevMMUPxSetup.pfnDevPxClean(psDevNode,
+		                                                 psMemHandle,
+		                                                 0,
+		                                                 ui32MemSize);
 		if (PVRSRV_OK != eError)
 		{
-			PVR_DPF((PVR_DBG_ERROR,"Unable to clean the allocated page"));
-			psDevNode->pfnDevPxUnMap(psDevNode, psMemHandle, pvCpuVAddr);
-			psDevNode->pfnDevPxFree(psDevNode, psMemHandle);
+			PVR_DPF((PVR_DBG_ERROR, "Unable to clean the allocated page"));
+			psDevNode->sDevMMUPxSetup.pfnDevPxUnMap(psDevNode, psMemHandle, pvCpuVAddr);
+			psDevNode->sDevMMUPxSetup.pfnDevPxFree(psDevNode, psMemHandle);
 			return eError;
 		}
 
 #if defined(PDUMP)
-		/*P-Dumping of the page contents can be done in two ways
+		/* PDumping of the page contents can be done in two ways
 		 * 1. Store the single byte init value to the .prm file
 		 *    and load the same value to the entire dummy page buffer
 		 *    This method requires lot of LDB's inserted into the out2.txt
@@ -189,7 +195,7 @@ PVRSRV_ERROR DevPhysMemAlloc(PVRSRV_DEVICE_NODE	*psDevNode,
 		 *    size of .prm file might go up but that's not huge at least
 		 *    for this allocation
 		 */
-		/*Write the buffer contents to the prm file */
+		/* Write the buffer contents to the prm file */
 		eError = PDumpWriteParameterBlob(pvCpuVAddr,
 		                          ui32PDumpMemSize,
 		                          PDUMP_FLAGS_CONTINUOUS,
@@ -211,7 +217,7 @@ PVRSRV_ERROR DevPhysMemAlloc(PVRSRV_DEVICE_NODE	*psDevNode,
 				PDUMP_ERROR(eError, "Failed to write LDB statement to script file");
 				PVR_DPF((PVR_DBG_ERROR, "Failed to write LDB statement to script file, error %d", eError));
 			}
- 		}
+		}
 		else if (eError != PVRSRV_ERROR_PDUMP_NOT_ALLOWED)
 		{
 			PDUMP_ERROR(eError, "Failed to write device allocation to parameter file");
@@ -219,18 +225,18 @@ PVRSRV_ERROR DevPhysMemAlloc(PVRSRV_DEVICE_NODE	*psDevNode,
 		}
 		else
 		{
-			/* else Write to parameter file prevented under the flags and
+			/* Else write to parameter file prevented under the flags and
 			 * current state of the driver so skip write to script and error IF.
-             * This is normal e..g. no in capture range for example
+			 * This is expected e.g., if not in the capture range.
 			 */
 			eError = PVRSRV_OK;
 		}
 #endif
 
-		/*UnMap the page */
-		psDevNode->pfnDevPxUnMap(psDevNode,
-		                         psMemHandle,
-		                         pvCpuVAddr);
+		/* Unmap the page */
+		psDevNode->sDevMMUPxSetup.pfnDevPxUnMap(psDevNode,
+		                                        psMemHandle,
+		                                        pvCpuVAddr);
 	}
 
 	return PVRSRV_OK;
@@ -245,7 +251,7 @@ void DevPhysMemFree(PVRSRV_DEVICE_NODE *psDevNode,
 	PG_HANDLE *psMemHandle;
 
 	psMemHandle = hMemHandle;
-	psDevNode->pfnDevPxFree(psDevNode, psMemHandle);
+	psDevNode->sDevMMUPxSetup.pfnDevPxFree(psDevNode, psMemHandle);
 #if defined(PDUMP)
 	if (NULL != hPDUMPMemHandle)
 	{
@@ -290,16 +296,16 @@ static inline PVRSRV_ERROR _ValidateParams(IMG_UINT32 ui32NumPhysChunks,
 	}
 
 	/* Fail if requesting coherency on one side but uncached on the other */
-	if ( (PVRSRV_CHECK_CPU_CACHE_COHERENT(uiFlags) &&
-	         (PVRSRV_CHECK_GPU_UNCACHED(uiFlags) || PVRSRV_CHECK_GPU_WRITE_COMBINE(uiFlags))) )
+	if (PVRSRV_CHECK_CPU_CACHE_COHERENT(uiFlags) &&
+	    (PVRSRV_CHECK_GPU_UNCACHED(uiFlags) || PVRSRV_CHECK_GPU_WRITE_COMBINE(uiFlags)))
 	{
 		PVR_DPF((PVR_DBG_ERROR, "Request for CPU coherency but specifying GPU uncached "
 				"Please use GPU cached flags for coherency."));
 		return PVRSRV_ERROR_UNSUPPORTED_CACHE_MODE;
 	}
 
-	if ( (PVRSRV_CHECK_GPU_CACHE_COHERENT(uiFlags) &&
-	         (PVRSRV_CHECK_CPU_UNCACHED(uiFlags) || PVRSRV_CHECK_CPU_WRITE_COMBINE(uiFlags))) )
+	if (PVRSRV_CHECK_GPU_CACHE_COHERENT(uiFlags) &&
+	    (PVRSRV_CHECK_CPU_UNCACHED(uiFlags) || PVRSRV_CHECK_CPU_WRITE_COMBINE(uiFlags)))
 	{
 		PVR_DPF((PVR_DBG_ERROR, "Request for GPU coherency but specifying CPU uncached "
 				"Please use CPU cached flags for coherency."));
@@ -329,8 +335,8 @@ static inline PVRSRV_ERROR _ValidateParams(IMG_UINT32 ui32NumPhysChunks,
 			return PVRSRV_ERROR_INVALID_PARAMS;
 		}
 
-		/* ... chunk size must be a equal to page size ...*/
-		if ( uiChunkSize != (1 << uiLog2AllocPageSize) )
+		/* ... chunk size must be a equal to page size ... */
+		if (uiChunkSize != (1 << uiLog2AllocPageSize))
 		{
 			PVR_DPF((PVR_DBG_ERROR,
 					 "%s: Invalid chunk size for sparse allocation. Requested "
@@ -394,7 +400,7 @@ static inline PVRSRV_ERROR _ValidateParams(IMG_UINT32 ui32NumPhysChunks,
 }
 
 PVRSRV_ERROR
-PhysmemNewRamBackedPMR(CONNECTION_DATA * psConnection,
+PhysmemNewRamBackedPMR(CONNECTION_DATA *psConnection,
                        PVRSRV_DEVICE_NODE *psDevNode,
                        IMG_DEVMEM_SIZE_T uiSize,
                        PMR_SIZE_T uiChunkSize,
@@ -406,14 +412,14 @@ PhysmemNewRamBackedPMR(CONNECTION_DATA * psConnection,
                        IMG_UINT32 uiAnnotationLength,
                        const IMG_CHAR *pszAnnotation,
                        IMG_PID uiPid,
-                       PMR **ppsPMRPtr)
+                       PMR **ppsPMRPtr,
+                       IMG_UINT32 ui32PDumpFlags)
 {
 	PVRSRV_ERROR eError;
 	PVRSRV_DEVICE_PHYS_HEAP ePhysHeapIdx;
 	PFN_SYS_DEV_CHECK_MEM_ALLOC_SIZE pfnCheckMemAllocSize =
 		psDevNode->psDevConfig->pfnCheckMemAllocSize;
 
-	PVR_UNREFERENCED_PARAMETER(psConnection);
 	PVR_UNREFERENCED_PARAMETER(uiAnnotationLength);
 
 	eError = _ValidateParams(ui32NumPhysChunks,
@@ -422,22 +428,16 @@ PhysmemNewRamBackedPMR(CONNECTION_DATA * psConnection,
 	                         &uiLog2AllocPageSize,
 	                         &uiSize,
 	                         &uiChunkSize);
-	if (eError != PVRSRV_OK)
-	{
-		return eError;
-	}
+	PVR_RETURN_IF_ERROR(eError);
 
 	/* Lookup the requested physheap index to use for this PMR allocation */
 	if (PVRSRV_CHECK_FW_LOCAL(uiFlags))
 	{
-		if (PVRSRV_CHECK_FW_GUEST(uiFlags))
+		if (PVRSRV_FW_ALLOC_TYPE(uiFlags) == FW_ALLOC_RAW)
 		{
+			/* Only a Host driver can handle memory on behalf of other drivers */
+			PVR_RETURN_IF_INVALID_PARAM(PVRSRV_VZ_MODE_IS(HOST));
 			ePhysHeapIdx = PVRSRV_DEVICE_PHYS_HEAP_FW_GUEST;
-			if (! PVRSRV_VZ_MODE_IS(DRIVER_MODE_HOST))
-			{
-				/* Shouldn't be reaching this code */
-				return PVRSRV_ERROR_INTERNAL_ERROR;
-			}
 		}
 		else
 		{
@@ -466,13 +466,9 @@ PhysmemNewRamBackedPMR(CONNECTION_DATA * psConnection,
 	if (pfnCheckMemAllocSize)
 	{
 		IMG_UINT64 uiMemSize = (IMG_UINT64)uiChunkSize * ui32NumPhysChunks;
-		PVRSRV_ERROR eError;
 
 		eError = pfnCheckMemAllocSize(psDevNode->psDevConfig->hSysData, uiMemSize);
-		if (eError != PVRSRV_OK)
-		{
-			return eError;
-		}
+		PVR_RETURN_IF_ERROR(eError);
 	}
 
 #if defined(DEBUG)
@@ -493,21 +489,43 @@ PhysmemNewRamBackedPMR(CONNECTION_DATA * psConnection,
 	}
 #endif /* defined(DEBUG) */
 
-	return psDevNode->pfnCreateRamBackedPMR[ePhysHeapIdx](psDevNode,
-											uiSize,
-											uiChunkSize,
-											ui32NumPhysChunks,
-											ui32NumVirtChunks,
-											pui32MappingTable,
-											uiLog2AllocPageSize,
-											uiFlags,
-											pszAnnotation,
-											uiPid,
-											ppsPMRPtr);
+	/* If the driver is in an 'init' state all of the allocated memory
+	 * should be attributed to the driver (PID 1) rather than to the
+	 * process those allocations are made under. Same applies to the memory
+	 * allocated for the Firmware. */
+	if (psDevNode->eDevState == PVRSRV_DEVICE_STATE_INIT ||
+	    PVRSRV_CHECK_FW_LOCAL(uiFlags))
+	{
+		uiPid = PVR_SYS_ALLOC_PID;
+	}
+
+	eError = psDevNode->pfnCreateRamBackedPMR[ePhysHeapIdx](psConnection,
+	                                                      psDevNode,
+	                                                      uiSize,
+	                                                      uiChunkSize,
+	                                                      ui32NumPhysChunks,
+	                                                      ui32NumVirtChunks,
+	                                                      pui32MappingTable,
+	                                                      uiLog2AllocPageSize,
+	                                                      uiFlags,
+	                                                      pszAnnotation,
+	                                                      uiPid,
+	                                                      ppsPMRPtr,
+	                                                      ui32PDumpFlags);
+
+#if defined(PVRSRV_ENABLE_PROCESS_STATS)
+	if (eError != PVRSRV_OK)
+	{
+		PVRSRVStatsUpdateOOMStats(PVRSRV_PROCESS_STAT_TYPE_OOM_PHYSMEM_COUNT,
+		                          OSGetCurrentClientProcessIDKM());
+	}
+#endif
+
+	return eError;
 }
 
 PVRSRV_ERROR
-PhysmemNewRamBackedLockedPMR(CONNECTION_DATA * psConnection,
+PhysmemNewRamBackedLockedPMR(CONNECTION_DATA *psConnection,
 							PVRSRV_DEVICE_NODE *psDevNode,
 							IMG_DEVMEM_SIZE_T uiSize,
 							PMR_SIZE_T uiChunkSize,
@@ -519,7 +537,8 @@ PhysmemNewRamBackedLockedPMR(CONNECTION_DATA * psConnection,
 							IMG_UINT32 uiAnnotationLength,
 							const IMG_CHAR *pszAnnotation,
 							IMG_PID uiPid,
-							PMR **ppsPMRPtr)
+							PMR **ppsPMRPtr,
+							IMG_UINT32 ui32PDumpFlags)
 {
 
 	PVRSRV_ERROR eError;
@@ -535,7 +554,8 @@ PhysmemNewRamBackedLockedPMR(CONNECTION_DATA * psConnection,
 									uiAnnotationLength,
 									pszAnnotation,
 									uiPid,
-									ppsPMRPtr);
+									ppsPMRPtr,
+									ui32PDumpFlags);
 
 	if (eError == PVRSRV_OK)
 	{
@@ -545,70 +565,70 @@ PhysmemNewRamBackedLockedPMR(CONNECTION_DATA * psConnection,
 	return eError;
 }
 
-static void GetLMASize( IMG_DEVMEM_SIZE_T *puiLMASize,
-			PVRSRV_DEVICE_NODE *psDevNode )
-{
-	IMG_UINT uiRegionIndex = 0, uiNumRegions = 0;
-	PVR_ASSERT(psDevNode);
-
-	uiNumRegions = psDevNode->psDevConfig->pasPhysHeaps[0].ui32NumOfRegions;
-
-	for (uiRegionIndex = 0; uiRegionIndex < uiNumRegions; ++uiRegionIndex)
-	{
-		*puiLMASize += psDevNode->psDevConfig->pasPhysHeaps[0].pasRegions[uiRegionIndex].uiSize;
-	}
-}
-
 PVRSRV_ERROR
-PVRSRVGetMaxDevMemSizeKM( CONNECTION_DATA * psConnection,
+PVRSRVGetMaxDevMemSizeKM(CONNECTION_DATA *psConnection,
 			  PVRSRV_DEVICE_NODE *psDevNode,
 			  IMG_DEVMEM_SIZE_T *puiLMASize,
 			  IMG_DEVMEM_SIZE_T *puiUMASize )
 {
-	IMG_BOOL bLMA = IMG_FALSE, bUMA = IMG_FALSE;
-
-	*puiLMASize = 0;
-	*puiUMASize = 0;
-
-#if defined(TC_MEMORY_CONFIG)			/* For TC2 */
-#if (TC_MEMORY_CONFIG == TC_MEMORY_LOCAL)
-	bLMA = IMG_TRUE;
-#elif (TC_MEMORY_CONFIG == TC_MEMORY_HOST)
-	bUMA = IMG_TRUE;
-#else
-	bUMA = IMG_TRUE;
-	bLMA = IMG_TRUE;
-#endif
-
-#elif defined(PLATO_MEMORY_CONFIG)		/* For Plato TC */
-#if (PLATO_MEMORY_CONFIG == PLATO_MEMORY_LOCAL)
-	bLMA = IMG_TRUE;
-#elif (PLATO_MEMORY_CONFIG == PLATO_MEMORY_HOST)
-	bUMA = IMG_TRUE;
-#else
-	bUMA = IMG_TRUE;
-	bLMA = IMG_TRUE;
-#endif
-
-#elif defined(LMA)				/* For emu, vp_linux */
-	bLMA = IMG_TRUE;
-
-#else						/* For all other platforms */
-	bUMA = IMG_TRUE;
-#endif
-
-	if (bLMA) { GetLMASize(puiLMASize, psDevNode); }
-	if (bUMA) { *puiUMASize = OSGetRAMSize(); }
+	IMG_DEVMEM_SIZE_T uiLMASize = 0;
+	IMG_DEVMEM_SIZE_T uiUMASize = 0;
+	PHYS_HEAP *psPhysHeap;
+	IMG_UINT uiHeapIndex;
+	IMG_UINT uiNumRegions;
+	IMG_UINT uiRegionID;
+	IMG_UINT64 uiRegionSize;
 
 	PVR_UNREFERENCED_PARAMETER(psConnection);
+
+	/*
+	 * psDevNode->apsPhysHeap may contain duplicates so loop over all registered
+	 * heaps instead.
+	 */
+	for (uiHeapIndex = 0; uiHeapIndex < psDevNode->ui32RegisteredPhysHeaps; uiHeapIndex++)
+	{
+		psPhysHeap = psDevNode->papsRegisteredPhysHeaps[uiHeapIndex];
+
+		if (psPhysHeap != psDevNode->apsPhysHeap[PVRSRV_DEVICE_PHYS_HEAP_GPU_LOCAL] &&
+			psPhysHeap != psDevNode->apsPhysHeap[PVRSRV_DEVICE_PHYS_HEAP_CPU_LOCAL])
+		{
+			continue;
+		}
+
+		if (PhysHeapGetType(psPhysHeap) == PHYS_HEAP_TYPE_LMA)
+		{
+			uiNumRegions = PhysHeapNumberOfRegions(psPhysHeap);
+			for (uiRegionID = 0; uiRegionID < uiNumRegions; uiRegionID++)
+			{
+				/*
+				 * Initialise uiRegionSize to 0 on each iteration in case
+				 * PhysHeapRegionGetSize() returns an error, which should never
+				 * actually happen in practice.
+				 */
+				uiRegionSize = 0;
+				PhysHeapRegionGetSize(psPhysHeap, uiRegionID, &uiRegionSize);
+				uiLMASize += uiRegionSize;
+			}
+		}
+		else if (PhysHeapGetType(psPhysHeap) == PHYS_HEAP_TYPE_UMA)
+		{
+			if (uiUMASize == 0)
+			{
+				uiUMASize = OSGetRAMSize();
+			}
+		}
+	}
+
+	*puiLMASize = uiLMASize;
+	*puiUMASize = uiUMASize;
+
 	return PVRSRV_OK;
 }
 
-/* 'Wrapper' function to call PMRImportPMR(), which
- * first checks the PMR is for the current device.
- * This avoids the need to do this in pmr.c, which
- * would then need PVRSRV_DEVICE_NODE (defining this
- * type in pmr.h causes a typedef redefinition issue).
+/* 'Wrapper' function to call PMRImportPMR(), which first checks the PMR is
+ * for the current device. This avoids the need to do this in pmr.c, which
+ * would then need PVRSRV_DEVICE_NODE (defining this type in pmr.h causes a
+ * typedef redefinition issue).
  */
 PVRSRV_ERROR
 PhysmemImportPMR(CONNECTION_DATA *psConnection,

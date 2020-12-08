@@ -49,6 +49,9 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #endif
 #include <linux/version.h>
 #include <linux/device.h>
+/* modified by semidrive begin */
+#include <linux/clk.h>
+/* modified by semidrive end */
 
 #include "power.h"
 #include "pvrsrv.h"
@@ -66,7 +69,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 static PVRSRV_DEVICE_NODE *gpsDeviceNode;
 
-static IMG_INT32 devfreq_target(struct device *dev, long unsigned *requested_freq, IMG_UINT32 flags)
+static IMG_INT32 devfreq_target(struct device *dev, unsigned long *requested_freq, IMG_UINT32 flags)
 {
 	RGX_DATA		*psRGXData = (RGX_DATA*) gpsDeviceNode->psDevConfig->hDevData;
 	IMG_DVFS_DEVICE		*psDVFSDevice = &gpsDeviceNode->psDevConfig->sDVFS.sDVFSDevice;
@@ -186,7 +189,7 @@ static int devfreq_get_dev_status(struct device *dev, struct devfreq_dev_status 
 		return -EAGAIN;
 	}
 
-	stat->busy_time = sGpuUtilStats.ui64GpuStatActiveHigh + sGpuUtilStats.ui64GpuStatActiveLow;
+	stat->busy_time = sGpuUtilStats.ui64GpuStatActive;
 	stat->total_time = sGpuUtilStats.ui64GpuStatCumulative;
 
 	return 0;
@@ -238,6 +241,46 @@ static int FillOPPTable(struct device *dev)
 	return 0;
 }
 
+static void ClearOPPTable(struct device *dev)
+{
+#if (defined(CHROMIUMOS_KERNEL) && (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 18, 0))) || \
+	(LINUX_VERSION_CODE >= KERNEL_VERSION(3, 19, 0))
+	const IMG_OPP *iopp;
+	int i;
+	IMG_DVFS_DEVICE_CFG *psDVFSDeviceCfg = &gpsDeviceNode->psDevConfig->sDVFS.sDVFSDeviceCfg;
+
+	for (i = 0, iopp = psDVFSDeviceCfg->pasOPPTable;
+	     i < psDVFSDeviceCfg->ui32OPPTableSize;
+	     i++, iopp++)
+	{
+		dev_pm_opp_remove(dev, iopp->ui32Freq);
+	}
+#endif
+}
+
+
+/* modified by semidrive begin */
+static int reConstructOPPTable(struct device *dev, unsigned long *freq_table, int count)
+{
+	int i, err = 0;
+
+	dev_pm_opp_of_remove_table(dev);
+
+	for (i = 0; i < count; i++)
+	{
+		err = dev_pm_opp_add(dev, freq_table[i], 0);
+		if (err) {
+			dev_err(dev, "Could not add OPP entry, %d\n", err);
+			return err;
+		}
+	}
+
+	return 0;
+}
+
+extern struct clk * getCoreClock(void);
+/* modified by semidrive end */
+
 static int GetOPPValues(struct device *dev,
                         unsigned long *min_freq,
                         unsigned long *min_volt,
@@ -250,6 +293,9 @@ static int GetOPPValues(struct device *dev,
 #endif
 	int count, i, err = 0;
 	unsigned long freq;
+	/* modified by semidrive begin */
+	int last_count = 1;
+	/* modified by semidrive end */
 
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(4, 5, 0)) && \
 	(!defined(CHROMIUMOS_KERNEL) || (LINUX_VERSION_CODE < KERNEL_VERSION(3, 18, 0)))
@@ -264,6 +310,8 @@ static int GetOPPValues(struct device *dev,
 		dev_err(dev, "Could not fetch OPP count, %d\n", count);
 		return count;
 	}
+
+	dev_info(dev, "Found %d OPP points.\n", count);
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 13, 0))
 	freq_table = devm_kcalloc(dev, count, sizeof(*freq_table), GFP_ATOMIC);
@@ -290,6 +338,9 @@ static int GetOPPValues(struct device *dev,
 		goto exit;
 	}
 
+	/* modified by semidrive begin */
+	freq = (freq <	clk_round_rate(getCoreClock(),freq))?freq:clk_round_rate(getCoreClock(),freq);
+	/* modified by semidrive end */
 	*min_volt = dev_pm_opp_get_voltage(opp);
 	*max_freq = *min_freq = freq_table[0] = freq;
 	dev_info(dev, "opp[%d/%d]: (%lu Hz, %lu uV)\n", 1, count, freq, *min_volt);
@@ -300,6 +351,10 @@ static int GetOPPValues(struct device *dev,
 	/* Iteration i > 0 finds "opp w/ freq >= (opp[i-1].freq + 1)". */
 	for (i = 1; i < count; i++)
 	{
+		/* modified by semidrive begin */
+		unsigned long newFreq;
+		/* modified by semidrive end */
+
 		freq++;
 		opp = dev_pm_opp_find_freq_ceil(dev, &freq);
 		if (IS_ERR(opp))
@@ -309,14 +364,28 @@ static int GetOPPValues(struct device *dev,
 			goto exit;
 		}
 
-		freq_table[i] = freq;
-		*max_freq = freq;
-		dev_info(dev,
-				 "opp[%d/%d]: (%lu Hz, %lu uV)\n",
-				  i + 1,
-				  count,
-				  freq,
-				  dev_pm_opp_get_voltage(opp));
+		/* modified by semidrive begin */
+		newFreq = (freq <	clk_round_rate(getCoreClock(),freq))?freq:clk_round_rate(getCoreClock(),freq);
+
+		if (newFreq > freq_table[last_count - 1]) {
+			freq_table[last_count] = newFreq;
+			*max_freq = newFreq;
+			dev_info(dev,
+					 "opp[%d/%d]: (%lu Hz, %lu uV)\n",
+					  last_count + 1,
+					  count,
+					  newFreq,
+					  dev_pm_opp_get_voltage(opp));
+			last_count++;
+		} else {
+			dev_info(dev,
+					 "opp[%d/%d]: (%lu Hz, %lu uV) is removed\n",
+					  last_count + 1,
+					  count,
+					  freq,
+					  dev_pm_opp_get_voltage(opp));
+		}
+		/* modified by semidrive end */
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 11, 0))
 		dev_pm_opp_put(opp);
 #endif
@@ -331,7 +400,10 @@ exit:
 	if (!err)
 	{
 		img_devfreq_dev_profile.freq_table = freq_table;
-		img_devfreq_dev_profile.max_state = count;
+		/* modified by semidrive begin */
+		img_devfreq_dev_profile.max_state = last_count;
+		reConstructOPPTable(dev, freq_table, last_count);
+		/* modified by semidrive end */
 	}
 	else
 #endif
@@ -353,7 +425,7 @@ static int RegisterCoolingDevice(struct device *dev,
 {
 	struct device_node *of_node;
 	int err = 0;
-	PVRSRV_VZ_RET_IF_MODE(DRIVER_MODE_GUEST, err);
+	PVRSRV_VZ_RET_IF_MODE(GUEST, err);
 
 	if (!powerOps)
 	{
@@ -391,7 +463,11 @@ PVRSRV_ERROR InitDVFS(PPVRSRV_DEVICE_NODE psDeviceNode)
 	PVRSRV_ERROR            eError;
 	int                     err;
 
-	PVRSRV_VZ_RET_IF_MODE(DRIVER_MODE_GUEST, PVRSRV_OK);
+	PVRSRV_VZ_RET_IF_MODE(GUEST, PVRSRV_OK);
+
+#if !defined(CONFIG_PM_OPP)
+	return PVRSRV_ERROR_NOT_SUPPORTED;
+#endif
 
 	if (gpsDeviceNode)
 	{
@@ -432,7 +508,7 @@ PVRSRV_ERROR InitDVFS(PPVRSRV_DEVICE_NODE psDeviceNode)
 		 */
 		if (err != -ENODEV || !psDVFSDeviceCfg->pasOPPTable)
 		{
-			PVR_DPF((PVR_DBG_ERROR,  "Failed to init opp table from devicetree, %d", err));
+			PVR_DPF((PVR_DBG_ERROR, "Failed to init opp table from devicetree, %d", err));
 			eError = TO_IMG_ERR(err);
 			goto err_exit;
 		}
@@ -494,13 +570,16 @@ PVRSRV_ERROR InitDVFS(PPVRSRV_DEVICE_NODE psDeviceNode)
 	eError = SuspendDVFS();
 	if (eError != PVRSRV_OK)
 	{
-		PVR_DPF((PVR_DBG_ERROR,"PVRSRVInit: Failed to suspend DVFS"));
+		PVR_DPF((PVR_DBG_ERROR, "PVRSRVInit: Failed to suspend DVFS"));
 		goto err_exit;
 	}
 
-#if	defined(CHROMIUMOS_KERNEL) && (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 4, 0)) && (LINUX_VERSION_CODE < KERNEL_VERSION(4, 5, 0))
+#if defined(CHROMIUMOS_KERNEL) && (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 4, 0)) && (LINUX_VERSION_CODE < KERNEL_VERSION(4, 5, 0))
 	psDVFSDevice->psDevFreq->policy.user.min_freq = min_freq;
 	psDVFSDevice->psDevFreq->policy.user.max_freq = max_freq;
+#elif (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 5, 0))
+	psDVFSDevice->psDevFreq->scaling_min_freq = min_freq;
+	psDVFSDevice->psDevFreq->scaling_max_freq = max_freq;
 #else
 	psDVFSDevice->psDevFreq->min_freq = min_freq;
 	psDVFSDevice->psDevFreq->max_freq = max_freq;
@@ -541,7 +620,7 @@ void DeinitDVFS(PPVRSRV_DEVICE_NODE psDeviceNode)
 	struct device *psDev = psDeviceNode->psDevConfig->pvOSDevice;
 	IMG_INT32 i32Error;
 
-	PVRSRV_VZ_RETN_IF_MODE(DRIVER_MODE_GUEST);
+	PVRSRV_VZ_RETN_IF_MODE(GUEST);
 
 	PVR_ASSERT(psDeviceNode == gpsDeviceNode);
 
@@ -580,6 +659,9 @@ void DeinitDVFS(PPVRSRV_DEVICE_NODE psDeviceNode)
 	kfree(img_devfreq_dev_profile.freq_table);
 #endif
 
+	/* Remove OPP entries for this device */
+	ClearOPPTable(psDev);
+
 #if defined(CONFIG_OF)
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 19, 0)) || \
 	(defined(CHROMIUMOS_KERNEL) && (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 18, 0)))
@@ -607,7 +689,7 @@ PVRSRV_ERROR ResumeDVFS(void)
 	IMG_DVFS_DEVICE	*psDVFSDevice = &gpsDeviceNode->psDevConfig->sDVFS.sDVFSDevice;
 
 	/* Not supported in GuestOS drivers */
-	psDVFSDevice->bEnabled = !PVRSRV_VZ_MODE_IS(DRIVER_MODE_GUEST);
+	psDVFSDevice->bEnabled = !PVRSRV_VZ_MODE_IS(GUEST);
 
 	return PVRSRV_OK;
 }

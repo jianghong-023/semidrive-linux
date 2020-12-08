@@ -43,8 +43,8 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */ /**************************************************************************/
 
-#ifndef _DC_EXTERNAL_H_
-#define _DC_EXTERNAL_H_
+#ifndef DC_EXTERNAL_H
+#define DC_EXTERNAL_H
 
 #include "img_types.h"
 
@@ -53,15 +53,19 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 #define DC_NAME_SIZE	50
 
+/* Maximum number of certain call parameters */
+#define DC_MAX_SRV_SYNC_COUNT	(1)
+#define DC_MAX_PLANES		(4)
+
 /*!
  * This contains information about a display.
  * The structure can be queried by services from the display driver via a
  * registered callback.
  *
- *   Structure: #_DC_DISPLAY_INFO_
+ *   Structure: #DC_DISPLAY_INFO_TAG
  *   Typedef: ::DC_DISPLAY_INFO
  */
-typedef struct _DC_DISPLAY_INFO_
+typedef struct DC_DISPLAY_INFO_TAG
 {
 	IMG_CHAR		szDisplayName[DC_NAME_SIZE];	/*!< Display identifier string */
 	IMG_UINT32		ui32MinDisplayPeriod;			/*!< Minimum number of VSync periods */
@@ -74,10 +78,10 @@ typedef struct _DC_DISPLAY_INFO_
  * When services imports a buffer from the display driver it has to fill
  * this structure to inform services about the buffer properties.
  *
- *   Structure: #_DC_BUFFER_IMPORT_INFO_
+ *   Structure: #DC_BUFFER_IMPORT_INFO_TAG
  *   Typedef: ::DC_BUFFER_IMPORT_INFO
  */
-typedef struct _DC_BUFFER_IMPORT_INFO_
+typedef struct DC_BUFFER_IMPORT_INFO_TAG
 {
 	IMG_UINT32		ePixFormat;			/*!< Enum value of type IMG_PIXFMT for the pixel format */
 	IMG_UINT32		ui32BPP;			/*!< Bits per pixel */
@@ -91,10 +95,10 @@ typedef struct _DC_BUFFER_IMPORT_INFO_
 /*!
  * Configuration details of the frame buffer compression module
  *
- *   Structure: #_DC_FBC_CREATE_INFO_
+ *   Structure: #DC_FBC_CREATE_INFO_TAG
  *   Typedef: ::DC_FBC_CREATE_INFO
  */
-typedef struct _DC_FBC_CREATE_INFO_
+typedef struct DC_FBC_CREATE_INFO_TAG
 {
 	IMG_UINT32		ui32FBCWidth;	/*!< Pixel width that the FBC module is working on */
 	IMG_UINT32		ui32FBCHeight;	/*!< Pixel height that the FBC module is working on */
@@ -105,16 +109,16 @@ typedef struct _DC_FBC_CREATE_INFO_
 /*!
  * DC buffer details like frame buffer compression and surface properties
  *
- *   Structure: #_DC_BUFFER_CREATE_INFO_
+ *   Structure: #DC_BUFFER_CREATE_INFO_TAG
  *   Typedef: ::DC_BUFFER_CREATE_INFO
  */
-typedef struct _DC_BUFFER_CREATE_INFO_
+typedef struct DC_BUFFER_CREATE_INFO_TAG
 {
 	PVRSRV_SURFACE_INFO		sSurface;	/*!< Surface properties, specified by user */
 	IMG_UINT32				ui32BPP;	/*!< Bits per pixel */
 	union {
-		DC_FBC_CREATE_INFO 	sFBC;
+		DC_FBC_CREATE_INFO	sFBC;
 	} u;								/*!< Frame buffer compressed specific data */
 } DC_BUFFER_CREATE_INFO;
 
-#endif /* _DC_EXTERNAL_H_ */
+#endif /* DC_EXTERNAL_H */

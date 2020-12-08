@@ -73,10 +73,13 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #define PVRSRV_2M_PAGE_SIZE_ALIGNSHIFT		21          /*!< Amount to shift an address by so that
                                                           it is always page-aligned */
 
+#ifndef PVRSRV_DEV_CONNECTION_TYPEDEF
+#define PVRSRV_DEV_CONNECTION_TYPEDEF
 /*!
  * Forward declaration (look on connection.h)
  */
-typedef struct _PVRSRV_DEV_CONNECTION_ PVRSRV_DEV_CONNECTION;
+typedef struct PVRSRV_DEV_CONNECTION_TAG PVRSRV_DEV_CONNECTION;
+#endif
 
 /*!
 	Flags for Services connection.
@@ -86,13 +89,11 @@ typedef struct _PVRSRV_DEV_CONNECTION_ PVRSRV_DEV_CONNECTION;
  *   Use of the 32-bit connection flags mask
  *   ( X = taken/in use, - = available/unused )
  *
- *   31  27     20             6   2 0
- *    |   |      |             |   | |
- *    X---XXXXXXXX-------------XXXXX--
+ *   31  27     20             6 4   0
+ *    |   |      |             | |   |
+ *    X---XXXXXXXX-------------XXX----
  */
 
-#define SRV_WORKEST_ENABLED             (1U << 2)  /*!< If Workload Estimation is enabled */
-#define SRV_PDVFS_ENABLED               (1U << 3)  /*!< If PDVFS is enabled */
 #define SRV_NO_HWPERF_CLIENT_STREAM     (1U << 4)  /*!< Don't create HWPerf for this connection */
 #define SRV_FLAGS_CLIENT_64BIT_COMPAT   (1U << 5)  /*!< This flags gets set if the client is 64 Bit compatible. */
 #define SRV_FLAGS_CLIENT_SLR_DISABLED   (1U << 6)  /*!< This flag is set if the client does not want Sync Lockup Recovery (SLR) enabled. */
@@ -131,15 +132,15 @@ typedef struct _PVRSRV_DEV_CONNECTION_ PVRSRV_DEV_CONNECTION;
 /*
     Pdump flags which are accessible to Services clients
 */
-#define PDUMP_NONE          0x00000000UL /*<! No flags */
+#define PDUMP_NONE          0x00000000U /*<! No flags */
 
-#define PDUMP_BLKDATA       0x10000000UL /*<! This flag indicates block-mode PDump data to be recorded in
+#define PDUMP_BLKDATA       0x10000000U /*<! This flag indicates block-mode PDump data to be recorded in
                                                           Block script stream in addition to Main script stream,
                                                           if capture mode is set to BLOCKED */
 
-#define PDUMP_CONT          0x40000000UL /*<! Output this entry always regardless of framed capture range,
+#define PDUMP_CONT          0x40000000U /*<! Output this entry always regardless of framed capture range,
                                                           used by client applications being dumped. */
-#define PDUMP_PERSIST       0x80000000UL /*<! Output this entry always regardless of app and range,
+#define PDUMP_PERSIST       0x80000000U /*<! Output this entry always regardless of app and range,
                                                           used by persistent resources created after
                                                           driver initialisation that must appear in
                                                           all PDump captures in that session. */

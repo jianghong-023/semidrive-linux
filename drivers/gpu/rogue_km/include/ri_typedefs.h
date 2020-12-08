@@ -50,4 +50,3 @@ typedef struct RI_SUBLIST_ENTRY RI_ENTRY;
 typedef RI_ENTRY* RI_HANDLE;
 
 #endif /* #ifndef RI_TYPEDEFS_H */
-

@@ -41,11 +41,10 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */ /**************************************************************************/
 
-#if !defined (RGX_PDUMP_PANICS_H_)
+#if !defined(RGX_PDUMP_PANICS_H_)
 #define RGX_PDUMP_PANICS_H_
 
-
-/*! Unique device specific IMG_UINT16 panic IDs to identify the cause of a
+/*! Unique device specific IMG_UINT16 panic IDs to identify the cause of an
  * RGX PDump panic in a PDump script. */
 typedef enum
 {
@@ -59,10 +58,7 @@ typedef enum
 	RGX_PDUMP_PANIC_ZSBUFFER_UNBACKING       = 102, /*!< Requests ZSBuffer to be unbacked */
 	RGX_PDUMP_PANIC_FREELIST_GROW            = 103, /*!< Requests an on-demand freelist grow/shrink */
 	RGX_PDUMP_PANIC_FREELISTS_RECONSTRUCTION = 104, /*!< Requests freelists reconstruction */
-	RGX_PDUMP_PANIC_SPARSEMEM_SWAP			= 105, /*!<	Requests sparse remap memory swap feature */
+	RGX_PDUMP_PANIC_SPARSEMEM_SWAP           = 105, /*!< Requests sparse remap memory swap feature */
 } RGX_PDUMP_PANIC;
 
-
 #endif /* RGX_PDUMP_PANICS_H_ */
-
-

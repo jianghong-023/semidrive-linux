@@ -1,4 +1,3 @@
-/* -*- mode: c; indent-tabs-mode: t; c-basic-offset: 8; tab-width: 8 -*- */
 /* vi: set ts=8 sw=8 sts=8: */
 /*************************************************************************/ /*!
 @File
@@ -47,12 +46,20 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include <linux/moduleparam.h>
 #include <linux/version.h>
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 5, 0))
+#else
 #include <drm/drmP.h>
+#endif
+
 #include <drm/drm_crtc.h>
 #include <drm/drm_crtc_helper.h>
 
 #if defined(PDP_USE_ATOMIC)
 #include <drm/drm_atomic_helper.h>
+#endif
+
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 1, 0))
+#include <drm/drm_probe_helper.h>
 #endif
 
 #include "kernel_compatibility.h"
@@ -174,8 +181,9 @@ static int pdp_dvi_connector_helper_get_modes(struct drm_connector *connector)
 	return num_modes;
 }
 
-static int pdp_dvi_connector_helper_mode_valid(struct drm_connector *connector,
-					       struct drm_display_mode *mode)
+static enum drm_mode_status
+pdp_dvi_connector_helper_mode_valid(struct drm_connector *connector,
+				    struct drm_display_mode *mode)
 {
 	if (mode->flags & DRM_MODE_FLAG_INTERLACE)
 		return MODE_NO_INTERLACE;

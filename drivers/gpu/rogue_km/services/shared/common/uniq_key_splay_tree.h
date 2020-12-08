@@ -56,6 +56,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 /* head of list of free boundary tags for indexed by pvr_log2 of the
    boundary tag size */
+
 #define FREE_TABLE_LIMIT 40
 
 struct _BT_;
@@ -81,6 +82,7 @@ typedef struct img_splay_tree
 IMG_PSPLAY_TREE PVRSRVSplay (IMG_UINT32 ui32Flags, IMG_PSPLAY_TREE psTree);
 IMG_PSPLAY_TREE PVRSRVInsert(IMG_UINT32 ui32Flags, IMG_PSPLAY_TREE psTree);
 IMG_PSPLAY_TREE PVRSRVDelete(IMG_UINT32 ui32Flags, IMG_PSPLAY_TREE psTree);
+IMG_PSPLAY_TREE PVRSRVFindNode(IMG_UINT32 ui32Flags, IMG_PSPLAY_TREE psTree);
 
 
 #endif /* !UNIQ_KEY_SPLAY_TREE_H_ */

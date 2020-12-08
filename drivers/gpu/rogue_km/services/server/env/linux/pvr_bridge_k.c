@@ -42,6 +42,8 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */ /**************************************************************************/
 
+#include <linux/version.h>
+
 #include <linux/mm_types.h>
 
 #include "img_defs.h"
@@ -50,14 +52,19 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "connection_server.h"
 #include "syscommon.h"
 #include "pvr_debug.h"
-#include "pvr_debugfs.h"
+#include "di_server.h"
 #include "private_data.h"
 #include "linkage.h"
 #include "pmr.h"
 #include "rgx_bvnc_defs_km.h"
 #include "pvrsrv_bridge_init.h"
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 5, 0))
+#include <drm/drm_print.h>
+#else
 #include <drm/drmP.h>
+#endif
+
 #include "pvr_drm.h"
 #include "pvr_drv.h"
 
@@ -87,28 +94,10 @@ PVRSRV_ERROR DeinitDMABUFBridge(void);
 /************************************************************************/
 #endif
 
-/* WARNING!
- * The mmap code has its own mutex, to prevent a possible deadlock,
- * when using gPVRSRVLock.
- * The Linux kernel takes the mm->mmap_sem before calling the mmap
- * entry points (PVRMMap, MMapVOpen, MMapVClose), but the ioctl
- * entry point may take mm->mmap_sem during fault handling, or
- * before calling get_user_pages.  If gPVRSRVLock was used in the
- * mmap entry points, a deadlock could result, due to the ioctl
- * and mmap code taking the two locks in different orders.
- * As a corollary to this, the mmap entry points must not call
- * any driver code that relies on gPVRSRVLock is held.
+/* The mmap code has its own mutex, to prevent possible re-entrant issues
+ * when the same PMR is mapped from two different connections/processes.
  */
 static DEFINE_MUTEX(g_sMMapMutex);
-
-#if defined(DEBUG_BRIDGE_KM)
-static PPVR_DEBUGFS_ENTRY_DATA gpsPVRDebugFSBridgeStatsEntry;
-static struct seq_operations gsBridgeStatsReadOps;
-static ssize_t BridgeStatsWrite(const char __user *pszBuffer,
-								size_t uiCount,
-								loff_t *puiPosition,
-								void *pvData);
-#endif
 
 #define _DRIVER_SUSPENDED 1
 #define _DRIVER_NOT_SUSPENDED 0
@@ -116,6 +105,135 @@ static ATOMIC_T g_iDriverSuspended;
 static ATOMIC_T g_iNumActiveDriverThreads;
 static ATOMIC_T g_iNumActiveKernelThreads;
 static IMG_HANDLE g_hDriverThreadEventObject;
+
+#if defined(DEBUG_BRIDGE_KM)
+static DI_ENTRY *gpsDIBridgeStatsEntry;
+
+static void *BridgeStatsDIStart(OSDI_IMPL_ENTRY *psEntry, IMG_UINT64 *pui64Pos)
+{
+	PVRSRV_BRIDGE_DISPATCH_TABLE_ENTRY *psDispatchTable = DIGetPrivData(psEntry);
+
+	BridgeGlobalStatsLock();
+
+	if (psDispatchTable == NULL || *pui64Pos > BRIDGE_DISPATCH_TABLE_ENTRY_COUNT)
+	{
+		return NULL;
+	}
+
+	if (*pui64Pos == 0)
+	{
+		return DI_START_TOKEN;
+	}
+
+	return &(psDispatchTable[*pui64Pos - 1]);
+}
+
+static void BridgeStatsDIStop(OSDI_IMPL_ENTRY *psEntry, void *pvData)
+{
+	PVR_UNREFERENCED_PARAMETER(psEntry);
+	PVR_UNREFERENCED_PARAMETER(pvData);
+
+	BridgeGlobalStatsUnlock();
+}
+
+static void *BridgeStatsDINext(OSDI_IMPL_ENTRY *psEntry, void *pvData,
+                               IMG_UINT64 *pui64Pos)
+{
+	PVRSRV_BRIDGE_DISPATCH_TABLE_ENTRY *psDispatchTable = DIGetPrivData(psEntry);
+	IMG_UINT64 uiItemAskedFor = *pui64Pos; /* pui64Pos on entry is the index to return */
+
+	PVR_UNREFERENCED_PARAMETER(pvData);
+
+	/* Is the item asked for (starts at 0) a valid table index? */
+	if (uiItemAskedFor < BRIDGE_DISPATCH_TABLE_ENTRY_COUNT)
+	{
+		(*pui64Pos)++; /* on exit it is the next DI index to ask for */
+		return &(psDispatchTable[uiItemAskedFor]);
+	}
+
+	/* Now passed the end of the table to indicate stop */
+	return NULL;
+}
+
+static int BridgeStatsDIShow(OSDI_IMPL_ENTRY *psEntry, void *pvData)
+{
+	if (pvData == DI_START_TOKEN)
+	{
+		DIPrintf(psEntry,
+		         "Total ioctl call count = %u\n"
+		         "Total number of bytes copied via copy_from_user = %u\n"
+		         "Total number of bytes copied via copy_to_user = %u\n"
+		         "Total number of bytes copied via copy_*_user = %u\n\n"
+		         "%3s: %-60s | %-48s | %10s | %20s | %20s | %20s | %20s\n",
+		         g_BridgeGlobalStats.ui32IOCTLCount,
+		         g_BridgeGlobalStats.ui32TotalCopyFromUserBytes,
+		         g_BridgeGlobalStats.ui32TotalCopyToUserBytes,
+		         g_BridgeGlobalStats.ui32TotalCopyFromUserBytes +
+		             g_BridgeGlobalStats.ui32TotalCopyToUserBytes,
+		         "#",
+		         "Bridge Name",
+		         "Wrapper Function",
+		         "Call Count",
+		         "copy_from_user (B)",
+		         "copy_to_user (B)",
+		         "Total Time (us)",
+		         "Max Time (us)");
+	}
+	else if (pvData != NULL)
+	{
+		PVRSRV_BRIDGE_DISPATCH_TABLE_ENTRY *psTableEntry = pvData;
+		IMG_UINT32 ui32Remainder;
+
+		DIPrintf(psEntry,
+		         "%3d: %-60s   %-48s   %-10u   %-20u   %-20u   %-20" IMG_UINT64_FMTSPEC "   %-20" IMG_UINT64_FMTSPEC "\n",
+		         (IMG_UINT32)(((size_t)psTableEntry-(size_t)g_BridgeDispatchTable)/sizeof(*g_BridgeDispatchTable)),
+		         psTableEntry->pszIOCName,
+		         (psTableEntry->pfFunction != NULL) ? psTableEntry->pszFunctionName : "(null)",
+		         psTableEntry->ui32CallCount,
+		         psTableEntry->ui32CopyFromUserTotalBytes,
+		         psTableEntry->ui32CopyToUserTotalBytes,
+		         OSDivide64r64(psTableEntry->ui64TotalTimeNS, 1000, &ui32Remainder),
+		         OSDivide64r64(psTableEntry->ui64MaxTimeNS, 1000, &ui32Remainder));
+	}
+
+	return 0;
+}
+
+static IMG_INT64 BridgeStatsWrite(const IMG_CHAR *pcBuffer,
+                                  IMG_UINT64 ui64Count, IMG_UINT64 *pui64Pos,
+                                  void *pvData)
+{
+	IMG_UINT32 i;
+
+	PVR_RETURN_IF_FALSE(pcBuffer != NULL, -EIO);
+	PVR_RETURN_IF_FALSE(pui64Pos != NULL && *pui64Pos == 0, -EIO);
+	PVR_RETURN_IF_FALSE(ui64Count >= 1, -EINVAL);
+	PVR_RETURN_IF_FALSE(pcBuffer[0] == '0', -EINVAL);
+	PVR_RETURN_IF_FALSE(pcBuffer[ui64Count - 1] == '\0', -EINVAL);
+
+	/* Reset stats. */
+
+	BridgeGlobalStatsLock();
+
+	g_BridgeGlobalStats.ui32IOCTLCount = 0;
+	g_BridgeGlobalStats.ui32TotalCopyFromUserBytes = 0;
+	g_BridgeGlobalStats.ui32TotalCopyToUserBytes = 0;
+
+	for (i = 0; i < ARRAY_SIZE(g_BridgeDispatchTable); i++)
+	{
+		g_BridgeDispatchTable[i].ui32CallCount = 0;
+		g_BridgeDispatchTable[i].ui32CopyFromUserTotalBytes = 0;
+		g_BridgeDispatchTable[i].ui32CopyToUserTotalBytes = 0;
+		g_BridgeDispatchTable[i].ui64TotalTimeNS = 0;
+		g_BridgeDispatchTable[i].ui64MaxTimeNS = 0;
+	}
+
+	BridgeGlobalStatsUnlock();
+
+	return ui64Count;
+}
+
+#endif /* defined(DEBUG_BRIDGE_KM) */
 
 PVRSRV_ERROR OSPlatformBridgeInit(void)
 {
@@ -130,23 +248,23 @@ PVRSRV_ERROR OSPlatformBridgeInit(void)
 
 	eError = OSEventObjectCreate("Global driver thread event object",
 	                             &g_hDriverThreadEventObject);
-	PVR_LOGG_IF_ERROR(eError, "OSEventObjectCreate", error_);
+	PVR_LOG_GOTO_IF_ERROR(eError, "OSEventObjectCreate", error_);
 
 #if defined(DEBUG_BRIDGE_KM)
 	{
-		IMG_INT iResult;
-		iResult = PVRDebugFSCreateFile("bridge_stats",
-					NULL,
-					&gsBridgeStatsReadOps,
-					BridgeStatsWrite,
-					NULL,
-					&g_BridgeDispatchTable[0],
-					&gpsPVRDebugFSBridgeStatsEntry);
-		if (iResult != 0)
-		{
-			eError = PVRSRV_ERROR_OUT_OF_MEMORY;
-			goto error_;
-		}
+		DI_ITERATOR_CB sIter = {
+			.pfnStart = BridgeStatsDIStart,
+			.pfnStop = BridgeStatsDIStop,
+			.pfnNext = BridgeStatsDINext,
+			.pfnShow = BridgeStatsDIShow,
+			.pfnWrite = BridgeStatsWrite
+		};
+
+		eError = DICreateEntry("bridge_stats", NULL, &sIter,
+		                       &g_BridgeDispatchTable[0],
+		                       DI_ENTRY_TYPE_GENERIC,
+		                       &gpsDIBridgeStatsEntry);
+		PVR_LOG_GOTO_IF_ERROR(eError, "DICreateEntry", error_);
 	}
 #endif
 
@@ -166,14 +284,14 @@ PVRSRV_ERROR OSPlatformBridgeDeInit(void)
 	PVRSRV_ERROR eError;
 
 #if defined(DEBUG_BRIDGE_KM)
-	if (gpsPVRDebugFSBridgeStatsEntry != NULL)
+	if (gpsDIBridgeStatsEntry != NULL)
 	{
-		PVRDebugFSRemoveFile(&gpsPVRDebugFSBridgeStatsEntry);
+		DIDestroyEntry(gpsDIBridgeStatsEntry);
 	}
 #endif
 
 	eError = DeinitDMABUFBridge();
-	PVR_LOGR_IF_ERROR(eError, "DeinitDMABUFBridge");
+	PVR_LOG_RETURN_IF_ERROR(eError, "DeinitDMABUFBridge");
 
 	if (g_hDriverThreadEventObject != NULL) {
 		OSEventObjectDestroy(g_hDriverThreadEventObject);
@@ -182,165 +300,6 @@ PVRSRV_ERROR OSPlatformBridgeDeInit(void)
 
 	return eError;
 }
-
-#if defined(DEBUG_BRIDGE_KM)
-static void *BridgeStatsSeqStart(struct seq_file *psSeqFile, loff_t *puiPosition)
-{
-	PVRSRV_BRIDGE_DISPATCH_TABLE_ENTRY *psDispatchTable = (PVRSRV_BRIDGE_DISPATCH_TABLE_ENTRY *)psSeqFile->private;
-
-#if defined(PVRSRV_USE_BRIDGE_LOCK)
-	OSAcquireBridgeLock();
-#else
-	BridgeGlobalStatsLock();
-#endif
-
-	if (psDispatchTable == NULL || (*puiPosition) > BRIDGE_DISPATCH_TABLE_ENTRY_COUNT)
-	{
-		return NULL;
-	}
-
-	if ((*puiPosition) == 0)
-	{
-		return SEQ_START_TOKEN;
-	}
-
-	return &(psDispatchTable[(*puiPosition) - 1]);
-}
-
-static void BridgeStatsSeqStop(struct seq_file *psSeqFile, void *pvData)
-{
-	PVR_UNREFERENCED_PARAMETER(psSeqFile);
-	PVR_UNREFERENCED_PARAMETER(pvData);
-
-#if defined(PVRSRV_USE_BRIDGE_LOCK)
-	OSReleaseBridgeLock();
-#else
-	BridgeGlobalStatsUnlock();
-#endif
-}
-
-static void *BridgeStatsSeqNext(struct seq_file *psSeqFile,
-			       void *pvData,
-			       loff_t *puiPosition)
-{
-	PVRSRV_BRIDGE_DISPATCH_TABLE_ENTRY *psDispatchTable = (PVRSRV_BRIDGE_DISPATCH_TABLE_ENTRY *)psSeqFile->private;
-	loff_t uiItemAskedFor = *puiPosition; /* puiPosition on entry is the index to return */
-
-	PVR_UNREFERENCED_PARAMETER(pvData);
-
-	/* Is the item asked for (starts at 0) a valid table index? */
-	if (uiItemAskedFor < BRIDGE_DISPATCH_TABLE_ENTRY_COUNT)
-	{
-		(*puiPosition)++; /* on exit it is the next seq index to ask for */
-		return &(psDispatchTable[uiItemAskedFor]);
-	}
-
-	/* Now passed the end of the table to indicate stop */
-	return NULL;
-}
-
-static int BridgeStatsSeqShow(struct seq_file *psSeqFile, void *pvData)
-{
-	if (pvData == SEQ_START_TOKEN)
-	{
-		seq_printf(psSeqFile,
-			   "Total ioctl call count = %u\n"
-			   "Total number of bytes copied via copy_from_user = %u\n"
-			   "Total number of bytes copied via copy_to_user = %u\n"
-			   "Total number of bytes copied via copy_*_user = %u\n\n"
-			   "%3s: %-60s | %-48s | %10s | %20s | %20s | %20s | %20s\n",
-			   g_BridgeGlobalStats.ui32IOCTLCount,
-			   g_BridgeGlobalStats.ui32TotalCopyFromUserBytes,
-			   g_BridgeGlobalStats.ui32TotalCopyToUserBytes,
-			   g_BridgeGlobalStats.ui32TotalCopyFromUserBytes + g_BridgeGlobalStats.ui32TotalCopyToUserBytes,
-			   "#",
-			   "Bridge Name",
-			   "Wrapper Function",
-			   "Call Count",
-			   "copy_from_user (B)",
-			   "copy_to_user (B)",
-			   "Total Time (us)",
-			   "Max Time (us)");
-	}
-	else if (pvData != NULL)
-	{
-		PVRSRV_BRIDGE_DISPATCH_TABLE_ENTRY *psEntry = (PVRSRV_BRIDGE_DISPATCH_TABLE_ENTRY *)pvData;
-		IMG_UINT32 ui32Remainder;
-
-		seq_printf(psSeqFile,
-			   "%3d: %-60s   %-48s   %-10u   %-20u   %-20u   %-20" IMG_UINT64_FMTSPEC "   %-20" IMG_UINT64_FMTSPEC "\n",
-			   (IMG_UINT32)(((size_t)psEntry-(size_t)g_BridgeDispatchTable)/sizeof(*g_BridgeDispatchTable)),
-			   psEntry->pszIOCName,
-			   (psEntry->pfFunction != NULL) ? psEntry->pszFunctionName : "(null)",
-			   psEntry->ui32CallCount,
-			   psEntry->ui32CopyFromUserTotalBytes,
-			   psEntry->ui32CopyToUserTotalBytes,
-			   OSDivide64r64(psEntry->ui64TotalTimeNS, 1000, &ui32Remainder),
-			   OSDivide64r64(psEntry->ui64MaxTimeNS, 1000, &ui32Remainder));
-	}
-
-	return 0;
-}
-
-static struct seq_operations gsBridgeStatsReadOps =
-{
-	.start = BridgeStatsSeqStart,
-	.stop = BridgeStatsSeqStop,
-	.next = BridgeStatsSeqNext,
-	.show = BridgeStatsSeqShow,
-};
-
-static ssize_t BridgeStatsWrite(const char __user *pszBuffer,
-								size_t uiCount,
-								loff_t *puiPosition,
-								void *pvData)
-{
-	IMG_UINT32 i;
-	/* We only care if a '0' is written to the file, if so we reset results. */
-	char buf[1];
-	ssize_t iResult = simple_write_to_buffer(&buf[0], sizeof(buf), puiPosition, pszBuffer, uiCount);
-
-	if (iResult < 0)
-	{
-		return iResult;
-	}
-
-	if (iResult == 0 || buf[0] != '0')
-	{
-		return -EINVAL;
-	}
-
-	/* Reset stats. */
-
-#if defined(PVRSRV_USE_BRIDGE_LOCK)
-	OSAcquireBridgeLock();
-#else
-	BridgeGlobalStatsLock();
-#endif
-
-	g_BridgeGlobalStats.ui32IOCTLCount = 0;
-	g_BridgeGlobalStats.ui32TotalCopyFromUserBytes = 0;
-	g_BridgeGlobalStats.ui32TotalCopyToUserBytes = 0;
-
-	for (i = 0; i < ARRAY_SIZE(g_BridgeDispatchTable); i++)
-	{
-		g_BridgeDispatchTable[i].ui32CallCount = 0;
-		g_BridgeDispatchTable[i].ui32CopyFromUserTotalBytes = 0;
-		g_BridgeDispatchTable[i].ui32CopyToUserTotalBytes = 0;
-		g_BridgeDispatchTable[i].ui64TotalTimeNS = 0;
-		g_BridgeDispatchTable[i].ui64MaxTimeNS = 0;
-	}
-
-#if defined(PVRSRV_USE_BRIDGE_LOCK)
-	OSReleaseBridgeLock();
-#else
-	BridgeGlobalStatsUnlock();
-#endif
-
-	return uiCount;
-}
-
-#endif /* defined(DEBUG_BRIDGE_KM) */
 
 PVRSRV_ERROR LinuxBridgeBlockClientsAccess(IMG_BOOL bShutdown)
 {
@@ -591,7 +550,6 @@ PVRSRV_MMap(struct file *pFile, struct vm_area_struct *ps_vma)
 	 * their own lock. This change was necessary to solve the lockdep issues
 	 * related with the PVRSRV_MMap.
 	 */
-	mutex_lock(&g_sMMapMutex);
 
 	eError = PVRSRVLookupHandle(psConnection->psHandleBase,
 								(void **)&psPMR,
@@ -603,11 +561,13 @@ PVRSRV_MMap(struct file *pFile, struct vm_area_struct *ps_vma)
 		goto e0;
 	}
 
+	mutex_lock(&g_sMMapMutex);
 	/* Note: PMRMMapPMR will take a reference on the PMR.
 	 * Unref the handle immediately, because we have now done
 	 * the required operation on the PMR (whether it succeeded or not)
 	 */
 	eError = PMRMMapPMR(psPMR, ps_vma);
+	mutex_unlock(&g_sMMapMutex);
 	PVRSRVReleaseHandle(psConnection->psHandleBase, hSecurePMRHandle, PVRSRV_HANDLE_TYPE_PHYSMEM_PMR);
 	if (eError != PVRSRV_OK)
 	{
@@ -616,12 +576,10 @@ PVRSRV_MMap(struct file *pFile, struct vm_area_struct *ps_vma)
 		goto e0;
 	}
 
-	mutex_unlock(&g_sMMapMutex);
 
 	return 0;
 
 e0:
-	mutex_unlock(&g_sMMapMutex);
 
 	PVR_DPF((PVR_DBG_ERROR, "Unable to translate error %d", eError));
 	PVR_ASSERT(eError != PVRSRV_OK);

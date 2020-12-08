@@ -1,4 +1,3 @@
-/* -*- mode: c; indent-tabs-mode: t; c-basic-offset: 8; tab-width: 8 -*- */
 /* vi: set ts=8 sw=8 sts=8: */
 /*************************************************************************/ /*!
 @Codingstyle    LinuxKernel
@@ -78,7 +77,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 static struct {
 	struct thermal_zone_device *thermal_zone;
 
-#if  defined(SUPPORT_APOLLO_FPGA)
+#if defined(SUPPORT_APOLLO_FPGA)
 	struct tc_io_region fpga;
 	struct apollo_debugfs_fpga_entries fpga_entries;
 #endif
@@ -89,6 +88,9 @@ static struct {
 #define APOLLO_DEVICE_NAME_FPGA "apollo_fpga"
 
 struct apollo_fpga_platform_data {
+	/* The testchip memory mode (LMA, HOST or HYBRID) */
+	int mem_mode;
+
 	resource_size_t tc_memory_base;
 
 	resource_size_t pdp_heap_memory_base;
@@ -440,17 +442,6 @@ static void apollo_fpga_update_dut_clk_freq(struct tc_device *tc,
 
 #endif /* defined(SUPPORT_RGX) */
 
-static void apollo_set_mem_mode(struct tc_device *tc)
-{
-	u32 val;
-
-	val = ioread32(tc->tcf.registers + TCF_CLK_CTRL_TEST_CTRL);
-	val &= ~(ADDRESS_FORCE_MASK | PCI_TEST_MODE_MASK | HOST_ONLY_MODE_MASK
-		| HOST_PHY_MODE_MASK);
-	val |= (0x1 << ADDRESS_FORCE_SHIFT);
-	iowrite32(val, tc->tcf.registers + TCF_CLK_CTRL_TEST_CTRL);
-}
-
 static int apollo_hard_reset(struct tc_device *tc,
 			     int core_clock, int mem_clock, int sys_clock)
 {
@@ -600,9 +591,93 @@ err_out:
 	return err;
 }
 
+static void apollo_set_mem_mode_lma(struct tc_device *tc)
+{
+	u32 val;
+
+	val = ioread32(tc->tcf.registers + TCF_CLK_CTRL_TEST_CTRL);
+	val &= ~(ADDRESS_FORCE_MASK | PCI_TEST_MODE_MASK | HOST_ONLY_MODE_MASK
+		| HOST_PHY_MODE_MASK);
+	val |= (0x1 << ADDRESS_FORCE_SHIFT);
+	iowrite32(val, tc->tcf.registers + TCF_CLK_CTRL_TEST_CTRL);
+}
+
+static void apollo_set_mem_mode_hybrid(struct tc_device *tc)
+{
+	u32 val;
+
+	val = ioread32(tc->tcf.registers + TCF_CLK_CTRL_TEST_CTRL);
+	val &= ~(ADDRESS_FORCE_MASK | PCI_TEST_MODE_MASK | HOST_ONLY_MODE_MASK
+		| HOST_PHY_MODE_MASK);
+	val |= ((0x1 << HOST_ONLY_MODE_SHIFT) | (0x1 << HOST_PHY_MODE_SHIFT));
+	iowrite32(val, tc->tcf.registers + TCF_CLK_CTRL_TEST_CTRL);
+
+	/* Setup apollo to pass 1GB window of address space to the local memory.
+	 * This is a sub-mode of the host only mode, meaning that the apollo TC
+	 * can address the system memory with a 1GB window of address space
+	 * routed to the device local memory. The simplest approach is to mirror
+	 * the CPU physical address space, by moving the device local memory
+	 * window where it is mapped in the CPU physical address space.
+	 */
+	iowrite32(tc->tc_mem.base,
+		  tc->tcf.registers + TCF_CLK_CTRL_HOST_PHY_OFFSET);
+}
+
+static int apollo_set_mem_mode(struct tc_device *tc, int mem_mode)
+{
+	switch (mem_mode) {
+	case TC_MEMORY_HYBRID:
+		apollo_set_mem_mode_hybrid(tc);
+		dev_info(&tc->pdev->dev, "Memory mode: TC_MEMORY_HYBRID\n");
+		break;
+	case TC_MEMORY_LOCAL:
+		apollo_set_mem_mode_lma(tc);
+		dev_info(&tc->pdev->dev, "Memory mode: TC_MEMORY_LOCAL\n");
+		break;
+	default:
+		dev_err(&tc->pdev->dev, "unsupported memory mode = %d\n",
+			mem_mode);
+		return -ENOSYS;
+	};
+
+	tc->mem_mode = mem_mode;
+
+	return 0;
+}
+
+static bool apollo_pdp_export_host_addr(struct tc_device *tc)
+{
+	return tc->mem_mode == TC_MEMORY_HYBRID;
+}
+
+static u64 apollo_get_pdp_dma_mask(struct tc_device *tc)
+{
+	/* The PDP does not access system memory, so there is no
+	 * DMA limitation.
+	 */
+	if ((tc->mem_mode == TC_MEMORY_LOCAL) ||
+	    (tc->mem_mode == TC_MEMORY_HYBRID))
+		return DMA_BIT_MASK(64);
+
+	return DMA_BIT_MASK(32);
+}
+
+#if defined(SUPPORT_RGX)
+static u64 apollo_get_rogue_dma_mask(struct tc_device *tc)
+#else /* SUPPORT_APOLLO_FPGA */
+static u64 apollo_get_fpga_dma_mask(struct tc_device *tc)
+#endif /* defined(SUPPORT_RGX) */
+{
+	/* Does not access system memory, so there is no DMA limitation */
+	if (tc->mem_mode == TC_MEMORY_LOCAL)
+		return DMA_BIT_MASK(64);
+
+	return DMA_BIT_MASK(32);
+}
+
 static int apollo_hw_init(struct tc_device *tc,
 			  int core_clock, int mem_clock, int sys_clock,
-			  int mem_latency, int mem_wresp_latency)
+			  int mem_latency, int mem_wresp_latency, int mem_mode)
 {
 	int err = 0;
 
@@ -610,7 +685,9 @@ static int apollo_hw_init(struct tc_device *tc,
 	if (err)
 		goto err_out;
 
-	apollo_set_mem_mode(tc);
+	err = apollo_set_mem_mode(tc, mem_mode);
+	if (err)
+		goto err_out;
 
 #if defined(SUPPORT_RGX)
 	if (tc->version == APOLLO_VERSION_TCF_BONNIE) {
@@ -882,7 +959,7 @@ static void apollo_dev_cleanup(struct tc_device *tc)
 int apollo_init(struct tc_device *tc, struct pci_dev *pdev,
 		int core_clock, int mem_clock, int sys_clock,
 		int pdp_mem_size, int secure_mem_size,
-		int mem_latency, int mem_wresp_latency)
+		int mem_latency, int mem_wresp_latency, int mem_mode)
 {
 	int err = 0;
 
@@ -893,7 +970,7 @@ int apollo_init(struct tc_device *tc, struct pci_dev *pdev,
 	}
 
 	err = apollo_hw_init(tc, core_clock, mem_clock, sys_clock,
-			     mem_latency, mem_wresp_latency);
+			     mem_latency, mem_wresp_latency, mem_mode);
 	if (err) {
 		dev_err(&pdev->dev, "apollo_hw_init failed\n");
 		goto err_dev_cleanup;
@@ -971,6 +1048,7 @@ int apollo_register_pdp_device(struct tc_device *tc)
 		.memory_base = tc->tc_mem.base,
 		.pdp_heap_memory_base = tc->pdp_heap_mem_base,
 		.pdp_heap_memory_size = tc->pdp_heap_mem_size,
+		.dma_map_export_host_addr = apollo_pdp_export_host_addr(tc),
 	};
 	struct platform_device_info pdp_device_info = {
 		.parent = &tc->pdev->dev,
@@ -978,16 +1056,7 @@ int apollo_register_pdp_device(struct tc_device *tc)
 		.id = -2,
 		.data = &pdata,
 		.size_data = sizeof(pdata),
-#if (TC_MEMORY_CONFIG == TC_MEMORY_LOCAL) || \
-	(TC_MEMORY_CONFIG == TC_MEMORY_HYBRID)
-		/*
-		 * The PDP does not access system memory, so there is no
-		 * DMA limitation.
-		 */
-		.dma_mask = DMA_BIT_MASK(64),
-#else
-		.dma_mask = DMA_BIT_MASK(32),
-#endif
+		.dma_mask = apollo_get_pdp_dma_mask(tc),
 	};
 
 	if (tc->version == APOLLO_VERSION_TCF_5) {
@@ -1029,6 +1098,7 @@ int apollo_register_ext_device(struct tc_device *tc)
 		.ion_device = tc->ion_device,
 		.ion_heap_id = ION_HEAP_TC_ROGUE,
 #endif
+		.mem_mode = tc->mem_mode,
 		.tc_memory_base = tc->tc_mem.base,
 		.pdp_heap_memory_base = tc->pdp_heap_mem_base,
 		.pdp_heap_memory_size = tc->pdp_heap_mem_size,
@@ -1047,15 +1117,7 @@ int apollo_register_ext_device(struct tc_device *tc)
 		.num_res = ARRAY_SIZE(rogue_resources),
 		.data = &pdata,
 		.size_data = sizeof(pdata),
-#if (TC_MEMORY_CONFIG == TC_MEMORY_LOCAL)
-		/*
-		 * Rogue does not access system memory, so there is no DMA
-		 * limitation.
-		 */
-		.dma_mask = DMA_BIT_MASK(64),
-#else
-		.dma_mask = DMA_BIT_MASK(32),
-#endif
+		.dma_mask = apollo_get_rogue_dma_mask(tc),
 	};
 
 	tc->ext_dev
@@ -1076,12 +1138,15 @@ int apollo_register_ext_device(struct tc_device *tc)
 {
 	int err = 0;
 	struct resource fpga_resources[] = {
-		/* FIXME: Don't overload SYS_RGX_REG_xxx for FPGA */
+		/* For the 'fpga' build, we don't use the Rogue, but reuse the
+		 * define that mentions RGX.
+		 */
 		DEFINE_RES_MEM_NAMED(pci_resource_start(tc->pdev,
 				SYS_RGX_REG_PCI_BASENUM),
 			 SYS_RGX_REG_REGION_SIZE, "fpga-regs"),
 	};
 	struct apollo_fpga_platform_data pdata = {
+		.mem_mode = tc->mem_mode,
 		.tc_memory_base = tc->tc_mem.base,
 		.pdp_heap_memory_base = tc->pdp_heap_mem_base,
 		.pdp_heap_memory_size = tc->pdp_heap_mem_size,
@@ -1094,15 +1159,7 @@ int apollo_register_ext_device(struct tc_device *tc)
 		.num_res = ARRAY_SIZE(fpga_resources),
 		.data = &pdata,
 		.size_data = sizeof(pdata),
-#if (TC_MEMORY_CONFIG == TC_MEMORY_LOCAL)
-		/*
-		 * The FPGA does not access system memory, so there is no DMA
-		 * limitation.
-		 */
-		.dma_mask = DMA_BIT_MASK(64),
-#else
-		.dma_mask = DMA_BIT_MASK(32),
-#endif
+		.dma_mask = apollo_get_fpga_dma_mask(tc),
 	};
 
 	tc->ext_dev = platform_device_register_full(&fpga_device_info);
@@ -1273,7 +1330,7 @@ int apollo_sys_strings(struct tc_device *tc,
 		pci_resource_start(tc->pdev, SYS_APOLLO_REG_PCI_BASENUM)
 				+ 0x40F0;
 
-	host_fpga_registers = ioremap_nocache(host_fpga_base, 0x04);
+	host_fpga_registers = ioremap(host_fpga_base, 0x04);
 	if (!host_fpga_registers) {
 		dev_err(&tc->pdev->dev,
 			"Failed to map host fpga registers\n");

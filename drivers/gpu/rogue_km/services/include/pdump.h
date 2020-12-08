@@ -38,8 +38,8 @@ COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
 IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */ /**************************************************************************/
-#ifndef _SERVICES_PDUMP_H_
-#define _SERVICES_PDUMP_H_
+#ifndef SERVICES_PDUMP_H
+#define SERVICES_PDUMP_H
 
 #include "img_types.h"
 #include "services_km.h"
@@ -103,10 +103,10 @@ typedef IMG_UINT32 PDUMP_FLAGS_T;
                                                           in Block script stream in addition to Main script stream,
                                                           if capture mode is set to BLOCKED */
 
-#define PDUMP_FLAGS_DEINIT          0x20000000UL   /*<! Output this entry to the de-initialisation section, must
+#define PDUMP_FLAGS_DEINIT          0x20000000U    /*<! Output this entry to the de-initialisation section, must
                                                           only be used by the initialisation code in the Server. */
 
-#define PDUMP_FLAGS_POWER           0x08000000UL   /*<! Output this entry even when a power transition is ongoing,
+#define PDUMP_FLAGS_POWER           0x08000000U    /*<! Output this entry even when a power transition is ongoing,
                                                           as directed by other PDUMP flags. */
 
 #define PDUMP_FLAGS_CONTINUOUS      PDUMP_CONT     /*<! Output this entry always regardless of framed capture range,
@@ -229,4 +229,4 @@ typedef IMG_UINT32 PDUMP_FILEOFFSET_T;
 
 #define PDUMP_IS_CONTINUOUS(flags) ((flags & PDUMP_FLAGS_CONTINUOUS) != 0)
 
-#endif /* _SERVICES_PDUMP_H_ */
+#endif /* SERVICES_PDUMP_H */

@@ -44,19 +44,21 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #include "img_types.h"
 #include "pvrsrv_error.h"
-#include <powervr/sync_external.h>
 #include "pvrsrv_surface.h"
 #include "pmr.h"
 #include "kerneldisplay.h"
 #include "sync_server.h"
+
+/* dc_external.h is where DC_MAX_SRV_SYNC_COUNT
+ * and DC_MAX_PLANES are defined
+ */
+#include "dc_external.h"
 
 #define DC_MAX_DEVICE_COUNT		(1)
 #define DC_MAX_PANEL_COUNT		(1)
 #define DC_MAX_FORMATS			(1)
 #define DC_MAX_DIMENSIONS		(1)
 #define DC_MAX_PIPE_COUNT		(1)
-#define DC_MAX_SRV_SYNC_COUNT	(1)
-#define DC_MAX_PLANES			(4)
 
 typedef struct _DC_DEVICE_ DC_DEVICE;
 typedef struct _DC_DISPLAY_CONTEXT_ DC_DISPLAY_CONTEXT;
@@ -129,9 +131,6 @@ PVRSRV_ERROR DCDisplayContextConfigure(DC_DISPLAY_CONTEXT *psDisplayContext,
 									   IMG_UINT32 ui32PipeCount,
 									   PVRSRV_SURFACE_CONFIG_INFO *pasSurfAttrib,
 									   DC_BUFFER **papsBuffers,
-									   IMG_UINT32 ui32SyncOpCount,
-									   SERVER_SYNC_PRIMITIVE **papsSync,
-									   IMG_BOOL *pabUpdate,
 									   IMG_UINT32 ui32DisplayPeriod,
 									   IMG_UINT32 ui32MaxDepth,
 									   PVRSRV_FENCE iAcquireFence,

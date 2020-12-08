@@ -1,4 +1,4 @@
-/**************************************************************************/ /*!
+/*************************************************************************/ /*!
 @File
 @Copyright      Copyright (c) Imagination Technologies Ltd. All Rights Reserved
 @License        Dual MIT/GPLv2
@@ -37,7 +37,7 @@ PURPOSE AND NONINFRINGEMENT; AND (B) IN NO EVENT SHALL THE AUTHORS OR
 COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
 IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/ /***************************************************************************/
+*/ /**************************************************************************/
 
 #include "img_types.h"
 #include "pvrsrv_error.h"
@@ -50,19 +50,18 @@ typedef struct _SECURE_CLEANUP_DATA_ {
 
 PVRSRV_ERROR PMRSecureExportPMR(CONNECTION_DATA *psConnection,
                                 PVRSRV_DEVICE_NODE * psDevNode,
-								PMR *psPMR,
-								IMG_SECURE_TYPE *phSecure,
-								PMR **ppsPMR,
-								CONNECTION_DATA **ppsSecureConnection);
+                                PMR *psPMR,
+                                IMG_SECURE_TYPE *phSecure,
+                                PMR **ppsPMR,
+                                CONNECTION_DATA **ppsSecureConnection);
 
 PVRSRV_ERROR PMRSecureUnexportPMR(PMR *psPMR);
 
 PVRSRV_ERROR PMRSecureImportPMR(CONNECTION_DATA *psConnection,
-								PVRSRV_DEVICE_NODE *psDevNode,
-								IMG_SECURE_TYPE hSecure,
-								PMR **ppsPMR,
-								IMG_DEVMEM_SIZE_T *puiSize,
-								IMG_DEVMEM_ALIGN_T *puiAlign);
+                                PVRSRV_DEVICE_NODE *psDevNode,
+                                IMG_SECURE_TYPE hSecure,
+                                PMR **ppsPMR,
+                                IMG_DEVMEM_SIZE_T *puiSize,
+                                IMG_DEVMEM_ALIGN_T *puiAlign);
 
 PVRSRV_ERROR PMRSecureUnimportPMR(PMR *psPMR);
-

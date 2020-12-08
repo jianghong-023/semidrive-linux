@@ -73,6 +73,19 @@ DevmemXAllocPhysical(DEVMEM_CONTEXT *psCtx,
 void
 DevmemXReleasePhysical(DEVMEMX_PHYSDESC *psPhysDesc);
 
+/* DevmemAllocVirtualAddr()
+ *
+ * Reserve a requested device virtual range and return
+ * a virtual descriptor for it.
+ */
+IMG_INTERNAL PVRSRV_ERROR
+DevmemXAllocVirtualAddr(DEVMEM_HEAP* hHeap,
+                   IMG_UINT32 uiNumPages,
+                   DEVMEM_FLAGS_T uiFlags,
+                   const IMG_CHAR *pszText,
+                   IMG_DEV_VIRTADDR sVirtAddr,
+                   DEVMEMX_VIRTDESC **ppsVirtDesc);
+
 /* DevmemAllocVirtual()
  *
  * Allocate and reserve a device virtual range and return
@@ -129,24 +142,46 @@ DevmemXMapPhysicalToCPU(DEVMEMX_PHYSDESC *psMemAllocPhys,
 PVRSRV_ERROR
 DevmemXUnmapPhysicalToCPU(DEVMEMX_PHYSDESC *psMemAllocPhys);
 
-/* DevmemXCreateDevmemMemDesc()
+/* DevmemXReacquireCpuVirtAddr()
  *
- * DEPRECATED!
- * DO NOT USE IN PRODUCTION DRIVER!
+ * Reacquire the CPU mapping by incrementing the refcount.
+ */
+void
+DevmemXReacquireCpuVirtAddr(DEVMEMX_PHYSDESC *psPhysDesc,
+                            void **ppvCpuVirtAddr);
+
+/* DevmemXReleaseCpuVirtAddr()
  *
- * Create a devmem memdesc from a physical and
- * virtual descriptor.
- * Always destroy with DevmemFreePhysVirtMemDesc().
+ * Release CPU mapping by decrementing the refcount.
+ */
+void
+DevmemXReleaseCpuVirtAddr(DEVMEMX_PHYSDESC *psPhysDesc);
+
+/* DevmemXCreateDevmemMemDescVA()
+ *
+ * (Deprecated)
+ *
+ * Create a devmem memdesc from a virtual address.
+ * Always destroy with DevmemXFreeDevmemMemDesc().
  */
 
 PVRSRV_ERROR
-DevmemXCreateDevmemMemDesc(const IMG_DEV_VIRTADDR sVirtualAddress,
-                            DEVMEM_MEMDESC **ppsMemDesc);
+DevmemXCreateDevmemMemDescVA(const IMG_DEV_VIRTADDR sVirtualAddress,
+                             DEVMEM_MEMDESC **ppsMemDesc);
+
+/* DevmemXCreateDevmemMemDesc()
+ *
+ * Create a devmem memdesc from a physical and
+ * virtual descriptor.
+ * Always destroy with DevmemXFreeDevmemMemDesc().
+ */
+
+PVRSRV_ERROR
+DevmemXCreateDevmemMemDesc(DEVMEMX_PHYSDESC *psPhysDesc,
+                           DEVMEMX_VIRTDESC *psVirtDesc,
+                           DEVMEM_MEMDESC **ppsMemDesc);
 
 /* DevmemXFreeDevmemMemDesc()
- *
- * DEPRECATED!
- * DO NOT USE IN PRODUCTION DRIVER!
  *
  * Free the memdesc again. Has no impact on the underlying
  * physical and virtual descriptors.
@@ -155,14 +190,14 @@ PVRSRV_ERROR
 DevmemXFreeDevmemMemDesc(DEVMEM_MEMDESC *psMemDesc);
 
 PVRSRV_ERROR
-_DevmemXFlagCompatibilityCheck(IMG_UINT32 uiPhysFlags,
+DevmemXFlagCompatibilityCheck(IMG_UINT32 uiPhysFlags,
                               IMG_UINT32 uiVirtFlags);
 
 PVRSRV_ERROR
-_DevmemXPhysDescAlloc(DEVMEMX_PHYSDESC **ppsPhysDesc);
+DevmemXPhysDescAlloc(DEVMEMX_PHYSDESC **ppsPhysDesc);
 
 void
-_DevmemXPhysDescInit(DEVMEMX_PHYSDESC *psPhysDesc,
+DevmemXPhysDescInit(DEVMEMX_PHYSDESC *psPhysDesc,
                     IMG_HANDLE hPMR,
                     IMG_UINT32 uiNumPages,
                     IMG_UINT32 uiLog2PageSize,
@@ -170,6 +205,19 @@ _DevmemXPhysDescInit(DEVMEMX_PHYSDESC *psPhysDesc,
                     IMG_HANDLE hBridge);
 
 void
-_DevmemXPhysDescFree(DEVMEMX_PHYSDESC *psPhysDesc);
+DevmemXPhysDescFree(DEVMEMX_PHYSDESC *psPhysDesc);
+
+void
+DevmemXPhysDescAcquire(DEVMEMX_PHYSDESC *psPhysDesc,
+                       IMG_UINT32 uiAcquireCount);
+void
+DevmemXPhysDescRelease(DEVMEMX_PHYSDESC *psPhysDesc,
+                       IMG_UINT32 uiReleaseCount);
+
+#if !defined(__KERNEL__)
+IMG_INTERNAL PVRSRV_ERROR
+DevmemXGetImportUID(DEVMEMX_PHYSDESC *psMemDescPhys,
+                    IMG_UINT64       *pui64UID);
+#endif
 
 #endif /* DEVICEMEMX_H */

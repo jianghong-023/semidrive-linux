@@ -1,4 +1,3 @@
-/* -*- mode: c; indent-tabs-mode: t; c-basic-offset: 8; tab-width: 8 -*- */
 /* vi: set ts=8 sw=8 sts=8: */
 /*************************************************************************/ /*!
 @File
@@ -42,7 +41,15 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */ /**************************************************************************/
 
+#include <linux/version.h>
+
 #include <linux/debugfs.h>
+
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 5, 0))
+#include <drm/drm_debugfs.h>
+#include <drm/drm_file.h>
+#include <linux/uaccess.h>
+#endif
 
 #include "drm_pdp_drv.h"
 

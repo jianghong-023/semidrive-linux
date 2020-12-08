@@ -1,4 +1,3 @@
-/* -*- mode: c; indent-tabs-mode: t; c-basic-offset: 8; tab-width: 8 -*- */
 /* vi: set ts=8 sw=8 sts=8: */
 /*************************************************************************/ /*!
 @File
@@ -101,7 +100,7 @@ static const char *pvr_sw_fence_get_timeline_name(struct dma_fence *fence)
 
 static void pvr_sw_fence_value_str(struct dma_fence *fence, char *str, int size)
 {
-	snprintf(str, size, "%d", fence->seqno);
+	snprintf(str, size, "%llu", (u64) fence->seqno);
 }
 
 static void pvr_sw_fence_timeline_value_str(struct dma_fence *fence,

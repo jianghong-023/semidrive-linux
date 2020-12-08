@@ -40,8 +40,8 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */ /**************************************************************************/
 
-#if !defined(__PVRSRV_DEVICE_TYPES_H__)
-#define __PVRSRV_DEVICE_TYPES_H__
+#if !defined(PVRSRV_DEVICE_TYPES_H)
+#define PVRSRV_DEVICE_TYPES_H
 
 #include "img_types.h"
 
@@ -52,5 +52,4 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include <services_kernel_client.h>
 #endif
 
-#endif /* __PVRSRV_DEVICE_TYPES_H__ */
-
+#endif /* PVRSRV_DEVICE_TYPES_H */

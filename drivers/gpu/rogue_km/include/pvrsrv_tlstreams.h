@@ -42,8 +42,8 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */ /**************************************************************************/
 
-#ifndef _PVRSRV_TLSTREAMS_H_
-#define _PVRSRV_TLSTREAMS_H_
+#ifndef PVRSRV_TLSTREAMS_H
+#define PVRSRV_TLSTREAMS_H
 
 #define PVRSRV_TL_CTLR_STREAM "tlctrl"
 
@@ -54,9 +54,8 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #define PVRSRV_TL_HWPERF_HOST_CLIENT_STREAM         "hwperf_client_"
 #define PVRSRV_TL_HWPERF_HOST_CLIENT_STREAM_FMTSPEC "hwperf_client_%u_%u"
 
-#endif /* _PVRSRV_TLSTREAMS_H_ */
+#endif /* PVRSRV_TLSTREAMS_H */
 
 /******************************************************************************
  End of file (pvrsrv_tlstreams.h)
 ******************************************************************************/
-

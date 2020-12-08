@@ -49,6 +49,18 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "ra.h"
 #include "devicemem_utils.h"
 #include "client_mm_bridge.h"
+#if defined(PVRSRV_ENABLE_GPU_MEMORY_INFO)
+#include "client_ri_bridge.h"
+#if defined(__KERNEL__)
+#include "pvrsrv.h"
+#else
+#include "pvr_bridge_client.h"
+#endif
+#endif
+
+#if defined(PVRSRV_ENABLE_PROCESS_STATS)
+#include "proc_stats.h"
+#endif
 
 /*
 	SVM heap management support functions for CPU (un)mapping
@@ -56,7 +68,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #define DEVMEM_MAP_SVM_USER_MANAGED_RETRY				2
 
 static inline PVRSRV_ERROR
-_DevmemCPUMapSVMKernelManaged(DEVMEM_HEAP *psHeap,
+DevmemCPUMapSVMKernelManaged(DEVMEM_HEAP *psHeap,
 		DEVMEM_IMPORT *psImport,
 		IMG_UINT64 *ui64MapAddress)
 {
@@ -65,10 +77,10 @@ _DevmemCPUMapSVMKernelManaged(DEVMEM_HEAP *psHeap,
 	IMG_UINT64 ui64SvmMapAddrEnd;
 	IMG_UINT64 ui64SvmHeapAddrEnd;
 
-	/* SVM heap management is always XXX_KERNEL_MANAGED unless we
+	/* SVM heap management always has XXX_MANAGER_KERNEL unless we
 	   have triggered the fall back code-path in which case we
 	   should not be calling into this code-path */
-	PVR_ASSERT(psHeap->eHeapType == DEVMEM_HEAP_TYPE_KERNEL_MANAGED);
+	PVR_ASSERT(psHeap->ui32HeapManagerFlags == DEVMEM_HEAP_MANAGER_KERNEL);
 
 	/* By acquiring the CPU virtual address here, it essentially
 	   means we lock-down the virtual address for the duration
@@ -77,7 +89,7 @@ _DevmemCPUMapSVMKernelManaged(DEVMEM_HEAP *psHeap,
 	   change its virtual address on the CPU during its life-time.
 	   NOTE: Import might have already been CPU Mapped before now,
 	   normally this is not a problem, see fall back */
-	eError = _DevmemImportStructCPUMap(psImport);
+	eError = DevmemImportStructCPUMap(psImport);
 	if (eError != PVRSRV_OK)
 	{
 		PVR_DPF((PVR_DBG_ERROR,
@@ -101,7 +113,7 @@ _DevmemCPUMapSVMKernelManaged(DEVMEM_HEAP *psHeap,
 		/* Unmap incompatible SVM virtual address, this
 		   may not release address if it was elsewhere
 		   CPU Mapped before call into this function */
-		_DevmemImportStructCPUUnmap(psImport);
+		DevmemImportStructCPUUnmap(psImport);
 
 		/* Flag incompatible SVM mapping */
 		eError = PVRSRV_ERROR_BAD_MAPPING;
@@ -109,20 +121,20 @@ _DevmemCPUMapSVMKernelManaged(DEVMEM_HEAP *psHeap,
 	}
 
 	*ui64MapAddress = ui64SvmMapAddr;
-	failSVM:
+failSVM:
 	/* either OK, MAP_FAILED or BAD_MAPPING */
 	return eError;
 }
 
 static inline void
-_DevmemCPUUnmapSVMKernelManaged(DEVMEM_HEAP *psHeap, DEVMEM_IMPORT *psImport)
+DevmemCPUUnmapSVMKernelManaged(DEVMEM_HEAP *psHeap, DEVMEM_IMPORT *psImport)
 {
 	PVR_UNREFERENCED_PARAMETER(psHeap);
-	_DevmemImportStructCPUUnmap(psImport);
+	DevmemImportStructCPUUnmap(psImport);
 }
 
 static inline PVRSRV_ERROR
-_DevmemCPUMapSVMUserManaged(DEVMEM_HEAP *psHeap,
+DevmemCPUMapSVMUserManaged(DEVMEM_HEAP *psHeap,
 		DEVMEM_IMPORT *psImport,
 		IMG_UINT uiAlign,
 		IMG_UINT64 *ui64MapAddress)
@@ -133,12 +145,12 @@ _DevmemCPUMapSVMUserManaged(DEVMEM_HEAP *psHeap,
 	IMG_UINT uiRetry = 0;
 	PVRSRV_ERROR eError;
 
-	/* If SVM heap management has transitioned to XXX_USER_MANAGED,
+	/* If SVM heap management has transitioned to XXX_MANAGER_USER,
 	   this is essentially a fall back approach that ensures we
 	   continue to satisfy SVM alloc. This approach is not without
 	   hazards in that we may specify a virtual address that is
 	   already in use by the user process */
-	PVR_ASSERT(psHeap->eHeapType == DEVMEM_HEAP_TYPE_USER_MANAGED);
+	PVR_ASSERT(psHeap->ui32HeapManagerFlags == DEVMEM_HEAP_MANAGER_USER);
 
 	/* Normally, for SVM heap allocations, CPUMap _must_ be done
 	   before DevMap; ideally the initial CPUMap should be done by
@@ -153,14 +165,14 @@ _DevmemCPUMapSVMUserManaged(DEVMEM_HEAP *psHeap,
 	{
 		/* Already CPU Mapped SVM heap allocation, this prior elsewhere
 		   obtained virtual address is responsible for the above
-		   XXX_KERNEL_MANAGED failure. As we are not responsible for
+		   XXX_MANAGER_KERNEL failure. As we are not responsible for
 		   this, we cannot progress any further so need to fail */
 		PVR_DPF((PVR_DBG_ERROR,
 				"%s: Previously obtained CPU map address not SVM compatible"
 				, __func__));
 
-		/* Revert SVM heap to DEVMEM_HEAP_TYPE_KERNEL_MANAGED */
-		psHeap->eHeapType = DEVMEM_HEAP_TYPE_KERNEL_MANAGED;
+		/* Revert SVM heap to DEVMEM_HEAP_MANAGER_KERNEL */
+		psHeap->ui32HeapManagerFlags = DEVMEM_HEAP_MANAGER_KERNEL;
 		PVR_DPF((PVR_DBG_MESSAGE,
 				"%s: Reverting SVM heap back to kernel managed",
 				__func__));
@@ -194,6 +206,16 @@ _DevmemCPUMapSVMUserManaged(DEVMEM_HEAP *psHeap,
 			PVR_DPF((PVR_DBG_ERROR,
 					"%s: Cannot RA allocate SVM compatible address",
 					__func__));
+#if defined(PVRSRV_ENABLE_PROCESS_STATS)
+			if (eError == PVRSRV_ERROR_RA_REQUEST_ALLOC_FAIL)
+			{
+				PVRSRV_ERROR eErr;
+				eErr = BridgePVRSRVUpdateOOMStats(GetBridgeHandle(psHeap->psCtx->hDevConnection),
+								  PVRSRV_PROCESS_STAT_TYPE_OOM_VIRTMEM_COUNT,
+								  OSGetCurrentProcessID());
+				PVR_LOG_IF_ERROR(eErr, "BridgePVRSRVUpdateOOMStats");
+			}
+#endif
 			goto failSVM;
 		}
 
@@ -206,7 +228,7 @@ _DevmemCPUMapSVMUserManaged(DEVMEM_HEAP *psHeap,
 		   the kernel may fail the request if the supplied virtual address
 		   is already in-use in which case we re-try using another virtual
 		   address obtained from the RA_Alloc */
-		eError = _DevmemImportStructCPUMap(psImport);
+		eError = DevmemImportStructCPUMap(psImport);
 		if (eError != PVRSRV_OK)
 		{
 			/* For now we simply discard failed RA_Alloc() obtained virtual
@@ -231,12 +253,12 @@ _DevmemCPUMapSVMUserManaged(DEVMEM_HEAP *psHeap,
 	} while (eError != PVRSRV_OK);
 
 	*ui64MapAddress = ui64SvmMapAddr;
-	failSVM:
+failSVM:
 	return eError;
 }
 
 static inline void
-_DevmemCPUUnmapSVMUserManaged(DEVMEM_HEAP *psHeap, DEVMEM_IMPORT *psImport)
+DevmemCPUUnmapSVMUserManaged(DEVMEM_HEAP *psHeap, DEVMEM_IMPORT *psImport)
 {
 	RA_BASE_T uiAllocatedAddr;
 
@@ -245,43 +267,43 @@ _DevmemCPUUnmapSVMUserManaged(DEVMEM_HEAP *psHeap, DEVMEM_IMPORT *psImport)
 	uiAllocatedAddr = psImport->sDeviceImport.sDevVAddr.uiAddr;
 	RA_Free(psHeap->psQuantizedVMRA, uiAllocatedAddr);
 
-	_DevmemImportStructCPUUnmap(psImport);
+	DevmemImportStructCPUUnmap(psImport);
 }
 
 static inline PVRSRV_ERROR
-_DevmemImportStructDevMapSVM(DEVMEM_HEAP *psHeap,
+DevmemImportStructDevMapSVM(DEVMEM_HEAP *psHeap,
 		DEVMEM_IMPORT *psImport,
 		IMG_UINT uiAlign,
 		IMG_UINT64 *ui64MapAddress)
 {
 	PVRSRV_ERROR eError;
 
-	switch (psHeap->eHeapType)
+	switch (psHeap->ui32HeapManagerFlags)
 	{
-	case DEVMEM_HEAP_TYPE_KERNEL_MANAGED:
-		eError = _DevmemCPUMapSVMKernelManaged(psHeap,
+	case DEVMEM_HEAP_MANAGER_KERNEL:
+		eError = DevmemCPUMapSVMKernelManaged(psHeap,
 				psImport,
 				ui64MapAddress);
 		if (eError == PVRSRV_ERROR_BAD_MAPPING)
 		{
 			/* If the SVM map address is outside of SVM heap limits,
-				   change heap type to DEVMEM_HEAP_TYPE_USER_MANAGED */
-			psHeap->eHeapType = DEVMEM_HEAP_TYPE_USER_MANAGED;
+				   change heap type to DEVMEM_HEAP_MANAGER_USER */
+			psHeap->ui32HeapManagerFlags = DEVMEM_HEAP_MANAGER_USER;
 
 			PVR_DPF((PVR_DBG_WARNING,
 					"%s: Kernel managed SVM heap is now user managed",
 					__func__));
 
 			/* Retry using user managed fall-back approach */
-			eError = _DevmemCPUMapSVMUserManaged(psHeap,
+			eError = DevmemCPUMapSVMUserManaged(psHeap,
 					psImport,
 					uiAlign,
 					ui64MapAddress);
 		}
 		break;
 
-	case DEVMEM_HEAP_TYPE_USER_MANAGED:
-		eError = _DevmemCPUMapSVMUserManaged(psHeap,
+	case DEVMEM_HEAP_MANAGER_USER:
+		eError = DevmemCPUMapSVMUserManaged(psHeap,
 				psImport,
 				uiAlign,
 				ui64MapAddress);
@@ -296,16 +318,16 @@ _DevmemImportStructDevMapSVM(DEVMEM_HEAP *psHeap,
 }
 
 static inline void
-_DevmemImportStructDevUnmapSVM(DEVMEM_HEAP *psHeap, DEVMEM_IMPORT *psImport)
+DevmemImportStructDevUnmapSVM(DEVMEM_HEAP *psHeap, DEVMEM_IMPORT *psImport)
 {
-	switch (psHeap->eHeapType)
+	switch (psHeap->ui32HeapManagerFlags)
 	{
-	case DEVMEM_HEAP_TYPE_KERNEL_MANAGED:
-		_DevmemCPUUnmapSVMKernelManaged(psHeap, psImport);
+	case DEVMEM_HEAP_MANAGER_KERNEL:
+		DevmemCPUUnmapSVMKernelManaged(psHeap, psImport);
 		break;
 
-	case DEVMEM_HEAP_TYPE_USER_MANAGED:
-		_DevmemCPUUnmapSVMUserManaged(psHeap, psImport);
+	case DEVMEM_HEAP_MANAGER_USER:
+		DevmemCPUUnmapSVMUserManaged(psHeap, psImport);
 		break;
 
 	default:
@@ -326,7 +348,7 @@ _DevmemImportStructDevUnmapSVM(DEVMEM_HEAP *psHeap, DEVMEM_IMPORT *psImport)
  */
 
 IMG_INTERNAL
-void _DevmemImportStructAcquire(DEVMEM_IMPORT *psImport)
+void DevmemImportStructAcquire(DEVMEM_IMPORT *psImport)
 {
 	IMG_INT iRefCount = OSAtomicIncrement(&psImport->hRefCount);
 	PVR_UNREFERENCED_PARAMETER(iRefCount);
@@ -340,7 +362,7 @@ void _DevmemImportStructAcquire(DEVMEM_IMPORT *psImport)
 }
 
 IMG_INTERNAL
-IMG_BOOL _DevmemImportStructRelease(DEVMEM_IMPORT *psImport)
+IMG_BOOL DevmemImportStructRelease(DEVMEM_IMPORT *psImport)
 {
 	IMG_INT iRefCount = OSAtomicDecrement(&psImport->hRefCount);
 	PVR_ASSERT(iRefCount >= 0);
@@ -367,7 +389,7 @@ IMG_BOOL _DevmemImportStructRelease(DEVMEM_IMPORT *psImport)
 }
 
 IMG_INTERNAL
-void _DevmemImportDiscard(DEVMEM_IMPORT *psImport)
+void DevmemImportDiscard(DEVMEM_IMPORT *psImport)
 {
 	PVR_ASSERT(OSAtomicRead(&psImport->hRefCount) == 0);
 	OSLockDestroy(psImport->sCPUImport.hLock);
@@ -377,36 +399,23 @@ void _DevmemImportDiscard(DEVMEM_IMPORT *psImport)
 }
 
 IMG_INTERNAL
-PVRSRV_ERROR _DevmemMemDescAlloc(DEVMEM_MEMDESC **ppsMemDesc)
+PVRSRV_ERROR DevmemMemDescAlloc(DEVMEM_MEMDESC **ppsMemDesc)
 {
 	DEVMEM_MEMDESC *psMemDesc;
 	PVRSRV_ERROR eError;
 
 	/* Must be zeroed in case it needs to be freed before it is initialised */
 	psMemDesc = OSAllocZMem(sizeof(DEVMEM_MEMDESC));
-	if (psMemDesc == NULL)
-	{
-		eError = PVRSRV_ERROR_OUT_OF_MEMORY;
-		goto failAlloc;
-	}
+	PVR_GOTO_IF_NOMEM(psMemDesc, eError, failAlloc);
 
 	eError = OSLockCreate(&psMemDesc->hLock);
-	if (eError != PVRSRV_OK)
-	{
-		goto failMDLock;
-	}
+	PVR_GOTO_IF_ERROR(eError, failMDLock);
 
 	eError = OSLockCreate(&psMemDesc->sDeviceMemDesc.hLock);
-	if (eError != PVRSRV_OK)
-	{
-		goto failDMDLock;
-	}
+	PVR_GOTO_IF_ERROR(eError, failDMDLock);
 
 	eError = OSLockCreate(&psMemDesc->sCPUMemDesc.hLock);
-	if (eError != PVRSRV_OK)
-	{
-		goto failCMDLock;
-	}
+	PVR_GOTO_IF_ERROR(eError, failCMDLock);
 
 	OSAtomicWrite(&psMemDesc->hRefCount, 0);
 
@@ -414,13 +423,13 @@ PVRSRV_ERROR _DevmemMemDescAlloc(DEVMEM_MEMDESC **ppsMemDesc)
 
 	return PVRSRV_OK;
 
-	failCMDLock:
+failCMDLock:
 	OSLockDestroy(psMemDesc->sDeviceMemDesc.hLock);
-	failDMDLock:
+failDMDLock:
 	OSLockDestroy(psMemDesc->hLock);
-	failMDLock:
+failMDLock:
 	OSFreeMem(psMemDesc);
-	failAlloc:
+failAlloc:
 	PVR_ASSERT(eError != PVRSRV_OK);
 
 	return eError;
@@ -430,7 +439,7 @@ PVRSRV_ERROR _DevmemMemDescAlloc(DEVMEM_MEMDESC **ppsMemDesc)
 	Init the MemDesc structure
  */
 IMG_INTERNAL
-void _DevmemMemDescInit(DEVMEM_MEMDESC *psMemDesc,
+void DevmemMemDescInit(DEVMEM_MEMDESC *psMemDesc,
 		IMG_DEVMEM_OFFSET_T uiOffset,
 		DEVMEM_IMPORT *psImport,
 		IMG_DEVMEM_SIZE_T uiSize)
@@ -454,7 +463,7 @@ void _DevmemMemDescInit(DEVMEM_MEMDESC *psMemDesc,
 }
 
 IMG_INTERNAL
-void _DevmemMemDescAcquire(DEVMEM_MEMDESC *psMemDesc)
+void DevmemMemDescAcquire(DEVMEM_MEMDESC *psMemDesc)
 {
 	IMG_INT iRefCount = 0;
 
@@ -469,7 +478,7 @@ void _DevmemMemDescAcquire(DEVMEM_MEMDESC *psMemDesc)
 }
 
 IMG_INTERNAL
-IMG_BOOL _DevmemMemDescRelease(DEVMEM_MEMDESC *psMemDesc)
+IMG_BOOL DevmemMemDescRelease(DEVMEM_MEMDESC *psMemDesc)
 {
 	IMG_INT iRefCount;
 	PVR_ASSERT(psMemDesc != NULL);
@@ -485,6 +494,22 @@ IMG_BOOL _DevmemMemDescRelease(DEVMEM_MEMDESC *psMemDesc)
 
 	if (iRefCount == 0)
 	{
+#if defined(PVRSRV_ENABLE_GPU_MEMORY_INFO)
+		if (PVRSRVIsBridgeEnabled(GetBridgeHandle(psMemDesc->psImport->hDevConnection), PVRSRV_BRIDGE_RI) &&
+		    (psMemDesc->hRIHandle))
+		{
+			PVRSRV_ERROR eError;
+
+			eError = BridgeRIDeleteMEMDESCEntry(GetBridgeHandle(psMemDesc->psImport->hDevConnection),
+			                                    psMemDesc->hRIHandle);
+			if (eError != PVRSRV_OK)
+			{
+				PVR_DPF((PVR_DBG_ERROR, "%s: call to BridgeRIDeleteMEMDESCEntry failed (Error=%d)", __func__, eError));
+			}
+		}
+#endif
+
+		OSLockAcquire(psMemDesc->psImport->hLock);
 		if (psMemDesc->psImport->uiProperties & DEVMEM_PROPERTIES_SUBALLOCATABLE)
 		{
 			/* As soon as the first sub-allocation on the psImport is freed
@@ -496,13 +521,16 @@ IMG_BOOL _DevmemMemDescRelease(DEVMEM_MEMDESC *psMemDesc)
 							DEVMEM_PROPERTIES_IMPORT_IS_CLEAN |
 							DEVMEM_PROPERTIES_IMPORT_IS_POISONED);
 
+			OSLockRelease(psMemDesc->psImport->hLock);
+
 			RA_Free(psMemDesc->psImport->sDeviceImport.psHeap->psSubAllocRA,
 					psMemDesc->psImport->sDeviceImport.sDevVAddr.uiAddr +
 					psMemDesc->uiOffset);
 		}
 		else
 		{
-			_DevmemImportStructRelease(psMemDesc->psImport);
+			OSLockRelease(psMemDesc->psImport->hLock);
+			DevmemImportStructRelease(psMemDesc->psImport);
 		}
 
 		OSLockDestroy(psMemDesc->sCPUMemDesc.hLock);
@@ -517,7 +545,7 @@ IMG_BOOL _DevmemMemDescRelease(DEVMEM_MEMDESC *psMemDesc)
 }
 
 IMG_INTERNAL
-void _DevmemMemDescDiscard(DEVMEM_MEMDESC *psMemDesc)
+void DevmemMemDescDiscard(DEVMEM_MEMDESC *psMemDesc)
 {
 	PVR_ASSERT(OSAtomicRead(&psMemDesc->hRefCount) == 0);
 
@@ -529,7 +557,7 @@ void _DevmemMemDescDiscard(DEVMEM_MEMDESC *psMemDesc)
 
 
 IMG_INTERNAL
-PVRSRV_ERROR _DevmemValidateParams(IMG_DEVMEM_SIZE_T uiSize,
+PVRSRV_ERROR DevmemValidateParams(IMG_DEVMEM_SIZE_T uiSize,
 		IMG_DEVMEM_ALIGN_T uiAlign,
 		DEVMEM_FLAGS_T *puiFlags)
 {
@@ -572,17 +600,14 @@ PVRSRV_ERROR _DevmemValidateParams(IMG_DEVMEM_SIZE_T uiSize,
 	Allocate and init an import structure
  */
 IMG_INTERNAL
-PVRSRV_ERROR _DevmemImportStructAlloc(SHARED_DEV_CONNECTION hDevConnection,
+PVRSRV_ERROR DevmemImportStructAlloc(SHARED_DEV_CONNECTION hDevConnection,
 		DEVMEM_IMPORT **ppsImport)
 {
 	DEVMEM_IMPORT *psImport;
 	PVRSRV_ERROR eError;
 
-	psImport = OSAllocMem(sizeof *psImport);
-	if (psImport == NULL)
-	{
-		return PVRSRV_ERROR_OUT_OF_MEMORY;
-	}
+	psImport = OSAllocMem(sizeof(*psImport));
+	PVR_RETURN_IF_FALSE(psImport != NULL, PVRSRV_ERROR_OUT_OF_MEMORY);
 
 	/* Setup some known bad values for things we don't have yet */
 	psImport->sDeviceImport.hReservation = LACK_OF_RESERVATION_POISON;
@@ -591,19 +616,13 @@ PVRSRV_ERROR _DevmemImportStructAlloc(SHARED_DEV_CONNECTION hDevConnection,
 	psImport->sDeviceImport.bMapped = IMG_FALSE;
 
 	eError = OSLockCreate(&psImport->sDeviceImport.hLock);
-	if (eError != PVRSRV_OK)
-	{
-		goto failDIOSLockCreate;
-	}
+	PVR_GOTO_IF_ERROR(eError, failDIOSLockCreate);
 
 	psImport->sCPUImport.hOSMMapData = NULL;
 	psImport->sCPUImport.pvCPUVAddr = NULL;
 
 	eError = OSLockCreate(&psImport->sCPUImport.hLock);
-	if (eError != PVRSRV_OK)
-	{
-		goto failCIOSLockCreate;
-	}
+	PVR_GOTO_IF_ERROR(eError, failCIOSLockCreate);
 
 	/* Set up common elements */
 	psImport->hDevConnection = hDevConnection;
@@ -618,20 +637,17 @@ PVRSRV_ERROR _DevmemImportStructAlloc(SHARED_DEV_CONNECTION hDevConnection,
 
 	/* Create the lock */
 	eError = OSLockCreate(&psImport->hLock);
-	if (eError != PVRSRV_OK)
-	{
-		goto failILockAlloc;
-	}
+	PVR_GOTO_IF_ERROR(eError, failILockAlloc);
 
 	*ppsImport = psImport;
 
 	return PVRSRV_OK;
 
-	failILockAlloc:
+failILockAlloc:
 	OSLockDestroy(psImport->sCPUImport.hLock);
-	failCIOSLockCreate:
+failCIOSLockCreate:
 	OSLockDestroy(psImport->sDeviceImport.hLock);
-	failDIOSLockCreate:
+failDIOSLockCreate:
 	OSFreeMem(psImport);
 	PVR_ASSERT(eError != PVRSRV_OK);
 
@@ -642,7 +658,7 @@ PVRSRV_ERROR _DevmemImportStructAlloc(SHARED_DEV_CONNECTION hDevConnection,
 	Initialise the import structure
  */
 IMG_INTERNAL
-void _DevmemImportStructInit(DEVMEM_IMPORT *psImport,
+void DevmemImportStructInit(DEVMEM_IMPORT *psImport,
 		IMG_DEVMEM_SIZE_T uiSize,
 		IMG_DEVMEM_ALIGN_T uiAlign,
 		DEVMEM_FLAGS_T uiFlags,
@@ -663,11 +679,52 @@ void _DevmemImportStructInit(DEVMEM_IMPORT *psImport,
 	OSAtomicWrite(&psImport->hRefCount, 1);
 }
 
+/* Allocate the requested device virtual address region
+ * from the heap */
+static PVRSRV_ERROR DevmemReserveVARange(DEVMEM_HEAP *psHeap,
+                                         DEVMEM_SIZE_T uiSize,
+                                         IMG_UINT uiAlign,
+                                         RA_LENGTH_T *puiAllocatedSize,
+                                         IMG_UINT64 ui64OptionalMapAddress)
+{
+	PVRSRV_ERROR eError;
+
+	/* Allocate space in the VM */
+	eError = RA_Alloc_Range(psHeap->psQuantizedVMRA,
+							uiSize,
+							0,
+							uiAlign,
+							ui64OptionalMapAddress,
+							puiAllocatedSize);
+
+	if (PVRSRV_OK != eError)
+	{
+#if defined(PVRSRV_ENABLE_PROCESS_STATS)
+		if ((eError == PVRSRV_ERROR_RA_REQUEST_ALLOC_FAIL) ||
+				(eError == PVRSRV_ERROR_RA_REQUEST_VIRT_ADDR_FAIL))
+		{
+			PVRSRV_ERROR eErr;
+			eErr = BridgePVRSRVUpdateOOMStats(GetBridgeHandle(psHeap->psCtx->hDevConnection),
+											PVRSRV_PROCESS_STAT_TYPE_INVALID_VIRTMEM,
+											OSGetCurrentProcessID());
+			PVR_LOG_IF_ERROR(eErr, "BridgePVRSRVUpdateOOMStats");
+		}
+#endif
+		return eError;
+	}
+
+	/* No reason for the allocated virtual size to be different from
+					   the PMR's size */
+	PVR_ASSERT(*puiAllocatedSize == uiSize);
+
+	return PVRSRV_OK;
+}
+
 /*
 	Map an import to the device
  */
 IMG_INTERNAL
-PVRSRV_ERROR _DevmemImportStructDevMap(DEVMEM_HEAP *psHeap,
+PVRSRV_ERROR DevmemImportStructDevMap(DEVMEM_HEAP *psHeap,
 		IMG_BOOL bMap,
 		DEVMEM_IMPORT *psImport,
 		IMG_UINT64 ui64OptionalMapAddress)
@@ -696,7 +753,7 @@ PVRSRV_ERROR _DevmemImportStructDevMap(DEVMEM_HEAP *psHeap,
 
 	if (psDeviceImport->ui32RefCount++ == 0)
 	{
-		_DevmemImportStructAcquire(psImport);
+		DevmemImportStructAcquire(psImport);
 
 		OSAtomicIncrement(&psHeap->hImportCount);
 
@@ -707,30 +764,35 @@ PVRSRV_ERROR _DevmemImportStructDevMap(DEVMEM_HEAP *psHeap,
 				used to map the allocation into the device virtual address
 				space; i.e. the virtual address of the allocation for both
 				the CPU/GPU must be identical. */
-			eError = _DevmemImportStructDevMapSVM(psHeap,
+			eError = DevmemImportStructDevMapSVM(psHeap,
 					psImport,
 					uiAlign,
 					&ui64OptionalMapAddress);
-			if (eError != PVRSRV_OK)
-			{
-				goto failVMRAAlloc;
-			}
+			PVR_GOTO_IF_ERROR(eError, failVMRAAlloc);
 		}
 
 		if (ui64OptionalMapAddress == 0)
 		{
-			if (psHeap->eHeapType == DEVMEM_HEAP_TYPE_USER_MANAGED ||
-					psHeap->eHeapType == DEVMEM_HEAP_TYPE_KERNEL_MANAGED)
+			/* If heap is _completely_ managed by USER or KERNEL, we shouldn't
+			 * be here, as this is RA manager code-path */
+			if (psHeap->ui32HeapManagerFlags == DEVMEM_HEAP_MANAGER_USER ||
+				psHeap->ui32HeapManagerFlags == DEVMEM_HEAP_MANAGER_KERNEL)
 			{
 				PVR_DPF((PVR_DBG_ERROR,
-						psHeap->eHeapType == DEVMEM_HEAP_TYPE_USER_MANAGED ?
-								"%s: Heap is user managed, please use PVRSRVMapToDeviceAddress().":
-								"%s: Heap is kernel managed, use right allocation flags (e.g. SVM).",
-								__func__));
-				eError = PVRSRV_ERROR_INVALID_PARAMS;
-				goto failVMRAAlloc;
+						psHeap->ui32HeapManagerFlags == DEVMEM_HEAP_MANAGER_USER ?
+						"%s: Heap is user managed, please use PVRSRVMapToDeviceAddress().":
+						"%s: Heap is kernel managed, use right allocation flags (e.g. SVM).",
+						__func__));
+				PVR_GOTO_WITH_ERROR(eError, PVRSRV_ERROR_INVALID_PARAMS, failVMRAAlloc);
 			}
-			psHeap->eHeapType = DEVMEM_HEAP_TYPE_RA_MANAGED;
+
+			if (psHeap->ui32HeapManagerFlags == DEVMEM_HEAP_MANAGER_UNKNOWN)
+			{
+				/* Only set the heap manager (to RA) at first map when heap manager
+				 * is unknown. It might be a dual heap (both, user and RA managed),
+				 * in which case heap manager is set at creation time */
+				psHeap->ui32HeapManagerFlags = DEVMEM_HEAP_MANAGER_RA;
+			}
 
 			/* Allocate space in the VM */
 			eError = RA_Alloc(psHeap->psQuantizedVMRA,
@@ -745,8 +807,17 @@ PVRSRV_ERROR _DevmemImportStructDevMap(DEVMEM_HEAP *psHeap,
 			);
 			if (PVRSRV_OK != eError)
 			{
-				eError = PVRSRV_ERROR_DEVICEMEM_OUT_OF_DEVICE_VM;
-				goto failVMRAAlloc;
+#if defined(PVRSRV_ENABLE_PROCESS_STATS)
+				if (eError == PVRSRV_ERROR_RA_REQUEST_ALLOC_FAIL)
+				{
+					PVRSRV_ERROR eErr;
+					eErr = BridgePVRSRVUpdateOOMStats(GetBridgeHandle(psHeap->psCtx->hDevConnection),
+									  PVRSRV_PROCESS_STAT_TYPE_OOM_VIRTMEM_COUNT,
+									  OSGetCurrentProcessID());
+					PVR_LOG_IF_ERROR(eErr, "BridgePVRSRVUpdateOOMStats");
+				}
+#endif
+				PVR_GOTO_WITH_ERROR(eError, PVRSRV_ERROR_DEVICEMEM_OUT_OF_DEVICE_VM, failVMRAAlloc);
 			}
 
 			/* No reason for the allocated virtual size to be different from
@@ -758,57 +829,83 @@ PVRSRV_ERROR _DevmemImportStructDevMap(DEVMEM_HEAP *psHeap,
 		}
 		else
 		{
-			IMG_UINT64 uiHeapAddrEnd;
-
-			switch (psHeap->eHeapType)
-			{
-			case DEVMEM_HEAP_TYPE_UNKNOWN:
-				/* DEVMEM_HEAP_TYPE_USER_MANAGED can apply to _any_
-					   heap and can only be determined here. This heap
-					   type transitions from DEVMEM_HEAP_TYPE_UNKNOWN
-					   to DEVMEM_HEAP_TYPE_USER_MANAGED on 1st alloc */
-				psHeap->eHeapType = DEVMEM_HEAP_TYPE_USER_MANAGED;
-				break;
-
-			case DEVMEM_HEAP_TYPE_USER_MANAGED:
-			case DEVMEM_HEAP_TYPE_KERNEL_MANAGED:
-				if (! psHeap->uiSize)
-				{
-					PVR_DPF((PVR_DBG_ERROR,
-							psHeap->eHeapType == DEVMEM_HEAP_TYPE_USER_MANAGED ?
-									"%s: Heap DEVMEM_HEAP_TYPE_USER_MANAGED is disabled.":
-									"%s: Heap DEVMEM_HEAP_TYPE_KERNEL_MANAGED is disabled."
-									, __func__));
-					eError = PVRSRV_ERROR_INVALID_HEAP;
-					goto failVMRAAlloc;
-				}
-				break;
-
-			case DEVMEM_HEAP_TYPE_RA_MANAGED:
-				PVR_DPF((PVR_DBG_ERROR,
-						"%s: This heap is managed by an RA, please use PVRSRVMapToDevice()"
-						" and don't use allocation flags that assume differently (e.g. SVM)."
-						, __func__));
-				eError = PVRSRV_ERROR_INVALID_PARAMS;
-				goto failVMRAAlloc;
-
-			default:
-				break;
-			}
+			IMG_UINT64 ui64ValidEndAddr;
 
 			/* Ensure supplied ui64OptionalMapAddress is within heap range */
-			uiHeapAddrEnd = psHeap->sBaseAddress.uiAddr + psHeap->uiSize;
-			if (ui64OptionalMapAddress >= uiHeapAddrEnd ||
-					ui64OptionalMapAddress + psImport->uiSize > uiHeapAddrEnd)
+			ui64ValidEndAddr = psHeap->sBaseAddress.uiAddr + psHeap->uiSize;
+			if ((ui64OptionalMapAddress + psImport->uiSize > ui64ValidEndAddr) ||
+					(ui64OptionalMapAddress < psHeap->sBaseAddress.uiAddr))
 			{
 				PVR_DPF((PVR_DBG_ERROR,
 						"%s: ui64OptionalMapAddress %p is outside of heap limits <%p:%p>."
 						, __func__
 						, (void*)(uintptr_t)ui64OptionalMapAddress
 						, (void*)(uintptr_t)psHeap->sBaseAddress.uiAddr
-						, (void*)(uintptr_t)uiHeapAddrEnd));
-				eError = PVRSRV_ERROR_INVALID_PARAMS;
-				goto failVMRAAlloc;
+						, (void*)(uintptr_t)ui64ValidEndAddr));
+				PVR_GOTO_WITH_ERROR(eError, PVRSRV_ERROR_INVALID_PARAMS, failVMRAAlloc);
+			}
+
+			switch (psHeap->ui32HeapManagerFlags)
+			{
+				case DEVMEM_HEAP_MANAGER_UNKNOWN:
+					/* DEVMEM_HEAP_MANAGER_USER can apply to _any_ heap and can only
+					 * be determined here. This heap type transitions from
+					 * DEVMEM_HEAP_MANAGER_UNKNOWN to DEVMEM_HEAP_MANAGER_USER on
+					 * 1st alloc. */
+					psHeap->ui32HeapManagerFlags = DEVMEM_HEAP_MANAGER_USER;
+					break;
+
+				case DEVMEM_HEAP_MANAGER_USER:
+				case DEVMEM_HEAP_MANAGER_KERNEL:
+					if (! psHeap->uiSize)
+					{
+						PVR_DPF((PVR_DBG_ERROR,
+								psHeap->ui32HeapManagerFlags == DEVMEM_HEAP_MANAGER_USER ?
+										"%s: Heap DEVMEM_HEAP_MANAGER_USER is disabled.":
+										"%s: Heap DEVMEM_HEAP_MANAGER_KERNEL is disabled."
+										, __func__));
+						PVR_GOTO_WITH_ERROR(eError, PVRSRV_ERROR_INVALID_HEAP, failVMRAAlloc);
+					}
+					break;
+
+				case DEVMEM_HEAP_MANAGER_DUAL_USER_RA:
+					/* When the heap is dual managed, ensure supplied ui64OptionalMapAddress
+					 * and import size are within heap address space range */
+					if (ui64OptionalMapAddress + psImport->uiSize <=
+							psHeap->sBaseAddress.uiAddr + psHeap->uiReservedRegionSize)
+					{
+						break;
+					}
+					else
+					{
+						/* Allocate requested VM range */
+						eError = DevmemReserveVARange(psHeap,
+													psImport->uiSize,
+													uiAlign,
+													&uiAllocatedSize,
+													ui64OptionalMapAddress);
+						if (eError != PVRSRV_OK)
+						{
+							PVR_GOTO_WITH_ERROR(eError, PVRSRV_ERROR_DEVICEMEM_VA_ALLOC_FAILED, failVMRAAlloc);
+						}
+
+					}
+					break;
+				case DEVMEM_HEAP_MANAGER_RA:
+					/* Allocate requested VM range */
+					eError = DevmemReserveVARange(psHeap,
+												psImport->uiSize,
+												uiAlign,
+												&uiAllocatedSize,
+												ui64OptionalMapAddress);
+					if (eError != PVRSRV_OK)
+					{
+						PVR_GOTO_WITH_ERROR(eError, PVRSRV_ERROR_DEVICEMEM_VA_ALLOC_FAILED, failVMRAAlloc);
+					}
+					break;
+
+				default:
+					break;
 			}
 
 			if (ui64OptionalMapAddress & ((1 << psHeap->uiLog2Quantum) - 1))
@@ -817,11 +914,8 @@ PVRSRV_ERROR _DevmemImportStructDevMap(DEVMEM_HEAP *psHeap,
 						"%s: Invalid address to map to. Please provide an "
 						"address aligned to a page multiple of the heap."
 						, __func__));
-				eError = PVRSRV_ERROR_INVALID_PARAMS;
-				goto failVMRAAlloc;
+				PVR_GOTO_WITH_ERROR(eError, PVRSRV_ERROR_INVALID_PARAMS, failVMRAAlloc);
 			}
-
-			uiAllocatedAddr = ui64OptionalMapAddress;
 
 			if (psImport->uiSize & ((1 << psHeap->uiLog2Quantum) - 1))
 			{
@@ -829,46 +923,52 @@ PVRSRV_ERROR _DevmemImportStructDevMap(DEVMEM_HEAP *psHeap,
 						"%s: Invalid heap to map to. "
 						"Please choose a heap that can handle smaller page sizes."
 						, __func__));
-				eError = PVRSRV_ERROR_INVALID_PARAMS;
-				goto failVMRAAlloc;
+				PVR_GOTO_WITH_ERROR(eError, PVRSRV_ERROR_INVALID_PARAMS, failVMRAAlloc);
 			}
+
+			uiAllocatedAddr = ui64OptionalMapAddress;
 			uiAllocatedSize = psImport->uiSize;
 			sBase.uiAddr = uiAllocatedAddr;
 		}
 
-		/* Setup page tables for the allocated VM space */
-		eError = BridgeDevmemIntReserveRange(GetBridgeHandle(psHeap->psCtx->hDevConnection),
-				psHeap->hDevMemServerHeap,
-				sBase,
-				uiAllocatedSize,
-				&hReservation);
-		if (eError != PVRSRV_OK)
+		if (psHeap->bPremapped)
 		{
-			goto failReserve;
+			/* no virtual address reservation and mapping are required for memory that's already mapped */
+			psDeviceImport->hReservation = LACK_OF_RESERVATION_POISON;
+			psDeviceImport->hMapping = LACK_OF_MAPPING_POISON;
 		}
-
-		if (bMap)
+		else
 		{
-			DEVMEM_FLAGS_T uiMapFlags;
-
-			uiMapFlags = psImport->uiFlags & PVRSRV_MEMALLOCFLAGS_PERMAPPINGFLAGSMASK;
-
-			/* Actually map the PMR to allocated VM space */
-			eError = BridgeDevmemIntMapPMR(GetBridgeHandle(psHeap->psCtx->hDevConnection),
+			/* Setup page tables for the allocated VM space */
+			eError = BridgeDevmemIntReserveRange(GetBridgeHandle(psHeap->psCtx->hDevConnection),
 					psHeap->hDevMemServerHeap,
-					hReservation,
-					psImport->hPMR,
-					uiMapFlags,
-					&psDeviceImport->hMapping);
-			if (eError != PVRSRV_OK)
+					sBase,
+					uiAllocatedSize,
+					&hReservation);
+			PVR_GOTO_IF_ERROR(eError, failReserve);
+
+			if (bMap)
 			{
-				goto failMap;
+				DEVMEM_FLAGS_T uiMapFlags;
+
+				uiMapFlags = psImport->uiFlags & PVRSRV_MEMALLOCFLAGS_PERMAPPINGFLAGSMASK;
+
+				/* Actually map the PMR to allocated VM space */
+				eError = BridgeDevmemIntMapPMR(GetBridgeHandle(psHeap->psCtx->hDevConnection),
+						psHeap->hDevMemServerHeap,
+						hReservation,
+						psImport->hPMR,
+						uiMapFlags,
+						&psDeviceImport->hMapping);
+				PVR_GOTO_IF_ERROR(eError, failMap);
+
+				psDeviceImport->bMapped = IMG_TRUE;
 			}
-			psDeviceImport->bMapped = IMG_TRUE;
+
+			psDeviceImport->hReservation = hReservation;
 		}
 
 		/* Setup device mapping specific parts of the mapping info */
-		psDeviceImport->hReservation = hReservation;
 		psDeviceImport->sDevVAddr.uiAddr = uiAllocatedAddr;
 		psDeviceImport->psHeap = psHeap;
 	}
@@ -880,27 +980,33 @@ PVRSRV_ERROR _DevmemImportStructDevMap(DEVMEM_HEAP *psHeap,
 		 */
 		if (psHeap != psDeviceImport->psHeap)
 		{
-			eError = PVRSRV_ERROR_INVALID_HEAP;
-			goto failParams;
+			PVR_GOTO_WITH_ERROR(eError, PVRSRV_ERROR_INVALID_HEAP, failParams);
 		}
 	}
 	OSLockRelease(psDeviceImport->hLock);
 
 	return PVRSRV_OK;
 
-	failMap:
-	BridgeDevmemIntUnreserveRange(GetBridgeHandle(psHeap->psCtx->hDevConnection),
-			hReservation);
-	failReserve:
+failMap:
+	if (!psHeap->bPremapped)
+	{
+		BridgeDevmemIntUnreserveRange(GetBridgeHandle(psHeap->psCtx->hDevConnection),
+				hReservation);
+	}
+failReserve:
 	if (ui64OptionalMapAddress == 0)
 	{
 		RA_Free(psHeap->psQuantizedVMRA,
 				uiAllocatedAddr);
 	}
-	failVMRAAlloc:
-	bDestroyed = _DevmemImportStructRelease(psImport);
+failVMRAAlloc:
+	if ((ui64OptionalMapAddress) && PVRSRV_CHECK_SVM_ALLOC(psImport->uiFlags))
+	{
+		DevmemImportStructDevUnmapSVM(psHeap, psImport);
+	}
+	bDestroyed = DevmemImportStructRelease(psImport);
 	OSAtomicDecrement(&psHeap->hImportCount);
-	failParams:
+failParams:
 	if (!bDestroyed)
 	{
 		psDeviceImport->ui32RefCount--;
@@ -914,7 +1020,7 @@ PVRSRV_ERROR _DevmemImportStructDevMap(DEVMEM_HEAP *psHeap,
 	Unmap an import from the Device
  */
 IMG_INTERNAL
-void _DevmemImportStructDevUnmap(DEVMEM_IMPORT *psImport)
+IMG_BOOL DevmemImportStructDevUnmap(DEVMEM_IMPORT *psImport)
 {
 	PVRSRV_ERROR eError;
 	DEVMEM_DEVICE_IMPORT *psDeviceImport;
@@ -932,41 +1038,50 @@ void _DevmemImportStructDevUnmap(DEVMEM_IMPORT *psImport)
 	{
 		DEVMEM_HEAP *psHeap = psDeviceImport->psHeap;
 
-		if (psDeviceImport->bMapped)
+		if (!psHeap->bPremapped)
 		{
-			eError = BridgeDevmemIntUnmapPMR(GetBridgeHandle(psImport->hDevConnection),
-					psDeviceImport->hMapping);
+			if (psDeviceImport->bMapped)
+			{
+				eError = BridgeDevmemIntUnmapPMR(GetBridgeHandle(psImport->hDevConnection),
+						psDeviceImport->hMapping);
+				PVR_ASSERT(eError == PVRSRV_OK);
+			}
+
+			eError = BridgeDevmemIntUnreserveRange(GetBridgeHandle(psImport->hDevConnection),
+					psDeviceImport->hReservation);
 			PVR_ASSERT(eError == PVRSRV_OK);
 		}
-
-		eError = BridgeDevmemIntUnreserveRange(GetBridgeHandle(psImport->hDevConnection),
-				psDeviceImport->hReservation);
-		PVR_ASSERT(eError == PVRSRV_OK);
 
 		psDeviceImport->bMapped = IMG_FALSE;
 		psDeviceImport->hMapping = LACK_OF_MAPPING_POISON;
 		psDeviceImport->hReservation = LACK_OF_RESERVATION_POISON;
 
-		if (psHeap->eHeapType == DEVMEM_HEAP_TYPE_RA_MANAGED)
+		/* DEVMEM_HEAP_MANAGER_RA can also come from a dual managed heap in which case,
+		   we need to check if the allocated VA falls within RA managed range */
+		if ((psHeap->ui32HeapManagerFlags & DEVMEM_HEAP_MANAGER_RA) &&
+		    psDeviceImport->sDevVAddr.uiAddr >= (psHeap->sBaseAddress.uiAddr + psHeap->uiReservedRegionSize) &&
+		    psDeviceImport->sDevVAddr.uiAddr < (psHeap->sBaseAddress.uiAddr + psHeap->uiSize))
 		{
-			RA_Free(psHeap->psQuantizedVMRA,
-					psDeviceImport->sDevVAddr.uiAddr);
+			RA_Free(psHeap->psQuantizedVMRA, psDeviceImport->sDevVAddr.uiAddr);
 		}
 
 		if (PVRSRV_CHECK_SVM_ALLOC(psImport->uiFlags))
 		{
-			_DevmemImportStructDevUnmapSVM(psHeap, psImport);
+			DevmemImportStructDevUnmapSVM(psHeap, psImport);
 		}
 
 		OSLockRelease(psDeviceImport->hLock);
 
-		_DevmemImportStructRelease(psImport);
+		DevmemImportStructRelease(psImport);
 
 		OSAtomicDecrement(&psHeap->hImportCount);
+
+		return IMG_TRUE;
 	}
 	else
 	{
 		OSLockRelease(psDeviceImport->hLock);
+		return IMG_FALSE;
 	}
 }
 
@@ -974,7 +1089,7 @@ void _DevmemImportStructDevUnmap(DEVMEM_IMPORT *psImport)
 	Map an import into the CPU
  */
 IMG_INTERNAL
-PVRSRV_ERROR _DevmemImportStructCPUMap(DEVMEM_IMPORT *psImport)
+PVRSRV_ERROR DevmemImportStructCPUMap(DEVMEM_IMPORT *psImport)
 {
 	PVRSRV_ERROR eError;
 	DEVMEM_CPU_IMPORT *psCPUImport;
@@ -991,7 +1106,7 @@ PVRSRV_ERROR _DevmemImportStructCPUMap(DEVMEM_IMPORT *psImport)
 
 	if (psCPUImport->ui32RefCount++ == 0)
 	{
-		_DevmemImportStructAcquire(psImport);
+		DevmemImportStructAcquire(psImport);
 
 		eError = OSMMapPMR(GetBridgeHandle(psImport->hDevConnection),
 				psImport->hPMR,
@@ -1000,10 +1115,7 @@ PVRSRV_ERROR _DevmemImportStructCPUMap(DEVMEM_IMPORT *psImport)
 				&psCPUImport->hOSMMapData,
 				&psCPUImport->pvCPUVAddr,
 				&uiMappingLength);
-		if (eError != PVRSRV_OK)
-		{
-			goto failMap;
-		}
+		PVR_GOTO_IF_ERROR(eError, failMap);
 
 		/* MappingLength might be rounded up to page size */
 		PVR_ASSERT(uiMappingLength >= psImport->uiSize);
@@ -1012,9 +1124,9 @@ PVRSRV_ERROR _DevmemImportStructCPUMap(DEVMEM_IMPORT *psImport)
 
 	return PVRSRV_OK;
 
-	failMap:
+failMap:
 	psCPUImport->ui32RefCount--;
-	if (!_DevmemImportStructRelease(psImport))
+	if (!DevmemImportStructRelease(psImport))
 	{
 		OSLockRelease(psCPUImport->hLock);
 	}
@@ -1026,7 +1138,7 @@ PVRSRV_ERROR _DevmemImportStructCPUMap(DEVMEM_IMPORT *psImport)
 	Unmap an import from the CPU
  */
 IMG_INTERNAL
-void _DevmemImportStructCPUUnmap(DEVMEM_IMPORT *psImport)
+void DevmemImportStructCPUUnmap(DEVMEM_IMPORT *psImport)
 {
 	DEVMEM_CPU_IMPORT *psCPUImport;
 
@@ -1053,16 +1165,17 @@ void _DevmemImportStructCPUUnmap(DEVMEM_IMPORT *psImport)
 				psImport->hPMR,
 				psCPUImport->hOSMMapData,
 				psCPUImport->pvCPUVAddr,
-				psImport->uiSize);
+				(size_t)psImport->uiSize);
+
+		psCPUImport->hOSMMapData = NULL;
+		psCPUImport->pvCPUVAddr = NULL;
 
 		OSLockRelease(psCPUImport->hLock);
 
-		_DevmemImportStructRelease(psImport);
+		DevmemImportStructRelease(psImport);
 	}
 	else
 	{
 		OSLockRelease(psCPUImport->hLock);
 	}
 }
-
-

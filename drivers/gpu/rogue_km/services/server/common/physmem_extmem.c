@@ -39,7 +39,7 @@ PURPOSE AND NONINFRINGEMENT; AND (B) IN NO EVENT SHALL THE AUTHORS OR
 COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
 IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/ /***************************************************************************/
+*/ /**************************************************************************/
 #include "img_types.h"
 #include "pvrsrv_error.h"
 #include "pvrsrv_memallocflags.h"
@@ -54,18 +54,17 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 PVRSRV_ERROR
 PhysmemWrapExtMem(CONNECTION_DATA * psConnection,
-                       PVRSRV_DEVICE_NODE *psDevNode,
-                       IMG_DEVMEM_SIZE_T uiSize,
-                       IMG_UINT64 pvCpuVAddr,
-                       PVRSRV_MEMALLOCFLAGS_T uiFlags,
-                       PMR **ppsPMRPtr)
+                  PVRSRV_DEVICE_NODE *psDevNode,
+                  IMG_DEVMEM_SIZE_T uiSize,
+                  IMG_UINT64 pvCpuVAddr,
+                  PVRSRV_MEMALLOCFLAGS_T uiFlags,
+                  PMR **ppsPMRPtr)
 {
 	return PhysmemWrapExtMemOS(psConnection,
-                       psDevNode,
-                       uiSize,
-                       (IMG_CPU_VIRTADDR)(uintptr_t)pvCpuVAddr,
-                       uiFlags,
-                       ppsPMRPtr);
+	                           psDevNode,
+	                           uiSize,
+	                           (IMG_CPU_VIRTADDR)(uintptr_t)pvCpuVAddr,
+	                           uiFlags,
+	                           ppsPMRPtr);
 
 }
-

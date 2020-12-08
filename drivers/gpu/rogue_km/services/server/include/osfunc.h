@@ -74,7 +74,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "img_defs.h"
 #include "device.h"
 #include "pvrsrv_device.h"
-#include "cache_km.h"
+#include "cache_ops.h"
 #include "osfunc_common.h"
 
 /******************************************************************************
@@ -255,7 +255,7 @@ typedef void (*PFN_MISR)(void *pvData);
 */ /**************************************************************************/
 typedef void (*PFN_THREAD)(void *pvData);
 
-/**************************************************************************/ /*!
+/*************************************************************************/ /*!
 @Function       OSChangeSparseMemCPUAddrMap
 @Description    This function changes the CPU mapping of the underlying
                 sparse allocation. It is used by a PMR 'factory'
@@ -280,7 +280,7 @@ typedef void (*PFN_THREAD)(void *pvData);
 @Input          bIsLMA             flag indicating if the sparse allocation
                                    is from LMA or UMA memory
 @Return         PVRSRV_OK on success, a failure code otherwise.
- */ /**************************************************************************/
+*/ /**************************************************************************/
 PVRSRV_ERROR OSChangeSparseMemCPUAddrMap(void **psPageArray,
                                          IMG_UINT64 sCpuVAddrBase,
                                          IMG_CPU_PHYADDR sCpuPAHeapBase,
@@ -426,7 +426,7 @@ PVRSRV_ERROR OSThreadCreatePriority(IMG_HANDLE *phThread,
 */ /**************************************************************************/
 PVRSRV_ERROR OSThreadDestroy(IMG_HANDLE hThread);
 
-/**************************************************************************/ /*!
+/*************************************************************************/ /*!
 @Function       OSMapPhysToLin
 @Description    Maps physical memory into a linear address range.
 @Input          BasePAddr    physical CPU address
@@ -437,10 +437,10 @@ PVRSRV_ERROR OSThreadDestroy(IMG_HANDLE hThread);
                              See pvrsrv_memallocflags.h for full flag bit
                              definitions.
 @Return         Pointer to the new mapping if successful, NULL otherwise.
- */ /**************************************************************************/
+*/ /**************************************************************************/
 void *OSMapPhysToLin(IMG_CPU_PHYADDR BasePAddr, size_t ui32Bytes, IMG_UINT32 ui32Flags);
 
-/**************************************************************************/ /*!
+/*************************************************************************/ /*!
 @Function       OSUnMapPhysToLin
 @Description    Unmaps physical memory previously mapped by OSMapPhysToLin().
 @Input          pvLinAddr    the linear mapping to be unmapped
@@ -448,18 +448,10 @@ void *OSMapPhysToLin(IMG_CPU_PHYADDR BasePAddr, size_t ui32Bytes, IMG_UINT32 ui3
 @Input          ui32Flags    flags denoting the caching mode that was employed
                              for the original mapping.
 @Return         IMG_TRUE if unmapping was successful, IMG_FALSE otherwise.
- */ /**************************************************************************/
+*/ /**************************************************************************/
 IMG_BOOL OSUnMapPhysToLin(void *pvLinAddr, size_t ui32Bytes, IMG_UINT32 ui32Flags);
 
-/**************************************************************************/ /*!
-@Function       OSCPUOperation
-@Description    Perform the specified cache operation on the CPU.
-@Input          eCacheOp      the type of cache operation to be performed
-@Return         PVRSRV_OK on success, a failure code otherwise.
- */ /**************************************************************************/
-PVRSRV_ERROR OSCPUOperation(PVRSRV_CACHE_OP eCacheOp);
-
-/**************************************************************************/ /*!
+/*************************************************************************/ /*!
 @Function       OSCPUCacheFlushRangeKM
 @Description    Clean and invalidate the CPU cache for the specified
                 address range.
@@ -473,14 +465,14 @@ PVRSRV_ERROR OSCPUOperation(PVRSRV_CACHE_OP eCacheOp);
 @Input          sCPUPhysEnd   physical end address of the range to be
                               flushed
 @Return         None
- */ /**************************************************************************/
+*/ /**************************************************************************/
 void OSCPUCacheFlushRangeKM(PVRSRV_DEVICE_NODE *psDevNode,
                             void *pvVirtStart,
                             void *pvVirtEnd,
                             IMG_CPU_PHYADDR sCPUPhysStart,
                             IMG_CPU_PHYADDR sCPUPhysEnd);
 
-/**************************************************************************/ /*!
+/*************************************************************************/ /*!
 @Function       OSCPUCacheCleanRangeKM
 @Description    Clean the CPU cache for the specified address range.
                 This writes out the contents of the cache and clears the
@@ -496,14 +488,14 @@ void OSCPUCacheFlushRangeKM(PVRSRV_DEVICE_NODE *psDevNode,
 @Input          sCPUPhysEnd   physical end address of the range to be
                               cleaned
 @Return         None
- */ /**************************************************************************/
+*/ /**************************************************************************/
 void OSCPUCacheCleanRangeKM(PVRSRV_DEVICE_NODE *psDevNode,
                             void *pvVirtStart,
                             void *pvVirtEnd,
                             IMG_CPU_PHYADDR sCPUPhysStart,
                             IMG_CPU_PHYADDR sCPUPhysEnd);
 
-/**************************************************************************/ /*!
+/*************************************************************************/ /*!
 @Function       OSCPUCacheInvalidateRangeKM
 @Description    Invalidate the CPU cache for the specified address range.
                 The cache must reload data from those addresses if they
@@ -518,34 +510,40 @@ void OSCPUCacheCleanRangeKM(PVRSRV_DEVICE_NODE *psDevNode,
 @Input          sCPUPhysEnd   physical end address of the range to be
                               invalidated
 @Return         None
- */ /**************************************************************************/
+*/ /**************************************************************************/
 void OSCPUCacheInvalidateRangeKM(PVRSRV_DEVICE_NODE *psDevNode,
                                  void *pvVirtStart,
                                  void *pvVirtEnd,
                                  IMG_CPU_PHYADDR sCPUPhysStart,
                                  IMG_CPU_PHYADDR sCPUPhysEnd);
 
-/**************************************************************************/ /*!
-@Function       OSCPUCacheOpAddressType
-@Description    Returns the address type (i.e. virtual/physical/both) that OS
-                uses to perform cache maintenance on the CPU. This is used
-				to infer whether the virtual or physical address supplied to
-				the OSCPUCacheXXXRangeKM functions can be omitted when called.
-@Return         PVRSRV_CACHE_OP_ADDR_TYPE
- */ /**************************************************************************/
-PVRSRV_CACHE_OP_ADDR_TYPE OSCPUCacheOpAddressType(void);
-
-/*!
- ******************************************************************************
- * Cache attribute size type
- *****************************************************************************/
-typedef enum _IMG_DCACHE_ATTRIBUTE_
+/*! CPU Cache operations address domain type */
+typedef enum
 {
-	PVR_DCACHE_LINE_SIZE = 0,    /*!< The cache line size */
-	PVR_DCACHE_ATTRIBUTE_COUNT   /*!< The number of attributes (must be last) */
-} IMG_DCACHE_ATTRIBUTE;
+	OS_CACHE_OP_ADDR_TYPE_VIRTUAL,    /*!< Operation requires CPU virtual address only */
+	OS_CACHE_OP_ADDR_TYPE_PHYSICAL,   /*!< Operation requires CPU physical address only */
+	OS_CACHE_OP_ADDR_TYPE_BOTH        /*!< Operation requires both CPU virtual & physical addresses */
+} OS_CACHE_OP_ADDR_TYPE;
 
-/**************************************************************************/ /*!
+/*************************************************************************/ /*!
+@Function       OSCPUCacheOpAddressType
+@Description    Returns the address type (i.e. virtual/physical/both) the CPU
+                architecture performs cache maintenance operations under.
+                This is used to infer whether the virtual or physical address
+                supplied to the OSCPUCacheXXXRangeKM functions can be omitted
+                when called.
+@Return         OS_CACHE_OP_ADDR_TYPE
+*/ /**************************************************************************/
+OS_CACHE_OP_ADDR_TYPE OSCPUCacheOpAddressType(void);
+
+/*! CPU Cache attributes available for retrieval, DCache unless specified */
+typedef enum _OS_CPU_CACHE_ATTRIBUTE_
+{
+	OS_CPU_CACHE_ATTRIBUTE_LINE_SIZE, /*!< The cache line size */
+	OS_CPU_CACHE_ATTRIBUTE_COUNT      /*!< The number of attributes (must be last) */
+} OS_CPU_CACHE_ATTRIBUTE;
+
+/*************************************************************************/ /*!
 @Function       OSCPUCacheAttributeSize
 @Description    Returns the size of a given cache attribute.
                 Typically this function is used to return the cache line
@@ -554,8 +552,8 @@ typedef enum _IMG_DCACHE_ATTRIBUTE_
 @Input          eCacheAttribute   the cache attribute whose size should
                                   be returned.
 @Return         The size of the specified cache attribute, in bytes.
- */ /**************************************************************************/
-IMG_UINT32 OSCPUCacheAttributeSize(IMG_DCACHE_ATTRIBUTE eCacheAttribute);
+*/ /**************************************************************************/
+IMG_UINT32 OSCPUCacheAttributeSize(OS_CPU_CACHE_ATTRIBUTE eCacheAttribute);
 
 /*************************************************************************/ /*!
 @Function       OSGetCurrentProcessID
@@ -565,6 +563,14 @@ IMG_UINT32 OSCPUCacheAttributeSize(IMG_DCACHE_ATTRIBUTE eCacheAttribute);
 IMG_PID OSGetCurrentProcessID(void);
 
 /*************************************************************************/ /*!
+@Function       OSGetCurrentVirtualProcessID
+@Description    Returns ID of current process (thread group of current
+                PID namespace)
+@Return         ID of current process in PID namespace
+*****************************************************************************/
+IMG_PID OSGetCurrentVirtualProcessID(void);
+
+/*************************************************************************/ /*!
 @Function       OSGetCurrentProcessName
 @Description    Gets the name of current process
 @Return         Process name
@@ -572,9 +578,9 @@ IMG_PID OSGetCurrentProcessID(void);
 IMG_CHAR *OSGetCurrentProcessName(void);
 
 /*************************************************************************/ /*!
-@Function		OSGetCurrentProcessVASpaceSize
-@Description	Returns the CPU virtual address space size of current process
-@Return			Process VA space size
+@Function       OSGetCurrentProcessVASpaceSize
+@Description    Returns the CPU virtual address space size of current process
+@Return         Process VA space size
 */ /**************************************************************************/
 IMG_UINT64 OSGetCurrentProcessVASpaceSize(void);
 
@@ -617,7 +623,7 @@ IMG_CHAR *OSGetCurrentClientProcessNameKM(void);
 *****************************************************************************/
 uintptr_t OSGetCurrentClientThreadIDKM(void);
 
-/**************************************************************************/ /*!
+/*************************************************************************/ /*!
 @Function       OSMemCmp
 @Description    Compares two blocks of memory for equality.
 @Input          pvBufA      Pointer to the first block of memory
@@ -644,7 +650,8 @@ IMG_INT OSMemCmp(void *pvBufA, void *pvBufB, size_t uiLen);
 @Return         PVRSRV_OK on success, a failure code otherwise.
 *****************************************************************************/
 PVRSRV_ERROR OSPhyContigPagesAlloc(PVRSRV_DEVICE_NODE *psDevNode, size_t uiSize,
-							PG_HANDLE *psMemHandle, IMG_DEV_PHYADDR *psDevPAddr);
+							PG_HANDLE *psMemHandle, IMG_DEV_PHYADDR *psDevPAddr,
+							IMG_PID uiPid);
 
 /*************************************************************************/ /*!
 @Function       OSPhyContigPagesFree
@@ -705,51 +712,45 @@ PVRSRV_ERROR OSPhyContigPagesClean(PVRSRV_DEVICE_NODE *psDevNode,
                                    IMG_UINT32 uiLength);
 
 
-/**************************************************************************/ /*!
+/*************************************************************************/ /*!
 @Function       OSInitEnvData
 @Description    Called to initialise any environment-specific data. This
                 could include initialising the bridge calling infrastructure
                 or device memory management infrastructure.
 @Return         PVRSRV_OK on success, a failure code otherwise.
- */ /**************************************************************************/
+*/ /**************************************************************************/
 PVRSRV_ERROR OSInitEnvData(void);
 
-/**************************************************************************/ /*!
+/*************************************************************************/ /*!
 @Function       OSDeInitEnvData
 @Description    The counterpart to OSInitEnvData(). Called to free any
                 resources which may have been allocated by OSInitEnvData().
 @Return         None.
- */ /**************************************************************************/
+*/ /**************************************************************************/
 void OSDeInitEnvData(void);
 
-/**************************************************************************/ /*!
-@Function       OSSScanf
-@Description    OS function to support the standard C sscanf() function.
- */ /**************************************************************************/
-IMG_UINT32 OSVSScanf(IMG_CHAR *pStr, const IMG_CHAR *pszFormat, ...);
+/*************************************************************************/ /*!
+@Function       OSVSScanf
+@Description    OS function to support the standard C vsscanf() function.
+*/ /**************************************************************************/
+IMG_UINT32 OSVSScanf(const IMG_CHAR *pStr, const IMG_CHAR *pszFormat, ...);
 
-/**************************************************************************/ /*!
-@Function       OSStringNCopy
-@Description    OS function to support the standard C strncpy() function.
- */ /**************************************************************************/
-IMG_CHAR* OSStringNCopy(IMG_CHAR *pszDest, const IMG_CHAR *pszSrc, size_t uSize);
+/*************************************************************************/ /*!
+@Function       OSStringLCat
+@Description    OS function to support the BSD C strlcat() function.
+*/ /**************************************************************************/
+size_t OSStringLCat(IMG_CHAR *pszDest, const IMG_CHAR *pszSrc, size_t uDstSize);
 
-/**************************************************************************/ /*!
-@Function       OSStringLCopy
-@Description    OS function to support the BSD C strlcpy() function.
- */ /**************************************************************************/
-size_t OSStringLCopy(IMG_CHAR *pszDest, const IMG_CHAR *pszSrc, size_t uSize);
-
-/**************************************************************************/ /*!
+/*************************************************************************/ /*!
 @Function       OSSNPrintf
 @Description    OS function to support the standard C snprintf() function.
 @Output         pStr        char array to print into
 @Input          ui32Size    maximum size of data to write (chars)
 @Input          pszFormat   format string
- */ /**************************************************************************/
+*/ /**************************************************************************/
 IMG_INT32 OSSNPrintf(IMG_CHAR *pStr, size_t ui32Size, const IMG_CHAR *pszFormat, ...) __printf(3, 4);
 
-/**************************************************************************/ /*!
+/*************************************************************************/ /*!
 @Function       OSVSNPrintf
 @Description    Printf to IMG string using variable args (see stdarg.h).
                 This is necessary because the '...' notation does not
@@ -762,13 +763,13 @@ IMG_INT32 OSSNPrintf(IMG_CHAR *pStr, size_t ui32Size, const IMG_CHAR *pszFormat,
 */ /**************************************************************************/
 IMG_INT32 OSVSNPrintf(IMG_CHAR *pStr, size_t ui32Size, const IMG_CHAR* pszFormat, va_list vaArgs) __printf(3, 0);
 
-/**************************************************************************/ /*!
+/*************************************************************************/ /*!
 @Function       OSStringLength
 @Description    OS function to support the standard C strlen() function.
- */ /**************************************************************************/
+*/ /**************************************************************************/
 size_t OSStringLength(const IMG_CHAR *pStr);
 
-/**************************************************************************/ /*!
+/*************************************************************************/ /*!
 @Function       OSStringNLength
 @Description    Return the length of a string, excluding the terminating null
                 byte ('\0'), but return at most 'uiCount' bytes. Only the first
@@ -777,28 +778,33 @@ size_t OSStringLength(const IMG_CHAR *pStr);
 @Input          uiCount  the maximum length to return
 @Return         Length of the string if less than 'uiCount' bytes, otherwise
                 'uiCount'.
- */ /**************************************************************************/
+*/ /**************************************************************************/
 size_t OSStringNLength(const IMG_CHAR *pStr, size_t uiCount);
 
-/**************************************************************************/ /*!
-@Function       OSStringCompare
-@Description    OS function to support the standard C strcmp() function.
- */ /**************************************************************************/
-IMG_INT32 OSStringCompare(const IMG_CHAR *pStr1, const IMG_CHAR *pStr2);
-
-/**************************************************************************/ /*!
+/*************************************************************************/ /*!
 @Function       OSStringNCompare
 @Description    OS function to support the standard C strncmp() function.
- */ /**************************************************************************/
+*/ /**************************************************************************/
 IMG_INT32 OSStringNCompare(const IMG_CHAR *pStr1, const IMG_CHAR *pStr2,
                            size_t uiSize);
 
-/**************************************************************************/ /*!
+/*************************************************************************/ /*!
 @Function       OSStringToUINT32
 @Description    Changes string to IMG_UINT32.
- */ /**************************************************************************/
+*/ /**************************************************************************/
 PVRSRV_ERROR OSStringToUINT32(const IMG_CHAR *pStr, IMG_UINT32 ui32Base,
                               IMG_UINT32 *ui32Result);
+
+/*************************************************************************/ /*!
+@Function       OSStringUINT32ToStr
+@Description    Changes IMG_UINT32 to string
+@Input          pszBuf         Buffer to write output number string
+@Input          uSize          Size of buffer provided, i.e. size of pszBuf
+@Input          ui32Num        Number to convert to string
+@Return         Returns 0 if buffer is not sufficient to hold the number string,
+                else returns length of number string
+*/ /**************************************************************************/
+IMG_UINT32 OSStringUINT32ToStr(IMG_CHAR *pszBuf, size_t uSize, IMG_UINT32 ui32Num);
 
 /*************************************************************************/ /*!
 @Function       OSEventObjectCreate
@@ -838,23 +844,6 @@ PVRSRV_ERROR OSEventObjectSignal(IMG_HANDLE hEventObject);
                 period (defined in EVENT_OBJECT_TIMEOUT_MS), the function
                 will return with the result code PVRSRV_ERROR_TIMEOUT.
 
-                Note: If use of the global bridge lock is supported (if the
-                DDK has been built with PVRSRV_USE_BRIDGE_LOCK defined), the
-                global bridge lock should be released while waiting for the
-                event object to signal (if held by the current thread).
-                The following logic should be implemented in the OS
-                implementation:
-                ...
-                bReleasePVRLock = (!bHoldBridgeLock &&
-                                   BridgeLockIsLocked() &&
-                                   current == BridgeLockGetOwner());
-                if (bReleasePVRLock == IMG_TRUE) OSReleaseBridgeLock();
-                ...
-                / * sleep & reschedule - wait for signal * /
-                ...
-                / * if lock was previously held, re-acquire it * /
-                if (bReleasePVRLock == IMG_TRUE) OSAcquireBridgeLock();
-                ...
 
 @Input          hOSEventKM    the OS event object handle associated with
                               the event object.
@@ -891,6 +880,15 @@ PVRSRV_ERROR OSEventObjectWaitKernel(IMG_HANDLE hOSEventKM, IMG_UINT64 uiTimeout
 #endif
 
 /*************************************************************************/ /*!
+@Function       OSSuspendTaskInterruptible
+@Description    Suspend the current task into interruptible state.
+@Return         none.
+*/ /**************************************************************************/
+#if defined(LINUX) && defined(__KERNEL__)
+void OSSuspendTaskInterruptible(void);
+#endif
+
+/*************************************************************************/ /*!
 @Function       OSEventObjectWaitTimeout
 @Description    Wait for an event object to signal or timeout. The function
                 is passed an OS event object handle (which allows the OS to
@@ -900,60 +898,12 @@ PVRSRV_ERROR OSEventObjectWaitKernel(IMG_HANDLE hOSEventKM, IMG_UINT64 uiTimeout
                 If the event object has not signalled after the specified
                 timeout period (passed in 'uiTimeoutus'), the function
                 will return with the result code PVRSRV_ERROR_TIMEOUT.
-                NB. If use of the global bridge lock is supported (if
-                PVRSRV_USE_BRIDGE_LOCK is defined) it should be released while
-                waiting for the event object to signal (if held by the current
-                thread).
-                See OSEventObjectWait() for details.
 @Input          hOSEventKM    the OS event object handle associated with
                               the event object.
 @Input          uiTimeoutus   the timeout period (in usecs)
 @Return         PVRSRV_OK on success, a failure code otherwise.
 */ /**************************************************************************/
 PVRSRV_ERROR OSEventObjectWaitTimeout(IMG_HANDLE hOSEventKM, IMG_UINT64 uiTimeoutus);
-
-/*************************************************************************/ /*!
-@Function       OSEventObjectWaitAndHoldBridgeLock
-@Description    Wait for an event object to signal. The function is passed
-                an OS event object handle (which allows the OS to have the
-                calling thread wait on the associated event object).
-                The calling thread will be rescheduled when the associated
-                event object signals.
-                If the event object has not signalled after a default timeout
-                period (defined in EVENT_OBJECT_TIMEOUT_MS), the function
-                will return with the result code PVRSRV_ERROR_TIMEOUT.
-                If use of the global bridge lock is supported (if
-                PVRSRV_USE_BRIDGE_LOCK is defined), it will be held while
-                waiting for the event object to signal (this will prevent
-                other bridge calls from being serviced during this time).
-                See OSEventObjectWait() for details.
-@Input          hOSEventKM    the OS event object handle associated with
-                              the event object.
-@Return         PVRSRV_OK on success, a failure code otherwise.
-*/ /**************************************************************************/
-PVRSRV_ERROR OSEventObjectWaitAndHoldBridgeLock(IMG_HANDLE hOSEventKM);
-
-/*************************************************************************/ /*!
-@Function       OSEventObjectWaitTimeoutAndHoldBridgeLock
-@Description    Wait for an event object to signal or timeout. The function
-                is passed an OS event object handle (which allows the OS to
-                have the calling thread wait on the associated event object).
-                The calling thread will be rescheduled when the associated
-                event object signals.
-                If the event object has not signalled after the specified
-                timeout period (passed in 'uiTimeoutus'), the function
-                will return with the result code PVRSRV_ERROR_TIMEOUT.
-                If use of the global bridge lock is supported (if
-                PVRSRV_USE_BRIDGE_LOCK is defined) it will be held while
-                waiting for the event object to signal (this will prevent
-                other bridge calls from being serviced during this time).
-                See OSEventObjectWait() for details.
-@Input          hOSEventKM    the OS event object handle associated with
-                              the event object.
-@Input          uiTimeoutus   the timeout period (in usecs)
-@Return         PVRSRV_OK on success, a failure code otherwise.
-*/ /**************************************************************************/
-PVRSRV_ERROR OSEventObjectWaitTimeoutAndHoldBridgeLock(IMG_HANDLE hOSEventKM, IMG_UINT64 uiTimeoutus);
 
 /*************************************************************************/ /*!
 @Function       OSEventObjectDumpDebugInfo
@@ -983,16 +933,6 @@ PVRSRV_ERROR OSEventObjectOpen(IMG_HANDLE hEventObject,
 @Return         PVRSRV_OK on success, a failure code otherwise.
 */ /**************************************************************************/
 PVRSRV_ERROR OSEventObjectClose(IMG_HANDLE hOSEventKM);
-
-/**************************************************************************/ /*!
-@Function       OSStringCopy
-@Description    OS function to support the standard C strcpy() function.
- */ /**************************************************************************/
-/* Avoid macros so we don't evaluate pszSrc twice */
-static INLINE IMG_CHAR *OSStringCopy(IMG_CHAR *pszDest, const IMG_CHAR *pszSrc)
-{
-	return OSStringNCopy(pszDest, pszSrc, OSStringLength(pszSrc) + 1);
-}
 
 /*************************************************************************/ /*!
 @Function      OSWaitus
@@ -1060,17 +1000,22 @@ void OSReleaseThreadQuanta(void);
 				__typeof__(addr) _addr = addr; \
 				__typeof__(off) _off = off; \
 				__typeof__(val) _val = val; \
-				writel((IMG_UINT32)((_val) & 0xffffffff), (IMG_BYTE __iomem *)(_addr) + (_off));	\
+				writel((IMG_UINT32)((_val) & 0xffffffff), (IMG_BYTE __iomem *)(_addr) + (_off)); \
 				writel((IMG_UINT32)(((IMG_UINT64)(_val) >> 32) & 0xffffffff), (IMG_BYTE __iomem *)(_addr) + (_off) + 4); \
 			} while (0)
 
 
 #elif defined(NO_HARDWARE)
-	/* FIXME: OSReadHWReg should not exist in no hardware builds */
+	/* OSReadHWReg operations skipped in no hardware builds */
 	#define OSReadHWReg8(addr, off)  (0x4eU)
 	#define OSReadHWReg16(addr, off) (0x3a4eU)
 	#define OSReadHWReg32(addr, off) (0x30f73a4eU)
-	#define OSReadHWReg64(addr, off) ((IMG_UINT64)0x5b376c9d30f73a4eU)
+#if defined(__QNXNTO__) && __SIZEOF_LONG__ == 8
+	/* This is needed for 64-bit QNX builds where the size of a long is 64 bits */
+	#define OSReadHWReg64(addr, off) (0x5b376c9d30f73a4eUL)
+#else
+	#define OSReadHWReg64(addr, off) (0x5b376c9d30f73a4eULL)
+#endif
 
 	#define OSWriteHWReg8(addr, off, val)
 	#define OSWriteHWReg16(addr, off, val)
@@ -1348,21 +1293,6 @@ PVRSRV_ERROR OSBridgeCopyToUser (void *pvProcess,
 #define PVRSRV_MAX_BRIDGE_IN_SIZE      0x2000    /*!< Size of the memory block used to hold data passed in to a bridge call */
 #define PVRSRV_MAX_BRIDGE_OUT_SIZE     0x1000    /*!< Size of the memory block used to hold data returned from a bridge call */
 
-#if defined(PVRSRV_USE_BRIDGE_LOCK) || defined(DOXYGEN)
-/*************************************************************************/ /*!
-@Function       OSGetGlobalBridgeBuffers
-@Description    Returns the addresses and sizes of the buffers used to pass
-                data into and out of bridge function calls.
-@Output         ppvBridgeInBuffer         pointer to the input bridge data buffer
-                                          of size PVRSRV_MAX_BRIDGE_IN_SIZE.
-@Output         ppvBridgeOutBuffer        pointer to the output bridge data buffer
-                                          of size PVRSRV_MAX_BRIDGE_OUT_SIZE.
-@Return         PVRSRV_OK on success, a failure code otherwise.
-*/ /**************************************************************************/
-PVRSRV_ERROR OSGetGlobalBridgeBuffers (void **ppvBridgeInBuffer,
-									   void **ppvBridgeOutBuffer);
-#endif
-
 /*************************************************************************/ /*!
 @Function       OSPlatformBridgeInit
 @Description    Called during device creation to allow the OS port to register
@@ -1396,13 +1326,13 @@ PVRSRV_ERROR OSPlatformBridgeDeInit(void);
 */ /**************************************************************************/
 void OSWriteMemoryBarrier(void);
 /*************************************************************************/ /*!
-@def            OSReadMemoryBarrier
+@Function       OSReadMemoryBarrier
 @Description    Insert a read memory barrier.
                 The read memory barrier guarantees that all load (read)
                 operations specified before the barrier will appear to happen
                 before all of the load operations specified after the barrier.
 */ /**************************************************************************/
-#define OSReadMemoryBarrier() OSMemoryBarrier()
+void OSReadMemoryBarrier(void);
 /*************************************************************************/ /*!
 @Function       OSMemoryBarrier
 @Description    Insert a read/write memory barrier.
@@ -1447,19 +1377,7 @@ int PVRSRVToNativeError(PVRSRV_ERROR e);
 #define OSWRLockAcquireWrite(psLock) ({down_write(psLock); PVRSRV_OK;})
 #define OSWRLockReleaseWrite(psLock) ({up_write(psLock); PVRSRV_OK;})
 
-typedef spinlock_t *POS_SPINLOCK;
-
-#define OSSpinLockCreate(_ppsLock) ({ \
-	PVRSRV_ERROR e = PVRSRV_ERROR_OUT_OF_MEMORY; \
-	*(_ppsLock) = OSAllocMem(sizeof(spinlock_t)); \
-	if (*(_ppsLock)) {spin_lock_init(*(_ppsLock)); e = PVRSRV_OK;} \
-	e;})
-#define OSSpinLockDestroy(_psLock) ({OSFreeMem(_psLock);})
-
-#define OSSpinLockAcquire(_pLock, _pFlags) {unsigned long *p = (unsigned long *)_pFlags; spin_lock_irqsave(_pLock, *p);}
-#define OSSpinLockRelease(_pLock, _flags)  {spin_unlock_irqrestore(_pLock, _flags);}
-
-#elif defined(LINUX) || defined(__QNXNTO__) || defined (INTEGRITY_OS)
+#elif defined(LINUX) || defined(__QNXNTO__) || defined(INTEGRITY_OS)
 /* User-mode unit tests use these definitions on Linux */
 
 PVRSRV_ERROR OSWRLockCreate(POSWR_LOCK *ppsLock);
@@ -1468,14 +1386,6 @@ void OSWRLockAcquireRead(POSWR_LOCK psLock);
 void OSWRLockReleaseRead(POSWR_LOCK psLock);
 void OSWRLockAcquireWrite(POSWR_LOCK psLock);
 void OSWRLockReleaseWrite(POSWR_LOCK psLock);
-
-/* For now, spin-locks are required on Linux only, so other platforms fake
- * spinlocks with normal mutex locks */
-#define POS_SPINLOCK POS_LOCK
-#define OSSpinLockCreate(ppLock) OSLockCreate(ppLock)
-#define OSSpinLockDestroy(pLock) OSLockDestroy(pLock)
-#define OSSpinLockAcquire(pLock, pFlags) {PVR_UNREFERENCED_PARAMETER(pFlags); OSLockAcquire(pLock);}
-#define OSSpinLockRelease(pLock, flags) {PVR_UNREFERENCED_PARAMETER(flags); OSLockRelease(pLock);}
 
 #else
 
@@ -1593,163 +1503,6 @@ IMG_UINT32 OSDivide64(IMG_UINT64 ui64Divident, IMG_UINT32 ui32Divisor, IMG_UINT3
 */ /**************************************************************************/
 void OSDumpStack(void);
 
-#if defined(PVRSRV_USE_BRIDGE_LOCK) || defined(DOXYGEN)
-/*************************************************************************/ /*!
-@Function       OSAcquireBridgeLock
-@Description    Acquire the global bridge lock.
-                This prevents another bridge call from being actioned while
-                we are still servicing the current bridge call.
-                NB. This function must not return until the lock is acquired
-                (meaning the implementation should not timeout or return with
-                an error, as the caller will assume they have the lock).
-                This function has an OS-specific implementation rather than
-                an abstracted implementation for efficiency reasons, as it
-                is called frequently.
-@Return         None
-*/ /**************************************************************************/
-void OSAcquireBridgeLock(void);
-/*************************************************************************/ /*!
-@Function       OSReleaseBridgeLock
-@Description    Release the global bridge lock.
-                This function has an OS-specific implementation rather than
-                an abstracted implementation for efficiency reasons, as it
-                is called frequently.
-@Return         None
-*/ /**************************************************************************/
-void OSReleaseBridgeLock(void);
-#endif
-
-/*
- *  Functions for providing support for PID statistics.
- */
-
-/*************************************************************************/ /*!
-@Description    Pointer to a function for printing statistics.
-@Input  pvFilePtr   File identifier.
-@Input  pszFormat   Text to be printed including format specifiers.
-@Input  ...         Additional arguments depending on the pszFormat string.
-*/ /**************************************************************************/
-typedef void (OS_STATS_PRINTF_FUNC)(void *pvFilePtr, const IMG_CHAR *pszFormat, ...);
-
-/*************************************************************************/ /*!
-@Description    Pointer to a function responsible for parsing and printing of
-                formatted process statistics. Actual output should be done by
-                the function pointed to by the pfnOSGetStatsPrintf variable.
-@Input  pvFilePtr            File identifier passed to the pfnOSGetStatsPrintf function.
-@Input  pvStatPtr            Pointer to statistics structure.
-@Input  pfnOSGetStatsPrintf  Pointer to a function for printing the statistics.
-*/ /**************************************************************************/
-typedef void (OS_STATS_PRINT_FUNC)(void *pvFilePtr,
-								   void *pvStatPtr,
-								   OS_STATS_PRINTF_FUNC* pfnOSGetStatsPrintf);
-
-/*************************************************************************/ /*!
-@Description    Pointer to a function used to atomically increment a reference
-                count on the memory backing the statistic entry.
-@Input  pvStatPtr   Pointer to the statistics structure.
-@Return			Reference count after the operation.
-*/ /**************************************************************************/
-typedef IMG_UINT32 (OS_INC_STATS_MEM_REFCOUNT_FUNC)(void *pvStatPtr);
-
-/*************************************************************************/ /*!
-@Description    Pointer to a function used to atomically decrement a reference
-                count on the memory backing the statistic entry.
-@Input  pvStatPtr   Pointer to the statistics structure.
-@Return			Reference count after the operation.
-*/ /**************************************************************************/
-typedef IMG_UINT32 (OS_DEC_STATS_MEM_REFCOUNT_FUNC)(void *pvStatPtr);
-
-/*************************************************************************/ /*!
-@Function       OSCreateStatisticEntry
-@Description    Create a statistic entry in the specified folder.
-                Where operating systems do not support a debugfs,
-                file system this function may be implemented as a stub.
-@Input          pszName        String containing the name for the entry.
-@Input          pvFolder       Reference from OSCreateStatisticFolder() of the
-                               folder to create the entry in, or NULL for the
-                               root.
-@Input          pfnStatsPrint  Pointer to function that can be used to print the
-                               values of all the statistics.
-@Input          pvData         OS specific reference that can be used by
-                               pfnGetElement.
-@Return	        Pointer void reference to the entry created, which can be
-                passed to OSRemoveStatisticEntry() to remove the entry.
-*/ /**************************************************************************/
-void *OSCreateStatisticEntry(IMG_CHAR* pszName, void *pvFolder,
-							 OS_STATS_PRINT_FUNC* pfnStatsPrint,
-							 void *pvData);
-
-/*************************************************************************/ /*!
-@Function       OSRemoveStatisticEntry
-@Description    Removes a statistic entry.
-                Where operating systems do not support a debugfs,
-                file system this function may be implemented as a stub.
-@Input          ppvEntry  Double Pointer void reference to the entry created by
-                          OSCreateStatisticEntry().
-                          Double pointer is used so that it can be NULLed
-                          right after memory is freed to avoid possible races
-                          and use-after-free situations.
-*/ /**************************************************************************/
-void OSRemoveStatisticEntry(void **ppvEntry);
-
-#if defined(PVRSRV_ENABLE_MEMTRACK_STATS_FILE)
-/*************************************************************************/ /*!
-@Function       OSCreateRawStatisticEntry
-@Description    Create a raw statistic entry in the specified folder.
-                Where operating systems do not support a debugfs
-                file system this function may be implemented as a stub.
-@Input          pszFileName    String containing the name for the entry.
-@Input          pvParentDir    Reference from OSCreateStatisticFolder() of the
-                               folder to create the entry in, or NULL for the
-                               root.
-@Input          pfnStatsPrint  Pointer to function that can be used to print the
-                               values of all the statistics.
-@Return	        Pointer void reference to the entry created, which can be
-                passed to OSRemoveRawStatisticEntry() to remove the entry.
-*/ /**************************************************************************/
-void *OSCreateRawStatisticEntry(const IMG_CHAR *pszFileName, void *pvParentDir,
-                                OS_STATS_PRINT_FUNC *pfStatsPrint);
-
-/*************************************************************************/ /*!
-@Function       OSRemoveRawStatisticEntry
-@Description    Removes a raw statistic entry.
-                Where operating systems do not support a debugfs
-                file system this function may be implemented as a stub.
-@Input          ppvEntry  Double Pointer void reference to the entry created by
-                          OSCreateRawStatisticEntry().
-                          Double pointer is used so that it can be NULLed
-                          right after memory is freed to avoid possible races
-                          and use-after-free situations.
-*/ /**************************************************************************/
-void OSRemoveRawStatisticEntry(void **ppvEntry);
-#endif
-
-/*************************************************************************/ /*!
-@Function       OSCreateStatisticFolder
-@Description    Create a statistic folder to hold statistic entries.
-                Where operating systems do not support a debugfs,
-                file system this function may be implemented as a stub.
-@Input          pszName   String containing the name for the folder.
-@Input          pvFolder  Reference from OSCreateStatisticFolder() of the folder
-                          to create the folder in, or NULL for the root.
-@Return         Pointer void reference to the folder created, which can be
-                passed to OSRemoveStatisticFolder() to remove the folder.
-*/ /**************************************************************************/
-void *OSCreateStatisticFolder(IMG_CHAR *pszName, void *pvFolder);
-
-/*************************************************************************/ /*!
-@Function       OSRemoveStatisticFolder
-@Description    Removes a statistic folder.
-                Where operating systems do not support a debugfs,
-                file system this function may be implemented as a stub.
-@Input          ppvFolder  Reference from OSCreateStatisticFolder() of the
-                           folder that should be removed.
-                           This needs to be double pointer because it has to
-                           be NULLed right after memory is freed to avoid
-                           possible races and use-after-free situations.
-*/ /**************************************************************************/
-void OSRemoveStatisticFolder(void **ppvFolder);
-
 /*************************************************************************/ /*!
 @Function       OSUserModeAccessToPerfCountersEn
 @Description    Permit User-mode access to CPU performance counter
@@ -1789,8 +1542,17 @@ PVRSRV_ERROR OSDebugSignalPID(IMG_UINT32 ui32PID);
 @Input          a    Expression to evaluate, if true trigger Warn signal
 @Return         None
 */ /**************************************************************************/
-#define OSWarnOn(a) do { if ((a)) { OSDumpStack(); } } while(0)
+#define OSWarnOn(a) do { if ((a)) { OSDumpStack(); } } while (0)
 #endif
+
+/*************************************************************************/ /*!
+@Function       OSIsKernelThread
+@Description    This API determines if the current running thread is a kernel
+                thread (i.e. one not associated with any userland process,
+                typically an MISR handler.)
+@Return         IMG_TRUE if it is a kernel thread, otherwise IMG_FALSE.
+*/ /**************************************************************************/
+IMG_BOOL OSIsKernelThread(void);
 
 /*************************************************************************/ /*!
 @Function       OSThreadDumpInfo

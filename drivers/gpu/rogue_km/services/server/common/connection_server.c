@@ -74,12 +74,8 @@ static PVRSRV_ERROR ConnectionDataDestroy(CONNECTION_DATA *psConnection)
 		ui64MaxBridgeTime = CONNECTION_DEFERRED_CLEANUP_TIMESLICE_NS;
 	}
 
-	if (psConnection == NULL)
-	{
-		PVR_DPF((PVR_DBG_ERROR, "%s: Missing connection!", __func__));
-		PVR_ASSERT(0);
-		return PVRSRV_ERROR_INVALID_PARAMS;
-	}
+	PVR_ASSERT(psConnection != NULL);
+	PVR_LOG_RETURN_IF_INVALID_PARAM(psConnection, "psConnection");
 
 	/* Close HWPerfClient stream here even though we created it in
 	 * PVRSRVConnectKM(). */
@@ -119,27 +115,10 @@ static PVRSRV_ERROR ConnectionDataDestroy(CONNECTION_DATA *psConnection)
 			}
 
 			eError = PVRSRVFreeKernelHandles(psProcessHandleBase->psHandleBase);
-			if (eError != PVRSRV_OK)
-			{
-				PVR_DPF((PVR_DBG_ERROR,
-						"%s: Couldn't free kernel handles for process (%s)",
-						__func__, PVRSRVGetErrorString(eError)));
-
-				return eError;
-			}
+			PVR_LOG_RETURN_IF_ERROR(eError, "PVRSRVFreeKernelHandles");
 
 			eError = PVRSRVFreeHandleBase(psProcessHandleBase->psHandleBase, ui64MaxBridgeTime);
-			if (eError != PVRSRV_OK)
-			{
-				if (eError != PVRSRV_ERROR_RETRY)
-				{
-					PVR_DPF((PVR_DBG_ERROR,
-						 "%s: Couldn't free handle base for process (%s)",
-						 __func__, PVRSRVGetErrorString(eError)));
-				}
-
-				return eError;
-			}
+			PVR_LOG_RETURN_IF_ERROR(eError, "PVRSRVFreeHandleBase:1");
 
 			OSFreeMem(psProcessHandleBase);
 		}
@@ -155,17 +134,7 @@ static PVRSRV_ERROR ConnectionDataDestroy(CONNECTION_DATA *psConnection)
 	if (psConnection->psHandleBase != NULL)
 	{
 		eError = PVRSRVFreeHandleBase(psConnection->psHandleBase, ui64MaxBridgeTime);
-		if (eError != PVRSRV_OK)
-		{
-			if (eError != PVRSRV_ERROR_RETRY)
-			{
-				PVR_DPF((PVR_DBG_ERROR,
-					 "%s: Couldn't free handle base for connection (%s)",
-					 __func__, PVRSRVGetErrorString(eError)));
-			}
-
-			return eError;
-		}
+		PVR_LOG_RETURN_IF_ERROR(eError, "PVRSRVFreeHandleBase:2");
 
 		psConnection->psHandleBase = NULL;
 	}
@@ -186,14 +155,7 @@ static PVRSRV_ERROR ConnectionDataDestroy(CONNECTION_DATA *psConnection)
 	if (psConnection->hOsPrivateData != NULL)
 	{
 		eError = OSConnectionPrivateDataDeInit(psConnection->hOsPrivateData);
-		if (eError != PVRSRV_OK)
-		{
-			PVR_DPF((PVR_DBG_ERROR,
-				 "%s: OSConnectionPrivateDataDeInit failed (%s)",
-				 __func__, PVRSRVGetErrorString(eError)));
-
-			return eError;
-		}
+		PVR_LOG_RETURN_IF_ERROR(eError, "OSConnectionPrivateDataDeInit");
 
 		psConnection->hOsPrivateData = NULL;
 	}
@@ -212,7 +174,7 @@ static PVRSRV_ERROR ConnectionDataDestroy(CONNECTION_DATA *psConnection)
 	return PVRSRV_OK;
 }
 
-PVRSRV_ERROR PVRSRVConnectionConnect(void **ppvPrivData, void *pvOSData)
+PVRSRV_ERROR PVRSRVCommonConnectionConnect(void **ppvPrivData, void *pvOSData)
 {
 	CONNECTION_DATA *psConnection;
 	PVRSRV_ERROR eError;
@@ -221,31 +183,21 @@ PVRSRV_ERROR PVRSRVConnectionConnect(void **ppvPrivData, void *pvOSData)
 
 	/* Allocate connection data area, no stats since process not registered yet */
 	psConnection = OSAllocZMemNoStats(sizeof(*psConnection));
-	if (psConnection == NULL)
-	{
-		PVR_DPF((PVR_DBG_ERROR,
-			 "%s: Couldn't allocate connection data",
-			 __func__));
-		return PVRSRV_ERROR_OUT_OF_MEMORY;
-	}
+	PVR_LOG_RETURN_IF_NOMEM(psConnection, "psConnection");
 
 	/* Allocate process statistics as early as possible to catch all allocs */
 #if defined(PVRSRV_ENABLE_PROCESS_STATS) && !defined(PVRSRV_DEBUG_LINUX_MEMORY_STATS)
 	eError = PVRSRVStatsRegisterProcess(&psConnection->hProcessStats);
-	if (eError != PVRSRV_OK)
-	{
-		PVR_DPF((PVR_DBG_ERROR,
-			 "%s: Couldn't register process statistics (%s)",
-			 __func__, PVRSRVGetErrorString(eError)));
-		goto failure;
-	}
+	PVR_LOG_GOTO_IF_ERROR(eError, "PVRSRVStatsRegisterProcess", failure);
 #endif
 
 	/* Call environment specific connection data init function */
 	eError = OSConnectionPrivateDataInit(&psConnection->hOsPrivateData, pvOSData);
-	PVR_LOGG_IF_ERROR(eError, "OSConnectionPrivateDataInit", failure);
+	PVR_LOG_GOTO_IF_ERROR(eError, "OSConnectionPrivateDataInit", failure);
 
 	psConnection->pid = OSGetCurrentClientProcessIDKM();
+	psConnection->vpid = OSGetCurrentVirtualProcessID();
+	psConnection->tid = (IMG_UINT32)OSGetCurrentClientThreadIDKM();
 	OSStringLCopy(psConnection->pszProcName, OSGetCurrentClientProcessNameKM(), PVRSRV_CONNECTION_PROCESS_NAME_LEN);
 
 #if defined(DEBUG) || defined(PDUMP)
@@ -254,12 +206,7 @@ PVRSRV_ERROR PVRSRVConnectionConnect(void **ppvPrivData, void *pvOSData)
 
 	/* Register this connection with the sync core */
 	eError = SyncRegisterConnection(&psConnection->psSyncConnectionData);
-	if (eError != PVRSRV_OK)
-	{
-		PVR_DPF((PVR_DBG_ERROR,
-			 "%s: Couldn't register the sync data", __func__));
-		goto failure;
-	}
+	PVR_LOG_GOTO_IF_ERROR(eError, "SyncRegisterConnection", failure);
 
 	/*
 	 * Register this connection and Sync PDump callback with
@@ -268,24 +215,12 @@ PVRSRV_ERROR PVRSRVConnectionConnect(void **ppvPrivData, void *pvOSData)
 	eError = PDumpRegisterConnection(psConnection->psSyncConnectionData,
 	                                  SyncConnectionPDumpSyncBlocks,
 	                                  &psConnection->psPDumpConnectionData);
-	if (eError != PVRSRV_OK)
-	{
-		PVR_DPF((PVR_DBG_ERROR,
-			 "%s: Couldn't register the PDump data",
-			 __func__));
-		goto failure;
-	}
+	PVR_LOG_GOTO_IF_ERROR(eError, "PDumpRegisterConnection", failure);
 
 	/* Allocate handle base for this connection */
 	eError = PVRSRVAllocHandleBase(&psConnection->psHandleBase,
 	                               PVRSRV_HANDLE_BASE_TYPE_CONNECTION);
-	if (eError != PVRSRV_OK)
-	{
-		PVR_DPF((PVR_DBG_ERROR,
-			 "%s: Couldn't allocate handle base for connection (%s)",
-			 __func__, PVRSRVGetErrorString(eError)));
-		goto failure;
-	}
+	PVR_LOG_GOTO_IF_ERROR(eError, "PVRSRVAllocHandleBase", failure);
 
 	/* Try to get process handle base if it already exists */
 	OSLockAcquire(psPVRSRVData->hProcessHandleBase_Lock);
@@ -296,14 +231,7 @@ PVRSRV_ERROR PVRSRVConnectionConnect(void **ppvPrivData, void *pvOSData)
 	if (psProcessHandleBase == NULL)
 	{
 		psProcessHandleBase = OSAllocZMem(sizeof(PROCESS_HANDLE_BASE));
-		if (psProcessHandleBase == NULL)
-		{
-			PVR_DPF((PVR_DBG_ERROR,
-					"%s: Failed to allocate handle base, oom.",
-					__func__));
-			eError = PVRSRV_ERROR_OUT_OF_MEMORY;
-			goto failureLock;
-		}
+		PVR_LOG_GOTO_IF_NOMEM(psProcessHandleBase, eError, failureLock);
 
 		OSAtomicWrite(&psProcessHandleBase->iRefCount, 0);
 
@@ -325,28 +253,30 @@ PVRSRV_ERROR PVRSRVConnectionConnect(void **ppvPrivData, void *pvOSData)
 		                 psConnection->pid,
 		                 (uintptr_t) psProcessHandleBase))
 		{
-
-			eError = PVRSRV_ERROR_UNABLE_TO_INSERT_HASH_VALUE;
-
 			PVRSRVFreeHandleBase(psProcessHandleBase->psHandleBase, 0);
 
 			OSFreeMem(psProcessHandleBase);
-			goto failureLock;
+			PVR_GOTO_WITH_ERROR(eError, PVRSRV_ERROR_UNABLE_TO_INSERT_HASH_VALUE, failureLock);
 		}
 	}
 	OSAtomicIncrement(&psProcessHandleBase->iRefCount);
 
 	OSLockRelease(psPVRSRVData->hProcessHandleBase_Lock);
 
-	OSLockAcquire(psPVRSRVData->hConnectionsLock);
-	dllist_add_to_tail(&psPVRSRVData->sConnections, &psConnection->sConnectionListNode);
-	OSLockRelease(psPVRSRVData->hConnectionsLock);
+	/* hConnectionsLock now resides in PVRSRV_DEVICE_NODE */
+	{
+		PVRSRV_DEVICE_NODE	*psDevNode = OSGetDevNode(psConnection);
+
+		OSLockAcquire(psDevNode->hConnectionsLock);
+		dllist_add_to_tail(&psDevNode->sConnections, &psConnection->sConnectionListNode);
+		OSLockRelease(psDevNode->hConnectionsLock);
+	}
 
 	psConnection->psProcessHandleBase = psProcessHandleBase;
 
 	*ppvPrivData = psConnection;
 
-	return eError;
+	return PVRSRV_OK;
 
 failureLock:
 	OSLockRelease(psPVRSRVData->hProcessHandleBase_Lock);
@@ -360,10 +290,6 @@ static PVRSRV_ERROR _CleanupThreadPurgeConnectionData(void *pvConnectionData)
 {
 	PVRSRV_ERROR eErrorConnection, eErrorKernel;
 	CONNECTION_DATA *psConnectionData = pvConnectionData;
-
-#if defined(PVRSRV_USE_BRIDGE_LOCK)
-	OSAcquireBridgeLock();
-#endif
 
 	gCurrentPurgeConnectionPid = psConnectionData->pid;
 
@@ -389,31 +315,21 @@ static PVRSRV_ERROR _CleanupThreadPurgeConnectionData(void *pvConnectionData)
 
 	/* Check if possible resize the global handle base */
 	eErrorKernel = PVRSRVPurgeHandles(KERNEL_HANDLE_BASE);
-	if (eErrorKernel != PVRSRV_OK)
-	{
-		PVR_DPF((PVR_DBG_ERROR,
-			 "%s: Purge of global handle pool failed (%s)",
-			 __func__,
-			 PVRSRVGetErrorString(eErrorKernel)));
-	}
+	PVR_LOG_IF_ERROR(eErrorKernel, "PVRSRVPurgeHandles");
 
 	gCurrentPurgeConnectionPid = 0;
-
-#if defined(PVRSRV_USE_BRIDGE_LOCK)
-	OSReleaseBridgeLock();
-#endif
 
 	return eErrorConnection;
 }
 
-void PVRSRVConnectionDisconnect(void *pvDataPtr)
+void PVRSRVCommonConnectionDisconnect(void *pvDataPtr)
 {
 	CONNECTION_DATA *psConnectionData = pvDataPtr;
-	PVRSRV_DATA *psPVRSRVData = PVRSRVGetPVRSRVData();
+	PVRSRV_DEVICE_NODE *psDevNode = OSGetDevNode(psConnectionData);
 
-	OSLockAcquire(psPVRSRVData->hConnectionsLock);
+	OSLockAcquire(psDevNode->hConnectionsLock);
 	dllist_remove_node(&psConnectionData->sConnectionListNode);
-	OSLockRelease(psPVRSRVData->hConnectionsLock);
+	OSLockRelease(psDevNode->hConnectionsLock);
 
 	/* Notify the PDump core if the pdump control client is disconnecting */
 	if (psConnectionData->ui32ClientFlags & SRV_FLAGS_PDUMPCTRL)
@@ -445,75 +361,106 @@ IMG_PID PVRSRVGetPurgeConnectionPid(void)
 }
 
 /* Prefix for debug messages about Active Connections */
-#define ACTIVE_PREFIX "Active connects:"
+#define DEBUG_DUMP_CONNECTION_FORMAT_STR " P%d-V%d-T%d-%s,"
+#define CONNECTIONS_PREFIX               "Connections:"
+#define MAX_CONNECTIONS_PREFIX            sizeof(CONNECTIONS_PREFIX)
+#define MAX_DEBUG_DUMP_CONNECTION_STR_LEN (1+10+10+10+7+PVRSRV_CONNECTION_PROCESS_NAME_LEN)
+#define MAX_DEBUG_DUMP_STRING_LEN         (1+MAX_CONNECTIONS_PREFIX+(3*MAX_DEBUG_DUMP_CONNECTION_STR_LEN))
 
 void PVRSRVConnectionDebugNotify(DUMPDEBUG_PRINTF_FUNC *pfnDumpDebugPrintf,
                                  void *pvDumpDebugFile)
 {
 	PDLLIST_NODE pNext, pNode;
 	PVRSRV_DATA *psPVRSRVData = PVRSRVGetPVRSRVData();
+	PVRSRV_DEVICE_NODE *psDevNode;
+	IMG_BOOL bFoundConnections = IMG_FALSE;
 
-	OSLockAcquire(psPVRSRVData->hConnectionsLock);
-	if (dllist_is_empty(&psPVRSRVData->sConnections))
+	/*
+	 * Connections are linked to each device-node within
+	 * PVRSRV_DATA->psDeviceNodeList. Traverse this and display each connection
+	 * within device node.
+	 */
+	for (psDevNode = psPVRSRVData->psDeviceNodeList;
+	     psDevNode != NULL;
+	     psDevNode = psDevNode->psNext)
 	{
-		PVR_DUMPDEBUG_LOG(ACTIVE_PREFIX " No active connections");
-	}
-	else
-	{
-#define MAX_DEBUG_DUMP_STRING_LEN 150
-#define MAX_DEBUG_DUMP_CONNECTION_STR_LEN 26
-		IMG_CHAR sActiveConnections[MAX_DEBUG_DUMP_STRING_LEN];
-		IMG_UINT16 i, uiPos = 0;
-		IMG_BOOL bPrinted = IMG_FALSE;
-		size_t uiSize = sizeof (sActiveConnections);
-
-		OSStringLCopy(sActiveConnections, ACTIVE_PREFIX, uiSize);
-		uiPos = sizeof (ACTIVE_PREFIX) - 1;	/* Next buffer location to fill */
-		uiSize -= uiPos;	/* Remaining space to use in sActiveConnections[] */
-
-		dllist_foreach_node(&psPVRSRVData->sConnections, pNode, pNext)
+		/* We must check for an initialised device before accessing its mutex.
+		 * The mutex is initialised as part of DeviceInitialize() which occurs
+		 * on first access to the device node.
+		 */
+		if (psDevNode->eDevState != PVRSRV_DEVICE_STATE_ACTIVE)
 		{
-			CONNECTION_DATA *sData = IMG_CONTAINER_OF(pNode, CONNECTION_DATA, sConnectionListNode);
+			continue;
+		}
 
-			IMG_CHAR sTmpBuff[MAX_DEBUG_DUMP_CONNECTION_STR_LEN];
-			i = OSSNPrintf(sTmpBuff, MAX_DEBUG_DUMP_CONNECTION_STR_LEN, " %d (%s),", sData->pid, sData->pszProcName);
-			i = MIN(MAX_DEBUG_DUMP_CONNECTION_STR_LEN, i);
-			bPrinted = IMG_FALSE;
+		bFoundConnections = IMG_TRUE;
 
-			OSStringLCopy(sActiveConnections+uiPos, sTmpBuff, uiSize);
+		OSLockAcquire(psDevNode->hConnectionsLock);
+		if (dllist_is_empty(&psDevNode->sConnections))
+		{
+			PVR_DUMPDEBUG_LOG(CONNECTIONS_PREFIX " No active connections");
+		}
+		else
+		{
+			IMG_CHAR sActiveConnections[MAX_DEBUG_DUMP_STRING_LEN];
+			IMG_UINT16 i, uiPos = 0;
+			IMG_BOOL bPrinted = IMG_FALSE;
+			size_t uiSize = sizeof(sActiveConnections);
 
-			// Move the write offset to the end of the current string
-			uiPos += i;
-			// Update the amount of remaining space available to copy into
-			uiSize -= i;
+			OSStringLCopy(sActiveConnections, CONNECTIONS_PREFIX, uiSize);
+			uiPos = sizeof(CONNECTIONS_PREFIX) - 1;	/* Next buffer location to fill */
+			uiSize -= uiPos;	/* Remaining space in sActiveConnections[] */
 
-			// If there is not enough space to add another connection to this line, output the line
-			if (uiSize <= MAX_DEBUG_DUMP_CONNECTION_STR_LEN)
+			dllist_foreach_node(&psDevNode->sConnections, pNode, pNext)
 			{
-				PVR_DUMPDEBUG_LOG("%s", sActiveConnections);
+				CONNECTION_DATA *sData = IMG_CONTAINER_OF(pNode, CONNECTION_DATA, sConnectionListNode);
 
-				/*
-				 * Remove the "Active connects:" prefix from the buffer.
-				 * Leave the subsequent buffer contents indented by the same
-				 * amount to aid in interpreting the debug output.
-				 */
-				OSCachedMemSet(sActiveConnections, ' ', sizeof (ACTIVE_PREFIX));
-				uiPos = sizeof (ACTIVE_PREFIX) - 1;
-				// Reset the amount of space available to copy into
-				uiSize = MAX_DEBUG_DUMP_STRING_LEN - uiPos;
-				bPrinted = IMG_TRUE;
+				IMG_CHAR sTmpBuff[MAX_DEBUG_DUMP_CONNECTION_STR_LEN];
+				i = OSSNPrintf(sTmpBuff, MAX_DEBUG_DUMP_CONNECTION_STR_LEN,
+					DEBUG_DUMP_CONNECTION_FORMAT_STR, sData->pid, sData->vpid, sData->tid, sData->pszProcName);
+				i = MIN(MAX_DEBUG_DUMP_CONNECTION_STR_LEN, i);
+				bPrinted = IMG_FALSE;
+
+				OSStringLCopy(sActiveConnections+uiPos, sTmpBuff, uiSize);
+
+				/* Move the write offset to the end of the current string */
+				uiPos += i;
+				/* Update the amount of remaining space available to copy into */
+				uiSize -= i;
+
+				/* If there is not enough space to add another connection to this line, output the line */
+				if (uiSize <= MAX_DEBUG_DUMP_CONNECTION_STR_LEN)
+				{
+					PVR_DUMPDEBUG_LOG("%s", sActiveConnections);
+
+					/*
+					 * Remove the "Connections:" prefix from the buffer.
+					 * Leave the subsequent buffer contents indented by the same
+					 * amount to aid in interpreting the debug output.
+					 */
+					uiPos = sizeof(CONNECTIONS_PREFIX) - 1;
+					/* Reset the amount of space available to copy into */
+					uiSize = MAX_DEBUG_DUMP_STRING_LEN - uiPos;
+					bPrinted = IMG_TRUE;
+				}
 			}
-		}
 
-		// Only print the current line if it hasn't already been printed
-		if (!bPrinted)
-		{
-			// Strip of the final comma
-			sActiveConnections[OSStringNLength(sActiveConnections, MAX_DEBUG_DUMP_STRING_LEN) - 1] = '\0';
-			PVR_DUMPDEBUG_LOG("%s", sActiveConnections);
-		}
+			/* Only print the current line if it hasn't already been printed */
+			if (!bPrinted)
+			{
+				// Strip of the final comma
+				sActiveConnections[OSStringNLength(sActiveConnections, MAX_DEBUG_DUMP_STRING_LEN) - 1] = '\0';
+				PVR_DUMPDEBUG_LOG("%s", sActiveConnections);
+			}
 #undef MAX_DEBUG_DUMP_STRING_LEN
 #undef MAX_DEBUG_DUMP_CONNECTIONS_PER_LINE
+		}
+		OSLockRelease(psDevNode->hConnectionsLock);
 	}
-	OSLockRelease(psPVRSRVData->hConnectionsLock);
+
+	/* Check to see if we have displayed anything from the loop above */
+	if (bFoundConnections == IMG_FALSE)
+	{
+		PVR_DUMPDEBUG_LOG(CONNECTIONS_PREFIX " No active connections");
+	}
 }

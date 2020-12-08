@@ -45,8 +45,8 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "pvrsrv_error.h"
 #include "pvrsrv_memallocflags.h"
 
-#ifndef _PHYSHEAP_H_
-#define _PHYSHEAP_H_
+#ifndef PHYSHEAP_H
+#define PHYSHEAP_H
 
 typedef struct _PHYS_HEAP_ PHYS_HEAP;
 
@@ -89,7 +89,6 @@ typedef struct _PHYS_HEAP_REGION_
 	IMG_CPU_PHYADDR			sStartAddr;
 	IMG_DEV_PHYADDR			sCardBase;
 	IMG_UINT64				uiSize;
-
 	IMG_HANDLE				hPrivData;
 } PHYS_HEAP_REGION;
 
@@ -102,7 +101,6 @@ typedef struct _PHYS_HEAP_CONFIG_
 
 	PHYS_HEAP_REGION		*pasRegions;
 	IMG_UINT32				ui32NumOfRegions;
-	IMG_BOOL				bDynAlloc;
 
 	IMG_HANDLE				hPrivData;
 } PHYS_HEAP_CONFIG;
@@ -125,16 +123,16 @@ PVRSRV_ERROR PhysHeapRegionGetCpuPAddr(PHYS_HEAP *psPhysHeap,
 
 
 PVRSRV_ERROR PhysHeapRegionGetSize(PHYS_HEAP *psPhysHeap,
-							IMG_UINT32 ui32RegionId,
-						     IMG_UINT64 *puiSize);
+								   IMG_UINT32 ui32RegionId,
+								   IMG_UINT64 *puiSize);
 
 PVRSRV_ERROR PhysHeapRegionGetDevPAddr(PHYS_HEAP *psPhysHeap,
 									   IMG_UINT32 ui32RegionId,
-							 		   IMG_DEV_PHYADDR *psDevPAddr);
+									   IMG_DEV_PHYADDR *psDevPAddr);
 
 PVRSRV_ERROR PhysHeapRegionGetSize(PHYS_HEAP *psPhysHeap,
 								   IMG_UINT32 ui32RegionId,
-						     	   IMG_UINT64 *puiSize);
+								   IMG_UINT64 *puiSize);
 
 IMG_UINT32 PhysHeapNumberOfRegions(PHYS_HEAP *psPhysHeap);
 
@@ -157,4 +155,4 @@ IMG_CHAR *PhysHeapPDumpMemspaceName(PHYS_HEAP *psPhysHeap);
 PVRSRV_ERROR PhysHeapInit(void);
 PVRSRV_ERROR PhysHeapDeinit(void);
 
-#endif /* _PHYSHEAP_H_ */
+#endif /* PHYSHEAP_H */

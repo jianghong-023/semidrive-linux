@@ -1,4 +1,3 @@
-/* -*- mode: c; indent-tabs-mode: t; c-basic-offset: 8; tab-width: 8 -*- */
 /* vi: set ts=8 sw=8 sts=8: */
 /*************************************************************************/ /*!
 @File
@@ -45,14 +44,19 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "pvr_linux_fence.h"
 #include "drm_pdp_drv.h"
 
-#include <linux/reservation.h>
 #include <linux/version.h>
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 5, 0))
+#include <drm/drm_vblank.h>
+#else
 #include <drm/drmP.h>
+#endif
+
 #include <drm/drm_crtc.h>
 #include <drm/drm_crtc_helper.h>
 #include <drm/drm_plane_helper.h>
 
+#include "pvr_dma_resv.h"
 #include "drm_pdp_gem.h"
 
 #include "pdp_apollo.h"
@@ -96,7 +100,8 @@ static bool pdp_clocks_set(struct drm_crtc *crtc,
 				0,                       /* apollo only */
 				pdp_crtc->odn_core_reg,  /* odin only */
 				adjusted_mode->hdisplay,
-				adjusted_mode->vdisplay);
+				adjusted_mode->vdisplay,
+				dev_priv->subversion);
 		pdp_odin_set_updates_enabled(crtc->dev->dev,
 					     pdp_crtc->pdp_reg, true);
 
@@ -353,9 +358,12 @@ static void pdp_crtc_helper_atomic_flush(struct drm_crtc *crtc,
 		struct pdp_crtc *pdp_crtc = to_pdp_crtc(crtc);
 		unsigned long flags;
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0))
+		pdp_crtc->flip_async = new_crtc_state->async_flip;
+#else
 		pdp_crtc->flip_async = !!(new_crtc_state->pageflip_flags
 					  & DRM_MODE_PAGE_FLIP_ASYNC);
-
+#endif
 		if (pdp_crtc->flip_async)
 			WARN_ON(drm_crtc_vblank_get(crtc) != 0);
 
@@ -593,8 +601,8 @@ static int pdp_crtc_flip_schedule(struct drm_crtc *crtc,
 				  struct drm_gem_object *old_obj)
 {
 	struct pdp_crtc *pdp_crtc = to_pdp_crtc(crtc);
-	struct reservation_object *resv = pdp_gem_get_resv(obj);
-	struct reservation_object *old_resv = pdp_gem_get_resv(old_obj);
+	struct dma_resv *resv = pdp_gem_get_resv(obj);
+	struct dma_resv *old_resv = pdp_gem_get_resv(old_obj);
 	struct pdp_flip_data *flip_data;
 	struct dma_fence *fence;
 	int err;
@@ -607,14 +615,14 @@ static int pdp_crtc_flip_schedule(struct drm_crtc *crtc,
 
 	ww_mutex_lock(&old_resv->lock, NULL);
 	flip_data->wait_fence =
-		dma_fence_get(reservation_object_get_excl(old_resv));
+		dma_fence_get(dma_resv_get_excl(old_resv));
 
 	if (old_resv != resv) {
 		ww_mutex_unlock(&old_resv->lock);
 		ww_mutex_lock(&resv->lock, NULL);
 	}
 
-	fence = dma_fence_get(reservation_object_get_excl(resv));
+	fence = dma_fence_get(dma_resv_get_excl(resv));
 	ww_mutex_unlock(&resv->lock);
 
 	pdp_crtc->flip_data = flip_data;
@@ -786,9 +794,8 @@ struct drm_crtc *pdp_crtc_create(struct drm_device *dev, uint32_t number,
 			pdp_crtc->pll_reg_phys_base = regs->start;
 			pdp_crtc->pll_reg_size = resource_size(regs);
 
-			pdp_crtc->pll_reg =
-				ioremap_nocache(pdp_crtc->pll_reg_phys_base,
-						pdp_crtc->pll_reg_size);
+			pdp_crtc->pll_reg = ioremap(pdp_crtc->pll_reg_phys_base,
+						    pdp_crtc->pll_reg_size);
 			if (!pdp_crtc->pll_reg) {
 				DRM_ERROR("failed to map pll registers\n");
 				err = -ENOMEM;
@@ -817,8 +824,8 @@ struct drm_crtc *pdp_crtc_create(struct drm_device *dev, uint32_t number,
 			}
 
 			pdp_crtc->pdp_bif_reg =
-				ioremap_nocache(pdp_crtc->pdp_bif_reg_phys_base,
-						pdp_crtc->pdp_bif_reg_size);
+				ioremap(pdp_crtc->pdp_bif_reg_phys_base,
+					pdp_crtc->pdp_bif_reg_size);
 			if (!pdp_crtc->pdp_bif_reg) {
 				DRM_ERROR("failed to map pdp-bif registers\n");
 				err = -ENOMEM;
@@ -841,7 +848,7 @@ struct drm_crtc *pdp_crtc_create(struct drm_device *dev, uint32_t number,
 			pdp_crtc->odn_core_size = resource_size(regs);
 
 			pdp_crtc->odn_core_reg
-				= ioremap_nocache(pdp_crtc->odn_core_phys_base,
+				= ioremap(pdp_crtc->odn_core_phys_base,
 					  pdp_crtc->odn_core_size);
 			if (!pdp_crtc->odn_core_reg) {
 				DRM_ERROR("failed to map pdp reset register\n");
@@ -867,8 +874,8 @@ struct drm_crtc *pdp_crtc_create(struct drm_device *dev, uint32_t number,
 		goto err_crtc_free;
 	}
 
-	pdp_crtc->pdp_reg = ioremap_nocache(pdp_crtc->pdp_reg_phys_base,
-							pdp_crtc->pdp_reg_size);
+	pdp_crtc->pdp_reg = ioremap(pdp_crtc->pdp_reg_phys_base,
+				    pdp_crtc->pdp_reg_size);
 	if (!pdp_crtc->pdp_reg) {
 		DRM_ERROR("failed to map pdp registers\n");
 		err = -ENOMEM;

@@ -1,6 +1,6 @@
 /*************************************************************************/ /*!
-@File
-@Title          PhysmemNewOSRamBackedPMR function declaration header
+@File           physmem_osmem.h
+@Title          OS memory PMR factory API
 @Copyright      Copyright (c) Imagination Technologies Ltd. All Rights Reserved
 @Description    Part of Services memory management.  This file defines the
                 OS memory PMR factory API that must be defined so that the
@@ -48,8 +48,8 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */ /**************************************************************************/
 
-#ifndef _PHYSMEM_OSMEM_H_
-#define _PHYSMEM_OSMEM_H_
+#ifndef PHYSMEM_OSMEM_H
+#define PHYSMEM_OSMEM_H
 
 /* include/ */
 #include "img_types.h"
@@ -65,9 +65,9 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 @Description    Rogue Services will call this function to allocate GPU device
                 memory from the PMR factory supported by the OS DDK port. This
                 factory typically obtains physical memory from the kernel/OS
-                API that allocates memory from the default heap of shared system
-                memory available on the platform. The allocated memory must be
-                page-aligned and be a whole number of pages.
+                API that allocates memory from the default heap of shared
+                system memory available on the platform. The allocated memory
+                must be page-aligned and be a whole number of pages.
                 After allocating the required memory, the implementation must
                 then call PMRCreatePMR() to obtain the PMR structure that
                 describes this allocation to the upper layers of the Services.
@@ -76,6 +76,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
                 system memory is not to be used in the OS port then the
                 implementation must return PVRSRV_ERROR_NOT_SUPPORTED.
 
+@Input          psConnection     the connection to the originator process
 @Input          psDevNode        the device node
 @Input          uiSize           the size of the allocation
                                  (must be a multiple of page size)
@@ -106,19 +107,22 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
                                  be associated with.
 @Output         ppsPMROut        pointer to the PMR created for the
                                  new allocation
+@Input          ui32PDumpFlags   the pdump flags.
 @Return         PVRSRV_OK on success, a failure code otherwise.
 */ /**************************************************************************/
-extern PVRSRV_ERROR
-PhysmemNewOSRamBackedPMR(PVRSRV_DEVICE_NODE *psDevNode,
+PVRSRV_ERROR
+PhysmemNewOSRamBackedPMR(CONNECTION_DATA *psConnection,
+                         PVRSRV_DEVICE_NODE *psDevNode,
                          IMG_DEVMEM_SIZE_T uiSize,
-						 IMG_DEVMEM_SIZE_T uiChunkSize,
-						 IMG_UINT32 ui32NumPhysChunks,
-						 IMG_UINT32 ui32NumVirtChunks,
-						 IMG_UINT32 *pui32MappingTable,
+                         IMG_DEVMEM_SIZE_T uiChunkSize,
+                         IMG_UINT32 ui32NumPhysChunks,
+                         IMG_UINT32 ui32NumVirtChunks,
+                         IMG_UINT32 *pui32MappingTable,
                          IMG_UINT32 uiLog2PageSize,
                          PVRSRV_MEMALLOCFLAGS_T uiFlags,
                          const IMG_CHAR *pszAnnotation,
                          IMG_PID uiPid,
-                         PMR **ppsPMROut);
+                         PMR **ppsPMROut,
+                         IMG_UINT32 ui32PDumpFlags);
 
-#endif /* #ifndef _PHYSMEM_OSMEM_H_ */
+#endif /* PHYSMEM_OSMEM_H */

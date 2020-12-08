@@ -60,9 +60,14 @@ typedef struct _PVRSRV_POWER_DEV_TAG_ PVRSRV_POWER_DEV;
 typedef IMG_BOOL (*PFN_SYS_DEV_IS_DEFAULT_STATE_OFF)(PVRSRV_POWER_DEV *psPowerDevice);
 
 
-PVRSRV_ERROR PVRSRVPowerLock(PCPVRSRV_DEVICE_NODE psDeviceNode);
-void PVRSRVPowerUnlock(PCPVRSRV_DEVICE_NODE psDeviceNode);
-PVRSRV_ERROR PVRSRVPowerTryLock(PCPVRSRV_DEVICE_NODE psDeviceNode);
+PVRSRV_ERROR PVRSRVPowerLockInit(PPVRSRV_DEVICE_NODE psDeviceNode);
+void PVRSRVPowerLockDeInit(PPVRSRV_DEVICE_NODE psDeviceNode);
+
+PVRSRV_ERROR PVRSRVPowerLock(PPVRSRV_DEVICE_NODE psDeviceNode);
+void PVRSRVPowerUnlock(PPVRSRV_DEVICE_NODE psDeviceNode);
+PVRSRV_ERROR PVRSRVPowerTryLock(PPVRSRV_DEVICE_NODE psDeviceNode);
+
+IMG_BOOL PVRSRVPwrLockIsLockedByMe(PCPVRSRV_DEVICE_NODE psDeviceNode);
 IMG_BOOL PVRSRVDeviceIsDefaultStateOFF(PVRSRV_POWER_DEV *psPowerDevice);
 
 
@@ -77,19 +82,19 @@ PVRSRV_ERROR PVRSRVSetDeviceDefaultPowerState(PCPVRSRV_DEVICE_NODE psDeviceNode,
 					PVRSRV_DEV_POWER_STATE eNewPowerState);
 
 /* Type PFN_DC_REGISTER_POWER */
-PVRSRV_ERROR PVRSRVRegisterPowerDevice(PPVRSRV_DEVICE_NODE		psDeviceNode,
-									   PFN_PRE_POWER				pfnDevicePrePower,
-									   PFN_POST_POWER				pfnDevicePostPower,
-									   PFN_SYS_DEV_PRE_POWER		pfnSystemPrePower,
-									   PFN_SYS_DEV_POST_POWER		pfnSystemPostPower,
-									   PFN_PRE_CLOCKSPEED_CHANGE	pfnPreClockSpeedChange,
-									   PFN_POST_CLOCKSPEED_CHANGE	pfnPostClockSpeedChange,
-									   PFN_FORCED_IDLE_REQUEST		pfnForcedIdleRequest,
+PVRSRV_ERROR PVRSRVRegisterPowerDevice(PPVRSRV_DEVICE_NODE				psDeviceNode,
+									   PFN_PRE_POWER					pfnDevicePrePower,
+									   PFN_POST_POWER					pfnDevicePostPower,
+									   PFN_SYS_DEV_PRE_POWER			pfnSystemPrePower,
+									   PFN_SYS_DEV_POST_POWER			pfnSystemPostPower,
+									   PFN_PRE_CLOCKSPEED_CHANGE		pfnPreClockSpeedChange,
+									   PFN_POST_CLOCKSPEED_CHANGE		pfnPostClockSpeedChange,
+									   PFN_FORCED_IDLE_REQUEST			pfnForcedIdleRequest,
 									   PFN_FORCED_IDLE_CANCEL_REQUEST	pfnForcedIdleCancelRequest,
-									   PFN_DUST_COUNT_REQUEST	pfnDustCountRequest,
-									   IMG_HANDLE					hDevCookie,
-									   PVRSRV_DEV_POWER_STATE		eCurrentPowerState,
-									   PVRSRV_DEV_POWER_STATE		eDefaultPowerState);
+									   PFN_GPU_UNITS_POWER_CHANGE		pfnGPUUnitsPowerChange,
+									   IMG_HANDLE						hDevCookie,
+									   PVRSRV_DEV_POWER_STATE			eCurrentPowerState,
+									   PVRSRV_DEV_POWER_STATE			eDefaultPowerState);
 
 PVRSRV_ERROR PVRSRVRemovePowerDevice(PPVRSRV_DEVICE_NODE psDeviceNode);
 
@@ -112,8 +117,8 @@ PVRSRV_ERROR PVRSRVDeviceIdleRequestKM(PPVRSRV_DEVICE_NODE psDeviceNode,
 
 PVRSRV_ERROR PVRSRVDeviceIdleCancelRequestKM(PPVRSRV_DEVICE_NODE psDeviceNode);
 
-PVRSRV_ERROR PVRSRVDeviceDustCountChange(PPVRSRV_DEVICE_NODE psDeviceNode,
-						IMG_UINT32	ui32DustCount);
+PVRSRV_ERROR PVRSRVDeviceGPUUnitsPowerChange(PPVRSRV_DEVICE_NODE psDeviceNode,
+					IMG_UINT32	ui32NewValue);
 
 
 #endif /* POWER_H */

@@ -40,13 +40,12 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */ /**************************************************************************/
 
-#ifndef _SRVSRV_PHYSMEM_TEST_H_
-#define _SRVSRV_PHYSMEM_TEST_H_
+#ifndef SRVSRV_PHYSMEM_TEST_H
+#define SRVSRV_PHYSMEM_TEST_H
 /*
  * PhysMemTest
- *
- *
  */
-extern PVRSRV_ERROR
+PVRSRV_ERROR
 PhysMemTest(void *pvDevConfig, IMG_UINT32 ui32MemTestPasses);
-#endif /* _SRVSRV_PHYSMEM_TEST_H_ */
+
+#endif /* SRVSRV_PHYSMEM_TEST_H */

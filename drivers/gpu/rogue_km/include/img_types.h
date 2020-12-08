@@ -65,9 +65,10 @@ extern "C" {
 	#include <stdbool.h>		/* bool */
 	#include "msvc_types.h"
 #elif defined(LINUX) && defined(__KERNEL__)
+	#include <linux/version.h>
 	#include <linux/types.h>
 	#include "kernel_types.h"
-#elif defined(LINUX) || defined(__METAG) || defined(__QNXNTO__) || defined(INTEGRITY_OS)
+#elif defined(LINUX) || defined(__METAG) || defined(__QNXNTO__) || defined(INTEGRITY_OS) || defined(__riscv)
 	#include <stddef.h>			/* NULL */
 	#include <stdint.h>
 	#include <inttypes.h>		/* intX_t/uintX_t, format specifiers */
@@ -113,6 +114,7 @@ typedef uint64_t		IMG_UINT64,	*IMG_PUINT64;
 typedef int64_t			IMG_INT64;
 #define IMG_INT64_C(c)	INT64_C(c)
 #define IMG_UINT64_C(c)	UINT64_C(c)
+#define IMG_UINT16_C(c)	UINT16_C(c)
 #define IMG_UINT64_FMTSPEC PRIu64
 #define IMG_UINT64_FMTSPECX PRIX64
 #define IMG_UINT64_FMTSPECx PRIx64
@@ -150,6 +152,7 @@ typedef	enum tag_img_bool
 typedef IMG_CHAR const* IMG_PCCHAR;
 #endif
 
+/* Format specifiers for 'size_t' type */
 #if defined(_MSC_VER) || defined(__MINGW32__)
 #define IMG_SIZE_FMTSPEC  "%Iu"
 #define IMG_SIZE_FMTSPECX "%Ix"
@@ -160,15 +163,16 @@ typedef IMG_CHAR const* IMG_PCCHAR;
 
 #if defined(LINUX) && defined(__KERNEL__)
 /* prints the function name when used with printk */
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 5, 0))
+#define IMG_PFN_FMTSPEC "%ps"
+#else
 #define IMG_PFN_FMTSPEC "%pf"
+#endif
 #else
 #define IMG_PFN_FMTSPEC "%p"
 #endif
 
 typedef void           *IMG_HANDLE;
-
-/* services/stream ID */
-typedef IMG_UINT64      IMG_SID;
 
 /* Process IDs */
 typedef IMG_UINT32      IMG_PID;
@@ -244,12 +248,6 @@ typedef struct
 {
 	IMG_UINT64 uiAddr;
 } IMG_DEV_PHYADDR;
-
-/* system physical address */
-typedef struct
-{
-	IMG_UINT64 uiAddr;
-} IMG_SYS_PHYADDR;
 
 /*
 	rectangle structure

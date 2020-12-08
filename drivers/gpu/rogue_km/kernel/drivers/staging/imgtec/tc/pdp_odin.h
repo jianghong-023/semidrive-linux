@@ -1,4 +1,3 @@
-/* -*- mode: c; indent-tabs-mode: t; c-basic-offset: 8; tab-width: 8 -*- */
 /* vi: set ts=8 sw=8 sts=8: */
 /*************************************************************************/ /*!
 @Codingstyle    LinuxKernel
@@ -49,12 +48,14 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 /* include here for ODN_PDP_SURF_PIXFMT_ARGB8888 as this is part of the API */
 #include "odin_pdp_regs.h"
+#include "pdp_common.h"
 
 bool pdp_odin_clocks_set(struct device *dev,
 			 void __iomem *pdp_reg, void __iomem *pll_reg,
 			 u32 clock_freq,
 			 void __iomem *odn_core_reg,
-			 u32 hdisplay, u32 vdisplay);
+			 u32 hdisplay, u32 vdisplay,
+			 enum pdp_odin_subversion);
 
 void pdp_odin_set_updates_enabled(struct device *dev, void __iomem *pdp_reg,
 				  bool enable);

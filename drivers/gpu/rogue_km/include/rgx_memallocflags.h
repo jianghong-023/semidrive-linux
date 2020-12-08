@@ -43,7 +43,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #ifndef RGX_MEMALLOCFLAGS_H
 #define RGX_MEMALLOCFLAGS_H
 
-#define PMMETA_PROTECT          (1 << 0)      /* Memory that only the PM and Meta can access */
-#define FIRMWARE_CACHED         (1 << 1)      /* Memory that is cached in META/MIPS */
+#define PMMETA_PROTECT          (1U << 0)      /* Memory that only the PM and Meta can access */
+#define FIRMWARE_CACHED         (1U << 1)      /* Memory that is cached in META/MIPS */
 
 #endif

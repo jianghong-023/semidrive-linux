@@ -51,6 +51,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "lock.h"
 #include "devicemem_history_server.h"
 #include "pdump_km.h"
+#include "di_server.h"
 
 #define ALLOCATION_LIST_NUM_ENTRIES 10000
 
@@ -192,8 +193,8 @@ typedef struct _RECORDS_
 
 typedef struct _DEVICEMEM_HISTORY_DATA_
 {
-	/* debugfs entry */
-	void *pvStatsEntry;
+	/* DI entry */
+	DI_ENTRY *psDIEntry;
 
 	RECORDS sRecords;
 	POS_LOCK hLock;
@@ -425,7 +426,6 @@ static void MapRangePack(COMMAND_MAP_RANGE *psMapRange,
 	 *   18 bits for the start page index
 	 *   12 bits for the range
 	*/
-
 	PVR_ASSERT(ui32StartPage <= MAP_RANGE_MAX_START);
 	PVR_ASSERT(ui32Count <= MAP_RANGE_MAX_RANGE);
 
@@ -604,11 +604,6 @@ static void TouchBusyAllocation(IMG_UINT32 ui32Alloc)
 	InsertAllocationToBusyList(ui32Alloc);
 }
 
-static INLINE IMG_BOOL IsAllocationListEmpty(IMG_UINT32 ui32ListHead)
-{
-	return ui32ListHead == END_OF_LIST;
-}
-
 /* GetOldestBusyAllocation:
  * Returns the index of the oldest allocation in the MRU list
  */
@@ -715,11 +710,11 @@ static IMG_BOOL MatchAllocation(IMG_UINT32 ui32AllocationIndex,
 
 	psAlloc = ALLOC_INDEX_TO_PTR(ui32AllocationIndex);
 
-	return 	(psAlloc->ui64Serial == ui64Serial) &&
-			(psAlloc->sDevVAddr.uiAddr == sDevVAddr.uiAddr) &&
-			(psAlloc->uiSize == uiSize) &&
-			(psAlloc->ui32Log2PageSize == ui32Log2PageSize) &&
-			(OSStringCompare(psAlloc->szName, pszName) == 0);
+	return (psAlloc->ui64Serial == ui64Serial) &&
+	       (psAlloc->sDevVAddr.uiAddr == sDevVAddr.uiAddr) &&
+	       (psAlloc->uiSize == uiSize) &&
+	       (psAlloc->ui32Log2PageSize == ui32Log2PageSize) &&
+	       (OSStringNCompare(psAlloc->szName, pszName, DEVMEM_ANNOTATION_MAX_LEN) == 0);
 }
 
 /* FindOrCreateAllocation:
@@ -1417,7 +1412,7 @@ static COMMAND_WRAPPER *CircularBufferIteratePrevious(IMG_UINT32 ui32Head,
 
 	psOut = gsDevicememHistoryData.sRecords.pasCircularBuffer + *pui32Iter;
 
-	pui8Header = (IMG_UINT8 *) psOut;
+	pui8Header = (void *) psOut;
 
 	/* sanity check the command looks valid.
 	 * this condition should never happen, but check for it anyway
@@ -1687,14 +1682,14 @@ static void DeviceMemHistoryFmt(IMG_CHAR szBuffer[PVR_MAX_DEBUG_MESSAGE_LEN],
 				/* PID NAME MAP/UNMAP MIN-MAX SIZE AbsUS AgeUS*/
 				"%04u %-40s %-10s "
 				IMG_DEV_VIRTADDR_FMTSPEC "-" IMG_DEV_VIRTADDR_FMTSPEC " "
-				"0x%08" IMG_UINT64_FMTSPECX
+				"0x%08" IMG_UINT64_FMTSPECX " "
 				"%013" IMG_UINT64_FMTSPEC, /* 13 digits is over 2 hours of ns */
 				uiPID,
 				pszName,
 				pszAction,
 				sDevVAddrStart.uiAddr,
 				sDevVAddrEnd.uiAddr,
-				sDevVAddrEnd.uiAddr - sDevVAddrStart.uiAddr,
+				sDevVAddrEnd.uiAddr - sDevVAddrStart.uiAddr + 1,
 				ui64TimeNs);
 }
 
@@ -1730,7 +1725,7 @@ static const char *CommandTypeToString(COMMAND_TYPE eType)
 	}
 }
 
-static void DevicememHistoryPrintAll(void *pvFilePtr, OS_STATS_PRINTF_FUNC* pfnOSStatsPrintf)
+static void DevicememHistoryPrintAll(OSDI_IMPL_ENTRY *psEntry)
 {
 	IMG_CHAR szBuffer[PVR_MAX_DEBUG_MESSAGE_LEN];
 	IMG_UINT32 ui32Iter;
@@ -1740,7 +1735,7 @@ static void DevicememHistoryPrintAll(void *pvFilePtr, OS_STATS_PRINTF_FUNC* pfnO
 	IMG_UINT64 ui64StartTime = OSClockns64();
 
 	DeviceMemHistoryFmtHeader(szBuffer);
-	pfnOSStatsPrintf(pvFilePtr, "%s\n", szBuffer);
+	DIPrintf(psEntry, "%s\n", szBuffer);
 
 	CircularBufferIterateStart(&ui32Head, &ui32Iter);
 
@@ -1749,7 +1744,8 @@ static void DevicememHistoryPrintAll(void *pvFilePtr, OS_STATS_PRINTF_FUNC* pfnO
 		COMMAND_WRAPPER *psCommand;
 		COMMAND_TYPE eType = COMMAND_TYPE_NONE;
 
-		psCommand = CircularBufferIteratePrevious(ui32Head, &ui32Iter, &eType, &bLast);
+		psCommand = CircularBufferIteratePrevious(ui32Head, &ui32Iter, &eType,
+		                                          &bLast);
 
 		if (eType == COMMAND_TYPE_TIMESTAMP)
 		{
@@ -1769,11 +1765,11 @@ static void DevicememHistoryPrintAll(void *pvFilePtr, OS_STATS_PRINTF_FUNC* pfnO
 			IMG_UINT32 ui32AllocIndex;
 
 			MapUnmapCommandGetInfo(psCommand,
-								eType,
-								&sDevVAddrStart,
-								&sDevVAddrEnd,
-								&bMap,
-								&ui32AllocIndex);
+			                       eType,
+			                       &sDevVAddrStart,
+			                       &sDevVAddrEnd,
+			                       &bMap,
+			                       &ui32AllocIndex);
 
 			psAlloc = ALLOC_INDEX_TO_PTR(ui32AllocIndex);
 
@@ -1786,26 +1782,31 @@ static void DevicememHistoryPrintAll(void *pvFilePtr, OS_STATS_PRINTF_FUNC* pfnO
 			}
 
 			DeviceMemHistoryFmt(szBuffer,
-								psAlloc->uiPID,
-								psAlloc->szName,
-								CommandTypeToString(eType),
-								sDevVAddrStart,
-								sDevVAddrEnd,
-								ui64TimeNs);
+			                    psAlloc->uiPID,
+			                    psAlloc->szName,
+			                    CommandTypeToString(eType),
+			                    sDevVAddrStart,
+			                    sDevVAddrEnd,
+			                    ui64TimeNs);
 
-			pfnOSStatsPrintf(pvFilePtr, "%s\n", szBuffer);
+			DIPrintf(psEntry, "%s\n", szBuffer);
 		}
 	}
 
-	pfnOSStatsPrintf(pvFilePtr, "\nTimestamp reference: %013" IMG_UINT64_FMTSPEC "\n", ui64StartTime);
+	DIPrintf(psEntry, "\nTimestamp reference: %013" IMG_UINT64_FMTSPEC "\n",
+	         ui64StartTime);
 }
 
-static void DevicememHistoryPrintAllWrapper(void *pvFilePtr, void *pvData, OS_STATS_PRINTF_FUNC* pfnOSStatsPrintf)
+static int DevicememHistoryPrintAllWrapper(OSDI_IMPL_ENTRY *psEntry,
+                                           void *pvData)
 {
 	PVR_UNREFERENCED_PARAMETER(pvData);
+
 	DevicememHistoryLock();
-	DevicememHistoryPrintAll(pvFilePtr, pfnOSStatsPrintf);
+	DevicememHistoryPrintAll(psEntry);
 	DevicememHistoryUnlock();
+
+	return 0;
 }
 
 static PVRSRV_ERROR CreateRecords(void)
@@ -1813,10 +1814,7 @@ static PVRSRV_ERROR CreateRecords(void)
 	gsDevicememHistoryData.sRecords.pasAllocations =
 			OSAllocMem(sizeof(RECORD_ALLOCATION) * ALLOCATION_LIST_NUM_ENTRIES);
 
-	if (gsDevicememHistoryData.sRecords.pasAllocations == NULL)
-	{
-		return PVRSRV_ERROR_OUT_OF_MEMORY;
-	}
+	PVR_RETURN_IF_NOMEM(gsDevicememHistoryData.sRecords.pasAllocations);
 
 	/* Allocated and initialise the circular buffer with zeros so every
 	 * command is initialised as a command of type COMMAND_TYPE_NONE. */
@@ -1861,32 +1859,25 @@ static void InitialiseRecords(void)
 PVRSRV_ERROR DevicememHistoryInitKM(void)
 {
 	PVRSRV_ERROR eError;
+	DI_ITERATOR_CB sIterator = {.pfnShow = DevicememHistoryPrintAllWrapper};
 
 	eError = OSLockCreate(&gsDevicememHistoryData.hLock);
-
-	if (eError != PVRSRV_OK)
-	{
-		PVR_DPF((PVR_DBG_ERROR, "DevicememHistoryInitKM: Failed to create lock"));
-		goto err_lock;
-	}
+	PVR_LOG_GOTO_IF_ERROR(eError, "OSLockCreate", err_lock);
 
 	eError = CreateRecords();
-
-	if (eError != PVRSRV_OK)
-	{
-		PVR_DPF((PVR_DBG_ERROR, "DevicememHistoryInitKM: Failed to create records"));
-		goto err_allocations;
-	}
+	PVR_LOG_GOTO_IF_ERROR(eError, "CreateRecords", err_allocations);
 
 	InitialiseRecords();
 
-	gsDevicememHistoryData.pvStatsEntry = OSCreateStatisticEntry("devicemem_history",
-						NULL,
-						DevicememHistoryPrintAllWrapper,
-						NULL);
+	eError = DICreateEntry("devicemem_history", NULL, &sIterator, NULL,
+	                       DI_ENTRY_TYPE_GENERIC,
+	                       &gsDevicememHistoryData.psDIEntry);
+	PVR_LOG_GOTO_IF_ERROR(eError, "DICreateEntry", err_di_creation);
 
 	return PVRSRV_OK;
 
+err_di_creation:
+	DestroyRecords();
 err_allocations:
 	OSLockDestroy(gsDevicememHistoryData.hLock);
 err_lock:
@@ -1895,14 +1886,12 @@ err_lock:
 
 void DevicememHistoryDeInitKM(void)
 {
-	if (gsDevicememHistoryData.pvStatsEntry != NULL)
+	if (gsDevicememHistoryData.psDIEntry != NULL)
 	{
-		OSRemoveStatisticEntry(&gsDevicememHistoryData.pvStatsEntry);
+		DIDestroyEntry(gsDevicememHistoryData.psDIEntry);
 	}
 
 	DestroyRecords();
 
 	OSLockDestroy(gsDevicememHistoryData.hLock);
 }
-
-

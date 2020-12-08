@@ -55,12 +55,11 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "pdump_km.h"
 #include "pmr.h"
 #include "physmem.h"
+#include "pdumpdesc.h"
 
 #include "allocmem.h"
 #include "osfunc.h"
 #include "lock.h"
-
-#include "rgx_bvnc_defs_km.h"
 
 #define DEVMEMCTX_FLAGS_FAULT_ADDRESS_AVAILABLE (1 << 0)
 
@@ -82,10 +81,8 @@ struct _DEVMEMINT_CTX_
 	   is associated with the context. */
 	IMG_HANDLE hPrivData;
 
-#if !defined(PVRSRV_USE_BRIDGE_LOCK)
 	/* Protects access to sProcessNotifyListHead */
 	POSWR_LOCK hListLock;
-#endif /* !defined(PVRSRV_USE_BRIDGE_LOCK) */
 
 	/* The following tracks UM applications that need to be notified of a
 	 * page fault */
@@ -136,23 +133,23 @@ struct _DEVMEMINT_PF_NOTIFY_
 };
 
 /*************************************************************************/ /*!
-@Function       _DevmemIntCtxAcquire
+@Function       DevmemIntCtxAcquire
 @Description    Acquire a reference to the provided device memory context.
 @Return         None
 */ /**************************************************************************/
-static INLINE void _DevmemIntCtxAcquire(DEVMEMINT_CTX *psDevmemCtx)
+static INLINE void DevmemIntCtxAcquire(DEVMEMINT_CTX *psDevmemCtx)
 {
 	OSAtomicIncrement(&psDevmemCtx->hRefCount);
 }
 
 /*************************************************************************/ /*!
-@Function       _DevmemIntCtxRelease
+@Function       DevmemIntCtxRelease
 @Description    Release the reference to the provided device memory context.
                 If this is the last reference which was taken then the
                 memory context will be freed.
 @Return         None
 */ /**************************************************************************/
-static INLINE void _DevmemIntCtxRelease(DEVMEMINT_CTX *psDevmemCtx)
+static INLINE void DevmemIntCtxRelease(DEVMEMINT_CTX *psDevmemCtx)
 {
 	if (OSAtomicDecrement(&psDevmemCtx->hRefCount) == 0)
 	{
@@ -183,9 +180,7 @@ static INLINE void _DevmemIntCtxRelease(DEVMEMINT_CTX *psDevmemCtx)
 		}
 		MMU_ContextDestroy(psDevmemCtx->psMMUContext);
 
-#if !defined(PVRSRV_USE_BRIDGE_LOCK)
 		OSWRLockDestroy(psDevmemCtx->hListLock);
-#endif /* !defined(PVRSRV_USE_BRIDGE_LOCK) */
 
 		PVR_DPF((PVR_DBG_MESSAGE, "%s: Freed memory context %p",
 				 __func__, psDevmemCtx));
@@ -194,23 +189,23 @@ static INLINE void _DevmemIntCtxRelease(DEVMEMINT_CTX *psDevmemCtx)
 }
 
 /*************************************************************************/ /*!
-@Function       _DevmemIntHeapAcquire
+@Function       DevmemIntHeapAcquire
 @Description    Acquire a reference to the provided device memory heap.
 @Return         None
 */ /**************************************************************************/
-static INLINE void _DevmemIntHeapAcquire(DEVMEMINT_HEAP *psDevmemHeap)
+static INLINE void DevmemIntHeapAcquire(DEVMEMINT_HEAP *psDevmemHeap)
 {
 	OSAtomicIncrement(&psDevmemHeap->hRefCount);
 }
 
 /*************************************************************************/ /*!
-@Function       _DevmemIntHeapRelease
+@Function       DevmemIntHeapRelease
 @Description    Release the reference to the provided device memory heap.
                 If this is the last reference which was taken then the
                 memory context will be freed.
 @Return         None
 */ /**************************************************************************/
-static INLINE void _DevmemIntHeapRelease(DEVMEMINT_HEAP *psDevmemHeap)
+static INLINE void DevmemIntHeapRelease(DEVMEMINT_HEAP *psDevmemHeap)
 {
 	OSAtomicDecrement(&psDevmemHeap->hRefCount);
 }
@@ -232,10 +227,7 @@ DevmemIntUnpinInvalidate(DEVMEMINT_MAPPING *psDevmemMapping, PMR *psPMR)
 	PVRSRV_ERROR eError;
 
 	eError = PMRUnpinPMR(psPMR, IMG_TRUE);
-	if (eError != PVRSRV_OK)
-	{
-		goto e_exit;
-	}
+	PVR_GOTO_IF_ERROR(eError, e_exit);
 
 	/* Invalidate mapping */
 	eError = MMU_ChangeValidity(psDevmemMapping->psReservation->psDevmemHeap->psDevmemCtx->psMMUContext,
@@ -319,10 +311,9 @@ DevmemServerGetImportHandle(DEVMEM_MEMDESC *psMemDesc,
 {
 	PVRSRV_ERROR eError;
 
-	if ((psMemDesc->psImport->uiProperties & DEVMEM_PROPERTIES_EXPORTABLE) == 0)
+	if ((GetImportProperties(psMemDesc->psImport) & DEVMEM_PROPERTIES_EXPORTABLE) == 0)
 	{
-		eError = PVRSRV_ERROR_DEVICEMEM_CANT_EXPORT_SUBALLOCATION;
-		goto e0;
+		PVR_GOTO_WITH_ERROR(eError, PVRSRV_ERROR_DEVICEMEM_CANT_EXPORT_SUBALLOCATION, e0);
 	}
 
 	*phImport = psMemDesc->psImport->hPMR;
@@ -341,10 +332,53 @@ PVRSRV_ERROR
 DevmemServerGetHeapHandle(DEVMEMINT_RESERVATION *psReservation,
                           IMG_HANDLE *phHeap)
 {
+	if (psReservation == NULL || phHeap == NULL)
+	{
+		return PVRSRV_ERROR_INVALID_PARAMS;
+	}
+
 	*phHeap = psReservation->psDevmemHeap;
+
 	return PVRSRV_OK;
 }
 
+/*************************************************************************/ /*!
+@Function       DevmemServerGetContext
+@Description    For given heap returns the context.
+@Return         PVRSRV_ERROR failure code
+*/ /**************************************************************************/
+PVRSRV_ERROR
+DevmemServerGetContext(DEVMEMINT_HEAP *psDevmemHeap,
+					   DEVMEMINT_CTX **ppsDevmemCtxPtr)
+{
+	if (psDevmemHeap == NULL || ppsDevmemCtxPtr == NULL)
+	{
+		return PVRSRV_ERROR_INVALID_PARAMS;
+	}
+
+	*ppsDevmemCtxPtr = psDevmemHeap->psDevmemCtx;
+
+	return PVRSRV_OK;
+}
+
+/*************************************************************************/ /*!
+@Function       DevmemServerGetPrivData
+@Description    For given context returns the private data handle.
+@Return         PVRSRV_ERROR failure code
+*/ /**************************************************************************/
+PVRSRV_ERROR
+DevmemServerGetPrivData(DEVMEMINT_CTX *psDevmemCtx,
+						IMG_HANDLE *phPrivData)
+{
+	if (psDevmemCtx == NULL || phPrivData == NULL)
+	{
+		return PVRSRV_ERROR_INVALID_PARAMS;
+	}
+
+	*phPrivData = psDevmemCtx->hPrivData;
+
+	return PVRSRV_OK;
+}
 
 /*************************************************************************/ /*!
 @Function       DevmemIntCtxCreate
@@ -363,24 +397,10 @@ DevmemIntCtxCreate(CONNECTION_DATA *psConnection,
 	PVRSRV_ERROR eError;
 	DEVMEMINT_CTX *psDevmemCtx;
 	IMG_HANDLE hPrivDataInt = NULL;
-	MMU_DEVICEATTRIBS      *psMMUDevAttrs;
-
-	if ((psDeviceNode->pfnCheckDeviceFeature) &&
-		PVRSRV_IS_FEATURE_SUPPORTED(psDeviceNode, MIPS))
-	{
-		psMMUDevAttrs = bKernelMemoryCtx ?
-		                psDeviceNode->psFirmwareMMUDevAttrs :
-		                psDeviceNode->psMMUDevAttrs;
-	}
-	else
-	{
-		psMMUDevAttrs = psDeviceNode->psMMUDevAttrs;
-		PVR_UNREFERENCED_PARAMETER(bKernelMemoryCtx);
-	}
-
+	MMU_DEVICEATTRIBS *psMMUDevAttrs = psDeviceNode->pfnGetMMUDeviceAttributes(psDeviceNode,
+	                                                                           bKernelMemoryCtx);
 
 	PVR_DPF((PVR_DBG_MESSAGE, "%s", __func__));
-	PVR_UNREFERENCED_PARAMETER(psConnection);
 
 	/*
 	 * Ensure that we are safe to perform unaligned accesses on memory
@@ -391,38 +411,24 @@ DevmemIntCtxCreate(CONNECTION_DATA *psConnection,
 	PVR_ASSERT(OSIsWriteCombineUnalignedSafe());
 
 	/* allocate a Devmem context */
-	psDevmemCtx = OSAllocMem(sizeof *psDevmemCtx);
-	if (psDevmemCtx == NULL)
-	{
-		eError = PVRSRV_ERROR_OUT_OF_MEMORY;
-		PVR_DPF ((PVR_DBG_ERROR, "%s: Alloc failed", __func__));
-		goto fail_alloc;
-	}
+	psDevmemCtx = OSAllocMem(sizeof(*psDevmemCtx));
+	PVR_LOG_GOTO_IF_NOMEM(psDevmemCtx, eError, fail_alloc);
 
 	OSAtomicWrite(&psDevmemCtx->hRefCount, 1);
 	psDevmemCtx->psDevNode = psDeviceNode;
 
 	/* Call down to MMU context creation */
 
-	eError = MMU_ContextCreate(psDeviceNode,
+	eError = MMU_ContextCreate(psConnection,
+	                           psDeviceNode,
 	                           &psDevmemCtx->psMMUContext,
 	                           psMMUDevAttrs);
-	if (eError != PVRSRV_OK)
-	{
-		PVR_DPF((PVR_DBG_ERROR, "%s: MMU_ContextCreate failed", __func__));
-		goto fail_mmucontext;
-	}
-
+	PVR_LOG_GOTO_IF_ERROR(eError, "MMU_ContextCreate", fail_mmucontext);
 
 	if (psDeviceNode->pfnRegisterMemoryContext)
 	{
 		eError = psDeviceNode->pfnRegisterMemoryContext(psDeviceNode, psDevmemCtx->psMMUContext, &hPrivDataInt);
-		if (eError != PVRSRV_OK)
-		{
-			PVR_DPF((PVR_DBG_ERROR, "%s: Failed to register MMU context",
-					 __func__));
-			goto fail_register;
-		}
+		PVR_LOG_GOTO_IF_ERROR(eError, "pfnRegisterMemoryContext", fail_register);
 	}
 
 	/* Store the private data as it is required to unregister the memory context */
@@ -431,12 +437,10 @@ DevmemIntCtxCreate(CONNECTION_DATA *psConnection,
 	*ppsDevmemCtxPtr = psDevmemCtx;
 
 	/* Pass the CPU cache line size through the bridge to the user mode as it can't be queried in user mode.*/
-	*pui32CPUCacheLineSize = OSCPUCacheAttributeSize(PVR_DCACHE_LINE_SIZE);
+	*pui32CPUCacheLineSize = OSCPUCacheAttributeSize(OS_CPU_CACHE_ATTRIBUTE_LINE_SIZE);
 
 	/* Initialise the PID notify list */
-#if !defined(PVRSRV_USE_BRIDGE_LOCK)
 	OSWRLockCreate(&psDevmemCtx->hListLock);
-#endif /* !defined(PVRSRV_USE_BRIDGE_LOCK) */
 	dllist_init(&(psDevmemCtx->sProcessNotifyListHead));
 	psDevmemCtx->sPageFaultNotifyListElem.psNextNode = NULL;
 	psDevmemCtx->sPageFaultNotifyListElem.psPrevNode = NULL;
@@ -471,23 +475,17 @@ DevmemIntHeapCreate(DEVMEMINT_CTX *psDevmemCtx,
                     IMG_UINT32 uiLog2DataPageSize,
                     DEVMEMINT_HEAP **ppsDevmemHeapPtr)
 {
-	PVRSRV_ERROR eError;
 	DEVMEMINT_HEAP *psDevmemHeap;
 
-	PVR_DPF((PVR_DBG_MESSAGE, "%s: DevmemIntHeap_Create", __func__));
+	PVR_DPF((PVR_DBG_MESSAGE, "%s", __func__));
 
 	/* allocate a Devmem context */
-	psDevmemHeap = OSAllocMem(sizeof *psDevmemHeap);
-	if (psDevmemHeap == NULL)
-	{
-		eError = PVRSRV_ERROR_OUT_OF_MEMORY;
-		PVR_DPF ((PVR_DBG_ERROR, "%s: Alloc failed", __func__));
-		goto fail_alloc;
-	}
+	psDevmemHeap = OSAllocMem(sizeof(*psDevmemHeap));
+	PVR_LOG_RETURN_IF_NOMEM(psDevmemHeap, "psDevmemHeap");
 
 	psDevmemHeap->psDevmemCtx = psDevmemCtx;
 
-	_DevmemIntCtxAcquire(psDevmemHeap->psDevmemCtx);
+	DevmemIntCtxAcquire(psDevmemHeap->psDevmemCtx);
 
 	OSAtomicWrite(&psDevmemHeap->hRefCount, 1);
 
@@ -496,21 +494,14 @@ DevmemIntHeapCreate(DEVMEMINT_CTX *psDevmemCtx,
 	*ppsDevmemHeapPtr = psDevmemHeap;
 
 	return PVRSRV_OK;
-
-fail_alloc:
-	return eError;
 }
 
-#define PVR_DUMMY_PAGE_INIT_VALUE	(0x0)
-#define PVR_ZERO_PAGE_INIT_VALUE	(0x0)
-
-static PVRSRV_ERROR DevmemIntAllocDefBackingPage(DEVMEMINT_CTX *psDevMemCtx,
+PVRSRV_ERROR DevmemIntAllocDefBackingPage(PVRSRV_DEVICE_NODE *psDevNode,
                                             PVRSRV_DEF_PAGE *psDefPage,
                                             IMG_INT	uiInitValue,
                                             IMG_CHAR *pcDefPageName,
                                             IMG_BOOL bInitPage)
 {
-	PVRSRV_DEVICE_NODE *psDevNode = psDevMemCtx->psDevNode;
 	IMG_UINT32 ui32RefCnt;
 	PVRSRV_ERROR eError = PVRSRV_OK;
 
@@ -526,14 +517,15 @@ static PVRSRV_ERROR DevmemIntAllocDefBackingPage(DEVMEMINT_CTX *psDevMemCtx,
 #if defined(PDUMP)
 		PDUMPCOMMENT("Alloc %s page object", pcDefPageName);
 #endif
+
 		/* Allocate the dummy page required for sparse backing */
 		eError = DevPhysMemAlloc(psDevNode,
 		                         (1 << psDefPage->ui32Log2PgSize),
 		                         0,
 		                         uiInitValue,
 		                         bInitPage,
-#if	defined(PDUMP)
-								 MMU_GetPxPDumpMemSpaceName(psDevMemCtx->psMMUContext),
+#if defined(PDUMP)
+		                         psDevNode->psMMUDevAttrs->pszMMUPxPDumpMemSpaceName,
 		                         pcDefPageName,
 		                         &psDefPage->hPdumpPg,
 #endif
@@ -547,7 +539,6 @@ static PVRSRV_ERROR DevmemIntAllocDefBackingPage(DEVMEMINT_CTX *psDevMemCtx,
 		{
 			psDefPage->ui64PgPhysAddr = sDevPhysAddr.uiAddr;
 		}
-
 	}
 
 	OSLockRelease(psDefPage->psPgLock);
@@ -555,7 +546,7 @@ static PVRSRV_ERROR DevmemIntAllocDefBackingPage(DEVMEMINT_CTX *psDevMemCtx,
 	return eError;
 }
 
-static void DevmemIntFreeDefBackingPage(PVRSRV_DEVICE_NODE *psDevNode,
+void DevmemIntFreeDefBackingPage(PVRSRV_DEVICE_NODE *psDevNode,
                                    PVRSRV_DEF_PAGE *psDefPage,
                                    IMG_CHAR *pcDefPageName)
 {
@@ -606,14 +597,13 @@ DevmemIntMapPages(DEVMEMINT_RESERVATION *psReservation,
 
 	if (psReservation->psDevmemHeap->uiLog2PageSize > PMR_GetLog2Contiguity(psPMR))
 	{
-		PVR_DPF ((PVR_DBG_ERROR,
-				"%s: Device heap and PMR have incompatible Log2Contiguity (%u - %u). "
-				"PMR contiguity must be a multiple of the heap contiguity!",
-				__func__,
-				psReservation->psDevmemHeap->uiLog2PageSize,
-				PMR_GetLog2Contiguity(psPMR) ));
-		eError = PVRSRV_ERROR_INVALID_PARAMS;
-		goto e0;
+		PVR_DPF((PVR_DBG_ERROR,
+		         "%s: Device heap and PMR have incompatible Log2Contiguity (%u - %u). "
+		         "PMR contiguity must be a multiple of the heap contiguity!",
+		         __func__,
+		         psReservation->psDevmemHeap->uiLog2PageSize,
+		         PMR_GetLog2Contiguity(psPMR)));
+		PVR_GOTO_WITH_ERROR(eError, PVRSRV_ERROR_INVALID_PARAMS, e0);
 	}
 
 	eError = MMU_MapPages(psReservation->psDevmemHeap->psDevmemCtx->psMMUContext,
@@ -670,37 +660,27 @@ DevmemIntMapPMR(DEVMEMINT_HEAP *psDevmemHeap,
 
 	if (uiLog2HeapContiguity > PMR_GetLog2Contiguity(psPMR))
 	{
-		PVR_DPF ((PVR_DBG_ERROR,
-				"%s: Device heap and PMR have incompatible contiguity (%u - %u). "
-				"Heap contiguity must be a multiple of the heap contiguity!",
-				__func__,
-				uiLog2HeapContiguity,
-				PMR_GetLog2Contiguity(psPMR) ));
-		eError = PVRSRV_ERROR_INVALID_PARAMS;
-		goto e0;
+		PVR_DPF((PVR_DBG_ERROR,
+		         "%s: Device heap and PMR have incompatible contiguity (%u - %u). "
+		         "Heap contiguity must be a multiple of the heap contiguity!",
+		         __func__,
+		         uiLog2HeapContiguity,
+		         PMR_GetLog2Contiguity(psPMR) ));
+		PVR_GOTO_WITH_ERROR(eError, PVRSRV_ERROR_INVALID_PARAMS, e0);
 	}
 	psDevNode = psDevmemHeap->psDevmemCtx->psDevNode;
 
 	/* allocate memory to record the mapping info */
-	psMapping = OSAllocMem(sizeof *psMapping);
-	if (psMapping == NULL)
-	{
-		eError = PVRSRV_ERROR_OUT_OF_MEMORY;
-		PVR_DPF ((PVR_DBG_ERROR, "DevmemIntMapPMR: Alloc failed"));
-		goto e0;
-	}
+	psMapping = OSAllocMem(sizeof(*psMapping));
+	PVR_LOG_GOTO_IF_NOMEM(psMapping, eError, e0);
 
 	uiAllocationSize = psReservation->uiLength;
-
 
 	ui32NumDevPages = 0xffffffffU & ( ( (uiAllocationSize - 1) >> uiLog2HeapContiguity) + 1);
 	PVR_ASSERT((IMG_DEVMEM_SIZE_T) ui32NumDevPages << uiLog2HeapContiguity == uiAllocationSize);
 
 	eError = PMRLockSysPhysAddresses(psPMR);
-	if (eError != PVRSRV_OK)
-	{
-		goto e2;
-	}
+	PVR_GOTO_IF_ERROR(eError, e2);
 
 	sAllocationDevVAddr = psReservation->sBase;
 
@@ -738,15 +718,12 @@ DevmemIntMapPMR(DEVMEMINT_HEAP *psDevmemHeap,
 			 * allocated after physically locking down pages, is considered.
 			 * If the dummy/zero page allocation fails, we do unlock the physical address and the impact
 			 * is a bit more in on demand mode of operation */
-			eError = DevmemIntAllocDefBackingPage(psDevmemHeap->psDevmemCtx,
-			                                      	  psDefPage,
-			                                      	  uiInitValue,
-			                                      	  pszPageName,
-			                                      	  IMG_TRUE);
-			if (PVRSRV_OK != eError)
-			{
-				goto e3;
-			}
+			eError = DevmemIntAllocDefBackingPage(psDevNode,
+			                                      psDefPage,
+			                                      uiInitValue,
+			                                      pszPageName,
+			                                      IMG_TRUE);
+			PVR_GOTO_IF_ERROR(eError, e3);
 		}
 
 		/* N.B. We pass mapping permission flags to MMU_MapPages and let
@@ -759,10 +736,7 @@ DevmemIntMapPMR(DEVMEMINT_HEAP *psDevmemHeap,
 		                      ui32NumDevPages,
 		                      NULL,
 		                      uiLog2HeapContiguity);
-		if (PVRSRV_OK != eError)
-		{
-			goto e4;
-		}
+		PVR_GOTO_IF_ERROR(eError, e4);
 	}
 	else
 	{
@@ -772,10 +746,7 @@ DevmemIntMapPMR(DEVMEMINT_HEAP *psDevmemHeap,
 		                        ui32NumDevPages << uiLog2HeapContiguity,
 		                        uiMapFlags,
 		                        uiLog2HeapContiguity);
-		if (PVRSRV_OK != eError)
-		{
-			goto e3;
-		}
+		PVR_GOTO_IF_ERROR(eError, e3);
 	}
 
 	psMapping->psReservation = psReservation;
@@ -785,7 +756,7 @@ DevmemIntMapPMR(DEVMEMINT_HEAP *psDevmemHeap,
 	/* Don't bother with refcount on reservation, as a reservation
 	   only ever holds one mapping, so we directly increment the
 	   refcount on the heap instead */
-	_DevmemIntHeapAcquire(psMapping->psReservation->psDevmemHeap);
+	DevmemIntHeapAcquire(psMapping->psReservation->psDevmemHeap);
 
 	*ppsMappingPtr = psMapping;
 
@@ -803,10 +774,8 @@ e3:
 	{
 		PVRSRV_ERROR eError1=PVRSRV_OK;
 		eError1 = PMRUnlockSysPhysAddresses(psPMR);
-		if (PVRSRV_OK != eError1)
-		{
-			PVR_DPF ((PVR_DBG_ERROR, "%s: Failed to unlock the physical addresses",__func__));
-		}
+		PVR_LOG_IF_ERROR(eError1, "PMRUnlockSysPhysAddresses");
+
 		*ppsMappingPtr = NULL;
 	}
 e2:
@@ -882,7 +851,7 @@ DevmemIntUnmapPMR(DEVMEMINT_MAPPING *psMapping)
 	/* Don't bother with refcount on reservation, as a reservation
 	   only ever holds one mapping, so we directly decrement the
 	   refcount on the heap instead */
-	_DevmemIntHeapRelease(psDevmemHeap);
+	DevmemIntHeapRelease(psDevmemHeap);
 
 	OSFreeMem(psMapping);
 
@@ -900,13 +869,8 @@ DevmemIntReserveRange(DEVMEMINT_HEAP *psDevmemHeap,
 	DEVMEMINT_RESERVATION *psReservation;
 
 	/* allocate memory to record the reservation info */
-	psReservation = OSAllocMem(sizeof *psReservation);
-	if (psReservation == NULL)
-	{
-		eError = PVRSRV_ERROR_OUT_OF_MEMORY;
-		PVR_DPF ((PVR_DBG_ERROR, "DevmemIntReserveRange: Alloc failed"));
-		goto e0;
-	}
+	psReservation = OSAllocMem(sizeof(*psReservation));
+	PVR_LOG_GOTO_IF_NOMEM(psReservation, eError, e0);
 
 	psReservation->sBase = sAllocationDevVAddr;
 	psReservation->uiLength = uiAllocationSize;
@@ -918,16 +882,13 @@ DevmemIntReserveRange(DEVMEMINT_HEAP *psDevmemHeap,
 	                   0, /* alignment is n/a since we supply devvaddr */
 	                   &sAllocationDevVAddr,
 	                   psDevmemHeap->uiLog2PageSize);
-	if (eError != PVRSRV_OK)
-	{
-		goto e1;
-	}
+	PVR_GOTO_IF_ERROR(eError, e1);
 
 	/* since we supplied the virt addr, MMU_Alloc shouldn't have
 	   chosen a new one for us */
 	PVR_ASSERT(sAllocationDevVAddr.uiAddr == psReservation->sBase.uiAddr);
 
-	_DevmemIntHeapAcquire(psDevmemHeap);
+	DevmemIntHeapAcquire(psDevmemHeap);
 
 	psReservation->psDevmemHeap = psDevmemHeap;
 	*ppsReservationPtr = psReservation;
@@ -958,7 +919,7 @@ DevmemIntUnreserveRange(DEVMEMINT_RESERVATION *psReservation)
 	         uiLength,
 	         uiLog2DataPageSize);
 
-	_DevmemIntHeapRelease(psReservation->psDevmemHeap);
+	DevmemIntHeapRelease(psReservation->psDevmemHeap);
 	OSFreeMem(psReservation);
 
     return PVRSRV_OK;
@@ -991,7 +952,7 @@ DevmemIntHeapDestroy(DEVMEMINT_HEAP *psDevmemHeap)
 
 	PVR_ASSERT(OSAtomicRead(&psDevmemHeap->hRefCount) == 1);
 
-	_DevmemIntCtxRelease(psDevmemHeap->psDevmemCtx);
+	DevmemIntCtxRelease(psDevmemHeap->psDevmemCtx);
 
 	PVR_DPF((PVR_DBG_MESSAGE, "%s: Freed heap %p", __func__, psDevmemHeap));
 	OSFreeMem(psDevmemHeap);
@@ -1036,18 +997,13 @@ DevmemIntChangeSparse(DEVMEMINT_HEAP *psDevmemHeap,
 		uiUnmapPageCount = (uiUnmapPageCount << uiOrderDiff);
 
 		pai32MapIndices = OSAllocMem(uiMapPageCount * sizeof(*pai32MapIndices));
-		if (!pai32MapIndices)
-		{
-			eError = PVRSRV_ERROR_OUT_OF_MEMORY;
-			goto e0;
-		}
+		PVR_GOTO_IF_NOMEM(pai32MapIndices, eError, e0);
 
 		pai32UnmapIndices = OSAllocMem(uiUnmapPageCount * sizeof(*pai32UnmapIndices));
 		if (!pai32UnmapIndices)
 		{
 			OSFreeMem(pai32MapIndices);
-			eError = PVRSRV_ERROR_OUT_OF_MEMORY;
-			goto e0;
+			PVR_GOTO_WITH_ERROR(eError, PVRSRV_ERROR_OUT_OF_MEMORY, e0);
 		}
 
 		/* Every chunk index needs to be translated from physical indices
@@ -1139,7 +1095,6 @@ DevmemIntChangeSparse(DEVMEMINT_HEAP *psDevmemHeap,
 			                       uiMapPageCount,
 			                       pai32MapIndices,
 			                       uiLog2HeapContiguity);
-
 			if (PVRSRV_OK != eError)
 			{
 				PVR_DPF((PVR_DBG_MESSAGE,
@@ -1185,8 +1140,8 @@ DevmemIntChangeSparse(DEVMEMINT_HEAP *psDevmemHeap,
 			if (PVRSRV_OK != eError)
 			{
 				PVR_DPF((PVR_DBG_MESSAGE,
-				        "%s: Failed to map to CPU addr space.",
-				        __func__));
+						"%s: Failed to map to CPU addr space.",
+						__func__));
 				goto e0;
 			}
 		}
@@ -1217,7 +1172,7 @@ DevmemIntCtxDestroy(DEVMEMINT_CTX *psDevmemCtx)
 {
 	/*
 	   We can't determine if we should be freeing the context here
-	   as it refcount!=1 could be due to either the fact that heap(s)
+	   as a refcount!=1 could be due to either the fact that heap(s)
 	   remain with allocations on them, or that this memory context
 	   has been exported.
 	   As the client couldn't do anything useful with this information
@@ -1225,7 +1180,7 @@ DevmemIntCtxDestroy(DEVMEMINT_CTX *psDevmemCtx)
 	   free the context when _all_ references have been released
 	   don't bother checking and just return OK regardless.
 	   */
-	_DevmemIntCtxRelease(psDevmemCtx);
+	DevmemIntCtxRelease(psDevmemCtx);
 	return PVRSRV_OK;
 }
 
@@ -1273,7 +1228,45 @@ PVRSRV_ERROR DevmemIntIsVDevAddrValid(CONNECTION_DATA * psConnection,
 	                           sDevAddr) ? PVRSRV_OK : PVRSRV_ERROR_INVALID_GPU_ADDR;
 }
 
-PVRSRV_ERROR DevmemIntGetFaultAddress(CONNECTION_DATA * psConnection,
+PVRSRV_ERROR
+DevmemIntFlushDevSLCRange(DEVMEMINT_CTX *psDevMemContext,
+                          IMG_DEV_VIRTADDR sDevVAddr,
+                          IMG_DEVMEM_SIZE_T uiSize,
+                          IMG_BOOL bInvalidate)
+{
+	PVRSRV_DEVICE_NODE *psDevNode = psDevMemContext->psDevNode;
+	MMU_CONTEXT *psMMUContext = psDevMemContext->psMMUContext;
+
+	if (psDevNode->pfnInvalFBSCTable)
+	{
+		return psDevNode->pfnDevSLCFlushRange(psDevNode,
+		                                      psMMUContext,
+		                                      sDevVAddr,
+		                                      uiSize,
+		                                      bInvalidate);
+	}
+
+	return PVRSRV_ERROR_NOT_SUPPORTED;
+}
+
+PVRSRV_ERROR
+DevmemIntInvalidateFBSCTable(DEVMEMINT_CTX *psDevMemContext,
+                             IMG_UINT64 ui64FBSCEntryMask)
+{
+	PVRSRV_DEVICE_NODE *psDevNode = psDevMemContext->psDevNode;
+	MMU_CONTEXT *psMMUContext = psDevMemContext->psMMUContext;
+
+	if (psDevNode->pfnInvalFBSCTable)
+	{
+		return psDevNode->pfnInvalFBSCTable(psDevNode,
+		                                    psMMUContext,
+		                                    ui64FBSCEntryMask);
+	}
+
+	return PVRSRV_ERROR_NOT_SUPPORTED;
+}
+
+PVRSRV_ERROR DevmemIntGetFaultAddress(CONNECTION_DATA *psConnection,
                                       PVRSRV_DEVICE_NODE *psDevNode,
                                       DEVMEMINT_CTX *psDevMemContext,
                                       IMG_DEV_VIRTADDR *psFaultAddress)
@@ -1289,9 +1282,7 @@ PVRSRV_ERROR DevmemIntGetFaultAddress(CONNECTION_DATA * psConnection,
 	return PVRSRV_OK;
 }
 
-#if !defined(PVRSRV_USE_BRIDGE_LOCK)
 static POSWR_LOCK g_hExportCtxListLock;
-#endif /* !defined(PVRSRV_USE_BRIDGE_LOCK) */
 static DLLIST_NODE g_sExportCtxList;
 
 PVRSRV_ERROR
@@ -1301,9 +1292,7 @@ DevmemIntInit(void)
 
 	dllist_init(&g_sExportCtxList);
 
-#if !defined(PVRSRV_USE_BRIDGE_LOCK)
 	eError = OSWRLockCreate(&g_hExportCtxListLock);
-#endif /* !defined(PVRSRV_USE_BRIDGE_LOCK) */
 
 	return eError;
 }
@@ -1313,9 +1302,7 @@ DevmemIntDeInit(void)
 {
 	PVR_ASSERT(dllist_is_empty(&g_sExportCtxList));
 
-#if !defined(PVRSRV_USE_BRIDGE_LOCK)
 	OSWRLockDestroy(g_hExportCtxListLock);
-#endif
 
 	return PVRSRV_OK;
 }
@@ -1328,25 +1315,15 @@ DevmemIntExportCtx(DEVMEMINT_CTX *psContext,
 	DEVMEMINT_CTX_EXPORT *psCtxExport;
 
 	psCtxExport = OSAllocMem(sizeof(DEVMEMINT_CTX_EXPORT));
-	if (psCtxExport == NULL)
-	{
-		PVR_DPF((PVR_DBG_ERROR,
-		         "%s: Failed to export context. System currently out of memory",
-		         __func__));
-		return PVRSRV_ERROR_OUT_OF_MEMORY;
-	}
+	PVR_LOG_RETURN_IF_NOMEM(psCtxExport, "psCtxExport");
 
-	_DevmemIntCtxAcquire(psContext);
+	DevmemIntCtxAcquire(psContext);
 	PMRRefPMR(psPMR);
 	psCtxExport->psDevmemCtx = psContext;
 	psCtxExport->psPMR = psPMR;
-#if !defined(PVRSRV_USE_BRIDGE_LOCK)
 	OSWRLockAcquireWrite(g_hExportCtxListLock);
-#endif /* !defined(PVRSRV_USE_BRIDGE_LOCK) */
 	dllist_add_to_tail(&g_sExportCtxList, &psCtxExport->sNode);
-#if !defined(PVRSRV_USE_BRIDGE_LOCK)
 	OSWRLockReleaseWrite(g_hExportCtxListLock);
-#endif /* !defined(PVRSRV_USE_BRIDGE_LOCK) */
 
 	*ppsContextExport = psCtxExport;
 
@@ -1357,14 +1334,10 @@ PVRSRV_ERROR
 DevmemIntUnexportCtx(DEVMEMINT_CTX_EXPORT *psContextExport)
 {
 	PMRUnrefPMR(psContextExport->psPMR);
-	_DevmemIntCtxRelease(psContextExport->psDevmemCtx);
-#if !defined(PVRSRV_USE_BRIDGE_LOCK)
+	DevmemIntCtxRelease(psContextExport->psDevmemCtx);
 	OSWRLockAcquireWrite(g_hExportCtxListLock);
-#endif /* !defined(PVRSRV_USE_BRIDGE_LOCK) */
 	dllist_remove_node(&psContextExport->sNode);
-#if !defined(PVRSRV_USE_BRIDGE_LOCK)
 	OSWRLockReleaseWrite(g_hExportCtxListLock);
-#endif /* !defined(PVRSRV_USE_BRIDGE_LOCK) */
 	OSFreeMem(psContextExport);
 
 	/* Unable to find exported context, return error */
@@ -1379,27 +1352,21 @@ DevmemIntAcquireRemoteCtx(PMR *psPMR,
 	PDLLIST_NODE psListNode, psListNodeNext;
 	DEVMEMINT_CTX_EXPORT *psCtxExport;
 
-#if !defined(PVRSRV_USE_BRIDGE_LOCK)
 	OSWRLockAcquireRead(g_hExportCtxListLock);
-#endif /* !defined(PVRSRV_USE_BRIDGE_LOCK) */
 	/* Find context from list using PMR as key */
 	dllist_foreach_node(&g_sExportCtxList, psListNode, psListNodeNext)
 	{
 		psCtxExport = IMG_CONTAINER_OF(psListNode, DEVMEMINT_CTX_EXPORT, sNode);
 		if (psCtxExport->psPMR == psPMR)
 		{
-#if !defined(PVRSRV_USE_BRIDGE_LOCK)
 			OSWRLockReleaseRead(g_hExportCtxListLock);
-#endif /* !defined(PVRSRV_USE_BRIDGE_LOCK) */
-			_DevmemIntCtxAcquire(psCtxExport->psDevmemCtx);
+			DevmemIntCtxAcquire(psCtxExport->psDevmemCtx);
 			*ppsContext = psCtxExport->psDevmemCtx;
 			*phPrivData = psCtxExport->psDevmemCtx->hPrivData;
 			return PVRSRV_OK;
 		}
 	}
-#if !defined(PVRSRV_USE_BRIDGE_LOCK)
 	OSWRLockReleaseRead(g_hExportCtxListLock);
-#endif /* !defined(PVRSRV_USE_BRIDGE_LOCK) */
 
 	/* Unable to find exported context, return error */
 	PVR_DPF((PVR_DBG_ERROR,
@@ -1427,42 +1394,30 @@ PVRSRV_ERROR DevmemIntRegisterPFNotifyKM(DEVMEMINT_CTX *psDevmemCtx,
 	DEVMEMINT_PF_NOTIFY *psNotifyNode;
 	IMG_BOOL            bPresent = IMG_FALSE;
 
-	if (psDevmemCtx == NULL)
-	{
-		PVR_ASSERT(!"Devmem Context Missing");
-		return PVRSRV_ERROR_INVALID_PARAMS;
-	}
+	PVR_LOG_RETURN_IF_INVALID_PARAM(psDevmemCtx, "psDevmemCtx");
 
 	psDevNode = psDevmemCtx->psDevNode;
 
 	if (bRegister)
 	{
-#if !defined(PVRSRV_USE_BRIDGE_LOCK)
 		OSWRLockAcquireRead(psDevmemCtx->hListLock);
-#endif /* !defined(PVRSRV_USE_BRIDGE_LOCK) */
 		/* If this is the first PID in the list, the device memory context
 		 * needs to be registered for notification */
 		if (dllist_is_empty(&psDevmemCtx->sProcessNotifyListHead))
 		{
-#if !defined(PVRSRV_USE_BRIDGE_LOCK)
 			OSWRLockReleaseRead(psDevmemCtx->hListLock);
-#endif /* !defined(PVRSRV_USE_BRIDGE_LOCK) */
 			dllist_add_to_tail(&psDevNode->sMemoryContextPageFaultNotifyListHead,
 			                   &psDevmemCtx->sPageFaultNotifyListElem);
 		}
 		else
 		{
-#if !defined(PVRSRV_USE_BRIDGE_LOCK)
 			OSWRLockReleaseRead(psDevmemCtx->hListLock);
-#endif /* !defined(PVRSRV_USE_BRIDGE_LOCK) */
 		}
 	}
 
 	/* Loop through the registered PIDs and check whether this one is
 	 * present */
-#if !defined(PVRSRV_USE_BRIDGE_LOCK)
 	OSWRLockAcquireRead(psDevmemCtx->hListLock);
-#endif /* !defined(PVRSRV_USE_BRIDGE_LOCK) */
 	dllist_foreach_node(&(psDevmemCtx->sProcessNotifyListHead), psNode, psNodeNext)
 	{
 		psNotifyNode = IMG_CONTAINER_OF(psNode, DEVMEMINT_PF_NOTIFY, sProcessNotifyListElem);
@@ -1473,9 +1428,7 @@ PVRSRV_ERROR DevmemIntRegisterPFNotifyKM(DEVMEMINT_CTX *psDevmemCtx,
 			break;
 		}
 	}
-#if !defined(PVRSRV_USE_BRIDGE_LOCK)
 	OSWRLockReleaseRead(psDevmemCtx->hListLock);
-#endif /* !defined(PVRSRV_USE_BRIDGE_LOCK) */
 
 	if (bRegister)
 	{
@@ -1496,13 +1449,9 @@ PVRSRV_ERROR DevmemIntRegisterPFNotifyKM(DEVMEMINT_CTX *psDevmemCtx,
 			return PVRSRV_ERROR_OUT_OF_MEMORY;
 		}
 		psNotifyNode->ui32PID = ui32PID;
-#if !defined(PVRSRV_USE_BRIDGE_LOCK)
 		OSWRLockAcquireWrite(psDevmemCtx->hListLock);
-#endif /* !defined(PVRSRV_USE_BRIDGE_LOCK) */
 		dllist_add_to_tail(&(psDevmemCtx->sProcessNotifyListHead), &(psNotifyNode->sProcessNotifyListElem));
-#if !defined(PVRSRV_USE_BRIDGE_LOCK)
 		OSWRLockReleaseWrite(psDevmemCtx->hListLock);
-#endif /* !defined(PVRSRV_USE_BRIDGE_LOCK) */
 	}
 	else
 	{
@@ -1522,16 +1471,12 @@ PVRSRV_ERROR DevmemIntRegisterPFNotifyKM(DEVMEMINT_CTX *psDevmemCtx,
 	{
 		/* If the last process in the list is being unregistered, then also
 		 * unregister the device memory context from the notify list. */
-#if !defined(PVRSRV_USE_BRIDGE_LOCK)
 		OSWRLockAcquireWrite(psDevmemCtx->hListLock);
-#endif /* !defined(PVRSRV_USE_BRIDGE_LOCK) */
 		if (dllist_is_empty(&psDevmemCtx->sProcessNotifyListHead))
 		{
 			dllist_remove_node(&psDevmemCtx->sPageFaultNotifyListElem);
 		}
-#if !defined(PVRSRV_USE_BRIDGE_LOCK)
 		OSWRLockReleaseWrite(psDevmemCtx->hListLock);
-#endif /* !defined(PVRSRV_USE_BRIDGE_LOCK) */
 	}
 
 	return PVRSRV_OK;
@@ -1557,14 +1502,10 @@ PVRSRV_ERROR DevmemIntPFNotify(PVRSRV_DEVICE_NODE *psDevNode,
 	DEVMEMINT_CTX       *psDevmemCtx = NULL;
 	IMG_BOOL            bFailed = IMG_FALSE;
 
-#if !defined(PVRSRV_USE_BRIDGE_LOCK)
 	OSWRLockAcquireRead(psDevNode->hMemoryContextPageFaultNotifyListLock);
-#endif /* !defined(PVRSRV_USE_BRIDGE_LOCK) */
 	if (dllist_is_empty(&(psDevNode->sMemoryContextPageFaultNotifyListHead)))
 	{
-#if !defined(PVRSRV_USE_BRIDGE_LOCK)
 		OSWRLockReleaseRead(psDevNode->hMemoryContextPageFaultNotifyListLock);
-#endif /* !defined(PVRSRV_USE_BRIDGE_LOCK) */
 		return PVRSRV_OK;
 	}
 
@@ -1581,9 +1522,7 @@ PVRSRV_ERROR DevmemIntPFNotify(PVRSRV_DEVICE_NODE *psDevNode,
 			         "%s: Failed to Acquire Base Address (%s)",
 			         __func__,
 			         PVRSRVGetErrorString(eError)));
-#if !defined(PVRSRV_USE_BRIDGE_LOCK)
 			OSWRLockReleaseRead(psDevNode->hMemoryContextPageFaultNotifyListLock);
-#endif /* !defined(PVRSRV_USE_BRIDGE_LOCK) */
 			return eError;
 		}
 
@@ -1593,18 +1532,14 @@ PVRSRV_ERROR DevmemIntPFNotify(PVRSRV_DEVICE_NODE *psDevNode,
 			break;
 		}
 	}
-#if !defined(PVRSRV_USE_BRIDGE_LOCK)
 	OSWRLockReleaseRead(psDevNode->hMemoryContextPageFaultNotifyListLock);
-#endif /* !defined(PVRSRV_USE_BRIDGE_LOCK) */
 
 	if (psDevmemCtx == NULL)
 	{
 		/* Not found, just return */
 		return PVRSRV_OK;
 	}
-#if !defined(PVRSRV_USE_BRIDGE_LOCK)
 	OSWRLockAcquireRead(psDevmemCtx->hListLock);
-#endif /* !defined(PVRSRV_USE_BRIDGE_LOCK) */
 
 	/*
 	 * Store the first occurrence of a page fault address,
@@ -1634,9 +1569,7 @@ PVRSRV_ERROR DevmemIntPFNotify(PVRSRV_DEVICE_NODE *psDevNode,
 			bFailed = IMG_TRUE;
 		}
 	}
-#if !defined(PVRSRV_USE_BRIDGE_LOCK)
 	OSWRLockReleaseRead(psDevmemCtx->hListLock);
-#endif /* !defined(PVRSRV_USE_BRIDGE_LOCK) */
 
 	if (bFailed)
 	{
@@ -1646,11 +1579,11 @@ PVRSRV_ERROR DevmemIntPFNotify(PVRSRV_DEVICE_NODE *psDevNode,
 	return PVRSRV_OK;
 }
 
-#if defined (PDUMP)
+#if defined(PDUMP)
 IMG_UINT32 DevmemIntMMUContextID(DEVMEMINT_CTX *psDevMemContext)
 {
 	IMG_UINT32 ui32MMUContextID;
-	MMU_AcquirePDumpMMUContext(psDevMemContext->psMMUContext, &ui32MMUContextID);
+	MMU_AcquirePDumpMMUContext(psDevMemContext->psMMUContext, &ui32MMUContextID, PDUMP_FLAGS_CONTINUOUS);
 	return ui32MMUContextID;
 }
 
@@ -1669,7 +1602,8 @@ DevmemIntPDumpSaveToFileVirtual(DEVMEMINT_CTX *psDevmemCtx,
 	PVR_UNREFERENCED_PARAMETER(ui32ArraySize);
 
 	eError = MMU_AcquirePDumpMMUContext(psDevmemCtx->psMMUContext,
-			&uiPDumpMMUCtx);
+			&uiPDumpMMUCtx,
+			ui32PDumpFlags);
 
 	PVR_ASSERT(eError == PVRSRV_OK);
 
@@ -1689,7 +1623,7 @@ DevmemIntPDumpSaveToFileVirtual(DEVMEMINT_CTX *psDevmemCtx,
 	                     ui32PDumpFlags);
 	PVR_ASSERT(eError == PVRSRV_OK);
 
-	MMU_ReleasePDumpMMUContext(psDevmemCtx->psMMUContext);
+	MMU_ReleasePDumpMMUContext(psDevmemCtx->psMMUContext, ui32PDumpFlags);
 	return PVRSRV_OK;
 }
 
@@ -1714,11 +1648,13 @@ DevmemIntPDumpBitmap(CONNECTION_DATA * psConnection,
 
 	PVR_UNREFERENCED_PARAMETER(psConnection);
 
-	eError = MMU_AcquirePDumpMMUContext(psDevMemContext->psMMUContext, &ui32ContextID);
+	eError = MMU_AcquirePDumpMMUContext(psDevMemContext->psMMUContext, &ui32ContextID, ui32PDumpFlags);
 
 	if (eError != PVRSRV_OK)
 	{
-		PVR_DPF((PVR_DBG_ERROR, "DevmemIntPDumpBitmap: Failed to acquire MMU context"));
+		PVR_DPF((PVR_DBG_ERROR,
+		         "%s: Failed to acquire MMU context",
+		         __func__));
 		return PVRSRV_ERROR_FAILED_TO_ALLOC_MMUCONTEXT_ID;
 	}
 
@@ -1736,7 +1672,7 @@ DevmemIntPDumpBitmap(CONNECTION_DATA * psConnection,
 	                       ui32PDumpFlags);
 
 	/* Don't care about return value */
-	MMU_ReleasePDumpMMUContext(psDevMemContext->psMMUContext);
+	MMU_ReleasePDumpMMUContext(psDevMemContext->psMMUContext, ui32PDumpFlags);
 
 	return eError;
 }
@@ -1768,8 +1704,8 @@ DevmemIntPDumpImageDescriptor(CONNECTION_DATA * psConnection,
 	PVR_UNREFERENCED_PARAMETER(psConnection);
 	PVR_UNREFERENCED_PARAMETER(ui32Size);
 
-	eError = MMU_AcquirePDumpMMUContext(psDevMemContext->psMMUContext, &ui32ContextID);
-	PVR_LOGR_IF_ERROR(eError, "MMU_AcquirePDumpMMUContext");
+	eError = MMU_AcquirePDumpMMUContext(psDevMemContext->psMMUContext, &ui32ContextID, ui32PDumpFlags);
+	PVR_LOG_RETURN_IF_ERROR(eError, "MMU_AcquirePDumpMMUContext");
 
 	eError = PDumpImageDescriptor(psDeviceNode,
 									ui32ContextID,
@@ -1791,22 +1727,23 @@ DevmemIntPDumpImageDescriptor(CONNECTION_DATA * psConnection,
 	PVR_LOG_IF_ERROR(eError, "PDumpImageDescriptor");
 
 	/* Don't care about return value */
-	(void) MMU_ReleasePDumpMMUContext(psDevMemContext->psMMUContext);
+	(void) MMU_ReleasePDumpMMUContext(psDevMemContext->psMMUContext, ui32PDumpFlags);
 
 	return eError;
 }
 
 PVRSRV_ERROR
 DevmemIntPDumpDataDescriptor(CONNECTION_DATA * psConnection,
-							  PVRSRV_DEVICE_NODE *psDeviceNode,
-							  DEVMEMINT_CTX *psDevMemContext,
-							  IMG_UINT32 ui32Size,
-							  const IMG_CHAR *pszFileName,
-							  IMG_DEV_VIRTADDR sData,
-							  IMG_UINT32 ui32DataSize,
-							  IMG_UINT32 ui32ElementType,
-							  IMG_UINT32 ui32ElementCount,
-							  IMG_UINT32 ui32PDumpFlags)
+							 PVRSRV_DEVICE_NODE *psDeviceNode,
+							 DEVMEMINT_CTX *psDevMemContext,
+							 IMG_UINT32 ui32Size,
+							 const IMG_CHAR *pszFileName,
+							 IMG_DEV_VIRTADDR sData,
+							 IMG_UINT32 ui32DataSize,
+							 IMG_UINT32 ui32HeaderType,
+							 IMG_UINT32 ui32ElementType,
+							 IMG_UINT32 ui32ElementCount,
+							 IMG_UINT32 ui32PDumpFlags)
 {
 	IMG_UINT32 ui32ContextID;
 	PVRSRV_ERROR eError;
@@ -1814,21 +1751,32 @@ DevmemIntPDumpDataDescriptor(CONNECTION_DATA * psConnection,
 	PVR_UNREFERENCED_PARAMETER(psConnection);
 	PVR_UNREFERENCED_PARAMETER(ui32Size);
 
-	eError = MMU_AcquirePDumpMMUContext(psDevMemContext->psMMUContext, &ui32ContextID);
-	PVR_LOGR_IF_ERROR(eError, "MMU_AcquirePDumpMMUContext");
+	if ((ui32HeaderType != IBIN_HEADER_TYPE) &&
+		(ui32HeaderType != DATA_HEADER_TYPE))
+	{
+		PVR_DPF((PVR_DBG_ERROR,
+		         "%s: Invalid header type (%u)",
+		         __func__,
+		         ui32HeaderType));
+		return PVRSRV_ERROR_INVALID_PARAMS;
+	}
+
+	eError = MMU_AcquirePDumpMMUContext(psDevMemContext->psMMUContext, &ui32ContextID, ui32PDumpFlags);
+	PVR_LOG_RETURN_IF_ERROR(eError, "MMU_AcquirePDumpMMUContext");
 
 	eError = PDumpDataDescriptor(psDeviceNode,
 									ui32ContextID,
 									(IMG_CHAR *)pszFileName,
 									sData,
 									ui32DataSize,
+									ui32HeaderType,
 									ui32ElementType,
 									ui32ElementCount,
 									ui32PDumpFlags);
 	PVR_LOG_IF_ERROR(eError, "PDumpDataDescriptor");
 
 	/* Don't care about return value */
-	(void) MMU_ReleasePDumpMMUContext(psDevMemContext->psMMUContext);
+	(void) MMU_ReleasePDumpMMUContext(psDevMemContext->psMMUContext, ui32PDumpFlags);
 
 	return eError;
 }

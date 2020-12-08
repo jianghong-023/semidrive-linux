@@ -1,4 +1,3 @@
-/* -*- mode: c; indent-tabs-mode: t; c-basic-offset: 8; tab-width: 8 -*- */
 /* vi: set ts=8 sw=8 sts=8: */
 /*************************************************************************/ /*!
 @File
@@ -42,9 +41,14 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */ /**************************************************************************/
 
+#include <linux/version.h>
+
 #include "drm_pdp_drv.h"
 
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 5, 0))
 #include <drm/drmP.h>
+#endif
+
 #include <drm/drm_plane_helper.h>
 
 #if defined(PDP_USE_ATOMIC)
@@ -112,12 +116,36 @@ static const struct drm_plane_funcs pdp_plane_funcs = {
 struct drm_plane *pdp_plane_create(struct drm_device *dev,
 				   enum drm_plane_type type)
 {
+	struct pdp_drm_private *dev_priv = dev->dev_private;
 	struct drm_plane *plane;
-	const uint32_t supported_formats[] = {
+	const uint32_t *supported_formats;
+	uint32_t num_supported_formats;
+	const uint32_t apollo_plato_formats[] = {
 		DRM_FORMAT_XRGB8888,
 		DRM_FORMAT_ARGB8888,
 	};
+	const uint32_t odin_formats[] = {
+		DRM_FORMAT_XRGB8888,
+		DRM_FORMAT_ARGB8888,
+		DRM_FORMAT_RGB565,
+	};
 	int err;
+
+	switch (dev_priv->version) {
+	case PDP_VERSION_ODIN:
+		supported_formats = odin_formats;
+		num_supported_formats = ARRAY_SIZE(odin_formats);
+		break;
+	case PDP_VERSION_APOLLO:
+	case PDP_VERSION_PLATO:
+		supported_formats = apollo_plato_formats;
+		num_supported_formats = ARRAY_SIZE(apollo_plato_formats);
+		break;
+	default:
+		DRM_ERROR("Unsupported PDP version\n");
+		err = -EINVAL;
+		goto err_exit;
+	}
 
 	plane = kzalloc(sizeof(*plane), GFP_KERNEL);
 	if (!plane) {
@@ -127,7 +155,7 @@ struct drm_plane *pdp_plane_create(struct drm_device *dev,
 
 	err = drm_universal_plane_init(dev, plane, 0, &pdp_plane_funcs,
 				       supported_formats,
-				       ARRAY_SIZE(supported_formats),
+				       num_supported_formats,
 				       NULL, type, NULL);
 	if (err)
 		goto err_plane_free;
@@ -155,6 +183,7 @@ void pdp_plane_set_surface(struct drm_crtc *crtc, struct drm_plane *plane,
 	struct pdp_framebuffer *pdp_fb = to_pdp_framebuffer(fb);
 	unsigned int pitch = fb->pitches[0];
 	uint64_t address = pdp_gem_get_dev_addr(pdp_fb->obj[0]);
+	uint32_t format;
 
 	/*
 	 * User space specifies 'x' and 'y' and this is used to tell the display
@@ -177,6 +206,7 @@ void pdp_plane_set_surface(struct drm_crtc *crtc, struct drm_plane *plane,
 		switch (pdp_drm_fb_format(fb)) {
 		case DRM_FORMAT_ARGB8888:
 		case DRM_FORMAT_XRGB8888:
+			format = 0xE;
 			break;
 		default:
 			DRM_ERROR("unsupported pixel format (format = %d)\n",
@@ -190,7 +220,7 @@ void pdp_plane_set_surface(struct drm_crtc *crtc, struct drm_plane *plane,
 				       address,
 				       0, 0,
 				       fb->width, fb->height, pitch,
-				       0xE,
+				       format,
 				       255,
 				       false);
 		break;
@@ -198,6 +228,10 @@ void pdp_plane_set_surface(struct drm_crtc *crtc, struct drm_plane *plane,
 		switch (pdp_drm_fb_format(fb)) {
 		case DRM_FORMAT_ARGB8888:
 		case DRM_FORMAT_XRGB8888:
+			format = ODN_PDP_SURF_PIXFMT_ARGB8888;
+			break;
+		case DRM_FORMAT_RGB565:
+			format = ODN_PDP_SURF_PIXFMT_RGB565;
 			break;
 		default:
 			DRM_ERROR("unsupported pixel format (format = %d)\n",
@@ -211,7 +245,7 @@ void pdp_plane_set_surface(struct drm_crtc *crtc, struct drm_plane *plane,
 				     address,
 				     0, 0,
 				     fb->width, fb->height, pitch,
-				     ODN_PDP_SURF_PIXFMT_ARGB8888,
+				     format,
 				     255,
 				     false);
 		break;
@@ -219,6 +253,7 @@ void pdp_plane_set_surface(struct drm_crtc *crtc, struct drm_plane *plane,
 		switch (pdp_drm_fb_format(fb)) {
 		case DRM_FORMAT_ARGB8888:
 		case DRM_FORMAT_XRGB8888:
+			format = PLATO_PDP_PIXEL_FORMAT_ARGB8;
 			break;
 		default:
 			DRM_ERROR("unsupported pixel format (format = %d)\n",
@@ -233,7 +268,7 @@ void pdp_plane_set_surface(struct drm_crtc *crtc, struct drm_plane *plane,
 				      address,
 				      0, 0,
 				      fb->width, fb->height, pitch,
-				      PLATO_PDP_PIXEL_FORMAT_ARGB8,
+				      format,
 				      255,
 				      false);
 		break;

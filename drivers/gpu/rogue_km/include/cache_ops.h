@@ -42,8 +42,8 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */ /**************************************************************************/
 
-#ifndef _CACHE_OPS_H_
-#define _CACHE_OPS_H_
+#ifndef CACHE_OPS_H
+#define CACHE_OPS_H
 #include "img_types.h"
 
 #define CACHE_BATCH_MAX (8)
@@ -53,4 +53,4 @@ typedef IMG_UINT32 PVRSRV_CACHE_OP;				/*!< Type represents cache maintenance op
 #define PVRSRV_CACHE_OP_INVALIDATE			0x2	/*!< Invalidate w/o flush */
 #define PVRSRV_CACHE_OP_FLUSH				0x3	/*!< Flush w/ invalidate */
 
-#endif	/* _CACHE_OPS_H_ */
+#endif	/* CACHE_OPS_H */

@@ -44,10 +44,10 @@ COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
 IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */ /**************************************************************************/
-#ifndef __HTBUFFER_H__
-#define __HTBUFFER_H__
+#ifndef HTBUFFER_H
+#define HTBUFFER_H
 
-#if defined (__cplusplus)
+#if defined(__cplusplus)
 extern "C" {
 #endif
 
@@ -80,7 +80,7 @@ extern "C" {
  @Function      HTBLog
  @Description   Record a Host Trace Buffer log event
 
- @Input         PID	            The PID of the process the event is associated
+ @Input         PID             The PID of the process the event is associated
                                 with. This is provided as an argument rather
                                 than querying internally so that events associated
                                 with a particular process, but performed by
@@ -122,13 +122,11 @@ HTBLogSimple(IMG_HANDLE hSrvHandle, IMG_UINT32 SF, ...);
 #endif
 
 
-#if defined (__cplusplus)
+#if defined(__cplusplus)
 }
 #endif
 
-#endif /* __HTBUFFER_H__ */
+#endif /* HTBUFFER_H */
 /*****************************************************************************
  End of file (htbuffer.h)
 *****************************************************************************/
-
-

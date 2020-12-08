@@ -43,8 +43,8 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 /*
  * This is an example file which is presented as a means of providing the
- * necessary access mechanisms to allow Services Server settings to
- * be set and/or queried in non-Linux operating systems.
+ * necessary access mechanisms to allow Services Server settings to be set
+ * and/or queried in non-Linux operating systems.
  *
  * The access mechanisms detailed here require the same functionality present
  * in the Services Client/UM to access AppHints. This is an example and it may
@@ -52,7 +52,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  * taken needs to be considered in the context of the target OS.
  *
  * Consult the PowerVR Rogue DDK Services AppHint Guide for more details on
- * the Application Hints subsytem and the
+ * the Application Hints subsystem and the
  * Rogue DDK Services OS Porting Reference for explanations of the interface(s)
  * provided by the routines shown in this file.
  */
@@ -93,7 +93,7 @@ _SrvInitParamGetUINT32(void *pvState, const IMG_CHAR *pszName, const IMG_UINT32 
 }
 
 void
-_SrvInitParamGetSTRING(void *pvState, const IMG_CHAR *pszName, const IMG_CHAR **psDefault, IMG_CHAR *pBuffer, size_t size)
+_SrvInitParamGetSTRING(void *pvState, const IMG_CHAR *pszName, const IMG_CHAR *psDefault, IMG_CHAR *pBuffer, size_t size)
 {
 	PVR_UNREFERENCED_PARAMETER(size);
 	(void) PVRSRVGetAppHint(pvState, pszName, IMG_STRING_TYPE, psDefault, pBuffer);
@@ -104,13 +104,13 @@ _SrvInitParamGetUINT32BitField(void *pvState, const IMG_CHAR *pszBaseName, IMG_U
 {
 	IMG_UINT32 uiValue = uiDefault;
 	IMG_CHAR *pszName;
-	const IMG_UINT32 baseLen = strlen(pszBaseName);
+	const IMG_UINT32 baseLen = OSStringLength(pszBaseName);
 	IMG_UINT32 extraLen = 0;
-	IMG_UINT32 i;
+	IMG_UINT32 i, ui32Size;
 
 	for (i = 0; i < uiSize; i++)
 	{
-		unsigned len = strlen(psLookup[i].pszValue);
+		unsigned len = OSStringLength(psLookup[i].pszValue);
 
 		if (len > extraLen)
 		{
@@ -119,11 +119,12 @@ _SrvInitParamGetUINT32BitField(void *pvState, const IMG_CHAR *pszBaseName, IMG_U
 	}
 	extraLen++;
 
-	pszName = OSAllocMem(baseLen + extraLen);
+	ui32Size = baseLen + extraLen;
+	pszName = OSAllocMem(ui32Size);
 
 	if (pszName != NULL)
 	{
-		(void) strcpy(pszName, pszBaseName);
+		(void) OSStringLCopy(pszName, pszBaseName, ui32Size);
 
 		for (i = 0; i < uiSize; i++)
 		{
@@ -169,7 +170,7 @@ _SrvInitParamGetUINT32List(void *pvState, const IMG_CHAR *pszName, IMG_UINT32 ui
 
 		acValue[APPHINT_MAX_STRING_SIZE - 1] = '\0';
 
-		pszParam = &acValue[strlen(acValue)];
+		pszParam = &acValue[OSStringLength(acValue)];
 
 		/* Strip trailing blanks */
 		while (pszParam >= &acValue[0])
@@ -192,15 +193,15 @@ _SrvInitParamGetUINT32List(void *pvState, const IMG_CHAR *pszName, IMG_UINT32 ui
 
 		for (i = 0; i < uiSize; i++)
 		{
-			if (strcmp(pszParam, psLookup[i].pszValue) == 0)
+			if (OSStringNCompare(pszParam, psLookup[i].pszValue, APPHINT_MAX_STRING_SIZE) == 0)
 			{
 				uiValue = psLookup[i].ui32Value;
 				break;
 			}
 		}
-		if (i ==  uiSize)
+		if (i == uiSize)
 		{
-			if (strlen(acValue) == 0)
+			if (OSStringLength(acValue) == 0)
 			{
 				PVR_DPF((PVR_DBG_WARNING, "No value set for initialisation parameter %s", pszName));
 			}
@@ -212,5 +213,4 @@ _SrvInitParamGetUINT32List(void *pvState, const IMG_CHAR *pszName, IMG_UINT32 ui
 	}
 
 	*puiValue = uiValue;
-
 }

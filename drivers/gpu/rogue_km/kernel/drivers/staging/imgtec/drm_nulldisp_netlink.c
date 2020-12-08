@@ -1,4 +1,3 @@
-/* -*- mode: c; indent-tabs-mode: t; c-basic-offset: 8; tab-width: 8 -*- */
 /* vi: set ts=8 sw=8 sts=8: */
 /*************************************************************************/ /*!
 @File
@@ -43,7 +42,17 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */ /**************************************************************************/
 
 #include <linux/version.h>
+
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 5, 0))
+#include <drm/drm_drv.h>
+#include <drm/drm_file.h>
+#include <drm/drm_framebuffer.h>
+#include <drm/drm_gem.h>
+#include <drm/drm_vma_manager.h>
+#else
 #include <drm/drmP.h>
+#endif
+
 #include <drm/drm_crtc.h>
 #include <linux/mutex.h>
 #include <linux/list.h>
@@ -222,6 +231,9 @@ static struct genl_family nlpvrdpy_family = {
 	.name = "nlpvrdpy",
 	.version = 1,
 	.maxattr = NLPVRDPY_ATTR_MAX,
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 2, 0))
+	.policy = nlpvrdpy_policy,
+#endif
 	.pre_doit = &nlpvrdpy_pre_cmd,
 	.post_doit = &nlpvrdpy_post_cmd
 };
@@ -307,8 +319,9 @@ static int nlpvrdpy_get_offsets_and_sizes(struct drm_framebuffer *fb,
 
 		err = drm_gem_create_mmap_offset(obj);
 		if (err) {
-			DRM_ERROR("Failed to get mmap offset for buffer[%d] = %p\n",
-				  i, obj);
+			DRM_ERROR(
+			    "Failed to get mmap offset for buffer[%d] = %p\n",
+			    i, obj);
 			return err;
 		}
 
@@ -341,24 +354,25 @@ static int nlpvrdpy_put_fb_attributes(struct sk_buff *msg,
 	RETURN_ON_ERROR(nlpvrdpy_get_offsets_and_sizes(fb, objs, &plane_addr[0],
 						       &plane_size[0]));
 
-	RETURN_ON_ERROR(nla_put_u32(msg, NLPVRDPY_ATTR_MINOR, NLPVRDPY_MINOR(nlpvrdpy)));
+	RETURN_ON_ERROR(nla_put_u32(msg, NLPVRDPY_ATTR_MINOR,
+			NLPVRDPY_MINOR(nlpvrdpy)));
 
 	RETURN_ON_ERROR(nla_put_u8(msg, NLPVRDPY_ATTR_NUM_PLANES, num_planes));
 
 	RETURN_ON_ERROR(nla_put_u32(msg, NLPVRDPY_ATTR_WIDTH,  fb->width));
 	RETURN_ON_ERROR(nla_put_u32(msg, NLPVRDPY_ATTR_HEIGHT, fb->height));
-	RETURN_ON_ERROR(nla_put_u32(msg, NLPVRDPY_ATTR_PIXFMT, nulldisp_drm_fb_format(fb)));
+	RETURN_ON_ERROR(nla_put_u32(msg, NLPVRDPY_ATTR_PIXFMT,
+			nulldisp_drm_fb_format(fb)));
 	RETURN_ON_ERROR(nla_put_u64_64bit(msg,
 					  NLPVRDPY_ATTR_FB_MODIFIER,
 					  nulldisp_drm_fb_modifier(fb),
 					  NLPVRDPY_ATTR_PAD));
 
-	/*
-	 * TODO YUV: get the actual CSC and BPP
-	 * for now only 8-bit BT601 short range is supported
-	 */
-	RETURN_ON_ERROR(nla_put_u8(msg, NLPVRDPY_ATTR_YUV_CSC, 1));  /* IMG_COLORSPACE_BT601_CONFORMANT_RANGE */
-	RETURN_ON_ERROR(nla_put_u8(msg, NLPVRDPY_ATTR_YUV_BPP, 8));  /* 8-bit per sample */
+	/* IMG_COLORSPACE_BT601_CONFORMANT_RANGE */
+	RETURN_ON_ERROR(nla_put_u8(msg, NLPVRDPY_ATTR_YUV_CSC, 1));
+
+	/* 8-bit per sample */
+	RETURN_ON_ERROR(nla_put_u8(msg, NLPVRDPY_ATTR_YUV_BPP, 8));
 
 	for (i = 0; i < num_planes; i++) {
 		RETURN_ON_ERROR(nla_put_u64_64bit(msg,
@@ -370,7 +384,8 @@ static int nlpvrdpy_put_fb_attributes(struct sk_buff *msg,
 						  plane_size[i],
 						  NLPVRDPY_ATTR_PAD));
 		RETURN_ON_ERROR(nla_put_u64_64bit(msg,
-						  NLPVRDPY_ATTR_PLANE(i, OFFSET),
+						  NLPVRDPY_ATTR_PLANE(i,
+								      OFFSET),
 						  fb->offsets[i],
 						  NLPVRDPY_ATTR_PAD));
 		RETURN_ON_ERROR(nla_put_u64_64bit(msg,
@@ -378,7 +393,8 @@ static int nlpvrdpy_put_fb_attributes(struct sk_buff *msg,
 						  fb->pitches[i],
 						  NLPVRDPY_ATTR_PAD));
 		RETURN_ON_ERROR(nla_put_u32(msg,
-					    NLPVRDPY_ATTR_PLANE(i, GEM_OBJ_NAME),
+					    NLPVRDPY_ATTR_PLANE(i,
+								GEM_OBJ_NAME),
 					    (u32)objs[0]->name));
 	}
 
@@ -589,28 +605,36 @@ static int nlpvrdpy_cmd_copied(struct sk_buff *skb, struct genl_info *info)
 static struct genl_ops nlpvrdpy_ops[] = {
 	{
 		.cmd = NLPVRDPY_CMD_CONNECT,
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 2, 0))
 		.policy = nlpvrdpy_policy,
+#endif
 		.doit = nlpvrdpy_cmd_connect,
 		.flags = GENL_ADMIN_PERM,
 		.internal_flags = NLPVRDPY_CIF_NLPVRDPY_NOT_CONNECTED
 	},
 	{
 		.cmd = NLPVRDPY_CMD_DISCONNECT,
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 2, 0))
 		.policy = nlpvrdpy_policy,
+#endif
 		.doit = nlpvrdpy_cmd_disconnect,
 		.flags = 0,
 		.internal_flags = NLPVRDPY_CIF_NLPVRDPY
 	},
 	{
 		.cmd = NLPVRDPY_CMD_FLIPPED,
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 2, 0))
 		.policy = nlpvrdpy_policy,
+#endif
 		.doit = nlpvrdpy_cmd_flipped,
 		.flags = 0,
 		.internal_flags = NLPVRDPY_CIF_NLPVRDPY
 	},
 	{
 		.cmd = NLPVRDPY_CMD_COPIED,
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 2, 0))
 		.policy = nlpvrdpy_policy,
+#endif
 		.doit = nlpvrdpy_cmd_copied,
 		.flags = 0,
 		.internal_flags = NLPVRDPY_CIF_NLPVRDPY

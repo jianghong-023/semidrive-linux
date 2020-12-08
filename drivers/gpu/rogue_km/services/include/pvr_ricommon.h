@@ -41,31 +41,28 @@ COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
 IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */ /**************************************************************************/
-#ifndef __PVR_RICOMMON_H__
-#define __PVR_RICOMMON_H__
+#ifndef PVR_RICOMMON_H
+#define PVR_RICOMMON_H
 
-#if defined (__cplusplus)
+#if defined(__cplusplus)
 extern "C" {
 #endif
 
 #include "img_defs.h"
 
-
 /*! Maximum text string length including the null byte */
 #define PRVSRVRI_MAX_TEXT_LENGTH	20U
 
-/* PID used to hold PMR allocations which are driver-wide (ie have a lifetime
-   longer than an application process) */
+/* PID used to hold PMR allocations which are driver-wide (i.e. have a lifetime
+ * longer than an application process)
+ */
 #define PVR_SYS_ALLOC_PID 1
 
-#if defined (__cplusplus)
+#if defined(__cplusplus)
 }
 #endif
 
-#endif /* __PVR_RICOMMON_H__ */
+#endif /* PVR_RICOMMON_H */
 /******************************************************************************
  End of file (pvr_ricommon.h)
 ******************************************************************************/
-
-
-

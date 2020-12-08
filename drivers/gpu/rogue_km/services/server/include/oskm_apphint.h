@@ -50,16 +50,16 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 
 #if defined(LINUX) && !defined(DOXYGEN)
-static INLINE IMG_UINT os_get_km_apphint_UINT32(void *state, APPHINT_ID id, IMG_UINT32 *pAppHintDefault, IMG_UINT32 *pVal) {
+static INLINE IMG_UINT os_get_km_apphint_UINT32(void *state, APPHINT_ID id, const IMG_UINT32 *pAppHintDefault, IMG_UINT32 *pVal) {
 	return !pvr_apphint_get_uint32(id, pVal);
 }
-static INLINE IMG_UINT os_get_km_apphint_UINT64(void *state, APPHINT_ID id, IMG_UINT64 *pAppHintDefault, IMG_UINT64 *pVal) {
+static INLINE IMG_UINT os_get_km_apphint_UINT64(void *state, APPHINT_ID id, const IMG_UINT64 *pAppHintDefault, IMG_UINT64 *pVal) {
 	return !pvr_apphint_get_uint64(id, pVal);
 }
-static INLINE IMG_UINT os_get_km_apphint_BOOL(void *state, APPHINT_ID id, IMG_BOOL *pAppHintDefault, IMG_BOOL *pVal) {
+static INLINE IMG_UINT os_get_km_apphint_BOOL(void *state, APPHINT_ID id, const IMG_BOOL *pAppHintDefault, IMG_BOOL *pVal) {
 	return !pvr_apphint_get_bool(id, pVal);
 }
-static INLINE IMG_UINT os_get_km_apphint_STRING(void *state, APPHINT_ID id, IMG_CHAR **pAppHintDefault, IMG_CHAR *buffer, size_t size) {
+static INLINE IMG_UINT os_get_km_apphint_STRING(void *state, APPHINT_ID id, const IMG_CHAR *pAppHintDefault, IMG_CHAR *buffer, size_t size) {
 	return !pvr_apphint_get_string(id, buffer, size);
 }
 

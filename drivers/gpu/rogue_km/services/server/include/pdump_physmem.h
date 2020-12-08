@@ -56,30 +56,30 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 typedef struct _PDUMP_PHYSMEM_INFO_T_ PDUMP_PHYSMEM_INFO_T;
 
 #if defined(PDUMP)
-extern PVRSRV_ERROR
+PVRSRV_ERROR
 PDumpGetSymbolicAddr(const IMG_HANDLE hPhysmemPDumpHandle,
                      IMG_CHAR **ppszSymbolicAddress);
 
-extern PVRSRV_ERROR
+PVRSRV_ERROR
 PDumpMalloc(const IMG_CHAR *pszDevSpace,
-               const IMG_CHAR *pszSymbolicAddress,
-               IMG_UINT64 ui64Size,
-               /* alignment is alignment of start of buffer _and_
-                  minimum contiguity - i.e. smallest allowable
-                  page-size. */
-               IMG_DEVMEM_ALIGN_T uiAlign,
-               IMG_BOOL bInitialise,
-               IMG_UINT32 ui32InitValue,
-               IMG_HANDLE *phHandlePtr,
-               IMG_UINT32 ui32PDumpFlags);
+            const IMG_CHAR *pszSymbolicAddress,
+            IMG_UINT64 ui64Size,
+            /* alignment is alignment of start of buffer _and_
+               minimum contiguity - i.e. smallest allowable
+               page-size. */
+            IMG_DEVMEM_ALIGN_T uiAlign,
+            IMG_BOOL bInitialise,
+            IMG_UINT32 ui32InitValue,
+            IMG_HANDLE *phHandlePtr,
+            IMG_UINT32 ui32PDumpFlags);
 
-extern
-PVRSRV_ERROR PDumpFree(IMG_HANDLE hPDumpAllocationInfoHandle);
+PVRSRV_ERROR
+PDumpFree(IMG_HANDLE hPDumpAllocationInfoHandle);
 
 void
 PDumpMakeStringValid(IMG_CHAR *pszString,
                      IMG_UINT32 ui32StrLen);
-#else	/* PDUMP */
+#else /* PDUMP */
 
 #ifdef INLINE_IS_PRAGMA
 #pragma inline(PDumpGetSymbolicAddr)
@@ -95,13 +95,13 @@ PDumpGetSymbolicAddr(const IMG_HANDLE hPhysmemPDumpHandle,
 
 static INLINE PVRSRV_ERROR
 PDumpMalloc(const IMG_CHAR *pszDevSpace,
-               const IMG_CHAR *pszSymbolicAddress,
-               IMG_UINT64 ui64Size,
-               IMG_DEVMEM_ALIGN_T uiAlign,
-               IMG_BOOL bInitialise,
-               IMG_UINT32 ui32InitValue,
-               IMG_HANDLE *phHandlePtr,
-               IMG_UINT32 ui32PDumpFlags)
+            const IMG_CHAR *pszSymbolicAddress,
+            IMG_UINT64 ui64Size,
+            IMG_DEVMEM_ALIGN_T uiAlign,
+            IMG_BOOL bInitialise,
+            IMG_UINT32 ui32InitValue,
+            IMG_HANDLE *phHandlePtr,
+            IMG_UINT32 ui32PDumpFlags)
 {
 	PVR_UNREFERENCED_PARAMETER(pszDevSpace);
 	PVR_UNREFERENCED_PARAMETER(pszSymbolicAddress);
@@ -110,6 +110,7 @@ PDumpMalloc(const IMG_CHAR *pszDevSpace,
 	PVR_UNREFERENCED_PARAMETER(bInitialise);
 	PVR_UNREFERENCED_PARAMETER(ui32InitValue);
 	PVR_UNREFERENCED_PARAMETER(phHandlePtr);
+	PVR_UNREFERENCED_PARAMETER(ui32PDumpFlags);
 	return PVRSRV_OK;
 }
 
@@ -119,12 +120,12 @@ PDumpFree(IMG_HANDLE hPDumpAllocationInfoHandle)
 	PVR_UNREFERENCED_PARAMETER(hPDumpAllocationInfoHandle);
 	return PVRSRV_OK;
 }
-#endif	/* PDUMP */
+#endif /* PDUMP */
 
 #define PMR_DEFAULT_PREFIX "PMR"
 #define PMR_SYMBOLICADDR_FMTSPEC "%s%"IMG_UINT64_FMTSPEC"_%"IMG_UINT64_FMTSPEC"_%s"
 #define PMR_MEMSPACE_FMTSPEC "%s"
-#define PMR_MEMSPACE_CACHE_COHERENT_FMTSPEC PMR_MEMSPACE_FMTSPEC
+#define PMR_MEMSPACE_CACHE_COHERENT_FMTSPEC "CC_%s"
 
 #if defined(PDUMP)
 #define PDUMP_PHYSMEM_MALLOC_OSPAGES(pszPDumpMemDevName, ui32SerialNum, ui32Size, ui32Align, bInitialise, ui32InitValue, phHandlePtr) \
@@ -136,51 +137,51 @@ PDumpFree(IMG_HANDLE hPDumpAllocationInfoHandle)
     ((void)(*phHandlePtr=NULL))
 #define PDUMP_PHYSMEM_FREE_OSPAGES(hHandle) \
     ((void)(0))
-#endif // defined(PDUMP)
+#endif /* PDUMP */
 
-extern PVRSRV_ERROR
+PVRSRV_ERROR
 PDumpPMRWRW32(const IMG_CHAR *pszDevSpace,
             const IMG_CHAR *pszSymbolicName,
             IMG_DEVMEM_OFFSET_T uiOffset,
             IMG_UINT32 ui32Value,
             PDUMP_FLAGS_T uiPDumpFlags);
 
-extern PVRSRV_ERROR
+PVRSRV_ERROR
 PDumpPMRWRW32InternalVarToMem(const IMG_CHAR *pszDevSpace,
                               const IMG_CHAR *pszSymbolicName,
                               IMG_DEVMEM_OFFSET_T uiOffset,
                               const IMG_CHAR *pszInternalVar,
                               PDUMP_FLAGS_T uiPDumpFlags);
 
-extern PVRSRV_ERROR
+PVRSRV_ERROR
 PDumpPMRRDW32MemToInternalVar(const IMG_CHAR *pszInternalVar,
                               const IMG_CHAR *pszDevSpace,
                               const IMG_CHAR *pszSymbolicName,
                               IMG_DEVMEM_OFFSET_T uiOffset,
                               PDUMP_FLAGS_T uiPDumpFlags);
 
-extern PVRSRV_ERROR
+PVRSRV_ERROR
 PDumpPMRWRW64(const IMG_CHAR *pszDevSpace,
             const IMG_CHAR *pszSymbolicName,
             IMG_DEVMEM_OFFSET_T uiOffset,
             IMG_UINT64 ui64Value,
             PDUMP_FLAGS_T uiPDumpFlags);
 
-extern PVRSRV_ERROR
+PVRSRV_ERROR
 PDumpPMRWRW64InternalVarToMem(const IMG_CHAR *pszDevSpace,
                               const IMG_CHAR *pszSymbolicName,
                               IMG_DEVMEM_OFFSET_T uiOffset,
                               const IMG_CHAR *pszInternalVar,
                               PDUMP_FLAGS_T uiPDumpFlags);
 
-extern PVRSRV_ERROR
+PVRSRV_ERROR
 PDumpPMRRDW64MemToInternalVar(const IMG_CHAR *pszInternalVar,
                               const IMG_CHAR *pszDevSpace,
                               const IMG_CHAR *pszSymbolicName,
                               IMG_DEVMEM_OFFSET_T uiOffset,
                               PDUMP_FLAGS_T uiPDumpFlags);
 
-extern PVRSRV_ERROR
+PVRSRV_ERROR
 PDumpPMRLDB(const IMG_CHAR *pszDevSpace,
             const IMG_CHAR *pszSymbolicName,
             IMG_DEVMEM_OFFSET_T uiOffset,
@@ -189,7 +190,7 @@ PDumpPMRLDB(const IMG_CHAR *pszDevSpace,
             IMG_UINT32 uiFileOffset,
             PDUMP_FLAGS_T uiPDumpFlags);
 
-extern PVRSRV_ERROR
+PVRSRV_ERROR
 PDumpPMRSAB(const IMG_CHAR *pszDevSpace,
             const IMG_CHAR *pszSymbolicName,
             IMG_DEVMEM_OFFSET_T uiOffset,
@@ -200,9 +201,9 @@ PDumpPMRSAB(const IMG_CHAR *pszDevSpace,
 /*
   PDumpPMRPOL()
 
-  emits a POL to the PDUMP.
+  Emits a POL to the PDUMP.
 */
-extern PVRSRV_ERROR
+PVRSRV_ERROR
 PDumpPMRPOL(const IMG_CHAR *pszMempaceName,
             const IMG_CHAR *pszSymbolicName,
             IMG_DEVMEM_OFFSET_T uiOffset,
@@ -213,7 +214,7 @@ PDumpPMRPOL(const IMG_CHAR *pszMempaceName,
             IMG_UINT32 uiDelay,
             PDUMP_FLAGS_T uiPDumpFlags);
 
-extern PVRSRV_ERROR
+PVRSRV_ERROR
 PDumpPMRCBP(const IMG_CHAR *pszMemspaceName,
             const IMG_CHAR *pszSymbolicName,
             IMG_DEVMEM_OFFSET_T uiReadOffset,
@@ -224,20 +225,19 @@ PDumpPMRCBP(const IMG_CHAR *pszMemspaceName,
 /*
  * PDumpWriteParameterBlob()
  *
- * writes a binary blob to the pdump param stream containing the
- * current contents of the memory, and returns the filename and offset
- * of where that blob is located (for use in a subsequent LDB, for
- * example)
+ * Writes a binary blob to the pdump param stream containing the current
+ * contents of the memory, and returns the filename and offset of where
+ * that blob is located (for use in a subsequent LDB, for example).
  *
- * Caller to provide buffer to receive filename, and declare the size
- * of that buffer
+ * Caller to provide buffer to receive filename, and declare the size of
+ * that buffer.
  */
-extern PVRSRV_ERROR
+PVRSRV_ERROR
 PDumpWriteParameterBlob(IMG_UINT8 *pcBuffer,
-                 size_t uiNumBytes,
-                 PDUMP_FLAGS_T uiPDumpFlags,
-                 IMG_CHAR *pszFilenameOut,
-                 size_t uiFilenameBufSz,
-                 PDUMP_FILEOFFSET_T *puiOffsetOut);
+                        size_t uiNumBytes,
+                        PDUMP_FLAGS_T uiPDumpFlags,
+                        IMG_CHAR *pszFilenameOut,
+                        size_t uiFilenameBufSz,
+                        PDUMP_FILEOFFSET_T *puiOffsetOut);
 
 #endif /* #ifndef SRVSRV_PDUMP_PHYSMEM_H */

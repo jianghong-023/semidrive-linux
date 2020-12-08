@@ -41,8 +41,8 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */ /***************************************************************************/
 
-#ifndef __DEVICEMEMHEAPCFG_H__
-#define __DEVICEMEMHEAPCFG_H__
+#ifndef DEVICEMEMHEAPCFG_H
+#define DEVICEMEMHEAPCFG_H
 
 #include <powervr/mem_types.h>
 
@@ -51,23 +51,21 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 
 
-/* FIXME: Find a better way of defining _PVRSRV_DEVICE_NODE_ */
 struct _PVRSRV_DEVICE_NODE_;
-/* FIXME: Find a better way of defining _CONNECTION_DATA_ */
 struct _CONNECTION_DATA_;
 
 
 /*
-  A "heap config" is a blueprint to be used for initial setting up of
-  heaps when a device memory context is created.
+  A "heap config" is a blueprint to be used for initial setting up of heaps
+  when a device memory context is created.
 
-  We define a data structure to define this, but it's really down to
-  the caller to populate it.  This is all expected to be in-kernel.
-  We provide an API that client code can use to enquire about the
-  blueprint, such that it may do the heap setup during the context
-  creation call on behalf of the user */
+  We define a data structure to define this, but it's really down to the
+  caller to populate it. This is all expected to be in-kernel. We provide an
+  API that client code can use to enquire about the blueprint, such that it may
+  do the heap set-up during the context creation call on behalf of the user.
+*/
 
-/* blueprint for a single heap */
+/* Blueprint for a single heap */
 typedef struct _DEVMEM_HEAP_BLUEPRINT_
 {
 	/* Name of this heap - for debug purposes, and perhaps for lookup
@@ -93,6 +91,17 @@ typedef struct _DEVMEM_HEAP_BLUEPRINT_
 	a multiple of 1GB */
 	IMG_DEVMEM_SIZE_T uiHeapLength;
 
+	/* VA space starting sHeapBaseAddr to uiReservedRegionLength-1 are reserved
+	for statically defined addresses (shared/known between clients and FW).
+	Services never maps allocations into this reserved address space _unless_
+	explicitly requested via PVRSRVMapToDeviceAddress by passing sDevVirtAddr
+	which falls within this reserved range. Since this range is completely for
+	clients to manage (where allocations are page granular), it _must_ again be
+	a whole number of data pages. Additionally, another constraint enforces this
+	to be a multiple of RGX_HEAP_RESERVED_SIZE_GRANULARITY (which evaluates to
+	max page size supported) to support varied pages sizes */
+	IMG_DEVMEM_SIZE_T uiReservedRegionLength;
+
 	/* Data page size.  This is the page size that is going to get
 	programmed into the MMU, so it needs to be a valid one for the
 	device.  Importantly, the start address and length _must_ be
@@ -105,13 +114,9 @@ typedef struct _DEVMEM_HEAP_BLUEPRINT_
 	aligned to at least this value */
 	IMG_UINT32 uiLog2ImportAlignment;
 
-	/* Tiled heaps have an optimum byte-stride, this can be derived from
-	the heap alignment and tiling mode. This is abstracted here such that
-	Log2ByteStride = Log2Alignment - Log2TilingStrideFactor */
-	IMG_UINT32 uiLog2TilingStrideFactor;
 } DEVMEM_HEAP_BLUEPRINT;
 
-/* entire named heap config */
+/* Entire named heap config */
 typedef struct _DEVMEM_HEAP_CONFIG_
 {
     /* Name of this heap config - for debug and maybe lookup */
@@ -125,29 +130,29 @@ typedef struct _DEVMEM_HEAP_CONFIG_
 } DEVMEM_HEAP_CONFIG;
 
 
-extern PVRSRV_ERROR
-HeapCfgHeapConfigCount(struct _CONNECTION_DATA_ * psConnection,
+PVRSRV_ERROR
+HeapCfgHeapConfigCount(struct _CONNECTION_DATA_ *psConnection,
     const struct _PVRSRV_DEVICE_NODE_ *psDeviceNode,
     IMG_UINT32 *puiNumHeapConfigsOut
 );
 
-extern PVRSRV_ERROR
-HeapCfgHeapCount(struct _CONNECTION_DATA_ * psConnection,
+PVRSRV_ERROR
+HeapCfgHeapCount(struct _CONNECTION_DATA_ *psConnection,
     const struct _PVRSRV_DEVICE_NODE_ *psDeviceNode,
     IMG_UINT32 uiHeapConfigIndex,
     IMG_UINT32 *puiNumHeapsOut
 );
 
-extern PVRSRV_ERROR
-HeapCfgHeapConfigName(struct _CONNECTION_DATA_ * psConnection,
+PVRSRV_ERROR
+HeapCfgHeapConfigName(struct _CONNECTION_DATA_ *psConnection,
     const struct _PVRSRV_DEVICE_NODE_ *psDeviceNode,
     IMG_UINT32 uiHeapConfigIndex,
     IMG_UINT32 uiHeapConfigNameBufSz,
     IMG_CHAR *pszHeapConfigNameOut
 );
 
-extern PVRSRV_ERROR
-HeapCfgHeapDetails(struct _CONNECTION_DATA_ * psConnection,
+PVRSRV_ERROR
+HeapCfgHeapDetails(struct _CONNECTION_DATA_ *psConnection,
     const struct _PVRSRV_DEVICE_NODE_ *psDeviceNode,
     IMG_UINT32 uiHeapConfigIndex,
     IMG_UINT32 uiHeapIndex,
@@ -155,9 +160,9 @@ HeapCfgHeapDetails(struct _CONNECTION_DATA_ * psConnection,
     IMG_CHAR *pszHeapNameOut,
     IMG_DEV_VIRTADDR *psDevVAddrBaseOut,
     IMG_DEVMEM_SIZE_T *puiHeapLengthOut,
+    IMG_DEVMEM_SIZE_T *puiReservedRegionLengthOut,
     IMG_UINT32 *puiLog2DataPageSizeOut,
-    IMG_UINT32 *puiLog2ImportAlignmentOut,
-    IMG_UINT32 *puiLog2TilingStrideFactorOut
+    IMG_UINT32 *puiLog2ImportAlignmentOut
 );
 
 #endif

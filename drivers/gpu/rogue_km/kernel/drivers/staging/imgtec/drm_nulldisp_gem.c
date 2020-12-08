@@ -1,4 +1,3 @@
-/* -*- mode: c; indent-tabs-mode: t; c-basic-offset: 8; tab-width: 8 -*- */
 /* vi: set ts=8 sw=8 sts=8: */
 /*************************************************************************/ /*!
 @File
@@ -45,7 +44,6 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include <linux/atomic.h>
 #include <linux/mm_types.h>
 #include <linux/dma-buf.h>
-#include <linux/reservation.h>
 #include <linux/dma-mapping.h>
 #include <linux/scatterlist.h>
 #include <linux/slab.h>
@@ -53,6 +51,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include <linux/mutex.h>
 #include <linux/capability.h>
 
+#include "pvr_dma_resv.h"
 #include "drm_nulldisp_gem.h"
 #include "nulldisp_drm.h"
 #include "kernel_compatibility.h"
@@ -64,8 +63,10 @@ struct nulldisp_gem_object {
 	struct page **pages;
 	dma_addr_t *addrs;
 
-	struct reservation_object _resv;
-	struct reservation_object *resv;
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 2, 0))
+	struct dma_resv _resv;
+#endif
+	struct dma_resv *resv;
 
 	bool cpu_prep;
 	struct sg_table *import_sgt;
@@ -150,7 +151,7 @@ static void nulldisp_gem_object_put_pages(struct drm_gem_object *obj)
 }
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 11, 0))
-int nulldisp_gem_object_vm_fault(struct vm_fault *vmf)
+vm_fault_t nulldisp_gem_object_vm_fault(struct vm_fault *vmf)
 #else
 int nulldisp_gem_object_vm_fault(struct vm_area_struct *vma,
 				 struct vm_fault *vmf)
@@ -227,7 +228,9 @@ void nulldisp_gem_object_free(struct drm_gem_object *obj)
 		drm_gem_free_mmap_offset(obj);
 		drm_prime_gem_destroy(obj, nulldisp_obj->import_sgt);
 	} else {
-		reservation_object_fini(nulldisp_obj->resv);
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 2, 0))
+		dma_resv_fini(&nulldisp_obj->_resv);
+#endif
 		drm_gem_object_release(obj);
 	}
 
@@ -291,7 +294,11 @@ nulldisp_gem_prime_import_sg_table(struct drm_device *dev,
 		return NULL;
 
 	nulldisp_obj->resv = attach->dmabuf->resv;
+
 	obj = &nulldisp_obj->base;
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 2, 0))
+	obj->resv = nulldisp_obj->resv;
+#endif
 
 	drm_gem_private_object_init(dev, obj, attach->dmabuf->size);
 
@@ -319,7 +326,9 @@ exit_free_arrays:
 	return NULL;
 }
 
-struct dma_buf *nulldisp_gem_prime_export(struct drm_device *dev,
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 4, 0))
+struct dma_buf *nulldisp_gem_prime_export(
+					  struct drm_device *dev,
 					  struct drm_gem_object *obj,
 					  int flags)
 {
@@ -329,6 +338,7 @@ struct dma_buf *nulldisp_gem_prime_export(struct drm_device *dev,
 #endif
 	return drm_gem_prime_export(dev, obj, flags);
 }
+#endif
 
 void *nulldisp_gem_prime_vmap(struct drm_gem_object *obj)
 {
@@ -365,13 +375,15 @@ int nulldisp_gem_prime_mmap(struct drm_gem_object *obj,
 	return err;
 }
 
-struct reservation_object *
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 4, 0))
+struct dma_resv *
 nulldisp_gem_prime_res_obj(struct drm_gem_object *obj)
 {
 	struct nulldisp_gem_object *nulldisp_obj = to_nulldisp_obj(obj);
 
 	return nulldisp_obj->resv;
 }
+#endif
 
 int nulldisp_gem_object_mmap_ioctl(struct drm_device *dev, void *data,
 				   struct drm_file *file)
@@ -430,12 +442,12 @@ int nulldisp_gem_object_cpu_prep_ioctl(struct drm_device *dev, void *data,
 	if (wait) {
 		long lerr;
 
-		lerr = reservation_object_wait_timeout_rcu(nulldisp_obj->resv,
-							   write,
-							   true,
-							   30 * HZ);
+		lerr = dma_resv_wait_timeout_rcu(nulldisp_obj->resv,
+						 write,
+						 true,
+						 30 * HZ);
 
-		/* remap return value (0 indicates busy state, > 0 success) */
+		/* Remap return value (0 indicates busy state, > 0 success) */
 		if (lerr > 0)
 			err = 0;
 		else if (!lerr)
@@ -443,9 +455,12 @@ int nulldisp_gem_object_cpu_prep_ioctl(struct drm_device *dev, void *data,
 		else
 			err = lerr;
 	} else {
-		/* remap return value (false indicates busy state, true success) */
-		if (!reservation_object_test_signaled_rcu(nulldisp_obj->resv,
-							  write))
+		/*
+		 * Remap return value (false indicates busy state,
+		 * true success).
+		 */
+		if (!dma_resv_test_signaled_rcu(nulldisp_obj->resv,
+						write))
 			err = -EBUSY;
 		else
 			err = 0;
@@ -513,7 +528,6 @@ static int nulldisp_gem_object_create_priv(struct drm_file *file,
 	if (!nulldisp_obj)
 		return -ENOMEM;
 
-	nulldisp_obj->resv = &nulldisp_obj->_resv;
 	obj = &nulldisp_obj->base;
 
 	err = drm_gem_object_init(dev, obj, size);
@@ -529,7 +543,13 @@ static int nulldisp_gem_object_create_priv(struct drm_file *file,
 	if (err)
 		goto exit;
 
-	reservation_object_init(nulldisp_obj->resv);
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 2, 0))
+	dma_resv_init(&nulldisp_obj->_resv);
+	nulldisp_obj->resv = &nulldisp_obj->_resv;
+#else
+	nulldisp_obj->resv = nulldisp_obj->base.resv;
+#endif
+
 exit:
 	drm_gem_object_put_unlocked(obj);
 	return err;
@@ -614,7 +634,7 @@ exit_unlock:
 	return err;
 }
 
-struct reservation_object *nulldisp_gem_get_resv(struct drm_gem_object *obj)
+struct dma_resv *nulldisp_gem_get_resv(struct drm_gem_object *obj)
 {
 	return (to_nulldisp_obj(obj)->resv);
 }

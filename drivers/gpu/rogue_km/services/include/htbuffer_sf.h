@@ -4,7 +4,7 @@
 @Copyright      Copyright (c) Imagination Technologies Ltd. All Rights Reserved
 @Description    Header for the Host Trace Buffer logging messages. The following
                 list are the messages the host driver prints. Changing anything
-				but the first column or spelling mistakes in the strings will
+                but the first column or spelling mistakes in the strings will
                 break compatibility with log files created with older/newer
                 driver versions.
 @License        Dual MIT/GPLv2
@@ -44,19 +44,19 @@ COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
 IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */ /**************************************************************************/
-#ifndef __HTBUFFER_SF_H__
-#define __HTBUFFER_SF_H__
+#ifndef HTBUFFER_SF_H
+#define HTBUFFER_SF_H
 
-#if defined (__cplusplus)
+#if defined(__cplusplus)
 extern "C" {
 #endif
 
 
-/*****************************************************************************
+/******************************************************************************
  * *DO*NOT* rearrange or delete lines in SFIDLIST or SFGROUPLIST or you
  *          WILL BREAK host tracing message compatibility with previous
  *          driver versions. Only add new ones, if so required.
- ****************************************************************************/
+ *****************************************************************************/
 
 
 /* String used in pvrdebug -h output */
@@ -134,8 +134,8 @@ X( 5,  HTB_GROUP_MAIN,  HTB_SF_MAIN_KICK_SHG,           "Kick SHG: FWCtx %08X @ 
 X( 6,  HTB_GROUP_MAIN,  HTB_SF_MAIN_KICK_2D,            "Kick 2D: FWCtx %08X @ %d\n", 2) \
 X( 7,  HTB_GROUP_MAIN,  HTB_SF_MAIN_KICK_UNCOUNTED,     "Kick (uncounted) for all DMs\n", 0) \
 X( 8,  HTB_GROUP_MAIN,  HTB_SF_MAIN_FWCCB_CMD,          "FW CCB Cmd: %d\n", 1) \
-X( 9,  HTB_GROUP_MAIN,  HTB_SF_MAIN_PRE_POWER,		"Pre-power duration @ phase [%d] (0-shutdown,1-startup) RGX: %llu ns SYS: %llu ns\n", 3) \
-X(10,  HTB_GROUP_MAIN,  HTB_SF_MAIN_POST_POWER,		"Post-power duration @ phase [%d] (0-shutdown,1-startup) SYS: %llu ns RGX: %llu ns\n", 3) \
+X( 9,  HTB_GROUP_MAIN,  HTB_SF_MAIN_PRE_POWER,          "Pre-power duration @ phase [%d] (0-shutdown,1-startup) RGX: %llu ns SYS: %llu ns\n", 3) \
+X(10,  HTB_GROUP_MAIN,  HTB_SF_MAIN_POST_POWER,         "Post-power duration @ phase [%d] (0-shutdown,1-startup) SYS: %llu ns RGX: %llu ns\n", 3) \
 \
 X( 1,  HTB_GROUP_BRG,   HTB_SF_BRG_BRIDGE_CALL,         "Bridge call: start: %010u: bid %03d fid %d\n", 3) \
 X( 2,  HTB_GROUP_BRG,   HTB_SF_BRG_BRIDGE_CALL_ERR,     "Bridge call: start: %010u: bid %03d fid %d error %d\n", 4) \
@@ -154,16 +154,17 @@ typedef enum _HTB_LOG_SFGROUPS {
 } HTB_LOG_SFGROUPS;
 
 
-/* group flags are stored in an array of elements */
-/* each of which have a certain number of bits */
+/* Group flags are stored in an array of elements.
+ * Each of which have a certain number of bits.
+ */
 #define HTB_FLAG_EL_T                   IMG_UINT32
-#define HTB_FLAG_NUM_BITS_IN_EL         ( sizeof(HTB_FLAG_EL_T) * 8 )
+#define HTB_FLAG_NUM_BITS_IN_EL         (sizeof(HTB_FLAG_EL_T) * 8)
 
-#define HTB_LOG_GROUP_FLAG_GROUP(gid)   ( (gid-1) / HTB_FLAG_NUM_BITS_IN_EL )
-#define HTB_LOG_GROUP_FLAG(gid)         (gid? (0x1 << ((gid-1)%HTB_FLAG_NUM_BITS_IN_EL)): 0)
+#define HTB_LOG_GROUP_FLAG_GROUP(gid)   ((gid-1) / HTB_FLAG_NUM_BITS_IN_EL)
+#define HTB_LOG_GROUP_FLAG(gid)         (gid ? (0x1 << ((gid-1)%HTB_FLAG_NUM_BITS_IN_EL)) : 0)
 #define HTB_LOG_GROUP_FLAG_NAME(gid)    HTB_LOG_TYPE_ ## gid
 
-/* group enable flags */
+/* Group enable flags */
 typedef enum _HTB_LOG_TYPE {
 #define X(a, b) HTB_LOG_GROUP_FLAG_NAME(b) = HTB_LOG_GROUP_FLAG(a),
 	HTB_LOG_SFGROUPLIST
@@ -172,18 +173,18 @@ typedef enum _HTB_LOG_TYPE {
 
 
 
-/*  The symbolic names found in the table above are assigned an ui32 value of
- *  the following format:
- *  31 30 28 27       20   19  16    15  12      11            0   bits
- *  -   ---   ---- ----     ----      ----        ---- ---- ----
- *     0-11: id number
- *    12-15: group id number
- *    16-19: number of parameters
- *    20-27: unused
- *    28-30: active: identify SF packet, otherwise regular int32
- *       31: reserved for signed/unsigned compatibility
+/* The symbolic names found in the table above are assigned an ui32 value of
+ * the following format:
+ * 31 30 28 27       20   19  16    15  12      11            0   bits
+ * -   ---   ---- ----     ----      ----        ---- ---- ----
+ *    0-11: id number
+ *   12-15: group id number
+ *   16-19: number of parameters
+ *   20-27: unused
+ *   28-30: active: identify SF packet, otherwise regular int32
+ *      31: reserved for signed/unsigned compatibility
  *
- *   The following macro assigns those values to the enum generated SF ids list.
+ * The following macro assigns those values to the enum generated SF ids list.
  */
 #define HTB_LOG_IDMARKER            (0x70000000)
 #define HTB_LOG_CREATESFID(a,b,e)   (((a) | (b << 12) | (e << 16)) | HTB_LOG_IDMARKER)
@@ -199,19 +200,21 @@ typedef enum HTB_LOG_SFids {
 
 /* Return the group id that the given (enum generated) id belongs to */
 #define HTB_SF_GID(x) (((x)>>12) & 0xf)
-/* future improvement to support log levels */
+/* Future improvement to support log levels */
 #define HTB_SF_LVL(x) (0)
-/* Returns how many arguments the SF(string format) for the given (enum generated) id requires */
+/* Returns how many arguments the SF(string format) for the given
+ * (enum generated) id requires.
+ */
 #define HTB_SF_PARAMNUM(x) (((x)>>16) & 0xf)
 /* Returns the id of given enum */
 #define HTB_SF_ID(x) (x & 0xfff)
 
-/* format of messages is: SF:PID:TIMEPT1:TIMEPT2:[PARn]*
+/* Format of messages is: SF:PID:TIMEPT1:TIMEPT2:[PARn]*
  */
 #define HTB_LOG_HEADER_SIZE         4
 #define HTB_LOG_MAX_PARAMS          15
 
-#if defined (__cplusplus)
+#if defined(__cplusplus)
 }
 #endif
 
@@ -228,9 +231,7 @@ typedef enum HTB_LOG_SFids {
 #define HTB_ARG_CRTS_PT2 4
 #define HTB_ARG_CLKSPD   5
 
-#endif /* __HTBUFFER_SF_H__ */
+#endif /* HTBUFFER_SF_H */
 /*****************************************************************************
  End of file (htbuffer_sf.h)
 *****************************************************************************/
-
-

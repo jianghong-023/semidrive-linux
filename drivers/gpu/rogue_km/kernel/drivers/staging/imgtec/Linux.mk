@@ -38,11 +38,7 @@
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ### ###########################################################################
 
-modules := adf_fbdev adf_pdp tc adf_sunxi drm_nulldisp drm_pdp plato drm_rk drm_pdp2_hdmi
-
-adf_fbdev_type := kernel_module
-adf_fbdev_target := adf_fbdev.ko
-adf_fbdev_makefile := $(THIS_DIR)/Kbuild.mk
+modules := adf_pdp tc drm_nulldisp drm_pdp plato drm_rk drm_pdp2_hdmi
 
 adf_pdp_type := kernel_module
 adf_pdp_target := adf_pdp.ko
@@ -51,10 +47,6 @@ adf_pdp_makefile := $(THIS_DIR)/Kbuild.mk
 tc_type := kernel_module
 tc_target := tc.ko
 tc_makefile := $(THIS_DIR)/Kbuild.mk
-
-adf_sunxi_type := kernel_module
-adf_sunxi_target := adf_sunxi.ko
-adf_sunxi_makefile := $(THIS_DIR)/Kbuild.mk
 
 drm_nulldisp_type := kernel_module
 drm_nulldisp_target := drm_nulldisp.ko

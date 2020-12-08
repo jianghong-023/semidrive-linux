@@ -1,4 +1,3 @@
-/* -*- mode: c; indent-tabs-mode: t; c-basic-offset: 8; tab-width: 8 -*- */
 /* vi: set ts=8 sw=8 sts=8: */
 /*************************************************************************/ /*!
 @File
@@ -62,9 +61,19 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "kernel_compatibility.h"
 
 #if defined(PVRSRV_SYNC_CHECKPOINT_CCB)
-static DEFINE_HASHTABLE(pvr_fence_ufo_lut, 16);
+/* Set size of the hashtable to 4096 entries. Empirical experiments showed
+ * that the actual required size doesn't exceed few hundreds of entries (~200).
+ * Even if assumed 5 times higher threshold 4k entries should be enough
+ * to hold all of them with minimal number of conflicts.
+ */
+static DEFINE_HASHTABLE(pvr_fence_ufo_lut, 12);
 static DEFINE_SPINLOCK(pvr_fence_ufo_lut_spinlock);
 #endif
+
+/* Global kmem_cache for pvr_fence object allocations */
+static struct kmem_cache *pvr_fence_cache;
+static DEFINE_MUTEX(pvr_fence_cache_mutex);
+static u32 pvr_fence_cache_refcount;
 
 #define PVR_DUMPDEBUG_LOG(pfnDumpDebugPrintf, pvDumpDebugFile, fmt, ...) \
 	do {                                                             \
@@ -173,6 +182,28 @@ pvr_fence_context_seqno_next(struct pvr_fence_context *fctx)
 	return atomic_inc_return(&fctx->fence_seqno) - 1;
 }
 
+/* This function prepends seqno to fence name */
+static inline void
+pvr_fence_prepare_name(char *fence_name, size_t fence_name_size,
+		const char *name, unsigned int seqno)
+{
+	unsigned int len;
+
+	len = OSStringUINT32ToStr(fence_name, fence_name_size, seqno);
+	if (likely((len > 0) && (fence_name_size >= (len + 1)))) {
+		fence_name[len] = '-';
+		fence_name[len + 1] = '\0';
+	}
+	strlcat(fence_name, name, fence_name_size);
+}
+
+static void
+pvr_fence_sched_free(struct rcu_head *rcu)
+{
+	struct pvr_fence *pvr_fence = container_of(rcu, struct pvr_fence, rcu);
+	kmem_cache_free(pvr_fence_cache, pvr_fence);
+}
+
 static inline void
 pvr_fence_context_free_deferred(struct pvr_fence_context *fctx)
 {
@@ -192,7 +223,7 @@ pvr_fence_context_free_deferred(struct pvr_fence_context *fctx)
 				 fence_head) {
 		list_del(&pvr_fence->fence_head);
 		SyncCheckpointFree(pvr_fence->sync_checkpoint);
-		dma_fence_free(&pvr_fence->base);
+		call_rcu(&pvr_fence->rcu, pvr_fence_sched_free);
 		module_put(THIS_MODULE);
 	}
 }
@@ -230,9 +261,9 @@ pvr_fence_context_signal_fences(void *data)
 	 * So extract the items we intend to signal and add them to their own
 	 * queue.
 	 */
-	spin_lock_irqsave(&fctx->list_lock, flags1);
 #if defined(PVRSRV_SYNC_CHECKPOINT_CCB)
 	spin_lock_irqsave(&pvr_fence_ufo_lut_spinlock, flags2);
+	spin_lock_irqsave(&fctx->list_lock, flags1);
 	list_for_each_entry_safe(pvr_fence, tmp, &fctx->signal_list,
 				 signal_head) {
 		if (pvr_fence_sync_is_signaled(pvr_fence, PVRSRV_FENCE_FLAG_SUPPRESS_HWP_PKT)) {
@@ -240,16 +271,17 @@ pvr_fence_context_signal_fences(void *data)
 			hash_del(&pvr_fence->ufo_lookup);
 		}
 	}
+	spin_unlock_irqrestore(&fctx->list_lock, flags1);
 	spin_unlock_irqrestore(&pvr_fence_ufo_lut_spinlock, flags2);
 #else
+	spin_lock_irqsave(&fctx->list_lock, flags1);
 	list_for_each_entry_safe(pvr_fence, tmp, &fctx->signal_list,
 	             signal_head) {
 		if (pvr_fence_sync_is_signaled(pvr_fence, PVRSRV_FENCE_FLAG_SUPPRESS_HWP_PKT))
 			list_move_tail(&pvr_fence->signal_head, &signal_list);
 	}
-#endif /* defined(PVRSRV_SYNC_CHECKPOINT_CCB) */
-
 	spin_unlock_irqrestore(&fctx->list_lock, flags1);
+#endif /* defined(PVRSRV_SYNC_CHECKPOINT_CCB) */
 
 	list_for_each_entry_safe(pvr_fence, tmp, &signal_list, signal_head) {
 
@@ -284,17 +316,19 @@ pvr_fence_context_destroy_work(struct work_struct *data)
 
 	pvr_fence_context_free_deferred(fctx);
 
-	/*
-	 * Ensure any outstanding calls to SyncCheckpointFree have completed
-	 * on the fence workqueue.
-	 */
-	flush_workqueue(fctx->fence_wq);
-
 	if (WARN_ON(!list_empty_careful(&fctx->fence_list)))
 		pvr_fence_context_fences_dump(fctx, NULL, NULL);
 
 	PVRSRVUnregisterDbgRequestNotify(fctx->dbg_request_handle);
 	PVRSRVUnregisterCmdCompleteNotify(fctx->cmd_complete_handle);
+
+	/* Destroy pvr_fence object cache, if no one is using it */
+	WARN_ON(pvr_fence_cache == NULL);
+	mutex_lock(&pvr_fence_cache_mutex);
+	if (--pvr_fence_cache_refcount == 0)
+		kmem_cache_destroy(pvr_fence_cache);
+	mutex_unlock(&pvr_fence_cache_mutex);
+
 	kfree(fctx);
 }
 
@@ -360,6 +394,21 @@ pvr_fence_context_create(void *dev_cookie,
 		       __func__, PVRSRVGetErrorString(srv_err));
 		goto err_free_fctx;
 	}
+
+	/* Create pvr_fence object cache, if not already created */
+	mutex_lock(&pvr_fence_cache_mutex);
+	if (pvr_fence_cache_refcount == 0) {
+		pvr_fence_cache = KMEM_CACHE(pvr_fence, 0);
+		if (!pvr_fence_cache) {
+			pr_err("%s: failed to allocate pvr_fence cache\n",
+					__func__);
+			mutex_unlock(&pvr_fence_cache_mutex);
+			goto err_unregister_cmd_complete_notify;
+		}
+	}
+	pvr_fence_cache_refcount++;
+	mutex_unlock(&pvr_fence_cache_mutex);
+
 	srv_err = PVRSRVRegisterDbgRequestNotify(&fctx->dbg_request_handle,
 				dev_cookie,
 				pvr_fence_context_debug_request,
@@ -368,7 +417,7 @@ pvr_fence_context_create(void *dev_cookie,
 	if (srv_err != PVRSRV_OK) {
 		pr_err("%s: failed to register debug request callback (%s)\n",
 		       __func__, PVRSRVGetErrorString(srv_err));
-		goto err_unregister_cmd_complete_notify;
+		goto err_free_pvr_fence_cache;
 	}
 
 	kref_init(&fctx->kref);
@@ -378,6 +427,11 @@ pvr_fence_context_create(void *dev_cookie,
 
 	return fctx;
 
+err_free_pvr_fence_cache:
+	mutex_lock(&pvr_fence_cache_mutex);
+	if (--pvr_fence_cache_refcount == 0)
+		kmem_cache_destroy(pvr_fence_cache);
+	mutex_unlock(&pvr_fence_cache_mutex);
 err_unregister_cmd_complete_notify:
 	PVRSRVUnregisterCmdCompleteNotify(fctx->cmd_complete_handle);
 err_free_fctx:
@@ -437,8 +491,8 @@ void pvr_fence_fence_value_str(struct dma_fence *fence, char *str, int size)
 		return;
 
 	snprintf(str, size,
-		 "%u: (%s%s) refs=%u fwaddr=%#08x enqueue=%u status=%-9s %s%s",
-		 pvr_fence->fence->seqno,
+		 "%llu: (%s%s) refs=%u fwaddr=%#08x enqueue=%u status=%-9s %s%s",
+		 (u64) pvr_fence->fence->seqno,
 		 test_bit(DMA_FENCE_FLAG_ENABLE_SIGNAL_BIT,
 			  &pvr_fence->fence->flags) ? "+" : "-",
 		 test_bit(DMA_FENCE_FLAG_SIGNALED_BIT,
@@ -566,9 +620,14 @@ pvr_fence_create(struct pvr_fence_context *fctx,
 	if (!try_module_get(THIS_MODULE))
 		goto err_exit;
 
-	pvr_fence = kzalloc(sizeof(*pvr_fence), GFP_KERNEL);
-	if (unlikely(!pvr_fence))
+	/* Note: As kmem_cache is used to allocate pvr_fence objects,
+	 * make sure that all members of pvr_fence struct are initialized
+	 * here
+	 */
+	pvr_fence = kmem_cache_alloc(pvr_fence_cache, GFP_KERNEL);
+	if (unlikely(!pvr_fence)) {
 		goto err_module_put;
+	}
 
 	srv_err = SyncCheckpointAlloc(sync_checkpoint_ctx,
 				      (PVRSRV_TIMELINE) timeline_fd, PVRSRV_NO_FENCE,
@@ -581,8 +640,11 @@ pvr_fence_create(struct pvr_fence_context *fctx,
 	pvr_fence->fctx = fctx;
 	seqno = pvr_fence_context_seqno_next(fctx);
 	/* Add the seqno to the fence name for easier debugging */
-	snprintf(pvr_fence->name, sizeof(pvr_fence->name), "%d-%s",
-		 seqno, name);
+	pvr_fence_prepare_name(pvr_fence->name, sizeof(pvr_fence->name),
+			name, seqno);
+
+	/* Reset cb to zero */
+	memset(&pvr_fence->cb, 0, sizeof(pvr_fence->cb));
 	pvr_fence->fence = &pvr_fence->base;
 
 	dma_fence_init(&pvr_fence->base, &pvr_fence_ops, &fctx->lock,
@@ -600,7 +662,7 @@ pvr_fence_create(struct pvr_fence_context *fctx,
 	return pvr_fence;
 
 err_free_fence:
-	kfree(pvr_fence);
+	kmem_cache_free(pvr_fence_cache, pvr_fence);
 err_module_put:
 	module_put(THIS_MODULE);
 err_exit:
@@ -638,8 +700,8 @@ void pvr_fence_foreign_fence_value_str(struct dma_fence *fence, char *str,
 	 * shadow copy. This is done as the shadow fence flag bits aren't used.
 	 */
 	snprintf(str, size,
-		 "%u: (%s%s) refs=%u fwaddr=%#08x cur=%#08x nxt=%#08x %s",
-		 fence->seqno,
+		 "%llu: (%s%s) refs=%u fwaddr=%#08x cur=%#08x nxt=%#08x %s",
+		 (u64) fence->seqno,
 		 test_bit(DMA_FENCE_FLAG_ENABLE_SIGNAL_BIT,
 			  &pvr_fence->fence->flags) ? "+" : "-",
 		 test_bit(DMA_FENCE_FLAG_SIGNALED_BIT,
@@ -784,9 +846,14 @@ pvr_fence_create_from_fence(struct pvr_fence_context *fctx,
 	if (!try_module_get(THIS_MODULE))
 		goto err_exit;
 
-	pvr_fence = kzalloc(sizeof(*pvr_fence), GFP_KERNEL);
-	if (!pvr_fence)
+	/* Note: As kmem_cache is used to allocate pvr_fence objects,
+	 * make sure that all members of pvr_fence struct are initialized
+	 * here
+	 */
+	pvr_fence = kmem_cache_alloc(pvr_fence_cache, GFP_KERNEL);
+	if (!pvr_fence) {
 		goto err_module_put;
+	}
 
 	srv_err = SyncCheckpointAlloc(sync_checkpoint_ctx,
 					  SYNC_CHECKPOINT_FOREIGN_CHECKPOINT,
@@ -801,8 +868,9 @@ pvr_fence_create_from_fence(struct pvr_fence_context *fctx,
 	pvr_fence->fence = dma_fence_get(fence);
 	seqno = pvr_fence_context_seqno_next(fctx);
 	/* Add the seqno to the fence name for easier debugging */
-	snprintf(pvr_fence->name, sizeof(pvr_fence->name), "%d-%s",
-		 seqno, name);
+	pvr_fence_prepare_name(pvr_fence->name, sizeof(pvr_fence->name),
+			name, seqno);
+
 	/*
 	 * We use the base fence to refcount the PVR fence and to do the
 	 * necessary clean up once the refcount drops to 0.
@@ -861,7 +929,7 @@ err_put_ref:
 	spin_unlock_irqrestore(&fctx->list_lock, flags);
 	SyncCheckpointFree(pvr_fence->sync_checkpoint);
 err_free_pvr_fence:
-	kfree(pvr_fence);
+	kmem_cache_free(pvr_fence_cache, pvr_fence);
 err_module_put:
 	module_put(THIS_MODULE);
 err_exit:
@@ -1069,7 +1137,7 @@ void
 pvr_fence_check_state(void)
 {
 	int bkt;
-	unsigned long flags;
+	unsigned long flags, flags2;
 	struct hlist_node *tmp1;
 	struct pvr_fence *pvr_fence, *tmp2;
 	LIST_HEAD(signal_list);
@@ -1082,7 +1150,9 @@ pvr_fence_check_state(void)
 	spin_lock_irqsave(&pvr_fence_ufo_lut_spinlock, flags);
 	hash_for_each_safe(pvr_fence_ufo_lut, bkt, tmp1, pvr_fence, ufo_lookup) {
 		if (pvr_fence_sync_is_signaled(pvr_fence, PVRSRV_FENCE_FLAG_SUPPRESS_HWP_PKT)) {
+			spin_lock_irqsave(&pvr_fence->fctx->list_lock, flags2);
 			list_move_tail(&pvr_fence->signal_head, &signal_list);
+			spin_unlock_irqrestore(&pvr_fence->fctx->list_lock, flags2);
 			hash_del(&pvr_fence->ufo_lookup);
 		}
 	}

@@ -62,7 +62,7 @@ struct SYNC_CHECKPOINT_RECORD;
 	Private structures
 */
 
-typedef struct _SYNC_CHECKPOINT_CONTEXT_CTL_ *_PSYNC_CHECKPOINT_CONTEXT_CTL;
+typedef struct _SYNC_CHECKPOINT_CONTEXT_CTL_ _SYNC_CHECKPOINT_CONTEXT_CTL, *_PSYNC_CHECKPOINT_CONTEXT_CTL;
 
 typedef struct _SYNC_CHECKPOINT_CONTEXT_
 {
@@ -75,6 +75,11 @@ typedef struct _SYNC_CHECKPOINT_CONTEXT_
 	ATOMIC_T						hCheckpointCount;                      /*!< Checkpoint count for this context */
 	POS_LOCK						hLock;
 	_PSYNC_CHECKPOINT_CONTEXT_CTL	psContextCtl;
+#if defined(PDUMP)
+	DLLIST_NODE						sSyncCheckpointBlockListHead;          /*!< List head for the sync chkpt blocks in this context*/
+	POS_LOCK						hSyncCheckpointBlockListLock;          /*!< sync chkpt blocks list lock*/
+	DLLIST_NODE						sListNode;				/*!< List node for the sync chkpt context list*/
+#endif
 } _SYNC_CHECKPOINT_CONTEXT;
 
 typedef struct _SYNC_CHECKPOINT_BLOCK_
@@ -88,6 +93,9 @@ typedef struct _SYNC_CHECKPOINT_BLOCK_
 	DEVMEM_MEMDESC            *hMemDesc;                  /*!< DevMem allocation for block */
 	volatile IMG_UINT32       *pui32LinAddr;              /*!< Server-code CPU mapping */
 	IMG_UINT64                uiSpanBase;                 /*!< Base of this import (FW DevMem) in the span RA */
+#if defined(PDUMP)
+	DLLIST_NODE               sListNode;                  /*!< List node for the sync chkpt blocks */
+#endif
 } SYNC_CHECKPOINT_BLOCK;
 
 typedef struct SYNC_CHECKPOINT_RECORD* PSYNC_CHECKPOINT_RECORD_HANDLE;
@@ -99,7 +107,6 @@ typedef struct _SYNC_CHECKPOINT_
 	 * the same memory be re-used later for a different checkpoint
 	 */
 	IMG_UINT32                      ui32UID;                /*!< Unique ID assigned to sync checkpoint (to distinguish checkpoints if memory is re-used)*/
-	POS_LOCK                        hLock;
 	ATOMIC_T                        hRefCount;              /*!< Ref count for this sync */
 	ATOMIC_T                        hEnqueuedCCBCount;      /*!< Num times sync has been put in CCBs */
 	SYNC_CHECKPOINT_BLOCK           *psSyncCheckpointBlock; /*!< Synchronisation block this checkpoint is allocated on */
@@ -114,7 +121,20 @@ typedef struct _SYNC_CHECKPOINT_
 	DLLIST_NODE                     sListNode;              /*!< List node for the global sync chkpt list */
 	DLLIST_NODE                     sDeferredFreeListNode;  /*!< List node for the deferred free sync chkpt list */
 	IMG_UINT32                      ui32FWAddr;             /*!< FWAddr stored at sync checkpoint alloc time */
+	PDUMP_FLAGS_T                   ui32PDumpFlags;         /*!< Pdump Capture mode to be used for POL*/
 } _SYNC_CHECKPOINT;
+
+
+typedef struct _SYNC_CHECKPOINT_SIGNAL_
+{
+	_SYNC_CHECKPOINT                asSyncCheckpoint;       /*!< Store sync checkpt for deferred signal */
+	IMG_UINT32                      ui32Status;             /*!< sync checkpt status signal/errored */
+} _SYNC_CHECKPOINT_DEFERRED_SIGNAL;
+
+#define GET_CP_CB_NEXT_IDX(_curridx) (((_curridx) + 1) % SYNC_CHECKPOINT_MAX_DEFERRED_SIGNAL)
+#define GET_CP_CB_BASE(_idx)   (IMG_OFFSET_ADDR(psDevNode->pui8DeferredSyncCPSignal, \
+                                                ((_idx) * sizeof(_SYNC_CHECKPOINT_DEFERRED_SIGNAL))))
+
 
 /*************************************************************************/ /*!
 @Function       SyncCheckpointGetFirmwareAddr

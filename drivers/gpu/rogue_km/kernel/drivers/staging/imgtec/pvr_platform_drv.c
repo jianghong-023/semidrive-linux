@@ -1,4 +1,3 @@
-/* -*- mode: c; indent-tabs-mode: t; c-basic-offset: 8; tab-width: 8 -*- */
 /* vi: set ts=8 sw=8 sts=8: */
 /*************************************************************************/ /*!
 @File
@@ -43,10 +42,21 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */ /**************************************************************************/
 
+#include <linux/version.h>
+
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 5, 0))
+#include <drm/drm_drv.h>
+#include <drm/drm_print.h>
+#include <linux/mod_devicetable.h>
+#include <linux/dma-mapping.h>
+#include <linux/of.h>
+#include <linux/slab.h>
+#else
 #include <drm/drmP.h>
+#endif
+
 #include <linux/module.h>
 #include <linux/platform_device.h>
-#include <linux/version.h>
 
 #include "module_common.h"
 #include "pvr_drv.h"
@@ -237,16 +247,13 @@ static void pvr_shutdown(struct platform_device *pdev)
 
 	DRM_DEBUG_DRIVER("device %p\n", &pdev->dev);
 
-	PVRSRVCommonDeviceShutdown(priv->dev_node);
+	PVRSRVDeviceShutdown(priv->dev_node);
 }
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 9, 0))
 static struct of_device_id pvr_of_ids[] = {
 #if defined(SYS_RGX_OF_COMPATIBLE)
 	{ .compatible = SYS_RGX_OF_COMPATIBLE, },
-#endif
-#if defined(SYS_RGX_OF_COMPATIBLE1)
-        { .compatible = SYS_RGX_OF_COMPATIBLE1, },
 #endif
 	{},
 };
@@ -293,7 +300,7 @@ static int __init pvr_init(void)
 	pvr_drm_platform_driver.set_busid = drm_platform_set_busid;
 #endif
 
-	err = PVRSRVCommonDriverInit();
+	err = PVRSRVDriverInit();
 	if (err)
 		return err;
 
@@ -310,7 +317,7 @@ static void __exit pvr_exit(void)
 
 	pvr_devices_unregister();
 	platform_driver_unregister(&pvr_platform_driver);
-	PVRSRVCommonDriverDeinit();
+	PVRSRVDriverDeinit();
 
 	DRM_DEBUG_DRIVER("done\n");
 }

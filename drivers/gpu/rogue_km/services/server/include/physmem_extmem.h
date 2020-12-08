@@ -41,8 +41,8 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */ /**************************************************************************/
 
-#ifndef _SRVSRV_PHYSMEM_EXTMEM_H_
-#define _SRVSRV_PHYSMEM_EXTMEM_H_
+#ifndef SRVSRV_PHYSMEM_EXTMEM_H
+#define SRVSRV_PHYSMEM_EXTMEM_H
 
 /* include/ */
 #include "img_types.h"
@@ -56,23 +56,21 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 /*
  * Based on PhysmemNewRamBackedPMR but uses a passed in virtual address.
- *
  */
+PVRSRV_ERROR
+PhysmemWrapExtMemOS(CONNECTION_DATA *psConnection,
+                    PVRSRV_DEVICE_NODE *psDevNode,
+                    IMG_DEVMEM_SIZE_T uiSize,
+                    IMG_CPU_VIRTADDR pvCpuVAddr,
+                    PVRSRV_MEMALLOCFLAGS_T uiFlags,
+                    PMR **ppsPMRPtr);
 
 PVRSRV_ERROR
-PhysmemWrapExtMemOS(CONNECTION_DATA * psConnection,
-                       PVRSRV_DEVICE_NODE *psDevNode,
-                       IMG_DEVMEM_SIZE_T uiSize,
-                       IMG_CPU_VIRTADDR pvCpuVAddr,
-                       PVRSRV_MEMALLOCFLAGS_T uiFlags,
-                       PMR **ppsPMRPtr);
+PhysmemWrapExtMem(CONNECTION_DATA *psConnection,
+                  PVRSRV_DEVICE_NODE *psDevNode,
+                  IMG_DEVMEM_SIZE_T uiSize,
+                  IMG_UINT64 pvCpuVAddr,
+                  PVRSRV_MEMALLOCFLAGS_T uiFlags,
+                  PMR **ppsPMROut);
 
-extern PVRSRV_ERROR
-PhysmemWrapExtMem(CONNECTION_DATA * psConnection,
-                       PVRSRV_DEVICE_NODE *psDevNode,
-                       IMG_DEVMEM_SIZE_T uiSize,
-                       IMG_UINT64 pvCpuVAddr,
-                       PVRSRV_MEMALLOCFLAGS_T uiFlags,
-                       PMR **ppsPMROut);
-
-#endif /* _SRVSRV_PHYSMEM__EXTERNMEMWRAP_H_ */
+#endif /* SRVSRV_PHYSMEM_EXTMEM_H */

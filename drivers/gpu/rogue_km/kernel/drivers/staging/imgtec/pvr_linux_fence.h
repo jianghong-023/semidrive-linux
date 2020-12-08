@@ -1,4 +1,3 @@
-/* -*- mode: c; indent-tabs-mode: t; c-basic-offset: 8; tab-width: 8 -*- */
 /* vi: set ts=8 sw=8 sts=8: */
 /*************************************************************************/ /*!
 @File
@@ -49,16 +48,14 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include <linux/version.h>
 
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(4, 10, 0)) && \
-	(!defined(CHROMIUMOS_KERNEL) || \
-	 (LINUX_VERSION_CODE < KERNEL_VERSION(4, 4, 0)))
+	!defined(CHROMIUMOS_KERNEL_HAS_DMA_FENCE)
 #include <linux/fence.h>
 #else
 #include <linux/dma-fence.h>
 #endif
 
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(4, 10, 0)) && \
-	(!defined(CHROMIUMOS_KERNEL) || \
-	 (LINUX_VERSION_CODE < KERNEL_VERSION(4, 4, 0)))
+	!defined(CHROMIUMOS_KERNEL_HAS_DMA_FENCE)
 /* Structures */
 #define	dma_fence fence
 #define dma_fence_array fence_array

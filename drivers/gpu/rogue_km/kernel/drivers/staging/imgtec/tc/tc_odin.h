@@ -1,4 +1,3 @@
-/* -*- mode: c; indent-tabs-mode: t; c-basic-offset: 8; tab-width: 8 -*- */
 /* vi: set ts=8 sw=8 sts=8: */
 /*************************************************************************/ /*!
 @Codingstyle    LinuxKernel
@@ -46,11 +45,12 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #include "tc_drv_internal.h"
 #include "odin_defs.h"
+#include "orion_defs.h"
 
 int odin_init(struct tc_device *tc, struct pci_dev *pdev,
 	      int core_clock, int mem_clock,
 	      int pdp_mem_size, int secure_mem_size,
-	      int mem_latency, int mem_wresp_latency);
+	      int mem_latency, int mem_wresp_latency, int mem_mode);
 int odin_cleanup(struct tc_device *tc);
 
 int odin_register_pdp_device(struct tc_device *tc);
@@ -72,4 +72,5 @@ int odin_sys_strings(struct tc_device *tc,
 		     char *str_pci_ver, size_t size_pci_ver,
 		     char *str_macro_ver, size_t size_macro_ver);
 
+const char *odin_tc_name(struct tc_device *tc);
 #endif /* _ODIN_DRV_H */

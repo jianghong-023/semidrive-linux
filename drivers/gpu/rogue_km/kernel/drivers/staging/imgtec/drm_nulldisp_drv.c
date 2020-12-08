@@ -1,4 +1,3 @@
-/* -*- mode: c; indent-tabs-mode: t; c-basic-offset: 8; tab-width: 8 -*- */
 /* vi: set ts=8 sw=8 sts=8: */
 /*************************************************************************/ /*!
 @File
@@ -42,21 +41,30 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */ /**************************************************************************/
 
+#include <linux/version.h>
+
 #include <linux/atomic.h>
 #include <linux/module.h>
 #include <linux/pagemap.h>
 #include <linux/jiffies.h>
 #include "pvr_linux_fence.h"
-#include <linux/reservation.h>
 #include <linux/workqueue.h>
 #include <linux/dma-mapping.h>
-#include <linux/version.h>
 #include <linux/mutex.h>
 #include <linux/capability.h>
 #include <linux/completion.h>
 #include <linux/dma-buf.h>
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 5, 0))
+#include <drm/drm_drv.h>
+#include <drm/drm_file.h>
+#include <drm/drm_ioctl.h>
+#include <drm/drm_vblank.h>
+#include <linux/platform_device.h>
+#else
 #include <drm/drmP.h>
+#endif
+
 #include <drm/drm_crtc.h>
 #include <drm/drm_crtc_helper.h>
 #include <drm/drm_edid.h>
@@ -67,6 +75,12 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 0, 0))
 #include <drm/drm_atomic_helper.h>
 #endif
+
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 1, 0))
+#include <drm/drm_probe_helper.h>
+#endif
+
+#include "pvr_dma_resv.h"
 
 #include "img_drm_fourcc_internal.h"
 #include <pvrversion.h>
@@ -85,16 +99,34 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "drm_netlink_gem.h"
 #include "drm_nulldisp_netlink.h"
 
+#if defined(NULLDISP_USE_ATOMIC)
+#include <drm/drm_atomic.h>
+#include <drm/drm_atomic_helper.h>
+#include <drm/drm_gem_framebuffer_helper.h>
+#endif
+
 #include "kernel_compatibility.h"
 
 #define DRIVER_NAME "nulldisp"
 #define DRIVER_DESC "Imagination Technologies Null DRM Display Driver"
 #define DRIVER_DATE "20150612"
 
+#if defined(NULLDISP_USE_ATOMIC)
+#define NULLDISP_DRIVER_ATOMIC DRIVER_ATOMIC
+#else
+#define NULLDISP_DRIVER_ATOMIC 0
+#endif
+
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0))
+#define	NULLDISP_DRIVER_PRIME 0
+#else
+#define	NULLDISP_DRIVER_PRIME DRIVER_PRIME
+#endif
+
 #define NULLDISP_FB_WIDTH_MIN 0
-#define NULLDISP_FB_WIDTH_MAX 4096
+#define NULLDISP_FB_WIDTH_MAX 8192
 #define NULLDISP_FB_HEIGHT_MIN 0
-#define NULLDISP_FB_HEIGHT_MAX 4096
+#define NULLDISP_FB_HEIGHT_MAX 8192
 
 #define NULLDISP_DEFAULT_WIDTH 640
 #define NULLDISP_DEFAULT_HEIGHT 480
@@ -102,9 +134,19 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #define NULLDISP_MAX_PLANES 3
 
+#if defined(NULLDISP_USE_ATOMIC)
+#define NULLDISP_NETLINK_TIMEOUT 5
+#else
+#define NULLDISP_NETLINK_TIMEOUT 30
+#endif
+#define NULLDISP_NETLINK_TIMEOUT_MAX 300
+#define NULLDISP_NETLINK_TIMEOUT_MIN 1
+
 enum nulldisp_crtc_flip_status {
 	NULLDISP_CRTC_FLIP_STATUS_NONE = 0,
+#if !defined(NULLDISP_USE_ATOMIC)
 	NULLDISP_CRTC_FLIP_STATUS_PENDING,
+#endif
 	NULLDISP_CRTC_FLIP_STATUS_DONE,
 };
 
@@ -117,18 +159,28 @@ struct nulldisp_flip_data {
 struct nulldisp_crtc {
 	struct drm_crtc base;
 	struct delayed_work vb_work;
+#if defined(NULLDISP_USE_ATOMIC)
+	struct drm_framebuffer *fb;
+	struct completion flip_done;
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 1, 0))
+	struct completion copy_done;
+#endif
+#else
 	struct work_struct flip_work;
 	struct delayed_work flip_to_work;
 	struct delayed_work copy_to_work;
 
 	struct completion flip_scheduled;
 	struct completion copy_done;
+#endif
 
 	/* Reuse the drm_device event_lock to protect these */
 	atomic_t flip_status;
 	struct drm_pending_vblank_event *flip_event;
+#if !defined(NULLDISP_USE_ATOMIC)
 	struct drm_framebuffer *old_fb;
 	struct nulldisp_flip_data *flip_data;
+#endif
 	bool flip_async;
 };
 
@@ -147,21 +199,25 @@ struct nulldisp_display_device {
 #endif
 };
 
+#if !defined(NULLDISP_USE_ATOMIC)
 struct nulldisp_framebuffer {
 	struct drm_framebuffer base;
 	struct drm_gem_object *obj[NULLDISP_MAX_PLANES];
 };
 
+#define to_nulldisp_framebuffer(framebuffer) \
+	container_of(framebuffer, struct nulldisp_framebuffer, base)
+#endif
+
 struct nulldisp_module_params {
-	uint32_t hdisplay;
-	uint32_t vdisplay;
-	uint32_t vrefresh;
+	unsigned int hdisplay;
+	unsigned int vdisplay;
+	unsigned int vrefresh;
+	unsigned int updateto;
 };
 
 #define to_nulldisp_crtc(crtc) \
 	container_of(crtc, struct nulldisp_crtc, base)
-#define to_nulldisp_framebuffer(framebuffer) \
-	container_of(framebuffer, struct nulldisp_framebuffer, base)
 
 #if defined(LMA)
 #define	obj_to_resv(obj) pdp_gem_get_resv(obj)
@@ -187,6 +243,7 @@ static const uint32_t nulldisp_modeset_formats[] = {
 	DRM_FORMAT_NV21,
 	DRM_FORMAT_YUYV,
 	DRM_FORMAT_YUV444,
+	DRM_FORMAT_YVU420,
 };
 
 /*
@@ -203,6 +260,8 @@ static const uint64_t nulldisp_primary_plane_modifiers[] = {
 	DRM_FORMAT_MOD_PVR_FBCDC_8x8_V2,
 	DRM_FORMAT_MOD_PVR_FBCDC_8x8_V3,
 	DRM_FORMAT_MOD_PVR_FBCDC_8x8_V7,
+	DRM_FORMAT_MOD_PVR_FBCDC_8x8_V8,
+	DRM_FORMAT_MOD_PVR_FBCDC_8x8_V10,
 	DRM_FORMAT_MOD_PVR_FBCDC_8x8_V12,
 	DRM_FORMAT_MOD_PVR_FBCDC_16x4_V0,
 	DRM_FORMAT_MOD_PVR_FBCDC_16x4_V0_FIX,
@@ -210,9 +269,13 @@ static const uint64_t nulldisp_primary_plane_modifiers[] = {
 	DRM_FORMAT_MOD_PVR_FBCDC_16x4_V2,
 	DRM_FORMAT_MOD_PVR_FBCDC_16x4_V3,
 	DRM_FORMAT_MOD_PVR_FBCDC_16x4_V7,
+	DRM_FORMAT_MOD_PVR_FBCDC_16x4_V8,
+	DRM_FORMAT_MOD_PVR_FBCDC_16x4_V10,
 	DRM_FORMAT_MOD_PVR_FBCDC_16x4_V12,
 	DRM_FORMAT_MOD_PVR_FBCDC_32x2_V1,
 	DRM_FORMAT_MOD_PVR_FBCDC_32x2_V3,
+	DRM_FORMAT_MOD_PVR_FBCDC_32x2_V8,
+	DRM_FORMAT_MOD_PVR_FBCDC_32x2_V10,
 	DRM_FORMAT_MOD_PVR_FBCDC_32x2_V12,
 	DRM_FORMAT_MOD_INVALID
 };
@@ -221,13 +284,25 @@ static struct nulldisp_module_params module_params = {
 	.hdisplay = NULLDISP_DEFAULT_WIDTH,
 	.vdisplay = NULLDISP_DEFAULT_HEIGHT,
 	.vrefresh = NULLDISP_DEFAULT_REFRESH_RATE,
+	.updateto = NULLDISP_NETLINK_TIMEOUT,
 };
+
+static int updateto_param_set(const char *val, const struct kernel_param *kp);
+
+static const struct kernel_param_ops updateto_ops = {
+	.set = updateto_param_set,
+	.get = param_get_uint,
+};
+
 module_param_named(width, module_params.hdisplay, uint, 0444);
 module_param_named(height, module_params.vdisplay, uint, 0444);
 module_param_named(refreshrate, module_params.vrefresh, uint, 0444);
+module_param_cb(updateto, &updateto_ops, &module_params.updateto, 0644);
+
 MODULE_PARM_DESC(width, "Preferred display width in pixels");
 MODULE_PARM_DESC(height, "Preferred display height in pixels");
 MODULE_PARM_DESC(refreshrate, "Preferred display refresh rate");
+MODULE_PARM_DESC(updateto, "Preferred remote update timeout (in seconds)");
 
 /*
  * Please use this function to obtain the module parameters instead of
@@ -237,6 +312,47 @@ static inline const struct nulldisp_module_params *
 nulldisp_get_module_params(void)
 {
 	return &module_params;
+}
+
+static int updateto_param_set(const char *val, const struct kernel_param *kp)
+{
+	unsigned int updateto;
+	int err;
+
+	err = kstrtouint(val, 10, &updateto);
+	if (err)
+		return err;
+
+	if (updateto < NULLDISP_NETLINK_TIMEOUT_MIN ||
+	    updateto > NULLDISP_NETLINK_TIMEOUT_MAX)
+		return -EINVAL;
+
+	return param_set_uint(val, kp);
+}
+
+static unsigned long nulldisp_netlink_timeout(void)
+{
+	const struct nulldisp_module_params *module_params =
+		nulldisp_get_module_params();
+	unsigned int updateto;
+
+#if !defined(CHROMIUMOS_KERNEL) && \
+	(LINUX_VERSION_CODE < KERNEL_VERSION(4, 2, 0))
+	kparam_block_sysfs_write(updateto);
+#else
+	kernel_param_lock(THIS_MODULE);
+#endif
+
+	updateto = module_params->updateto;
+
+#if !defined(CHROMIUMOS_KERNEL) && \
+	(LINUX_VERSION_CODE < KERNEL_VERSION(4, 2, 0))
+	kparam_unblock_sysfs_write(updateto);
+#else
+	kernel_param_unlock(THIS_MODULE);
+#endif
+
+	return msecs_to_jiffies(updateto * 1000);
 }
 
 /******************************************************************************
@@ -279,7 +395,7 @@ static inline void nulldisp_drm_fb_set_modifier(struct drm_framebuffer *fb,
 {
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 10, 0))
 	fb->modifier = value;
-#elif(LINUX_VERSION_CODE >= KERNEL_VERSION(4, 1, 0))
+#elif (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 1, 0))
 	/* FB modifier values must be the same for all planes */
 	fb->modifier[0] = value;
 	fb->modifier[1] = value;
@@ -293,7 +409,67 @@ static inline void nulldisp_drm_fb_set_modifier(struct drm_framebuffer *fb,
 /******************************************************************************
  * Plane functions
  ******************************************************************************/
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 14, 0))
+static bool nulldisp_primary_format_mod_supported(struct drm_plane *plane,
+						  uint32_t format,
+						  uint64_t modifier)
+{
+	/*
+	 * All 'nulldisp_modeset_formats' are supported for every modifier
+	 * in the 'nulldisp_primary_plane_modifiers' array.
+	 */
+	return true;
+}
+#endif
 
+#if defined(NULLDISP_USE_ATOMIC)
+static int nulldisp_plane_helper_atomic_check(struct drm_plane *plane,
+					      struct drm_plane_state *state)
+{
+	struct drm_crtc_state *crtc_new_state;
+
+	if (!state->crtc)
+		return 0;
+
+	crtc_new_state = drm_atomic_get_new_crtc_state(state->state,
+						       state->crtc);
+
+	return drm_atomic_helper_check_plane_state(state, crtc_new_state,
+						   DRM_PLANE_HELPER_NO_SCALING,
+						   DRM_PLANE_HELPER_NO_SCALING,
+						   false, true);
+}
+
+static void
+nulldisp_plane_helper_atomic_update(struct drm_plane *plane,
+				    struct drm_plane_state *old_state)
+{
+	struct drm_plane_state *state = plane->state;
+
+	if (state->crtc) {
+		struct nulldisp_crtc *nulldisp_crtc =
+					to_nulldisp_crtc(state->crtc);
+
+		nulldisp_crtc->fb = state->fb;
+	}
+}
+
+static const struct drm_plane_helper_funcs nulldisp_plane_helper_funcs = {
+	.prepare_fb =  drm_gem_fb_prepare_fb,
+	.atomic_check = nulldisp_plane_helper_atomic_check,
+	.atomic_update = nulldisp_plane_helper_atomic_update,
+};
+
+static const struct drm_plane_funcs nulldisp_plane_funcs = {
+	.update_plane = drm_atomic_helper_update_plane,
+	.disable_plane = drm_atomic_helper_disable_plane,
+	.destroy = drm_primary_helper_destroy,
+	.reset = drm_atomic_helper_plane_reset,
+	.atomic_duplicate_state = drm_atomic_helper_plane_duplicate_state,
+	.atomic_destroy_state = drm_atomic_helper_plane_destroy_state,
+	.format_mod_supported = nulldisp_primary_format_mod_supported,
+};
+#else	/* defined(NULLDISP_USE_ATOMIC) */
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 0, 0))
 static int nulldisp_primary_helper_update(struct drm_plane *plane,
 					  struct drm_crtc *crtc,
@@ -361,20 +537,7 @@ static int nulldisp_primary_helper_disable(struct drm_plane *plane,
 }
 #endif /* (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 0, 0)) */
 
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 14, 0))
-static bool nulldisp_primary_format_mod_supported(struct drm_plane *plane,
-						  uint32_t format,
-						  uint64_t modifier)
-{
-	/*
-	 * All 'nulldisp_modeset_formats' are supported for every modifier in the
-	 * 'nulldisp_primary_plane_modifiers' array.
-	 */
-	return true;
-}
-#endif
-
-static const struct drm_plane_funcs nulldisp_primary_plane_funcs = {
+static const struct drm_plane_funcs nulldisp_plane_funcs = {
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 0, 0))
 	.update_plane = nulldisp_primary_helper_update,
 	.disable_plane = nulldisp_primary_helper_disable,
@@ -387,11 +550,198 @@ static const struct drm_plane_funcs nulldisp_primary_plane_funcs = {
 	.format_mod_supported = nulldisp_primary_format_mod_supported,
 #endif
 };
+#endif	/* defined(NULLDISP_USE_ATOMIC) */
 
 /******************************************************************************
  * CRTC functions
  ******************************************************************************/
 
+static bool
+nulldisp_crtc_helper_mode_fixup(struct drm_crtc *crtc,
+				const struct drm_display_mode *mode,
+				struct drm_display_mode *adjusted_mode)
+{
+	/*
+	 * Fix up mode so that it's compatible with the hardware. The results
+	 * should be stored in adjusted_mode (i.e. mode should be untouched).
+	 */
+	return true;
+}
+
+static void nulldisp_crtc_helper_disable(struct drm_crtc *crtc)
+{
+	struct nulldisp_crtc *nulldisp_crtc = to_nulldisp_crtc(crtc);
+
+#if !defined(NULLDISP_USE_ATOMIC)
+	if (atomic_read(&nulldisp_crtc->flip_status) ==
+	    NULLDISP_CRTC_FLIP_STATUS_PENDING)
+		wait_for_completion(&nulldisp_crtc->flip_scheduled);
+
+	/*
+	 * Flush any outstanding page flip related work. The order this
+	 * is done is important, to ensure there are no outstanding
+	 * page flips.
+	 */
+	flush_work(&nulldisp_crtc->flip_work);
+	flush_delayed_work(&nulldisp_crtc->flip_to_work);
+#endif
+	flush_delayed_work(&nulldisp_crtc->vb_work);
+
+	drm_crtc_vblank_off(crtc);
+	flush_delayed_work(&nulldisp_crtc->vb_work);
+
+	/*
+	 * Vblank has been disabled, so the vblank handler shouldn't be
+	 * able to reschedule itself.
+	 */
+	BUG_ON(cancel_delayed_work(&nulldisp_crtc->vb_work));
+
+	BUG_ON(atomic_read(&nulldisp_crtc->flip_status) !=
+	       NULLDISP_CRTC_FLIP_STATUS_NONE);
+
+#if !defined(NULLDISP_USE_ATOMIC)
+	/* Flush any remaining dirty FB work */
+	flush_delayed_work(&nulldisp_crtc->copy_to_work);
+#endif
+}
+
+static void nulldisp_crtc_flip_complete(struct drm_crtc *crtc)
+{
+	struct nulldisp_crtc *nulldisp_crtc = to_nulldisp_crtc(crtc);
+	unsigned long flags;
+
+	spin_lock_irqsave(&crtc->dev->event_lock, flags);
+
+	/* The flipping process has been completed so reset the flip state */
+	atomic_set(&nulldisp_crtc->flip_status, NULLDISP_CRTC_FLIP_STATUS_NONE);
+	nulldisp_crtc->flip_async = false;
+
+#if !defined(NULLDISP_USE_ATOMIC)
+	if (nulldisp_crtc->flip_data) {
+		dma_fence_put(nulldisp_crtc->flip_data->wait_fence);
+		kfree(nulldisp_crtc->flip_data);
+		nulldisp_crtc->flip_data = NULL;
+	}
+#endif
+	if (nulldisp_crtc->flip_event) {
+		drm_crtc_send_vblank_event(crtc, nulldisp_crtc->flip_event);
+		nulldisp_crtc->flip_event = NULL;
+	}
+
+	spin_unlock_irqrestore(&crtc->dev->event_lock, flags);
+}
+
+#if defined(NULLDISP_USE_ATOMIC)
+static void nulldisp_crtc_helper_mode_set_nofb(struct drm_crtc *crtc)
+{
+}
+
+static void nulldisp_crtc_helper_atomic_flush(struct drm_crtc *crtc,
+					      struct drm_crtc_state *old_state)
+{
+	struct nulldisp_crtc *nulldisp_crtc = to_nulldisp_crtc(crtc);
+
+	if (!crtc->state->active || !old_state->active)
+		return;
+
+	if (nulldisp_crtc->fb) {
+		struct nulldisp_display_device *nulldisp_dev =
+							crtc->dev->dev_private;
+
+		reinit_completion(&nulldisp_crtc->flip_done);
+
+		if (!nlpvrdpy_send_flip(nulldisp_dev->nlpvrdpy,
+				       nulldisp_crtc->fb,
+				       &nulldisp_crtc->fb->obj[0])) {
+			unsigned long res;
+
+			res = wait_for_completion_timeout(
+					&nulldisp_crtc->flip_done,
+					nulldisp_netlink_timeout());
+
+			if (!res)
+				DRM_ERROR(
+				    "timed out waiting for remote update\n");
+		}
+
+		nulldisp_crtc->fb = NULL;
+	}
+
+	if (crtc->state->event) {
+		unsigned long flags;
+
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0))
+		nulldisp_crtc->flip_async = crtc->state->async_flip;
+#else
+		nulldisp_crtc->flip_async = !!(crtc->state->pageflip_flags
+					       & DRM_MODE_PAGE_FLIP_ASYNC);
+#endif
+		if (nulldisp_crtc->flip_async)
+			WARN_ON(drm_crtc_vblank_get(crtc) != 0);
+
+		spin_lock_irqsave(&crtc->dev->event_lock, flags);
+		nulldisp_crtc->flip_event = crtc->state->event;
+		crtc->state->event = NULL;
+
+		atomic_set(&nulldisp_crtc->flip_status,
+			   NULLDISP_CRTC_FLIP_STATUS_DONE);
+		spin_unlock_irqrestore(&crtc->dev->event_lock, flags);
+
+		if (nulldisp_crtc->flip_async)
+			nulldisp_crtc_flip_complete(crtc);
+	}
+}
+
+static void nulldisp_crtc_set_enabled(struct drm_crtc *crtc, bool enable)
+{
+	if (enable)
+		drm_crtc_vblank_on(crtc);
+	else
+		nulldisp_crtc_helper_disable(crtc);
+}
+
+static void
+nulldisp_crtc_helper_atomic_enable(struct drm_crtc *crtc,
+				   struct drm_crtc_state *old_crtc_state)
+{
+	nulldisp_crtc_set_enabled(crtc, true);
+
+	if (crtc->state->event) {
+		struct nulldisp_crtc *nulldisp_crtc = to_nulldisp_crtc(crtc);
+		unsigned long flags;
+
+		WARN_ON(drm_crtc_vblank_get(crtc) != 0);
+
+		spin_lock_irqsave(&crtc->dev->event_lock, flags);
+		nulldisp_crtc->flip_event = crtc->state->event;
+		crtc->state->event = NULL;
+
+		atomic_set(&nulldisp_crtc->flip_status,
+			   NULLDISP_CRTC_FLIP_STATUS_DONE);
+		spin_unlock_irqrestore(&crtc->dev->event_lock, flags);
+	}
+}
+
+static void
+nulldisp_crtc_helper_atomic_disable(struct drm_crtc *crtc,
+				    struct drm_crtc_state *old_crtc_state)
+{
+	struct nulldisp_crtc *nulldisp_crtc = to_nulldisp_crtc(crtc);
+
+	nulldisp_crtc_set_enabled(crtc, false);
+
+	nulldisp_crtc->fb = NULL;
+
+	if (crtc->state->event) {
+		unsigned long flags;
+
+		spin_lock_irqsave(&crtc->dev->event_lock, flags);
+		drm_crtc_send_vblank_event(crtc, crtc->state->event);
+		crtc->state->event = NULL;
+		spin_unlock_irqrestore(&crtc->dev->event_lock, flags);
+	}
+}
+#else	/* defined(NULLDISP_USE_ATOMIC) */
 static void nulldisp_crtc_helper_dpms(struct drm_crtc *crtc,
 				      int mode)
 {
@@ -417,18 +767,6 @@ static void nulldisp_crtc_helper_commit(struct drm_crtc *crtc)
 	/* Turn the display/pipe/port/etc back on */
 
 	drm_crtc_vblank_on(crtc);
-}
-
-static bool
-nulldisp_crtc_helper_mode_fixup(struct drm_crtc *crtc,
-				const struct drm_display_mode *mode,
-				struct drm_display_mode *adjusted_mode)
-{
-	/*
-	 * Fix up mode so that it's compatible with the hardware. The results
-	 * should be stored in adjusted_mode (i.e. mode should be untouched).
-	 */
-	return true;
 }
 
 static int
@@ -468,6 +806,7 @@ static void nulldisp_crtc_helper_load_lut(struct drm_crtc *crtc)
 {
 }
 #endif
+#endif	/* defined(NULLDISP_USE_ATOMIC) */
 
 static void nulldisp_crtc_destroy(struct drm_crtc *crtc)
 {
@@ -483,28 +822,7 @@ static void nulldisp_crtc_destroy(struct drm_crtc *crtc)
 	kfree(nulldisp_crtc);
 }
 
-static void nulldisp_crtc_flip_complete(struct drm_crtc *crtc)
-{
-	struct nulldisp_crtc *nulldisp_crtc = to_nulldisp_crtc(crtc);
-	unsigned long flags;
-
-	spin_lock_irqsave(&crtc->dev->event_lock, flags);
-
-	/* The flipping process has been completed so reset the flip status */
-	atomic_set(&nulldisp_crtc->flip_status, NULLDISP_CRTC_FLIP_STATUS_NONE);
-
-	dma_fence_put(nulldisp_crtc->flip_data->wait_fence);
-	kfree(nulldisp_crtc->flip_data);
-	nulldisp_crtc->flip_data = NULL;
-
-	if (nulldisp_crtc->flip_event) {
-		drm_crtc_send_vblank_event(crtc, nulldisp_crtc->flip_event);
-		nulldisp_crtc->flip_event = NULL;
-	}
-
-	spin_unlock_irqrestore(&crtc->dev->event_lock, flags);
-}
-
+#if !defined(NULLDISP_USE_ATOMIC)
 static void nulldisp_crtc_flip_done(struct nulldisp_crtc *nulldisp_crtc)
 {
 	struct drm_crtc *crtc = &nulldisp_crtc->base;
@@ -524,11 +842,6 @@ static void nulldisp_crtc_flip_done(struct nulldisp_crtc *nulldisp_crtc)
 
 	if (nulldisp_crtc->flip_async)
 		nulldisp_crtc_flip_complete(crtc);
-}
-
-static inline unsigned long nulldisp_netlink_timeout(void)
-{
-	return msecs_to_jiffies(30000);
 }
 
 static bool nulldisp_set_flip_to(struct nulldisp_crtc *nulldisp_crtc)
@@ -648,8 +961,8 @@ static int nulldisp_crtc_flip_schedule(struct drm_crtc *crtc,
 				       struct drm_gem_object *old_obj)
 {
 	struct nulldisp_crtc *nulldisp_crtc = to_nulldisp_crtc(crtc);
-	struct reservation_object *resv = obj_to_resv(obj);
-	struct reservation_object *old_resv = obj_to_resv(old_obj);
+	struct dma_resv *resv = obj_to_resv(obj);
+	struct dma_resv *old_resv = obj_to_resv(old_obj);
 	struct nulldisp_flip_data *flip_data;
 	struct dma_fence *fence;
 	int err;
@@ -662,14 +975,14 @@ static int nulldisp_crtc_flip_schedule(struct drm_crtc *crtc,
 
 	ww_mutex_lock(&old_resv->lock, NULL);
 	flip_data->wait_fence =
-		dma_fence_get(reservation_object_get_excl(old_resv));
+		dma_fence_get(dma_resv_get_excl(old_resv));
 
 	if (old_resv != resv) {
 		ww_mutex_unlock(&old_resv->lock);
 		ww_mutex_lock(&resv->lock, NULL);
 	}
 
-	fence = dma_fence_get(reservation_object_get_excl(resv));
+	fence = dma_fence_get(dma_resv_get_excl(resv));
 	ww_mutex_unlock(&resv->lock);
 
 	nulldisp_crtc->flip_data = flip_data;
@@ -756,45 +1069,19 @@ err_vblank_put:
 		drm_crtc_vblank_put(crtc);
 	return err;
 }
-
-static void nulldisp_crtc_helper_disable(struct drm_crtc *crtc)
-{
-	struct nulldisp_crtc *nulldisp_crtc = to_nulldisp_crtc(crtc);
-
-	if (atomic_read(&nulldisp_crtc->flip_status) ==
-	    NULLDISP_CRTC_FLIP_STATUS_PENDING)
-		wait_for_completion(&nulldisp_crtc->flip_scheduled);
-
-	/*
-	 * Flush any outstanding page flip related work. The order this
-	 * is done is important, to ensure there are no outstanding
-	 * page flips.
-	 */
-	flush_work(&nulldisp_crtc->flip_work);
-	flush_delayed_work(&nulldisp_crtc->flip_to_work);
-	flush_delayed_work(&nulldisp_crtc->vb_work);
-
-	drm_crtc_vblank_off(crtc);
-	flush_delayed_work(&nulldisp_crtc->vb_work);
-
-	/*
-	 * Vblank has been disabled, so the vblank handler shouldn't be
-	 * able to reschedule itself.
-	 */
-	BUG_ON(cancel_delayed_work(&nulldisp_crtc->vb_work));
-
-	BUG_ON(atomic_read(&nulldisp_crtc->flip_status) !=
-	       NULLDISP_CRTC_FLIP_STATUS_NONE);
-
-	/* Flush any remaining dirty FB work */
-	flush_delayed_work(&nulldisp_crtc->copy_to_work);
-}
+#endif /* !defined(NULLDISP_USE_ATOMIC) */
 
 static const struct drm_crtc_helper_funcs nulldisp_crtc_helper_funcs = {
+	.mode_fixup = nulldisp_crtc_helper_mode_fixup,
+#if defined(NULLDISP_USE_ATOMIC)
+	.mode_set_nofb = nulldisp_crtc_helper_mode_set_nofb,
+	.atomic_flush = nulldisp_crtc_helper_atomic_flush,
+	.atomic_enable = nulldisp_crtc_helper_atomic_enable,
+	.atomic_disable = nulldisp_crtc_helper_atomic_disable,
+#else
 	.dpms = nulldisp_crtc_helper_dpms,
 	.prepare = nulldisp_crtc_helper_prepare,
 	.commit = nulldisp_crtc_helper_commit,
-	.mode_fixup = nulldisp_crtc_helper_mode_fixup,
 	.mode_set = nulldisp_crtc_helper_mode_set,
 	.mode_set_base = nulldisp_crtc_helper_mode_set_base,
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0))
@@ -802,16 +1089,25 @@ static const struct drm_crtc_helper_funcs nulldisp_crtc_helper_funcs = {
 #endif
 	.mode_set_base_atomic = nulldisp_crtc_helper_mode_set_base_atomic,
 	.disable = nulldisp_crtc_helper_disable,
+#endif	/* defined(NULLDISP_USE_ATOMIC) */
 };
 
 static const struct drm_crtc_funcs nulldisp_crtc_funcs = {
+	.destroy = nulldisp_crtc_destroy,
+#if defined(NULLDISP_USE_ATOMIC)
+	.reset = drm_atomic_helper_crtc_reset,
+	.set_config = drm_atomic_helper_set_config,
+	.page_flip = drm_atomic_helper_page_flip,
+	.atomic_duplicate_state = drm_atomic_helper_crtc_duplicate_state,
+	.atomic_destroy_state = drm_atomic_helper_crtc_destroy_state,
+#else
 	.reset = NULL,
 	.cursor_set = NULL,
 	.cursor_move = NULL,
 	.gamma_set = NULL,
-	.destroy = nulldisp_crtc_destroy,
 	.set_config = drm_crtc_helper_set_config,
 	.page_flip = nulldisp_crtc_page_flip,
+#endif
 };
 
 static bool nulldisp_queue_vblank_work(struct nulldisp_crtc *nulldisp_crtc)
@@ -858,7 +1154,9 @@ static void nulldisp_handle_vblank(struct work_struct *w)
 	if (status == NULLDISP_CRTC_FLIP_STATUS_DONE) {
 		if (!nulldisp_crtc->flip_async)
 			nulldisp_crtc_flip_complete(crtc);
+#if !defined(NULLDISP_USE_ATOMIC)
 		drm_crtc_vblank_put(crtc);
+#endif
 	}
 
 }
@@ -881,17 +1179,28 @@ nulldisp_crtc_create(struct nulldisp_display_device *nulldisp_dev)
 	crtc = &nulldisp_crtc->base;
 
 	atomic_set(&nulldisp_crtc->flip_status, NULLDISP_CRTC_FLIP_STATUS_NONE);
+#if defined(NULLDISP_USE_ATOMIC)
+	init_completion(&nulldisp_crtc->flip_done);
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 1, 0))
+	init_completion(&nulldisp_crtc->copy_done);
+#endif
+#else
 	init_completion(&nulldisp_crtc->flip_scheduled);
 	init_completion(&nulldisp_crtc->copy_done);
+#endif
 
 	if (drm_universal_plane_init(nulldisp_dev->dev, primary, 0,
-				     &nulldisp_primary_plane_funcs,
+				     &nulldisp_plane_funcs,
 				     nulldisp_modeset_formats,
 				     ARRAY_SIZE(nulldisp_modeset_formats),
 				     nulldisp_primary_plane_modifiers,
 				     DRM_PLANE_TYPE_PRIMARY, NULL)) {
 		goto err_free_primary;
 	}
+
+#if defined(NULLDISP_USE_ATOMIC)
+	drm_plane_helper_add(primary, &nulldisp_plane_helper_funcs);
+#endif
 
 	if (drm_crtc_init_with_planes(nulldisp_dev->dev, crtc, primary,
 				      NULL, &nulldisp_crtc_funcs, NULL)) {
@@ -901,9 +1210,11 @@ nulldisp_crtc_create(struct nulldisp_display_device *nulldisp_dev)
 	drm_crtc_helper_add(crtc, &nulldisp_crtc_helper_funcs);
 
 	INIT_DELAYED_WORK(&nulldisp_crtc->vb_work, nulldisp_handle_vblank);
+#if !defined(NULLDISP_USE_ATOMIC)
 	INIT_WORK(&nulldisp_crtc->flip_work, nulldisp_flip_work);
-	INIT_DELAYED_WORK(&nulldisp_crtc->flip_to_work, nulldisp_flip_to_work);
 	INIT_DELAYED_WORK(&nulldisp_crtc->copy_to_work, nulldisp_copy_to_work);
+	INIT_DELAYED_WORK(&nulldisp_crtc->flip_to_work, nulldisp_flip_to_work);
+#endif
 
 	DRM_DEBUG_DRIVER("[CRTC:%d]\n", crtc->base.id);
 
@@ -1046,6 +1357,7 @@ nulldisp_connector_helper_mode_valid(struct drm_connector *connector,
 	return MODE_OK;
 }
 
+#if !defined(NULLDISP_USE_ATOMIC)
 static struct drm_encoder *
 nulldisp_connector_helper_best_encoder(struct drm_connector *connector)
 {
@@ -1057,18 +1369,19 @@ nulldisp_connector_helper_best_encoder(struct drm_connector *connector)
 					   NULL,
 					   connector->encoder_ids[0]);
 		if (encoder) {
-			DRM_DEBUG_DRIVER("[ENCODER:%d:%s] best for "
-					 "[CONNECTOR:%d:%s]\n",
-					 encoder->base.id,
-					 encoder->name,
-					 connector->base.id,
-					 connector->name);
+			DRM_DEBUG_DRIVER(
+				"[ENCODER:%d:%s] best for [CONNECTOR:%d:%s]\n",
+				 encoder->base.id,
+				 encoder->name,
+				 connector->base.id,
+				 connector->name);
 			return encoder;
 		}
 	}
 
 	return NULL;
 }
+#endif
 
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(4, 10, 0))
 static enum drm_connector_status
@@ -1100,12 +1413,25 @@ static const struct drm_connector_helper_funcs
 nulldisp_connector_helper_funcs = {
 	.get_modes = nulldisp_connector_helper_get_modes,
 	.mode_valid = nulldisp_connector_helper_mode_valid,
+	/*
+	 * For atomic, don't set atomic_best_encoder or best_encoder. This will
+	 * cause the DRM core to fallback to drm_atomic_helper_best_encoder().
+	 * This is fine as we only have a single connector and encoder.
+	 */
+#if !defined(NULLDISP_USE_ATOMIC)
 	.best_encoder = nulldisp_connector_helper_best_encoder,
+#endif
 };
 
 static const struct drm_connector_funcs nulldisp_connector_funcs = {
+#if defined(NULLDISP_USE_ATOMIC)
+	.reset = drm_atomic_helper_connector_reset,
+	.atomic_duplicate_state = drm_atomic_helper_connector_duplicate_state,
+	.atomic_destroy_state = drm_atomic_helper_connector_destroy_state,
+#else
 	.dpms = drm_helper_connector_dpms,
 	.reset = NULL,
+#endif
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(4, 10, 0))
 	.detect = nulldisp_connector_detect,
 #endif
@@ -1252,6 +1578,54 @@ nulldisp_encoder_create(struct nulldisp_display_device *nulldisp_dev,
  * Framebuffer functions
  ******************************************************************************/
 
+#if defined(NULLDISP_USE_ATOMIC)
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 1, 0))
+static int
+nulldisp_framebuffer_dirty(struct drm_framebuffer *framebuffer,
+			   struct drm_file *file_priv,
+			   unsigned int flags,
+			   unsigned int color,
+			   struct drm_clip_rect *clips,
+			   unsigned int num_clips)
+{
+	struct nulldisp_display_device *nulldisp_dev =
+		framebuffer->dev->dev_private;
+	struct nulldisp_crtc *nulldisp_crtc = nulldisp_dev->nulldisp_crtc;
+
+	reinit_completion(&nulldisp_crtc->copy_done);
+
+	if (!nlpvrdpy_send_copy(nulldisp_dev->nlpvrdpy,
+				framebuffer,
+				&framebuffer->obj[0])) {
+		unsigned long res;
+
+		res = wait_for_completion_timeout(&nulldisp_crtc->copy_done,
+						  nulldisp_netlink_timeout());
+
+		if (!res)
+			DRM_ERROR("timed out waiting for remote update\n");
+	}
+
+	return 0;
+}
+
+static const struct drm_framebuffer_funcs nulldisp_framebuffer_funcs = {
+	.destroy = drm_gem_fb_destroy,
+	.create_handle = drm_gem_fb_create_handle,
+	.dirty = nulldisp_framebuffer_dirty,
+};
+
+static struct drm_framebuffer *
+nulldisp_fb_create(struct drm_device *dev, struct drm_file *file,
+		   const struct drm_mode_fb_cmd2 *mode_cmd)
+{
+	return drm_gem_fb_create_with_funcs(dev, file, mode_cmd,
+					    &nulldisp_framebuffer_funcs);
+}
+#else /* (LINUX_VERSION_CODE < KERNEL_VERSION(5, 1, 0)) */
+#define nulldisp_fb_create drm_gem_fb_create_with_dirty
+#endif /* (LINUX_VERSION_CODE < KERNEL_VERSION(5, 1, 0)) */
+#else /* defined(NULLDISP_USE_ATOMIC) */
 static void nulldisp_framebuffer_destroy(struct drm_framebuffer *framebuffer)
 {
 	struct nulldisp_framebuffer *nulldisp_framebuffer =
@@ -1330,7 +1704,8 @@ static const struct drm_framebuffer_funcs nulldisp_framebuffer_funcs = {
 static int
 nulldisp_framebuffer_init(struct drm_device *dev,
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 5, 0)) || \
-	(defined(CHROMIUMOS_KERNEL) && (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 18, 0)))
+	(defined(CHROMIUMOS_KERNEL) && \
+	(LINUX_VERSION_CODE >= KERNEL_VERSION(3, 18, 0)))
 			  const
 #endif
 			  struct drm_mode_fb_cmd2 *mode_cmd,
@@ -1376,7 +1751,8 @@ static struct drm_framebuffer *
 nulldisp_fb_create(struct drm_device *dev,
 		   struct drm_file *file_priv,
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 5, 0)) || \
-	(defined(CHROMIUMOS_KERNEL) && (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 18, 0)))
+	(defined(CHROMIUMOS_KERNEL) && \
+	(LINUX_VERSION_CODE >= KERNEL_VERSION(3, 18, 0)))
 		   const
 #endif
 		   struct drm_mode_fb_cmd2 *mode_cmd)
@@ -1423,17 +1799,26 @@ fail_unreference:
 fail_exit:
 	return ERR_PTR(err);
 }
+#endif	/* defined(NULLDISP_USE_ATOMIC) */
 
 static const struct drm_mode_config_funcs nulldisp_mode_config_funcs = {
 	.fb_create = nulldisp_fb_create,
 	.output_poll_changed = NULL,
+#if defined(NULLDISP_USE_ATOMIC)
+	.atomic_check = drm_atomic_helper_check,
+	.atomic_commit = drm_atomic_helper_commit,
+#endif
 };
 
 static int nulldisp_nl_flipped_cb(void *data)
 {
 	struct nulldisp_crtc *nulldisp_crtc = data;
 
+#if defined(NULLDISP_USE_ATOMIC)
+	complete(&nulldisp_crtc->flip_done);
+#else
 	flush_delayed_work(&nulldisp_crtc->flip_to_work);
+#endif
 	flush_delayed_work(&nulldisp_crtc->vb_work);
 
 	return 0;
@@ -1441,10 +1826,17 @@ static int nulldisp_nl_flipped_cb(void *data)
 
 static int nulldisp_nl_copied_cb(void *data)
 {
+#if defined(NULLDISP_USE_ATOMIC)
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 1, 0))
+	struct nulldisp_crtc *nulldisp_crtc = data;
+
+	complete(&nulldisp_crtc->copy_done);
+#endif
+#else
 	struct nulldisp_crtc *nulldisp_crtc = data;
 
 	flush_delayed_work(&nulldisp_crtc->copy_to_work);
-
+#endif
 	return 0;
 }
 
@@ -1452,8 +1844,15 @@ static void nulldisp_nl_disconnect_cb(void *data)
 {
 	struct nulldisp_crtc *nulldisp_crtc = data;
 
+#if defined(NULLDISP_USE_ATOMIC)
+	complete(&nulldisp_crtc->flip_done);
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 1, 0))
+	complete(&nulldisp_crtc->copy_done);
+#endif
+#else
 	flush_delayed_work(&nulldisp_crtc->flip_to_work);
 	flush_delayed_work(&nulldisp_crtc->copy_to_work);
+#endif
 }
 
 static int nulldisp_early_load(struct drm_device *dev)
@@ -1582,17 +1981,22 @@ err_config_cleanup:
 
 static int nulldisp_late_load(struct drm_device *dev)
 {
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(4, 8, 0))
-	struct nulldisp_display_device *nulldisp_dev = dev->dev_private;
-	int err;
+	drm_mode_config_reset(dev);
 
-	err = drm_connector_register(nulldisp_dev->connector);
-	if (err) {
-		DRM_ERROR("[CONNECTOR:%d:%s] failed to register (err=%d)\n",
-			  nulldisp_dev->connector->base.id,
-			  nulldisp_dev->connector->name,
-			  err);
-		return err;
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(4, 8, 0))
+	{
+		struct nulldisp_display_device *nulldisp_dev = dev->dev_private;
+		int err;
+
+		err = drm_connector_register(nulldisp_dev->connector);
+		if (err) {
+			DRM_ERROR(
+			    "[CONNECTOR:%d:%s] failed to register (err=%d)\n",
+			    nulldisp_dev->connector->base.id,
+			    nulldisp_dev->connector->name,
+			    err);
+			return err;
+		}
 	}
 #endif
 	return 0;
@@ -1691,6 +2095,9 @@ static void nulldisp_preclose(struct drm_device *dev, struct drm_file *file)
 
 static void nulldisp_lastclose(struct drm_device *dev)
 {
+#if defined(NULLDISP_USE_ATOMIC)
+	drm_atomic_helper_shutdown(dev);
+#else
 	struct drm_crtc *crtc;
 
 	drm_modeset_lock_all(dev);
@@ -1701,15 +2108,18 @@ static void nulldisp_lastclose(struct drm_device *dev)
 
 			err = drm_mode_set_config_internal(&mode_set);
 			if (err)
-				DRM_ERROR("failed to disable crtc %p (err=%d)\n",
-					  crtc, err);
+				DRM_ERROR(
+				    "failed to disable crtc %p (err=%d)\n",
+				    crtc, err);
 		}
 	}
 	drm_modeset_unlock_all(dev);
+#endif
 }
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 4, 0)) || \
-	(defined(CHROMIUMOS_KERNEL) && (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 18, 0)))
+	(defined(CHROMIUMOS_KERNEL) && \
+	(LINUX_VERSION_CODE >= KERNEL_VERSION(3, 18, 0)))
 static int nulldisp_enable_vblank(struct drm_device *dev, unsigned int crtc)
 #else
 static int nulldisp_enable_vblank(struct drm_device *dev, int crtc)
@@ -1738,7 +2148,8 @@ static int nulldisp_enable_vblank(struct drm_device *dev, int crtc)
 }
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 4, 0)) || \
-	(defined(CHROMIUMOS_KERNEL) && (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 18, 0)))
+	(defined(CHROMIUMOS_KERNEL) && \
+	(LINUX_VERSION_CODE >= KERNEL_VERSION(3, 18, 0)))
 static void nulldisp_disable_vblank(struct drm_device *dev, unsigned int crtc)
 #else
 static void nulldisp_disable_vblank(struct drm_device *dev, int crtc)
@@ -1886,10 +2297,18 @@ static void pdp_gem_object_free(struct drm_gem_object *obj)
 #endif
 
 static const struct drm_ioctl_desc nulldisp_ioctls[] = {
-	DRM_IOCTL_DEF_DRV(NULLDISP_GEM_CREATE, nulldisp_gem_object_create_ioctl, DRM_AUTH | DRM_UNLOCKED),
-	DRM_IOCTL_DEF_DRV(NULLDISP_GEM_MMAP, nulldisp_gem_object_mmap_ioctl, DRM_AUTH | DRM_UNLOCKED),
-	DRM_IOCTL_DEF_DRV(NULLDISP_GEM_CPU_PREP, nulldisp_gem_object_cpu_prep_ioctl, DRM_AUTH | DRM_UNLOCKED),
-	DRM_IOCTL_DEF_DRV(NULLDISP_GEM_CPU_FINI, nulldisp_gem_object_cpu_fini_ioctl, DRM_AUTH | DRM_UNLOCKED),
+	DRM_IOCTL_DEF_DRV(NULLDISP_GEM_CREATE,
+			  nulldisp_gem_object_create_ioctl,
+			  DRM_AUTH | DRM_UNLOCKED),
+	DRM_IOCTL_DEF_DRV(NULLDISP_GEM_MMAP,
+			  nulldisp_gem_object_mmap_ioctl,
+			  DRM_AUTH | DRM_UNLOCKED),
+	DRM_IOCTL_DEF_DRV(NULLDISP_GEM_CPU_PREP,
+			  nulldisp_gem_object_cpu_prep_ioctl,
+			  DRM_AUTH | DRM_UNLOCKED),
+	DRM_IOCTL_DEF_DRV(NULLDISP_GEM_CPU_FINI,
+			  nulldisp_gem_object_cpu_fini_ioctl,
+			  DRM_AUTH | DRM_UNLOCKED),
 };
 
 static int nulldisp_gem_mmap(struct file *file, struct vm_area_struct *vma)
@@ -1972,7 +2391,11 @@ static struct drm_driver nulldisp_drm_driver = {
 	.dumb_map_offset		= pdp_gem_dumb_map_offset,
 #else
 	.gem_free_object		= nulldisp_gem_object_free,
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 4, 0))
 	.gem_prime_export		= nulldisp_gem_prime_export,
+#else
+	.gem_prime_export		= drm_gem_prime_export,
+#endif
 	.gem_prime_import		= drm_gem_prime_import,
 	.gem_prime_pin			= nulldisp_gem_prime_pin,
 	.gem_prime_unpin		= nulldisp_gem_prime_unpin,
@@ -1981,8 +2404,9 @@ static struct drm_driver nulldisp_drm_driver = {
 	.gem_prime_vmap			= nulldisp_gem_prime_vmap,
 	.gem_prime_vunmap		= nulldisp_gem_prime_vunmap,
 	.gem_prime_mmap			= nulldisp_gem_prime_mmap,
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 4, 0))
 	.gem_prime_res_obj		= nulldisp_gem_prime_res_obj,
-
+#endif
 	.dumb_create			= nulldisp_gem_dumb_create,
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0))
 	.dumb_map_offset		= nulldisp_gem_dumb_map_offset,
@@ -2003,7 +2427,8 @@ static struct drm_driver nulldisp_drm_driver = {
 
 	.driver_features		= DRIVER_GEM |
 					  DRIVER_MODESET |
-					  DRIVER_PRIME,
+					  NULLDISP_DRIVER_PRIME |
+					  NULLDISP_DRIVER_ATOMIC,
 	.ioctls				= nulldisp_ioctls,
 	.num_ioctls			= ARRAY_SIZE(nulldisp_ioctls),
 	.fops				= &nulldisp_driver_fops,
@@ -2045,6 +2470,8 @@ static int nulldisp_probe(struct platform_device *pdev)
 	ret = nulldisp_late_load(ddev);
 	if (ret)
 		goto err_drm_dev_unregister;
+
+	drm_mode_config_reset(ddev);
 
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(4, 11, 0))
 	DRM_INFO("Initialized %s %d.%d.%d %s on minor %d\n",
@@ -2119,20 +2546,15 @@ static struct platform_driver nulldisp_platform_driver = {
 };
 
 
+#if !defined(LMA)
 static struct platform_device_info nulldisp_device_info = {
 	.name		= "nulldisp",
 	.id		= -1,
-#if defined(LMA)
-	/*
-	 * The display hardware does not access system memory, so there
-	 * is no DMA limitation.
-	 */
-	.dma_mask	= DMA_BIT_MASK(64),
-#elif defined(NO_HARDWARE)
+#if defined(NO_HARDWARE)
 	/*
 	 * Not all cores have 40 bit physical support, but this
 	 * will work unless > 32 bit address is returned on those cores.
-	 * In the future this will be fixed more correctly.
+	 * In the future this will be fixed properly.
 	 */
 	.dma_mask	= DMA_BIT_MASK(40),
 #else
@@ -2141,6 +2563,7 @@ static struct platform_device_info nulldisp_device_info = {
 };
 
 static struct platform_device *nulldisp_dev;
+#endif
 
 static int __init nulldisp_init(void)
 {
@@ -2158,13 +2581,14 @@ static int __init nulldisp_init(void)
 		return err;
 	}
 
+#if !defined(LMA)
 	nulldisp_dev = platform_device_register_full(&nulldisp_device_info);
 	if (IS_ERR(nulldisp_dev)) {
 		err = PTR_ERR(nulldisp_dev);
 		nulldisp_dev = NULL;
 		goto err_unregister_family;
 	}
-
+#endif
 	err = platform_driver_register(&nulldisp_platform_driver);
 	if (err)
 		goto err_unregister_family;
@@ -2183,9 +2607,10 @@ static void __exit nulldisp_exit(void)
 	err = nlpvrdpy_unregister();
 	BUG_ON(err);
 
+#if !defined(LMA)
 	if (nulldisp_dev)
 		platform_device_unregister(nulldisp_dev);
-
+#endif
 	platform_driver_unregister(&nulldisp_platform_driver);
 }
 

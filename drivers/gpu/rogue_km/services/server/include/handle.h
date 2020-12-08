@@ -41,74 +41,73 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */ /***************************************************************************/
 
-#if !defined(__HANDLE_H__)
-#define __HANDLE_H__
+#if !defined(HANDLE_API_H)
+#define HANDLE_API_H
 
 #include "lock_types.h"
 
 /*
  * Handle API
  * ----------
- * The handle API is intended to provide handles for kernel resources,
- * which can then be passed back to user space processes.
+ * The handle API is intended to provide handles for kernel resources, which
+ * can then be passed back to user space processes.
  *
- * The following functions comprise the API.  Each function takes a
- * pointer to a PVRSRV_HANDLE_BASE strcture, one of which is allocated
- * for each process, and stored in the per-process data area.  Use
- * KERNEL_HANDLE_BASE for handles not allocated for a particular process,
- * or for handles that need to be allocated before the PVRSRV_HANDLE_BASE
- * structure for the process is available.
+ * The following functions comprise the API. Each function takes a pointer to
+ * a PVRSRV_HANDLE_BASE structure, one of which is allocated for each process,
+ * and stored in the per-process data area. Use KERNEL_HANDLE_BASE for handles
+ * not allocated for a particular process, or for handles that need to be
+ * allocated before the PVRSRV_HANDLE_BASE structure for the process is
+ * available.
  *
  * PVRSRV_ERROR PVRSRVAllocHandle(PVRSRV_HANDLE_BASE *psBase,
- * 	IMG_HANDLE *phHandle, void *pvData, PVRSRV_HANDLE_TYPE eType,
- * 	PVRSRV_HANDLE_ALLOC_FLAG eFlag);
+ *      IMG_HANDLE *phHandle, void *pvData, PVRSRV_HANDLE_TYPE eType,
+ *      PVRSRV_HANDLE_ALLOC_FLAG eFlag);
  *
  * Allocate a handle phHandle, for the resource of type eType pointed to by
  * pvData.
  *
- * For handles that have a definite lifetime, where the corresponding
- * resource is explicitly created and destroyed, eFlag should be zero.
+ * For handles that have a definite lifetime, where the corresponding resource
+ * is explicitly created and destroyed, eFlag should be zero.
  *
- * If a particular resource may be referenced multiple times by a
- * given process, setting eFlag to PVRSRV_HANDLE_ALLOC_FLAG_MULTI
- * will allow multiple handles to be allocated for the resource.
- * Such handles cannot be found with PVRSRVFindHandle.
+ * If a particular resource may be referenced multiple times by a given
+ * process, setting eFlag to PVRSRV_HANDLE_ALLOC_FLAG_MULTI will allow multiple
+ * handles to be allocated for the resource. Such handles cannot be found with
+ * PVRSRVFindHandle.
  *
  * PVRSRV_ERROR PVRSRVAllocSubHandle(PVRSRV_HANDLE_BASE *psBase,
- * 	IMG_HANDLE *phHandle, void *pvData, PVRSRV_HANDLE_TYPE eType,
- * 	PVRSRV_HANDLE_ALLOC_FLAG eFlag, IMG_HANDLE hParent);
+ *      IMG_HANDLE *phHandle, void *pvData, PVRSRV_HANDLE_TYPE eType,
+ *      PVRSRV_HANDLE_ALLOC_FLAG eFlag, IMG_HANDLE hParent);
  *
  * This function is similar to PVRSRVAllocHandle, except that the allocated
  * handles are associated with a parent handle, hParent, that has been
- * allocated previously.  Subhandles are automatically deallocated when their
+ * allocated previously. Subhandles are automatically deallocated when their
  * parent handle is deallocated.
- * Subhandles can be treated as ordinary handles.  For example, they may
- * have subhandles of their own, and may be explicity deallocated using
+ * Subhandles can be treated as ordinary handles. For example, they may have
+ * subhandles of their own, and may be explicitly deallocated using
  * PVRSRVReleaseHandle (see below).
  *
  * PVRSRV_ERROR PVRSRVFindHandle(PVRSRV_HANDLE_BASE *psBase,
- * 	IMG_HANDLE *phHandle, void *pvData, PVRSRV_HANDLE_TYPE eType);
+ *      IMG_HANDLE *phHandle, void *pvData, PVRSRV_HANDLE_TYPE eType);
  *
- * Find the handle previously allocated for the resource pointed to by
- * pvData, of type eType.  Handles allocated with the flag
- * PVRSRV_HANDLE_ALLOC_FLAG_MULTI cannot be found using this
- * function.
+ * Find the handle previously allocated for the resource pointed to by pvData,
+ * of type eType. Handles allocated with the flag
+ * PVRSRV_HANDLE_ALLOC_FLAG_MULTI cannot be found using this function.
  *
  * PVRSRV_ERROR PVRSRVLookupHandle(PVRSRV_HANDLE_BASE *psBase,
- * 	void **ppvData, IMG_HANDLE hHandle, PVRSRV_HANDLE_TYPE eType);
+ *      void **ppvData, IMG_HANDLE hHandle, PVRSRV_HANDLE_TYPE eType);
  *
  * Given a handle for a resource of type eType, return the pointer to the
  * resource.
  *
  * PVRSRV_ERROR PVRSRVLookuSubHandle(PVRSRV_HANDLE_BASE *psBase,
- * 	void **ppvData, IMG_HANDLE hHandle, PVRSRV_HANDLE_TYPE eType,
- * 	IMH_HANDLE hAncestor);
+ *      void **ppvData, IMG_HANDLE hHandle, PVRSRV_HANDLE_TYPE eType,
+ *      IMH_HANDLE hAncestor);
  *
  * Similar to PVRSRVLookupHandle, but checks the handle is a descendant
  * of hAncestor.
  *
  * PVRSRV_ERROR PVRSRVReleaseHandle(PVRSRV_HANDLE_BASE *psBase,
- * 	IMG_HANDLE hHandle, PVRSRV_HANDLE_TYPE eType);
+ *      IMG_HANDLE hHandle, PVRSRV_HANDLE_TYPE eType);
  *
  * Deallocate a handle of given type.
  *
@@ -140,11 +139,11 @@ typedef enum
 typedef enum
 {
 	/* No flags */
-	PVRSRV_HANDLE_ALLOC_FLAG_NONE = 		0,
-	/* Muliple handles can point at the given data pointer */
-	PVRSRV_HANDLE_ALLOC_FLAG_MULTI = 		0x01,
+	PVRSRV_HANDLE_ALLOC_FLAG_NONE =    0,
+	/* Multiple handles can point at the given data pointer */
+	PVRSRV_HANDLE_ALLOC_FLAG_MULTI =   0x01,
 	/* Subhandles are allocated in a private handle space */
-	PVRSRV_HANDLE_ALLOC_FLAG_PRIVATE = 		0x02
+	PVRSRV_HANDLE_ALLOC_FLAG_PRIVATE = 0x02
 } PVRSRV_HANDLE_ALLOC_FLAG;
 
 typedef struct _HANDLE_BASE_ PVRSRV_HANDLE_BASE;
@@ -179,6 +178,7 @@ PVRSRV_ERROR PVRSRVLookupSubHandle(PVRSRV_HANDLE_BASE *psBase, void **ppvData, I
 
 PVRSRV_ERROR PVRSRVReleaseHandle(PVRSRV_HANDLE_BASE *psBase, IMG_HANDLE hHandle, PVRSRV_HANDLE_TYPE eType);
 PVRSRV_ERROR PVRSRVReleaseHandleUnlocked(PVRSRV_HANDLE_BASE *psBase, IMG_HANDLE hHandle, PVRSRV_HANDLE_TYPE eType);
+PVRSRV_ERROR PVRSRVReleaseHandleStagedUnlock(PVRSRV_HANDLE_BASE *psBase, IMG_HANDLE hHandle, PVRSRV_HANDLE_TYPE eType);
 
 PVRSRV_ERROR PVRSRVPurgeHandles(PVRSRV_HANDLE_BASE *psBase);
 
@@ -198,5 +198,4 @@ PVRSRV_HANDLE_BASE *PVRSRVRetrieveProcessHandleBase(void);
 void LockHandle(PVRSRV_HANDLE_BASE *psBase);
 void UnlockHandle(PVRSRV_HANDLE_BASE *psBase);
 
-
-#endif /* !defined(__HANDLE_H__) */
+#endif /* !defined(HANDLE_API_H) */

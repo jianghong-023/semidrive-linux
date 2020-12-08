@@ -1,8 +1,8 @@
 /*************************************************************************/ /*!
 @File
-@Title		Resource Handle Manager - Generic Back-end
+@Title          Resource Handle Manager - Generic Back-end
 @Copyright      Copyright (c) Imagination Technologies Ltd. All Rights Reserved
-@Description	Provide generic resource handle management back-end
+@Description    Provide generic resource handle management back-end
 @License        Dual MIT/GPLv2
 
 The contents of this file are subject to the MIT license as set out below.
@@ -59,14 +59,14 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #define	DIVIDE_BY_BLOCK_SIZE(i)					(((IMG_UINT32)(i)) >> HANDLE_BLOCK_SHIFT)
 #define	MULTIPLY_BY_BLOCK_SIZE(i)				(((IMG_UINT32)(i)) << HANDLE_BLOCK_SHIFT)
 
-#define HANDLE_BLOCK_SIZE       				MULTIPLY_BY_BLOCK_SIZE(1)
+#define HANDLE_BLOCK_SIZE						MULTIPLY_BY_BLOCK_SIZE(1)
 #define	HANDLE_SUB_BLOCK_MASK					(HANDLE_BLOCK_SIZE - 1)
 #define	HANDLE_BLOCK_MASK					(~(HANDLE_SUB_BLOCK_MASK))
 
-#define	INDEX_IS_VALID(psBase, i) 				((i) < (psBase)->ui32TotalHandCount)
+#define	INDEX_IS_VALID(psBase, i)				((i) < (psBase)->ui32TotalHandCount)
 
-#define	INDEX_TO_HANDLE(i) 					((IMG_HANDLE)((uintptr_t)(i) + HANDLE_OFFSET_FROM_INDEX))
-#define	HANDLE_TO_INDEX(h) 					((IMG_UINT32)((uintptr_t)(h) - HANDLE_OFFSET_FROM_INDEX))
+#define	INDEX_TO_HANDLE(i)					((IMG_HANDLE)((uintptr_t)(i) + HANDLE_OFFSET_FROM_INDEX))
+#define	HANDLE_TO_INDEX(h)					((IMG_UINT32)((uintptr_t)(h) - HANDLE_OFFSET_FROM_INDEX))
 
 #define	INDEX_TO_BLOCK_INDEX(i)					DIVIDE_BY_BLOCK_SIZE(i)
 #define BLOCK_INDEX_TO_INDEX(i)					MULTIPLY_BY_BLOCK_SIZE(i)
@@ -140,9 +140,9 @@ struct _HANDLE_IMPL_BASE_
 
 	/* Purging enabled.
 	 * If purging is enabled, the size of the table can be reduced
-	 * by removing free space at the end of the table.  To make
+	 * by removing free space at the end of the table. To make
 	 * purging more likely to succeed, handles are allocated as
-	 * far to the front of the table as possible.  The first free
+	 * far to the front of the table as possible. The first free
 	 * handle is found by a linear search from the start of the table,
 	 * and so no free handle list management is done.
 	 */
@@ -152,7 +152,7 @@ struct _HANDLE_IMPL_BASE_
 	 * If purging is not enabled, this is the array index of first free
 	 * handle.
 	 * If purging is enabled, this is the index to start searching for
-	 * a free handle from.  In this case it is usually zero, unless
+	 * a free handle from. In this case it is usually zero, unless
 	 * the handle array size has been increased due to lack of
 	 * handles.
 	 */
@@ -213,13 +213,7 @@ static PVRSRV_ERROR ReallocHandleBlockArray(HANDLE_IMPL_BASE *psBase,
 	{
 		/* Allocate new handle array */
 		psNewArray = OSAllocMem(HANDLE_BLOCK_ARRAY_SIZE(ui32NewCount) * sizeof(HANDLE_BLOCK));
-		if (psNewArray == NULL)
-		{
-			PVR_DPF((PVR_DBG_ERROR, "%s: Couldn't allocate new handle array",
-					 __func__));
-			eError = PVRSRV_ERROR_OUT_OF_MEMORY;
-			goto error;
-		}
+		PVR_LOG_GOTO_IF_NOMEM(psNewArray, eError, error);
 
 		if (ui32OldCount != 0)
 		{
@@ -260,10 +254,7 @@ static PVRSRV_ERROR ReallocHandleBlockArray(HANDLE_IMPL_BASE *psBase,
 		}
 	}
 
-	if (eError != PVRSRV_OK)
-	{
-		goto error;
-	}
+	PVR_GOTO_IF_ERROR(eError, error);
 
 #if defined(DEBUG_MAX_HANDLE_COUNT)
 	/* Force handle failure to test error exit code */
@@ -271,8 +262,7 @@ static PVRSRV_ERROR ReallocHandleBlockArray(HANDLE_IMPL_BASE *psBase,
 	{
 		PVR_DPF((PVR_DBG_ERROR, "%s: Max handle count (%u) reached",
 				 __func__, DEBUG_MAX_HANDLE_COUNT));
-		eError = PVRSRV_ERROR_OUT_OF_MEMORY;
-		goto error;
+		PVR_GOTO_WITH_ERROR(eError, PVRSRV_ERROR_OUT_OF_MEMORY, error);
 	}
 #endif /* defined(DEBUG_MAX_HANDLE_COUNT) */
 
@@ -295,7 +285,7 @@ static PVRSRV_ERROR ReallocHandleBlockArray(HANDLE_IMPL_BASE *psBase,
 
 		/*
 		 * If purging is enabled, there is no free handle list
-		 * management, but as an optimization, when allocating
+		 * management, but as an optimisation, when allocating
 		 * new handles, we use ui32FirstFreeIndex to point to
 		 * the first handle in a newly allocated block.
 		 */
@@ -557,7 +547,7 @@ static PVRSRV_ERROR AcquireHandle(HANDLE_IMPL_BASE *psBase,
 			 * Update the first free handle index.
 			 * If the "next free index plus one" field in the new
 			 * handle structure is zero, the next free index is
-			 * the index of the new handle plus one.  This
+			 * the index of the new handle plus one. This
 			 * convention has been adopted to simplify the
 			 * initialisation of freshly allocated handle
 			 * space.
@@ -579,9 +569,7 @@ static PVRSRV_ERROR AcquireHandle(HANDLE_IMPL_BASE *psBase,
 	/* Return the new handle to the client */
 	*phHandle = INDEX_TO_HANDLE(ui32NewIndex);
 
-#if defined(DEBUG_HANDLEALLOC_KM)
 	PVR_DPF((PVR_DBG_MESSAGE, "Handle acquire base %p hdl %p", psBase, *phHandle));
-#endif
 
 	return PVRSRV_OK;
 }
@@ -608,6 +596,7 @@ static PVRSRV_ERROR ReleaseHandle(HANDLE_IMPL_BASE *psBase,
 {
 	IMG_UINT32 ui32Index = HANDLE_TO_INDEX(hHandle);
 	HANDLE_IMPL_DATA *psHandleData;
+	IMG_UINT32 ui32ValidatedHandleIndex = OSConfineArrayIndexNoSpeculation(ui32Index, psBase->ui32TotalHandCount);
 	void *pvData;
 
 	PVR_ASSERT(psBase);
@@ -620,7 +609,7 @@ static PVRSRV_ERROR ReleaseHandle(HANDLE_IMPL_BASE *psBase,
 		return PVRSRV_ERROR_HANDLE_INDEX_OUT_OF_RANGE;
 	}
 
-	psHandleData = INDEX_TO_HANDLE_DATA(psBase, ui32Index);
+	psHandleData = INDEX_TO_HANDLE_DATA(psBase, ui32ValidatedHandleIndex);
 
 	pvData = psHandleData->pvData;
 	psHandleData->pvData = NULL;
@@ -633,7 +622,7 @@ static PVRSRV_ERROR ReleaseHandle(HANDLE_IMPL_BASE *psBase,
 			PVR_ASSERT(psBase->ui32FirstFreeIndex == 0);
 			PVR_ASSERT(psBase->ui32LastFreeIndexPlusOne == 0);
 
-			psBase->ui32FirstFreeIndex =  ui32Index;
+			psBase->ui32FirstFreeIndex =  ui32ValidatedHandleIndex;
 		}
 		else
 		{
@@ -643,19 +632,19 @@ static PVRSRV_ERROR ReleaseHandle(HANDLE_IMPL_BASE *psBase,
 			 */
 			PVR_ASSERT(psBase->ui32LastFreeIndexPlusOne != 0);
 			PVR_ASSERT(INDEX_TO_HANDLE_DATA(psBase, psBase->ui32LastFreeIndexPlusOne - 1)->ui32NextIndexPlusOne == 0);
-			INDEX_TO_HANDLE_DATA(psBase, psBase->ui32LastFreeIndexPlusOne - 1)->ui32NextIndexPlusOne =  ui32Index + 1;
+			INDEX_TO_HANDLE_DATA(psBase, psBase->ui32LastFreeIndexPlusOne - 1)->ui32NextIndexPlusOne =  ui32ValidatedHandleIndex + 1;
 		}
 
 		PVR_ASSERT(psHandleData->ui32NextIndexPlusOne == 0);
 
 		/* Update the end of the free handle linked list */
-		psBase->ui32LastFreeIndexPlusOne = ui32Index + 1;
+		psBase->ui32LastFreeIndexPlusOne = ui32ValidatedHandleIndex + 1;
 	}
 
 	psBase->ui32TotalFreeHandCount++;
-	INDEX_TO_BLOCK_FREE_HAND_COUNT(psBase, ui32Index)++;
+	INDEX_TO_BLOCK_FREE_HAND_COUNT(psBase, ui32ValidatedHandleIndex)++;
 
-	PVR_ASSERT(INDEX_TO_BLOCK_FREE_HAND_COUNT(psBase, ui32Index)<= HANDLE_BLOCK_SIZE);
+	PVR_ASSERT(INDEX_TO_BLOCK_FREE_HAND_COUNT(psBase, ui32ValidatedHandleIndex)<= HANDLE_BLOCK_SIZE);
 
 #if defined(DEBUG)
 	{
@@ -676,9 +665,7 @@ static PVRSRV_ERROR ReleaseHandle(HANDLE_IMPL_BASE *psBase,
 		*ppvData = pvData;
 	}
 
-#if defined(DEBUG_HANDLEALLOC_KM)
 	PVR_DPF((PVR_DBG_MESSAGE, "Handle release base %p hdl %p", psBase, hHandle));
-#endif
 
 	return PVRSRV_OK;
 }
@@ -692,7 +679,7 @@ static PVRSRV_ERROR ReleaseHandle(HANDLE_IMPL_BASE *psBase,
 
  @Input		psBase - Pointer to handle base structure
 		hHandle - Handle from which data should be retrieved
-                ppvData - Points to a void data pointer
+		ppvData - Points to a void data pointer
 
  @Output	ppvData - Points to a void data pointer
 
@@ -705,7 +692,7 @@ static PVRSRV_ERROR GetHandleData(HANDLE_IMPL_BASE *psBase,
 {
 	IMG_UINT32 ui32Index = HANDLE_TO_INDEX(hHandle);
 	HANDLE_IMPL_DATA *psHandleData;
-
+	IMG_UINT32 ui32ValidatedHandleIndex = OSConfineArrayIndexNoSpeculation(ui32Index, psBase->ui32TotalHandCount);
 	PVR_ASSERT(psBase);
 	PVR_ASSERT(ppvData);
 
@@ -718,7 +705,7 @@ static PVRSRV_ERROR GetHandleData(HANDLE_IMPL_BASE *psBase,
 		return PVRSRV_ERROR_HANDLE_INDEX_OUT_OF_RANGE;
 	}
 
-	psHandleData = INDEX_TO_HANDLE_DATA(psBase, ui32Index);
+	psHandleData = INDEX_TO_HANDLE_DATA(psBase, ui32ValidatedHandleIndex);
 	if (unlikely(psHandleData == NULL || psHandleData->pvData == NULL))
 	{
 		return PVRSRV_ERROR_HANDLE_NOT_ALLOCATED;
@@ -749,6 +736,7 @@ static PVRSRV_ERROR SetHandleData(HANDLE_IMPL_BASE *psBase,
 {
 	IMG_UINT32 ui32Index = HANDLE_TO_INDEX(hHandle);
 	HANDLE_IMPL_DATA *psHandleData;
+	IMG_UINT32 ui32ValidatedHandleIndex = OSConfineArrayIndexNoSpeculation(ui32Index, psBase->ui32TotalHandCount);
 
 	PVR_ASSERT(psBase);
 
@@ -761,7 +749,7 @@ static PVRSRV_ERROR SetHandleData(HANDLE_IMPL_BASE *psBase,
 		return PVRSRV_ERROR_HANDLE_INDEX_OUT_OF_RANGE;
 	}
 
-	psHandleData = INDEX_TO_HANDLE_DATA(psBase, ui32Index);
+	psHandleData = INDEX_TO_HANDLE_DATA(psBase, ui32ValidatedHandleIndex);
 	if (psHandleData == NULL || psHandleData->pvData == NULL)
 	{
 		return PVRSRV_ERROR_HANDLE_NOT_ALLOCATED;
@@ -816,7 +804,7 @@ static PVRSRV_ERROR IterateOverHandles(HANDLE_IMPL_BASE *psBase,
 
  @Description	Enable purging for a given handle base
 
- @Input 	psBase - pointer to handle base structure
+ @Input		psBase - pointer to handle base structure
 
  @Return	Error code or PVRSRV_OK
 
@@ -851,7 +839,7 @@ static PVRSRV_ERROR EnableHandlePurging(HANDLE_IMPL_BASE *psBase)
 
  @Description	Purge handles for a given handle base
 
- @Input 	psBase - Pointer to handle base structure
+ @Input		psBase - Pointer to handle base structure
 
  @Return	Error code or PVRSRV_OK
 
@@ -897,7 +885,7 @@ static PVRSRV_ERROR PurgeHandles(HANDLE_IMPL_BASE *psBase)
 
  @Description	Create a handle base structure
 
- @Input 	ppsBase - pointer to handle base structure pointer
+ @Input		ppsBase - pointer to handle base structure pointer
 
  @Output	ppsBase - points to handle base structure pointer
 
@@ -911,13 +899,7 @@ static PVRSRV_ERROR CreateHandleBase(HANDLE_IMPL_BASE **ppsBase)
 	PVR_ASSERT(ppsBase);
 
 	psBase = OSAllocZMem(sizeof(*psBase));
-	if (psBase == NULL)
-	{
-		PVR_DPF((PVR_DBG_ERROR, "%s: Couldn't allocate generic handle base",
-				 __func__));
-
-		return PVRSRV_ERROR_OUT_OF_MEMORY;
-	}
+	PVR_LOG_RETURN_IF_NOMEM(psBase, "psBase");
 
 	psBase->psHandleBlockArray	= NULL;
 	psBase->ui32MaxHandleValue	= HANDLE_VALUE_MAX;
@@ -935,7 +917,7 @@ static PVRSRV_ERROR CreateHandleBase(HANDLE_IMPL_BASE **ppsBase)
 
  @Description	Destroy a handle base structure
 
- @Input 	psBase - pointer to handle base structure
+ @Input		psBase - pointer to handle base structure
 
  @Return	Error code or PVRSRV_OK
 
@@ -969,14 +951,7 @@ static PVRSRV_ERROR DestroyHandleBase(HANDLE_IMPL_BASE *psBase)
 	}
 
 	eError = ReallocHandleBlockArray(psBase, 0);
-	if (eError != PVRSRV_OK)
-	{
-		PVR_DPF((PVR_DBG_ERROR, "%s: Couldn't free handle array (%s)",
-			 __func__,
-			 PVRSRVGetErrorString(eError)));
-
-		return eError;
-	}
+	PVR_LOG_RETURN_IF_ERROR(eError, "ReallocHandleBlockArray");
 
 	OSFreeMem(psBase);
 
@@ -1025,10 +1000,7 @@ PVRSRV_ERROR PVRSRVHandleGetFuncTable(HANDLE_IMPL_FUNCTAB const **ppsFuncs)
 		return PVRSRV_ERROR_RESOURCE_UNAVAILABLE;
 	}
 
-	if (ppsFuncs == NULL)
-	{
-		return PVRSRV_ERROR_INVALID_PARAMS;
-	}
+	PVR_RETURN_IF_INVALID_PARAM(ppsFuncs);
 
 	*ppsFuncs = &g_sHandleFuncTab;
 

@@ -52,7 +52,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 static INLINE IMG_BOOL __const_function IsPower2(uint32_t n)
 {
 	/* C++ needs this cast. */
-	return (IMG_BOOL)((n & (n - 1)) == 0);
+	return (IMG_BOOL)((n & (n - 1U)) == 0U);
 }
 
 /*************************************************************************/ /*!
@@ -63,7 +63,7 @@ static INLINE IMG_BOOL __const_function IsPower2(uint32_t n)
 static INLINE IMG_BOOL __const_function IsPower2_64(uint64_t n)
 {
 	/* C++ needs this cast. */
-	return (IMG_BOOL)((n & (n - 1)) == 0);
+	return (IMG_BOOL)((n & (n - 1U)) == 0U);
 }
 
 /* Code using GNU GCC intrinsics */
@@ -83,13 +83,13 @@ static INLINE IMG_BOOL __const_function IsPower2_64(uint64_t n)
 */ /**************************************************************************/
 static INLINE uint32_t __const_function FloorLog2(uint32_t n)
 {
-	if (unlikely(n == 0))
+	if (unlikely(n == 0U))
 	{
 		return 0;
 	}
 	else
 	{
-		uint32_t uNumBits = CHAR_BIT * sizeof(n);
+		uint32_t uNumBits = (uint32_t)CHAR_BIT * (uint32_t)sizeof(n);
 		return uNumBits - (uint32_t)__builtin_clz(n) - 1U;
 	}
 }
@@ -101,13 +101,13 @@ static INLINE uint32_t __const_function FloorLog2(uint32_t n)
 */ /**************************************************************************/
 static INLINE uint32_t __const_function FloorLog2_64(uint64_t n)
 {
-	if (unlikely(n == 0))
+	if (unlikely(n == 0U))
 	{
 		return 0;
 	}
 	else
 	{
-		uint32_t uNumBits = CHAR_BIT * sizeof(n);
+		uint32_t uNumBits = (uint32_t)CHAR_BIT * (uint32_t)sizeof(n);
 		return uNumBits - (uint32_t)__builtin_clzll(n) - 1U;
 	}
 }
@@ -119,13 +119,13 @@ static INLINE uint32_t __const_function FloorLog2_64(uint64_t n)
 */ /**************************************************************************/
 static INLINE uint32_t __const_function CeilLog2(uint32_t n)
 {
-	if (unlikely(n == 0 || n == 1))
+	if (unlikely(n == 0U || n == 1U))
 	{
 		return 0;
 	}
 	else
 	{
-		uint32_t uNumBits = CHAR_BIT * sizeof(n);
+		uint32_t uNumBits = (uint32_t)CHAR_BIT * (uint32_t)sizeof(n);
 
 		n--; /* Handle powers of 2 */
 		return uNumBits - (uint32_t)__builtin_clz(n);
@@ -139,13 +139,13 @@ static INLINE uint32_t __const_function CeilLog2(uint32_t n)
 */ /**************************************************************************/
 static INLINE uint32_t __const_function CeilLog2_64(uint64_t n)
 {
-	if (unlikely(n == 0 || n == 1))
+	if (unlikely(n == 0U || n == 1U))
 	{
 		return 0;
 	}
 	else
 	{
-		uint32_t uNumBits = CHAR_BIT * sizeof(n);
+		uint32_t uNumBits = (uint32_t)CHAR_BIT * (uint32_t)sizeof(n);
 
 		n--; /* Handle powers of 2 */
 		return uNumBits - (uint32_t)__builtin_clzll(n);
@@ -159,7 +159,7 @@ static INLINE uint32_t __const_function CeilLog2_64(uint64_t n)
 */ /**************************************************************************/
 static INLINE uint32_t __const_function ExactLog2(uint32_t n)
 {
-	return (uint32_t)(CHAR_BIT * sizeof(n)) - (uint32_t)__builtin_clz(n) - 1U;
+	return (uint32_t)CHAR_BIT * (uint32_t)sizeof(n) - (uint32_t)__builtin_clz(n) - 1U;
 }
 
 /*************************************************************************/ /*!
@@ -169,7 +169,7 @@ static INLINE uint32_t __const_function ExactLog2(uint32_t n)
 */ /**************************************************************************/
 static INLINE uint32_t __const_function ExactLog2_64(uint64_t n)
 {
-	return (uint32_t)(CHAR_BIT * sizeof(n)) - (uint32_t)__builtin_clzll(n) - 1U;
+	return (uint32_t)CHAR_BIT * (uint32_t)sizeof(n) - (uint32_t)__builtin_clzll(n) - 1U;
 }
 
 /*************************************************************************/ /*!
@@ -182,18 +182,18 @@ static INLINE uint32_t __const_function RoundUpToNextPowerOfTwo(uint32_t n)
 {
 	/* Cases with n greater than 2^31 needs separate handling
 	 * as result of (1<<32) is undefined. */
-	if (unlikely( n == 0 || n > (uint32_t)1 << (CHAR_BIT * sizeof(n) - 1)))
+	if (unlikely( n == 0U || n > (uint32_t)1 << ((uint32_t)CHAR_BIT * sizeof(n) - 1U)))
 	{
 		return 0;
 	}
 
 	/* Return n if it is already a power of 2 */
-	if ((IMG_BOOL)((n & (n - 1)) == 0))
+	if ((IMG_BOOL)((n & (n - 1U)) == 0U))
 	{
 		return n;
 	}
 
-	return (uint32_t)1 << ((uint32_t)(CHAR_BIT * sizeof(n)) - (uint32_t)__builtin_clz(n));
+	return (uint32_t)1 << ((uint32_t)CHAR_BIT * sizeof(n) - (uint32_t)__builtin_clz(n));
 }
 
 /*************************************************************************/ /*!
@@ -206,18 +206,18 @@ static INLINE uint64_t __const_function RoundUpToNextPowerOfTwo_64(uint64_t n)
 {
 	/* Cases with n greater than 2^63 needs separate handling
 	 * as result of (1<<64) is undefined. */
-	if (unlikely( n == 0 || n > (uint64_t)1 << (CHAR_BIT * sizeof(n) - 1)))
+	if (unlikely( n == 0U || n > (uint64_t)1 << ((uint32_t)CHAR_BIT * sizeof(n) - 1U)))
 	{
 		return 0;
 	}
 
 	/* Return n if it is already a power of 2 */
-	if ((IMG_BOOL)((n & (n - 1)) == 0))
+	if ((IMG_BOOL)((n & (n - 1U)) == 0U))
 	{
 		return n;
 	}
 
-	return (uint64_t)1 << ((uint32_t)(CHAR_BIT * sizeof(n)) - (uint32_t)__builtin_clzll(n));
+	return (uint64_t)1 << ((uint64_t)CHAR_BIT * sizeof(n) - (uint64_t)__builtin_clzll(n));
 }
 
 #else /* #if (defined(__GNUC__) || defined(__GNUG__)) && !(defined(__clang__) || defined(__INTEL_COMPILER)) */
@@ -403,7 +403,7 @@ static INLINE uint32_t __const_function NumMipLevels(uint32_t sizeX, uint32_t si
 {
 
 	uint32_t maxSize = MAX(MAX(sizeX, sizeY), sizeZ);
-	return FloorLog2(maxSize) + 1;
+	return FloorLog2(maxSize) + 1U;
 }
 
 #endif /* LOG2_H */

@@ -1,4 +1,3 @@
-/* -*- mode: c; indent-tabs-mode: t; c-basic-offset: 8; tab-width: 8 -*- */
 /* vi: set ts=8 sw=8 sts=8: */
 /*************************************************************************/ /*!
 @Codingstyle    LinuxKernel
@@ -92,6 +91,10 @@ static int tc_mem_latency;
 module_param(tc_mem_latency, int, 0444);
 MODULE_PARM_DESC(tc_mem_latency, "TC memory read latency in cycles (TCF5 only)");
 
+static unsigned long tc_mem_mode = TC_MEMORY_CONFIG;
+module_param(tc_mem_mode, ulong, 0444);
+MODULE_PARM_DESC(tc_mem_mode, "TC memory mode (local = 1, hybrid = 2, host = 3)");
+
 static int tc_wresp_latency;
 module_param(tc_wresp_latency, int, 0444);
 MODULE_PARM_DESC(tc_wresp_latency, "TC memory write response latency in cycles (TCF5 only)");
@@ -129,7 +132,54 @@ static struct debugfs_blob_wrapper tc_debugfs_rogue_name_blobs[] = {
 		.data = "fpga (unknown)",
 		.size = sizeof("fpga (unknown)") - 1,
 	},
+	[ODIN_VERSION_ORION] = {
+		.data = "orion",
+		.size = sizeof("orion") - 1,
+	},
 };
+
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0))
+/* forward declaration */
+static void tc_devres_release(struct device *dev, void *res);
+
+static ssize_t rogue_name_show(struct device_driver *drv, char *buf)
+{
+	struct pci_dev *pci_dev;
+	struct tc_device *tc;
+	struct device *dev;
+
+	dev = driver_find_next_device(drv, NULL);
+	if (!dev)
+		return -ENODEV;
+
+	pci_dev = to_pci_dev(dev);
+	if (!pci_dev)
+		return -ENODEV;
+
+	tc = devres_find(&pci_dev->dev, tc_devres_release, NULL, NULL);
+	if (!tc)
+		return -ENODEV;
+
+	return sprintf(buf, "%s\n", (const char *)
+			tc_debugfs_rogue_name_blobs[tc->version].data);
+}
+
+static DRIVER_ATTR_RO(rogue_name);
+
+static struct attribute *tc_attrs[] = {
+	&driver_attr_rogue_name.attr,
+	NULL,
+};
+
+static struct attribute_group tc_attr_group = {
+	.attrs = tc_attrs,
+};
+
+static const struct attribute_group *tc_attr_groups[] = {
+	&tc_attr_group,
+	NULL,
+};
+#endif /* (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0)) */
 
 #if defined(CONFIG_MTRR) && (LINUX_VERSION_CODE < KERNEL_VERSION(4, 1, 0))
 /*
@@ -356,8 +406,7 @@ int setup_io_region(struct pci_dev *pdev,
 	region->region.base = pci_phys_addr + offset;
 	region->region.size = size;
 
-	region->registers
-		= ioremap_nocache(region->region.base, region->region.size);
+	region->registers = ioremap(region->region.base, region->region.size);
 
 	if (!region->registers) {
 		dev_err(&pdev->dev, "Failed to map tc registers\n");
@@ -387,7 +436,7 @@ static int tc_register_pdp_device(struct tc_device *tc)
 {
 	int err = 0;
 
-	if (tc->odin)
+	if (tc->odin || tc->orion)
 		err = odin_register_pdp_device(tc);
 	else
 		err = apollo_register_pdp_device(tc);
@@ -399,7 +448,7 @@ static int tc_register_ext_device(struct tc_device *tc)
 {
 	int err = 0;
 
-	if (tc->odin)
+	if (tc->odin || tc->orion)
 		err = odin_register_ext_device(tc);
 	else
 		err = apollo_register_ext_device(tc);
@@ -429,7 +478,7 @@ static int tc_cleanup(struct pci_dev *pdev)
 		if (tc->interrupt_handlers[i].enabled)
 			tc_disable_interrupt(&pdev->dev, i);
 
-	if (tc->odin)
+	if (tc->odin || tc->orion)
 		err = odin_cleanup(tc);
 	else
 		err = apollo_cleanup(tc);
@@ -475,16 +524,23 @@ static int tc_init(struct pci_dev *pdev, const struct pci_device_id *id)
 
 	tc->debugfs_tc_dir = debugfs_create_dir(DRV_NAME, NULL);
 
-	if (pdev->vendor == PCI_VENDOR_ID_ODIN &&
-	    pdev->device == DEVICE_ID_ODIN) {
+	if (pdev->vendor == PCI_VENDOR_ID_ODIN) {
 
-		dev_info(&pdev->dev, "Odin detected");
-		tc->odin = true;
+		if (pdev->device == DEVICE_ID_ODIN)
+			tc->odin = true;
+		else if (pdev->device == DEVICE_ID_ORION)
+			tc->orion = true;
+
+		dev_info(&pdev->dev, "%s detected. Core %d MHz, mem %d MHz\n",
+			 odin_tc_name(tc),
+			 tc_core_clock / 1000000,
+			 tc_mem_clock / 1000000);
 
 		err = odin_init(tc, pdev,
 				tc_core_clock, tc_mem_clock,
 				tc_pdp_mem_size, sec_mem_size,
-				tc_mem_latency, tc_wresp_latency);
+				tc_mem_latency, tc_wresp_latency,
+				tc_mem_mode);
 		if (err)
 			goto err_dev_cleanup;
 
@@ -495,7 +551,8 @@ static int tc_init(struct pci_dev *pdev, const struct pci_device_id *id)
 		err = apollo_init(tc, pdev,
 				  tc_core_clock, tc_mem_clock, tc_sys_clock,
 				  tc_pdp_mem_size, sec_mem_size,
-				  tc_mem_latency, tc_wresp_latency);
+				  tc_mem_latency, tc_wresp_latency,
+				  tc_mem_mode);
 		if (err)
 			goto err_dev_cleanup;
 	}
@@ -561,14 +618,18 @@ static struct pci_device_id tc_pci_tbl[] = {
 	{ PCI_VDEVICE(POWERVR, DEVICE_ID_PCI_APOLLO_FPGA) },
 	{ PCI_VDEVICE(POWERVR, DEVICE_ID_PCIE_APOLLO_FPGA) },
 	{ PCI_VDEVICE(ODIN, DEVICE_ID_ODIN) },
+	{ PCI_VDEVICE(ODIN, DEVICE_ID_ORION) },
 	{ },
 };
 
 static struct pci_driver tc_pci_driver = {
-	.name		= DRV_NAME,
-	.id_table	= tc_pci_tbl,
-	.probe		= tc_init,
-	.remove		= tc_exit,
+	.name           = DRV_NAME,
+	.id_table       = tc_pci_tbl,
+	.probe          = tc_init,
+	.remove         = tc_exit,
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0))
+	.groups         = tc_attr_groups,
+#endif /* (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0)) */
 };
 
 module_pci_driver(tc_pci_driver);
@@ -651,7 +712,7 @@ int tc_enable_interrupt(struct device *dev, int interrupt_id)
 	}
 	tc->interrupt_handlers[interrupt_id].enabled = true;
 
-	if (tc->odin)
+	if (tc->odin || tc->orion)
 		odin_enable_interrupt_register(tc, interrupt_id);
 	else
 		apollo_enable_interrupt_register(tc, interrupt_id);
@@ -688,7 +749,7 @@ int tc_disable_interrupt(struct device *dev, int interrupt_id)
 	}
 	tc->interrupt_handlers[interrupt_id].enabled = false;
 
-	if (tc->odin)
+	if (tc->odin || tc->orion)
 		odin_disable_interrupt_register(tc, interrupt_id);
 	else
 		apollo_disable_interrupt_register(tc, interrupt_id);
@@ -710,7 +771,7 @@ int tc_sys_info(struct device *dev, u32 *tmp, u32 *pll)
 		goto err_out;
 	}
 
-	if (tc->odin)
+	if (tc->odin || tc->orion)
 		err = odin_sys_info(tc, tmp, pll);
 	else
 		err = apollo_sys_info(tc, tmp, pll);
@@ -753,7 +814,7 @@ int tc_sys_strings(struct device *dev,
 		goto err_out;
 	}
 
-	if (tc->odin) {
+	if (tc->odin || tc->orion) {
 		err = odin_sys_strings(tc,
 				 str_fpga_rev, size_fpga_rev,
 				 str_tcf_core_rev, size_tcf_core_rev,
@@ -782,3 +843,14 @@ int tc_core_clock_speed(struct device *dev)
 }
 EXPORT_SYMBOL(tc_core_clock_speed);
 
+unsigned int tc_odin_subvers(struct device *dev)
+{
+	struct tc_device *tc = devres_find(dev, tc_devres_release,
+		NULL, NULL);
+
+	if (tc->orion)
+		return 1;
+	else
+		return 0;
+}
+EXPORT_SYMBOL(tc_odin_subvers);

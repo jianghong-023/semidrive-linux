@@ -1,5 +1,5 @@
 /*************************************************************************/ /*!
-@File           cache.h
+@File           cache_km.h
 @Title          CPU cache management header
 @Copyright      Copyright (c) Imagination Technologies Ltd. All Rights Reserved
 @License        Dual MIT/GPLv2
@@ -40,8 +40,8 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */ /**************************************************************************/
 
-#ifndef _CACHE_KM_H_
-#define _CACHE_KM_H_
+#ifndef CACHE_KM_H
+#define CACHE_KM_H
 
 #if defined(LINUX)
 #include <linux/version.h>
@@ -89,7 +89,7 @@ void CacheOpDeInit2(void);
  * pre-validated for performance reasons else the d-cache maintenance
  * operation might cause the underlying OS kernel to fault.
  */
-PVRSRV_ERROR CacheOpExec (PPVRSRV_DEVICE_NODE psDevNode,
+PVRSRV_ERROR CacheOpExec(PPVRSRV_DEVICE_NODE psDevNode,
 						void *pvVirtStart,
 						void *pvVirtEnd,
 						IMG_CPU_PHYADDR sCPUPhysStart,
@@ -124,8 +124,8 @@ PVRSRV_ERROR CacheOpValExec(PMR *psPMR,
  * server queueing protocol so making use of this interface outside
  * of services client is not recommended and should not be done.
  */
-PVRSRV_ERROR CacheOpQueue (CONNECTION_DATA *psConnection,
-					    PPVRSRV_DEVICE_NODE psDevNode,
+PVRSRV_ERROR CacheOpQueue(CONNECTION_DATA *psConnection,
+						PPVRSRV_DEVICE_NODE psDevNode,
 						IMG_UINT32 ui32OpCount,
 						PMR **ppsPMR,
 						IMG_UINT64 *puiAddress,
@@ -133,7 +133,6 @@ PVRSRV_ERROR CacheOpQueue (CONNECTION_DATA *psConnection,
 						IMG_DEVMEM_SIZE_T *puiSize,
 						PVRSRV_CACHE_OP *puiCacheOp,
 						IMG_UINT32 ui32OpTimeline,
-						IMG_UINT32 uiOpInfoPgGFSeqNum,
 						IMG_UINT32 uiCurrentFenceSeqNum,
 						IMG_UINT32 *puiNextFenceSeqNum);
 
@@ -145,7 +144,7 @@ PVRSRV_ERROR CacheOpQueue (CONNECTION_DATA *psConnection,
  * This should be called before any subsequent HW device kicks to ensure
  * device memory is coherent with the HW before the kick.
  */
-PVRSRV_ERROR CacheOpFence (RGXFWIF_DM eOpType, IMG_UINT32 ui32OpSeqNum);
+PVRSRV_ERROR CacheOpFence(RGXFWIF_DM eOpType, IMG_UINT32 ui32OpSeqNum);
 
 /*
  * CacheOpLog()
@@ -153,15 +152,13 @@ PVRSRV_ERROR CacheOpFence (RGXFWIF_DM eOpType, IMG_UINT32 ui32OpSeqNum);
  * This is used for logging client cache maintenance operations that
  * was executed in user-space.
  */
-PVRSRV_ERROR CacheOpLog (PMR *psPMR,
+PVRSRV_ERROR CacheOpLog(PMR *psPMR,
 						IMG_UINT64 uiAddress,
 						IMG_DEVMEM_OFFSET_T uiOffset,
 						IMG_DEVMEM_SIZE_T uiSize,
 						IMG_UINT64 ui64QueuedTimeMs,
 						IMG_UINT64 ui64ExecuteTimeMs,
 						IMG_UINT32 ui32NumRBF,
-						IMG_BOOL bIsDiscard,
 						PVRSRV_CACHE_OP uiCacheOp);
 
-#endif	/* _CACHE_KM_H_ */
-
+#endif	/* CACHE_KM_H */

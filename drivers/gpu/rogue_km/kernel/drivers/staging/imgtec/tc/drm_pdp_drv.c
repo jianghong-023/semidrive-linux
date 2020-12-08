@@ -1,4 +1,3 @@
-/* -*- mode: c; indent-tabs-mode: t; c-basic-offset: 8; tab-width: 8 -*- */
 /* vi: set ts=8 sw=8 sts=8: */
 /*************************************************************************/ /*!
 @File
@@ -43,14 +42,19 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */ /**************************************************************************/
 
 #include <linux/module.h>
-#include <linux/reservation.h>
 #include <linux/version.h>
 #include <linux/component.h>
 #include <linux/of_platform.h>
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 5, 0))
+#include <drm/drm_drv.h>
+#include <drm/drm_file.h>
+#include <drm/drm_ioctl.h>
+#include <drm/drm_prime.h>
+#include <drm/drm_print.h>
+#include <drm/drm_vblank.h>
+#else
 #include <drm/drmP.h>
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 18, 0))
-#include <drm/drm_gem.h>
 #endif
 
 #include "tc_drv.h"
@@ -78,6 +82,12 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #define PVR_DRIVER_ATOMIC DRIVER_ATOMIC
 #else
 #define PVR_DRIVER_ATOMIC 0
+#endif
+
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0))
+#define	PVR_DRIVER_PRIME 0
+#else
+#define	PVR_DRIVER_PRIME DRIVER_PRIME
 #endif
 
 /* This header must always be included last */
@@ -125,8 +135,17 @@ static int pdp_early_load(struct drm_device *dev)
 			DRM_ERROR("failed to enable parent device (err=%d)\n", err);
 			goto err_dev_priv_free;
 		}
+
+		/*
+		 * check whether it's Orion PDP for picking
+		 * the right display mode list later on
+		 */
+		if (dev_priv->version == PDP_VERSION_ODIN)
+			dev_priv->subversion = (enum pdp_odin_subversion)
+				tc_odin_subvers(dev->dev->parent);
 #endif
 	}
+
 #if defined(SUPPORT_PLATO_DISPLAY)
 	else if (dev_priv->version == PDP_VERSION_PLATO) {
 // XXX do we we need to do this? Plato driver has already enabled device.
@@ -270,6 +289,9 @@ static void pdp_early_unload(struct drm_device *dev)
 {
 	struct pdp_drm_private *dev_priv = dev->dev_private;
 
+#if defined(CONFIG_DRM_FBDEV_EMULATION) && defined(PDP_USE_ATOMIC)
+	drm_atomic_helper_shutdown(dev);
+#endif
 	pdp_modeset_early_cleanup(dev_priv);
 }
 
@@ -362,7 +384,7 @@ static void pdp_preclose(struct drm_device *dev, struct drm_file *file)
 }
 #endif
 
-static void pdp_lastclose(struct drm_device *dev)
+static inline void pdp_teardown_drm_config(struct drm_device *dev)
 {
 #if defined(PDP_USE_ATOMIC)
 	drm_atomic_helper_shutdown(dev);
@@ -370,6 +392,11 @@ static void pdp_lastclose(struct drm_device *dev)
 	struct drm_crtc *crtc;
 
 	DRM_INFO("%s: %s device\n", __func__, to_platform_device(dev->dev)->name);
+
+	/*
+	 * When non atomic driver is in use, manually trigger ->set_config
+	 * with an empty mode set associated to this crtc.
+	 */
 	drm_modeset_lock_all(dev);
 	list_for_each_entry(crtc, &dev->mode_config.crtc_list, head) {
 		if (crtc->primary->fb) {
@@ -383,6 +410,27 @@ static void pdp_lastclose(struct drm_device *dev)
 		}
 	}
 	drm_modeset_unlock_all(dev);
+#endif
+}
+
+static void pdp_lastclose(struct drm_device *dev)
+{
+#if defined(CONFIG_DRM_FBDEV_EMULATION)
+	struct pdp_drm_private *dev_priv = dev->dev_private;
+	struct pdp_fbdev *fbdev = dev_priv->fbdev;
+	int err;
+
+	if (fbdev) {
+		/*
+		 * This is a fbdev driver, therefore never attempt to shutdown
+		 * on a client disconnecting.
+		 */
+		err = drm_fb_helper_restore_fbdev_mode_unlocked(&fbdev->helper);
+		if (err)
+			DRM_ERROR("failed to restore mode (err=%d)\n", err);
+	}
+#else
+	pdp_teardown_drm_config(dev);
 #endif
 }
 
@@ -556,7 +604,7 @@ static struct drm_driver pdp_drm_driver = {
 
 	.driver_features		= DRIVER_GEM |
 					  DRIVER_MODESET |
-					  DRIVER_PRIME |
+					  PVR_DRIVER_PRIME |
 					  PVR_DRIVER_ATOMIC,
 	.ioctls				= pdp_ioctls,
 	.num_ioctls			= ARRAY_SIZE(pdp_ioctls),

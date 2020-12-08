@@ -1,4 +1,3 @@
-/* -*- mode: c; indent-tabs-mode: t; c-basic-offset: 8; tab-width: 8 -*- */
 /* vi: set ts=8 sw=8 sts=8: */
 /*************************************************************************/ /*!
 @File           services_kernel_client.h
@@ -98,7 +97,7 @@ enum PVRSRV_ERROR PVRSRVUnregisterCmdCompleteNotify(void *hNotify);
 void PVRSRVCheckStatus(void *hCmdCompCallerHandle);
 
 #define DEBUG_REQUEST_DC               0
-#define DEBUG_REQUEST_SERVERSYNC       1
+#define DEBUG_REQUEST_SYNCTRACKING     1
 #define DEBUG_REQUEST_SYS              2
 #define DEBUG_REQUEST_ANDROIDSYNC      3
 #define DEBUG_REQUEST_LINUXFENCE       4
@@ -152,25 +151,20 @@ enum PVRSRV_ERROR SyncPrimFree(struct PVRSRV_CLIENT_SYNC_PRIM *psSync);
 enum PVRSRV_ERROR SyncPrimGetFirmwareAddr(
 	struct PVRSRV_CLIENT_SYNC_PRIM *psSync,
 	__u32 *sync_addr);
-enum PVRSRV_ERROR SyncPrimSet(struct PVRSRV_CLIENT_SYNC_PRIM *psSync,
-	__u32 ui32Value);
 
 /* osfunc.h */
-#if defined(PVRSRV_USE_BRIDGE_LOCK)
-void OSAcquireBridgeLock(void);
-void OSReleaseBridgeLock(void);
-#endif
 enum PVRSRV_ERROR OSEventObjectWait(void *hOSEventKM);
 enum PVRSRV_ERROR OSEventObjectOpen(void *hEventObject, void **phOSEventKM);
 enum PVRSRV_ERROR OSEventObjectClose(void *hOSEventKM);
 __u32 OSGetCurrentClientProcessIDKM(void);
+__u32 OSStringUINT32ToStr(char *pszBuf, size_t uSize, __u32 ui32Num);
 
 /* srvkm.h */
 
-enum PVRSRV_ERROR PVRSRVDeviceCreate(void *pvOSDevice,
+enum PVRSRV_ERROR PVRSRVCommonDeviceCreate(void *pvOSDevice,
 	int i32UMIdentifier,
 	struct _PVRSRV_DEVICE_NODE_ **ppsDeviceNode);
-enum PVRSRV_ERROR PVRSRVDeviceDestroy(
+enum PVRSRV_ERROR PVRSRVCommonDeviceDestroy(
 	struct _PVRSRV_DEVICE_NODE_ *psDeviceNode);
 const char *PVRSRVGetErrorString(enum PVRSRV_ERROR eError);
 
@@ -207,6 +201,11 @@ typedef enum tag_img_bool (*PFN_SYNC_CHECKPOINT_UFO_HAS_SIGNALLED_FN)(
 	__u32 ui32FwAddr, __u32 ui32Value);
 typedef enum PVRSRV_ERROR (*PFN_SYNC_CHECKPOINT_SIGNAL_WAITERS_FN)(void);
 typedef void(*PFN_SYNC_CHECKPOINT_CHECK_STATE_FN)(void);
+#if defined(PDUMP)
+typedef PVRSRV_ERROR(*PFN_SYNC_CHECKPOINT_FENCE_GETCHECKPOINTS_FN)(PVRSRV_FENCE iFence,
+						IMG_UINT32 *puiNumCheckpoints,
+		                                PSYNC_CHECKPOINT **papsCheckpoints);
+#endif
 #endif
 
 /* This is the function that kick code will call in a NO_HARDWARE build only after
@@ -234,6 +233,9 @@ typedef struct {
 	PFN_SYNC_CHECKPOINT_SIGNAL_WAITERS_FN pfnSignalWaiters;
 #endif
 	char pszImplName[SYNC_CHECKPOINT_IMPL_MAX_STRLEN];
+#if defined(PDUMP)
+	PFN_SYNC_CHECKPOINT_FENCE_GETCHECKPOINTS_FN pfnSyncFenceGetCheckpoints;
+#endif
 } PFN_SYNC_CHECKPOINT_STRUCT;
 
 enum PVRSRV_ERROR SyncCheckpointRegisterFunctions(PFN_SYNC_CHECKPOINT_STRUCT *psSyncCheckpointPfns);

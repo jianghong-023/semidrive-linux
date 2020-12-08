@@ -116,10 +116,7 @@ PVRSRV_ERROR PhysHeapRegister(PHYS_HEAP_CONFIG *psConfig,
 	}
 
 	psNew = OSAllocMem(sizeof(PHYS_HEAP));
-	if (psNew == NULL)
-	{
-		return PVRSRV_ERROR_OUT_OF_MEMORY;
-	}
+	PVR_RETURN_IF_NOMEM(psNew);
 
 	psNew->ui32PhysHeapID = psConfig->ui32PhysHeapID;
 	psNew->eType = psConfig->eType;
@@ -221,6 +218,7 @@ void PhysHeapRelease(PHYS_HEAP *psPhysHeap)
 
 PHYS_HEAP_TYPE PhysHeapGetType(PHYS_HEAP *psPhysHeap)
 {
+	PVR_ASSERT(psPhysHeap->eType != PHYS_HEAP_TYPE_UNKNOWN);
 	return psPhysHeap->eType;
 }
 
@@ -325,14 +323,7 @@ PVRSRV_ERROR PhysHeapInit(void)
 	g_psPhysHeapList = NULL;
 
 	eError = OSLockCreate(&g_hPhysHeapLock);
-
-	if (eError != PVRSRV_OK)
-	{
-		PVR_DPF((PVR_DBG_ERROR, "%s: Failed to create PhysHeapLock: %s",
-										__func__,
-										PVRSRVGETERRORSTRING(eError)));
-		return eError;
-	}
+	PVR_LOG_RETURN_IF_ERROR(eError, "OSLockCreate");
 
 	return PVRSRV_OK;
 }

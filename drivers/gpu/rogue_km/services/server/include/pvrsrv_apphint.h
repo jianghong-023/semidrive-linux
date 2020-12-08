@@ -40,8 +40,8 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */ /***************************************************************************/
 
-#if !defined(__PVRSRV_APPHINT_H__)
-#define __PVRSRV_APPHINT_H__
+#if !defined(PVRSRV_APPHINT_H)
+#define PVRSRV_APPHINT_H
 
 /* Supplied to PVRSRVAppHintRegisterHandlers*() functions when the apphint
  * is a global driver apphint, i.e. apphints not present in
@@ -68,5 +68,4 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #endif
 
-#endif /* !defined(__PVRSRV_APPHINT_H__) */
-
+#endif /* PVRSRV_APPHINT_H */

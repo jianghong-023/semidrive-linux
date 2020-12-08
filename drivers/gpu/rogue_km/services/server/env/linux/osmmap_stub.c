@@ -122,7 +122,7 @@ OSMMapPMR(IMG_HANDLE hBridge,
       error exit paths follow
     */
 
- e0:
+e0:
     PVR_ASSERT(eError != PVRSRV_OK);
     return eError;
 }

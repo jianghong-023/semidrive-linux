@@ -265,18 +265,17 @@ int PVRGpuTraceEnableUfoCallbackWrapper(void);
 
 TRACE_EVENT_FN(rogue_ufo_update,
 
-	TP_PROTO(u64 timestamp, u32 ctx_id, u32 job_id, u32 ext_id, u32 int_id,
+	TP_PROTO(u64 timestamp, u32 ctx_id, u32 int_id, u32 ext_id,
 	         u32 fwaddr, u32 old_value, u32 new_value),
 
-	TP_ARGS(timestamp, ctx_id, job_id, ext_id, int_id, fwaddr, old_value,
+	TP_ARGS(timestamp, ctx_id, int_id, ext_id, fwaddr, old_value,
 	        new_value),
 
 	TP_STRUCT__entry(
 		__field(        u64,            timestamp   )
 		__field(        u32,            ctx_id      )
-		__field(        u32,            job_id      )
-		__field(        u32,            ext_id      )
 		__field(        u32,            int_id      )
+		__field(        u32,            ext_id      )
 		__field(        u32,            fwaddr      )
 		__field(        u32,            old_value   )
 		__field(        u32,            new_value   )
@@ -285,22 +284,20 @@ TRACE_EVENT_FN(rogue_ufo_update,
 	TP_fast_assign(
 		__entry->timestamp = timestamp;
 		__entry->ctx_id = ctx_id;
-		__entry->job_id = job_id;
-		__entry->ext_id = ext_id;
 		__entry->int_id = int_id;
+		__entry->ext_id = ext_id;
 		__entry->fwaddr = fwaddr;
 		__entry->old_value = old_value;
 		__entry->new_value = new_value;
 	),
 
-	TP_printk("ts=%llu.%06lu ctx_id=%lu job_id=%lu ext_id=%lu int_id=%lu"
+	TP_printk("ts=%llu.%06lu ctx_id=%lu int_id=%lu ext_id=%lu"
 		" fwaddr=%#lx old_value=%#lx new_value=%#lx",
 		(unsigned long long)show_secs_from_ns(__entry->timestamp),
 		(unsigned long)show_usecs_from_ns(__entry->timestamp),
 		(unsigned long)__entry->ctx_id,
-		(unsigned long)__entry->job_id,
-		(unsigned long)__entry->ext_id,
 		(unsigned long)__entry->int_id,
+		(unsigned long)__entry->ext_id,
 		(unsigned long)__entry->fwaddr,
 		(unsigned long)__entry->old_value,
 		(unsigned long)__entry->new_value),
@@ -310,17 +307,16 @@ TRACE_EVENT_FN(rogue_ufo_update,
 
 TRACE_EVENT_FN(rogue_ufo_check_fail,
 
-	TP_PROTO(u64 timestamp, u32 ctx_id, u32 job_id, u32 ext_id, u32 int_id,
+	TP_PROTO(u64 timestamp, u32 ctx_id, u32 int_id, u32 ext_id,
 	         u32 fwaddr, u32 value, u32 required),
 
-	TP_ARGS(timestamp, ctx_id, job_id, ext_id, int_id, fwaddr, value, required),
+	TP_ARGS(timestamp, ctx_id, int_id, ext_id, fwaddr, value, required),
 
 	TP_STRUCT__entry(
 		__field(        u64,            timestamp   )
 		__field(        u32,            ctx_id      )
-		__field(        u32,            job_id      )
-		__field(        u32,            ext_id      )
 		__field(        u32,            int_id      )
+		__field(        u32,            ext_id      )
 		__field(        u32,            fwaddr      )
 		__field(        u32,            value       )
 		__field(        u32,            required    )
@@ -329,22 +325,20 @@ TRACE_EVENT_FN(rogue_ufo_check_fail,
 	TP_fast_assign(
 		__entry->timestamp = timestamp;
 		__entry->ctx_id = ctx_id;
-		__entry->job_id = job_id;
-		__entry->ext_id = ext_id;
 		__entry->int_id = int_id;
+		__entry->ext_id = ext_id;
 		__entry->fwaddr = fwaddr;
 		__entry->value = value;
 		__entry->required = required;
 	),
 
-	TP_printk("ts=%llu.%06lu ctx_id=%lu job_id=%lu ext_id=%lu int_id=%lu"
+	TP_printk("ts=%llu.%06lu ctx_id=%lu int_id=%lu ext_id=%lu"
 		" fwaddr=%#lx value=%#lx required=%#lx",
 		(unsigned long long)show_secs_from_ns(__entry->timestamp),
 		(unsigned long)show_usecs_from_ns(__entry->timestamp),
 		(unsigned long)__entry->ctx_id,
-		(unsigned long)__entry->job_id,
-		(unsigned long)__entry->ext_id,
 		(unsigned long)__entry->int_id,
+		(unsigned long)__entry->ext_id,
 		(unsigned long)__entry->fwaddr,
 		(unsigned long)__entry->value,
 		(unsigned long)__entry->required),
@@ -354,17 +348,16 @@ TRACE_EVENT_FN(rogue_ufo_check_fail,
 
 TRACE_EVENT_FN(rogue_ufo_pr_check_fail,
 
-	TP_PROTO(u64 timestamp, u32 ctx_id, u32 job_id, u32 ext_id, u32 int_id,
+	TP_PROTO(u64 timestamp, u32 ctx_id, u32 int_id, u32 ext_id,
 	         u32 fwaddr, u32 value, u32 required),
 
-	TP_ARGS(timestamp, ctx_id, job_id, ext_id, int_id, fwaddr, value, required),
+	TP_ARGS(timestamp, ctx_id, int_id, ext_id, fwaddr, value, required),
 
 	TP_STRUCT__entry(
 		__field(        u64,            timestamp   )
 		__field(        u32,            ctx_id      )
-		__field(        u32,            job_id      )
-		__field(        u32,            ext_id      )
 		__field(        u32,            int_id      )
+		__field(        u32,            ext_id      )
 		__field(        u32,            fwaddr      )
 		__field(        u32,            value       )
 		__field(        u32,            required    )
@@ -373,22 +366,20 @@ TRACE_EVENT_FN(rogue_ufo_pr_check_fail,
 	TP_fast_assign(
 		__entry->timestamp = timestamp;
 		__entry->ctx_id = ctx_id;
-		__entry->job_id = job_id;
-		__entry->ext_id = ext_id;
 		__entry->int_id = int_id;
+		__entry->ext_id = ext_id;
 		__entry->fwaddr = fwaddr;
 		__entry->value = value;
 		__entry->required = required;
 	),
 
-	TP_printk("ts=%llu.%06lu ctx_id=%lu job_id=%lu ext_id=%lu int_id=%lu"
+	TP_printk("ts=%llu.%06lu ctx_id=%lu int_id=%lu ext_id=%lu"
 		" fwaddr=%#lx value=%#lx required=%#lx",
 		(unsigned long long)show_secs_from_ns(__entry->timestamp),
 		(unsigned long)show_usecs_from_ns(__entry->timestamp),
 		(unsigned long)__entry->ctx_id,
-		(unsigned long)__entry->job_id,
-		(unsigned long)__entry->ext_id,
 		(unsigned long)__entry->int_id,
+		(unsigned long)__entry->ext_id,
 		(unsigned long)__entry->fwaddr,
 		(unsigned long)__entry->value,
 		(unsigned long)__entry->required),
@@ -398,17 +389,16 @@ TRACE_EVENT_FN(rogue_ufo_pr_check_fail,
 
 TRACE_EVENT_FN(rogue_ufo_check_success,
 
-	TP_PROTO(u64 timestamp, u32 ctx_id, u32 job_id, u32 ext_id, u32 int_id,
+	TP_PROTO(u64 timestamp, u32 ctx_id, u32 int_id, u32 ext_id,
 	         u32 fwaddr, u32 value),
 
-	TP_ARGS(timestamp, ctx_id, job_id, ext_id, int_id, fwaddr, value),
+	TP_ARGS(timestamp, ctx_id, int_id, ext_id, fwaddr, value),
 
 	TP_STRUCT__entry(
 		__field(        u64,            timestamp   )
 		__field(        u32,            ctx_id      )
-		__field(        u32,            job_id      )
-		__field(        u32,            ext_id      )
 		__field(        u32,            int_id      )
+		__field(        u32,            ext_id      )
 		__field(        u32,            fwaddr      )
 		__field(        u32,            value       )
 	),
@@ -416,21 +406,19 @@ TRACE_EVENT_FN(rogue_ufo_check_success,
 	TP_fast_assign(
 		__entry->timestamp = timestamp;
 		__entry->ctx_id = ctx_id;
-		__entry->job_id = job_id;
-		__entry->ext_id = ext_id;
 		__entry->int_id = int_id;
+		__entry->ext_id = ext_id;
 		__entry->fwaddr = fwaddr;
 		__entry->value = value;
 	),
 
-	TP_printk("ts=%llu.%06lu ctx_id=%lu job_id=%lu ext_id=%lu int_id=%lu"
+	TP_printk("ts=%llu.%06lu ctx_id=%lu int_id=%lu ext_id=%lu"
 		" fwaddr=%#lx value=%#lx",
 		(unsigned long long)show_secs_from_ns(__entry->timestamp),
 		(unsigned long)show_usecs_from_ns(__entry->timestamp),
 		(unsigned long)__entry->ctx_id,
-		(unsigned long)__entry->job_id,
-		(unsigned long)__entry->ext_id,
 		(unsigned long)__entry->int_id,
+		(unsigned long)__entry->ext_id,
 		(unsigned long)__entry->fwaddr,
 		(unsigned long)__entry->value),
 	PVRGpuTraceEnableUfoCallbackWrapper,
@@ -439,17 +427,16 @@ TRACE_EVENT_FN(rogue_ufo_check_success,
 
 TRACE_EVENT_FN(rogue_ufo_pr_check_success,
 
-	TP_PROTO(u64 timestamp, u32 ctx_id, u32 job_id, u32 ext_id, u32 int_id,
+	TP_PROTO(u64 timestamp, u32 ctx_id, u32 int_id, u32 ext_id,
 	         u32 fwaddr, u32 value),
 
-	TP_ARGS(timestamp, ctx_id, job_id, ext_id, int_id, fwaddr, value),
+	TP_ARGS(timestamp, ctx_id, int_id, ext_id, fwaddr, value),
 
 	TP_STRUCT__entry(
 		__field(        u64,            timestamp   )
 		__field(        u32,            ctx_id      )
-		__field(        u32,            job_id      )
-		__field(        u32,            ext_id      )
 		__field(        u32,            int_id      )
+		__field(        u32,            ext_id      )
 		__field(        u32,            fwaddr      )
 		__field(        u32,            value       )
 	),
@@ -457,21 +444,19 @@ TRACE_EVENT_FN(rogue_ufo_pr_check_success,
 	TP_fast_assign(
 		__entry->timestamp = timestamp;
 		__entry->ctx_id = ctx_id;
-		__entry->job_id = job_id;
-		__entry->ext_id = ext_id;
 		__entry->int_id = int_id;
+		__entry->ext_id = ext_id;
 		__entry->fwaddr = fwaddr;
 		__entry->value = value;
 	),
 
-	TP_printk("ts=%llu.%06lu ctx_id=%lu job_id=%lu ext_id=%lu int_id=%lu"
+	TP_printk("ts=%llu.%06lu ctx_id=%lu int_id=%lu ext_id=%lu"
 		" fwaddr=%#lx value=%#lx",
 		(unsigned long long)show_secs_from_ns(__entry->timestamp),
 		(unsigned long)show_usecs_from_ns(__entry->timestamp),
 		(unsigned long)__entry->ctx_id,
-		(unsigned long)__entry->job_id,
-		(unsigned long)__entry->ext_id,
 		(unsigned long)__entry->int_id,
+		(unsigned long)__entry->ext_id,
 		(unsigned long)__entry->fwaddr,
 		(unsigned long)__entry->value),
 	PVRGpuTraceEnableUfoCallbackWrapper,

@@ -44,15 +44,10 @@ ccflags-y := \
  -I$(TOP)/kernel/drivers/staging/imgtec/rk3368 \
  -I$(TOP)/kernel/drivers/staging/imgtec/plato \
  -I$(TOP)/kernel/drivers/staging/imgtec/plato/hdmi \
- -I$(TOP)/kernel/drivers/staging/imgtec/sunxi \
- -I$(TOP)/include/system/rgx_tc \
+ -I$(TOP)/include/$(PVR_ARCH)/system/rgx_tc -I$(TOP)/include/system/rgx_tc \
  -I$(TOP)/include/drm \
- -I$(TOP)/hwdefs \
+ -I$(TOP)/hwdefs/$(PVR_ARCH) \
  $(ccflags-y)
-
-adf_fbdev-y += \
- kernel/drivers/staging/imgtec/adf_fbdev.o \
- kernel/drivers/staging/imgtec/adf_common.o
 
 adf_pdp-y += \
  kernel/drivers/staging/imgtec/tc/adf_pdp.o \
@@ -78,10 +73,6 @@ tc-y += \
  kernel/drivers/staging/imgtec/ion_fbcdc_clear.o
 endif
 
-adf_sunxi-y += \
- kernel/drivers/staging/imgtec/sunxi/adf_sunxi.o \
- kernel/drivers/staging/imgtec/adf_common.o
-
 drm_nulldisp-y += \
  kernel/drivers/staging/imgtec/drm_nulldisp_drv.o \
  kernel/drivers/staging/imgtec/drm_nulldisp_netlink.o \
@@ -104,6 +95,7 @@ drm_pdp-y += \
  kernel/drivers/staging/imgtec/tc/drm_pdp_crtc.o \
  kernel/drivers/staging/imgtec/tc/drm_pdp_dvi.o \
  kernel/drivers/staging/imgtec/tc/drm_pdp_tmds.o \
+ kernel/drivers/staging/imgtec/tc/drm_pdp_fb.o \
  kernel/drivers/staging/imgtec/tc/pdp_apollo.o \
  kernel/drivers/staging/imgtec/tc/pdp_odin.o \
  kernel/drivers/staging/imgtec/tc/pdp_plato.o

@@ -1,4 +1,3 @@
-/* -*- mode: c; indent-tabs-mode: t; c-basic-offset: 8; tab-width: 8 -*- */
 /* vi: set ts=8 sw=8 sts=8: */
 /*************************************************************************/ /*!
 @File
@@ -51,6 +50,10 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include <drm/drm_fourcc.h>
 #endif
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 14, 0))
+#define NULLDISP_USE_ATOMIC
+#endif
+
 struct drm_framebuffer;
 
 /******************************************************************************
@@ -82,6 +85,10 @@ static inline u64 nulldisp_drm_fb_modifier(struct drm_framebuffer *fb)
  ******************************************************************************/
 static inline int nulldisp_drm_fb_num_planes(struct drm_framebuffer *fb)
 {
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 11, 0))
+	return fb->format->num_planes;
+#else
 	return drm_format_num_planes(nulldisp_drm_fb_format(fb));
+#endif
 }
 #endif /* __DRM_NULLDISP_DRV_H__ */

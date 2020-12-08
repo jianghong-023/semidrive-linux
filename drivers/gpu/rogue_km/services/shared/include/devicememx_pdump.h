@@ -42,8 +42,8 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */ /**************************************************************************/
 
-#ifndef _DEVICEMEMX_PDUMP_H_
-#define _DEVICEMEMX_PDUMP_H_
+#ifndef DEVICEMEMX_PDUMP_H
+#define DEVICEMEMX_PDUMP_H
 
 #include "devicememx.h"
 #include "pdumpdefs.h"
@@ -51,15 +51,15 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #if defined(PDUMP)
 /*
- * PVRSRVDevMemXPDumpLoadMem()
+ * DevmemXPDumpLoadMem()
  *
  * Same as DevmemPDumpLoadMem().
  */
-extern void
+IMG_INTERNAL void
 DevmemXPDumpLoadMem(DEVMEMX_PHYSDESC *psMemDescPhys,
-                       IMG_DEVMEM_OFFSET_T uiOffset,
-                       IMG_DEVMEM_SIZE_T uiSize,
-                       PDUMP_FLAGS_T uiPDumpFlags);
+                    IMG_DEVMEM_OFFSET_T uiOffset,
+                    IMG_DEVMEM_SIZE_T uiSize,
+                    PDUMP_FLAGS_T uiPDumpFlags);
 #else
 
 #ifdef INLINE_IS_PRAGMA
@@ -77,5 +77,5 @@ DevmemXPDumpLoadMem(DEVMEMX_PHYSDESC *psMemDescPhys,
 	PVR_UNREFERENCED_PARAMETER(uiSize);
 	PVR_UNREFERENCED_PARAMETER(uiPDumpFlags);
 }
-#endif	/* PDUMP */
-#endif	/* _DEVICEMEMX_PDUMP_H_ */
+#endif /* PDUMP */
+#endif /* DEVICEMEMX_PDUMP_H */

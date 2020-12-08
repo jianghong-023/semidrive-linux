@@ -118,7 +118,7 @@ Debug Notifier Interface
 */ /**************************************************************************/
 
 #define DEBUG_REQUEST_DC                0
-#define DEBUG_REQUEST_SERVERSYNC        1
+#define DEBUG_REQUEST_SYNCTRACKING      1
 #define DEBUG_REQUEST_SYS               2
 #define DEBUG_REQUEST_ANDROIDSYNC       3
 #define DEBUG_REQUEST_LINUXFENCE        4
@@ -148,7 +148,7 @@ Debug Notifier Interface
 			pfnDumpDebugPrintf(pvDumpDebugFile, __VA_ARGS__); \
 		else                                                  \
 			PVR_LOG((__VA_ARGS__));                           \
-	} while(0)
+	} while (0)
 
 struct _PVRSRV_DEVICE_NODE_;
 

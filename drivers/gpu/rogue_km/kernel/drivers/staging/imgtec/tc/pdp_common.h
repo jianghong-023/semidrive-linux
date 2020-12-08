@@ -1,4 +1,3 @@
-/* -*- mode: c; indent-tabs-mode: t; c-basic-offset: 8; tab-width: 8 -*- */
 /* vi: set ts=8 sw=8 sts=8: */
 /*************************************************************************/ /*!
 @Codingstyle    LinuxKernel
@@ -60,6 +59,11 @@ enum pdp_version {
 	PDP_VERSION_APOLLO,
 	PDP_VERSION_ODIN,
 	PDP_VERSION_PLATO,
+};
+
+enum pdp_odin_subversion {
+	PDP_ODIN_NONE = 0,
+	PDP_ODIN_ORION,
 };
 
 /* Register R-W */
