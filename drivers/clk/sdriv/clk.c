@@ -635,7 +635,7 @@ static struct clk *sdrv_register_out_composite(struct device_node *np, void __io
 			|| clk->type == CLK_TYPE_CORE || clk->type == CLK_TYPE_GATE) {
 		havegate = true;
 	}
-	pr_info("register clk:%s\n", clk->name);
+	//pr_info("register clk:%s\n", clk->name);
 	if(clk->type == CLK_TYPE_IP_POST) {
 		sprintf(pname, "%s_PRE", np->name);
 		parents[0] = pname;
