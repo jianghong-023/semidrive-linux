@@ -852,6 +852,16 @@ int __video_register_device(struct video_device *vdev, int type, int nr,
 			name_base = "video-evs";
 		else if(!strncmp(vdev->name, "sdrv-kstream-1", 14))
 			name_base = "video-dvr";
+		else if(!strncmp(vdev->name, "EVS", 3))
+			name_base = "video-evs";
+		else if(!strncmp(vdev->name, "DMS", 3))
+			name_base = "video-dms";
+		else if(!strncmp(vdev->name, "DVR", 3))
+			name_base = "video-dvr";
+		else if(!strncmp(vdev->name, "FRONT", 5))
+			name_base = "video-front";
+		else if(!strncmp(vdev->name, "BACK", 4))
+			name_base = "video-back";
 		else
 		name_base = "video";
 		break;
