@@ -511,7 +511,7 @@ static struct clk *sdrv_register_pll(struct device_node *np, void __iomem *base,
 	if (!pll)
 		return ERR_PTR(-ENOMEM);
 
-	pr_info("register pll type %d name %s\n", type, clk_name);
+	//pr_info("register pll type %d name %s\n", type, clk_name);
 	pll->name = clk_name;
 	pll->type = type;
 	pll->isreadonly = readonly;
