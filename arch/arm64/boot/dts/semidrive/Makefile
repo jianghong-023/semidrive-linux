@@ -51,5 +51,10 @@ dtb-$(CONFIG_ARCH_SEMIDRIVE_X9) += x9_mid_ref_native_ivi_serdes.dtb
 dtb-$(CONFIG_ARCH_SEMIDRIVE_X9) += x9_mid_ref_native_cluster.dtb
 dtb-$(CONFIG_ARCH_SEMIDRIVE_X9) += x9_mid_ref_native_controlpanel.dtb
 always		:= $(dtb-y)
-subdir-y	:= $(dts-dirs)
+subdir-y	+= overlays
 clean-files	:= *.dtb
+
+# Add __symbols__ node
+ifeq ($(CONFIG_ARCH_SEMIDRIVE),y)
+	DTC_FLAGS ?= -@
+endif
