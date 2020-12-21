@@ -167,11 +167,14 @@ static struct snd_soc_dai_link snd_x9_ref_soc_dai_links[] = {
 		.ops = &x9_ref_hs_ops,
     },
 };
-
+/*-Init Machine Driver
+ * ---------------------------------------------------------------------*/
+#define SND_X9_MACH_DRIVER "x9-ref-ak4556"
+#define SND_CARD_NAME SND_X9_MACH_DRIVER
 /*Sound Card Driver
  * ------------------------------------------------------------------------*/
 static struct snd_soc_card x9_ref_hs_card = {
-    .name = "sd-x9-snd-card-hs",
+    .name = SND_X9_MACH_DRIVER,
 
     .dai_link = snd_x9_ref_soc_dai_links,
     .num_links = ARRAY_SIZE(snd_x9_ref_soc_dai_links),
@@ -185,9 +188,7 @@ static int x9_gpio_probe(struct snd_soc_card *card)
 	return ret;
 }
 
-/*-Init Machine Driver
- * ---------------------------------------------------------------------*/
-#define SND_X9_MACH_DRIVER "x9-hs-ref"
+
 
 /*ALSA machine driver probe functions.*/
 static int x9_ref_hs_probe(struct platform_device *pdev)

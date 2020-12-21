@@ -181,11 +181,14 @@ static struct snd_soc_dai_link snd_x9_ref_soc_dai_links[] = {
 		.ops = &x9_ref_tlv320aic23_ops,
     },
 };
-
+/*-Init Machine Driver
+ * ---------------------------------------------------------------------*/
+#define SND_X9_MACH_DRIVER "x9-ref-tlv320aic23"
+#define SND_CARD_NAME SND_X9_MACH_DRIVER
 /*Sound Card Driver
  * ------------------------------------------------------------------------*/
 static struct snd_soc_card x9_ref_tlv320aic23_card = {
-    .name = "sd-x9-snd-card-tlv320aic23",
+    .name = SND_X9_MACH_DRIVER,
 
     .dai_link = snd_x9_ref_soc_dai_links,
     .num_links = ARRAY_SIZE(snd_x9_ref_soc_dai_links),
@@ -199,9 +202,7 @@ static int x9_gpio_probe(struct snd_soc_card *card)
 	return ret;
 }
 
-/*-Init Machine Driver
- * ---------------------------------------------------------------------*/
-#define SND_X9_MACH_DRIVER "x9-hs-ref-tlv320aic23"
+
 
 /*ALSA machine driver probe functions.*/
 static int x9_ref_tlv320aic23_probe(struct platform_device *pdev)
@@ -213,10 +214,13 @@ static int x9_ref_tlv320aic23_probe(struct platform_device *pdev)
 	int ret;
 	struct snd_x9_chip_hs *chip;
 
-	dev_info(&pdev->dev, ": dev name =%s %s\n", pdev->name, __func__);
+	dev_info(&pdev->dev, ": dev name = %s %s %d\n", pdev->name, __func__,
+		 get_part_id(PART_BOARD_ID_MIN));
 	/*FIXME:  Notice: Next part configure probe action by hwid, it is out of control of DTB.      */
-	if((get_part_id(PART_BOARD_TYPE) != BOARD_TYPE_REF)||(get_part_id(PART_BOARD_ID_MAJ) != 1)||(get_part_id(PART_BOARD_ID_MIN) != 3))
-	{
+	if ((get_part_id(PART_BOARD_TYPE) != BOARD_TYPE_REF) ||
+	    (get_part_id(PART_BOARD_ID_MAJ) != 1) ||
+	    ((get_part_id(PART_BOARD_ID_MIN) != 3) &&
+	    (get_part_id(PART_BOARD_ID_MIN) != 4))) {
 		/*If it is not ref A03 board. dump_all_part_id();*/
 		return -ENXIO;
 	}

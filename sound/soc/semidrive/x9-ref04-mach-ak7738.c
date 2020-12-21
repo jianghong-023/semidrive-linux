@@ -71,7 +71,7 @@ enum snd_x9_ctrl {
 	PCM_PLAYBACK_DEVICE,
 };
 
-static int snd_x9_ref_ak7738_controls_get(struct snd_kcontrol *kcontrol,
+static int snd_x9_ref04_ak7738_controls_get(struct snd_kcontrol *kcontrol,
 					  struct snd_ctl_elem_value *ucontrol)
 {
 	/* struct snd_soc_card *card = snd_kcontrol_chip(kcontrol); */
@@ -80,7 +80,7 @@ static int snd_x9_ref_ak7738_controls_get(struct snd_kcontrol *kcontrol,
 	return 0;
 }
 
-static int snd_x9_ref_ak7738_controls_put(struct snd_kcontrol *kcontrol,
+static int snd_x9_ref04_ak7738_controls_put(struct snd_kcontrol *kcontrol,
 					  struct snd_ctl_elem_value *ucontrol)
 {
 	/*  Add control here.
@@ -126,18 +126,9 @@ static int snd_x9_ctl_put(struct snd_kcontrol *kcontrol,
 	return changed;
 }
 
-SNDRV_CTL_TLVD_DECLARE_DB_SCALE(snd_codec_db_scale, -10239, 1, 1);
 
-static const struct snd_kcontrol_new snd_x9_ak7738_controls[] = {
-/* 	Add kcontrol for machine driver. */
+static int x9_ref04_late_probe(struct snd_soc_card *card) {
 
-};
-
-static int x9_ref_late_probe(struct snd_soc_card *card) {
-	/* 	Configure kcontrol for machine driver.
-		snd_soc_dapm_ignore_suspend(&card->dapm, "BT SCO Input");
-		snd_soc_dapm_ignore_suspend(&card->dapm, "BT SCO Output");
-		*/
 	return 0;
 }
 
@@ -154,9 +145,9 @@ static struct snd_soc_jack_gpio hs_jack_gpios[] = {
 };
 
 /*
- * Logic for a ak7738 as connected on a x9_ref
+ * Logic for a ak7738 as connected on a x9_ref04
  */
-static int x9_ref_ak7738_init(struct snd_soc_pcm_runtime *rtd)
+static int x9_ref04_ak7738_init(struct snd_soc_pcm_runtime *rtd)
 {
 	int err;
 	DEBUG_FUNC_PRT;
@@ -166,9 +157,9 @@ static int x9_ref_ak7738_init(struct snd_soc_pcm_runtime *rtd)
 }
 
 /*
- * Logic for a tas5404 as connected on a x9_ref amp
+ * Logic for a tas5404 as connected on a x9_ref04 amp
  */
-static int x9_ref_tas5404_init(struct snd_soc_pcm_runtime *rtd)
+static int x9_ref04_tas5404_init(struct snd_soc_pcm_runtime *rtd)
 {
 	int err;
 	DEBUG_FUNC_PRT;
@@ -176,7 +167,7 @@ static int x9_ref_tas5404_init(struct snd_soc_pcm_runtime *rtd)
 
 	return err;
 }
-static int x9_ref_tas6424_init(struct snd_soc_pcm_runtime *rtd)
+static int x9_ref04_tas6424_init(struct snd_soc_pcm_runtime *rtd)
 {
 	int err;
 	DEBUG_FUNC_PRT;
@@ -185,7 +176,7 @@ static int x9_ref_tas6424_init(struct snd_soc_pcm_runtime *rtd)
 	return err;
 }
 
-static int x9_ref_hs_ak4556_init(struct snd_soc_pcm_runtime *rtd)
+static int x9_ref04_hs_ak4556_init(struct snd_soc_pcm_runtime *rtd)
 {
 	int err;
 	DEBUG_FUNC_PRT;
@@ -193,7 +184,7 @@ static int x9_ref_hs_ak4556_init(struct snd_soc_pcm_runtime *rtd)
 }
 
 /*Dapm widtets*/
-static const struct snd_soc_dapm_widget sd_x9_ref_dapm_widgets[] = {
+static const struct snd_soc_dapm_widget sd_x9_ref04_dapm_widgets[] = {
     /* Outputs */
     SND_SOC_DAPM_HP("Headphone Jack", NULL),
 
@@ -228,13 +219,13 @@ static const struct snd_soc_pcm_stream dsp_bt_params = {
     .channels_max = 1,
 };
 
-static const struct snd_soc_dapm_route sd_x9_ref_dapm_map[] = {
+static const struct snd_soc_dapm_route sd_x9_ref04_dapm_map[] = {
     /* Main SPK Out connected to amplifier SPK<- CPU*/
-    {"AIF2 Playback", NULL, "PCM0 OUT"},
-    {"AIF5 Playback", NULL, "PCM0 OUT"},
+    {"AIF4 Playback", NULL, "PCM0 OUT"},
+    {"AIF3 Playback", NULL, "PCM0 OUT"},
     {"DIG_AMP Playback", NULL, "PCM0 OUT"},
 
-    {"DAC IN", NULL, "SDOUT5"},
+    {"DAC IN", NULL, "SDOUT3"},
     {"FL SPK", NULL, "DIG_AMP_OUT"},
     {"FR SPK", NULL, "DIG_AMP_OUT"},
     {"C  SPK", NULL, "DIG_AMP_OUT"},
@@ -256,62 +247,64 @@ static const struct snd_soc_dapm_route sd_x9_ref_dapm_map[] = {
     {"AIN2", NULL, "RR Mic"},
     {"IN2P_N", NULL, "RR Mic"},
 
-    {"SAI1_IN", NULL, "SDOUT4"},
-    {"SAI1_IN", NULL, "AIF4 Capture"},
-    {"SDIN4", NULL, "XF Capture"},
+    {"SAI1_IN", NULL, "SDOUT2"},
+    {"SAI1_IN", NULL, "AIF2 Capture"},
+    {"SDIN2", NULL, "XF Capture"},
     {"PCM0 IN", NULL, "AIF2 Capture"},
     {"PCM0 IN", NULL, "AIF4 Capture"},
 
-    {"DIG_AMP Playback", NULL, "AIF3 Playback"},
-    {"AIF3 Capture", NULL, "AIF4 Capture"},
+    {"DIG_AMP Playback", NULL, "AIF5 Playback"},
+    {"AIF5 Capture", NULL, "AIF4 Capture"},
 };
 
-static const struct snd_soc_ops x9_ref_ak7738_ops = {
+static const struct snd_soc_ops x9_ref04_ak7738_ops = {
 
 };
 
-static const struct snd_soc_ops x9_ref_tas5404_ops = {
+static const struct snd_soc_ops x9_ref04_tas5404_ops = {
     // .hw_params = x9_tas5404_soc_hw_params,
 };
 
-static const struct snd_soc_ops x9_ref_tas6424_ops = {
+static const struct snd_soc_ops x9_ref04_tas6424_ops = {
 
 };
 
-static const struct snd_soc_ops x9_ref_hs_ops = {
-    // .hw_params = x9_ref_hs_soc_hw_params,
+static const struct snd_soc_ops x9_ref04_hs_ops = {
+    // .hw_params = x9_ref04_hs_soc_hw_params,
 };
 
 
 static int be_hw_params_fixup_sd2(struct snd_soc_pcm_runtime *rtd,
 			      struct snd_pcm_hw_params *params)
 {
-
 	struct snd_mask *mask;
 
 	int ret;
 
-	struct snd_interval *rate = hw_param_interval(params,
-			SNDRV_PCM_HW_PARAM_RATE);
-	struct snd_interval *channels = hw_param_interval(params,
-						SNDRV_PCM_HW_PARAM_CHANNELS);
+	struct snd_interval *rate =
+	    hw_param_interval(params, SNDRV_PCM_HW_PARAM_RATE);
+	struct snd_interval *channels =
+	    hw_param_interval(params, SNDRV_PCM_HW_PARAM_CHANNELS);
 
 	/*  48k, stereo */
 	rate->min = rate->max = 48000;
 	channels->min = channels->max = 8;
-	dev_dbg(rtd->dev,"[AK7738 SD2] -------------------------------rate: %d chan: %d  \n",rate->max,channels->max);
+	dev_dbg(
+	    rtd->dev,
+	    "[AK7738 SD2] -------------------------------rate: %d chan: %d  \n",
+	    rate->max, channels->max);
 	/* set 32 bit */
-/* 	mask = hw_param_mask(params, SNDRV_PCM_HW_PARAM_FORMAT);
+	mask = hw_param_mask(params, SNDRV_PCM_HW_PARAM_FORMAT);
 	snd_mask_none(mask);
-	snd_mask_set(mask, SNDRV_PCM_FORMAT_S24_LE); */
+	snd_mask_set(mask, SNDRV_PCM_FORMAT_S32_LE);
+	// ret = snd_soc_dai_set_tdm_slot(rtd->cpu_dai, 0x3, 0x3, 2, 24);
 
-	ret = snd_soc_dai_set_fmt(rtd->codec_dai,
-				  SND_SOC_DAIFMT_DSP_A|SND_SOC_DAIFMT_CBM_CFM);
+	ret = snd_soc_dai_set_fmt(rtd->codec_dai, SND_SOC_DAIFMT_DSP_A |
+						      SND_SOC_DAIFMT_CBM_CFM);
 	if (ret < 0) {
 		dev_err(rtd->dev, "can't set format to DSP_A, err %d\n", ret);
 		return ret;
 	}
-
 	return 0;
 }
 static int be_hw_params_fixup_sd3(struct snd_soc_pcm_runtime *rtd,
@@ -328,22 +321,23 @@ static int be_hw_params_fixup_sd3(struct snd_soc_pcm_runtime *rtd,
 	    hw_param_interval(params, SNDRV_PCM_HW_PARAM_CHANNELS);
 
 	/*  48k, stereo */
-	rate->min = rate->max = 8000;
-	channels->min = channels->max = 2;
+	rate->min = rate->max = 48000;
+	channels->min = channels->max = 8;
 	dev_dbg(
 	    rtd->dev,
 	    "[AK7738 SD3] -------------------------------rate: %d chan: %d  \n",
 	    rate->max, channels->max);
+	/* set 32 bit */
+	mask = hw_param_mask(params, SNDRV_PCM_HW_PARAM_FORMAT);
+	snd_mask_none(mask);
+	snd_mask_set(mask, SNDRV_PCM_FORMAT_S24_LE);
 
-	ret = snd_soc_dai_set_fmt(rtd->codec_dai,
-				  SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_CBM_CFM);
+	ret = snd_soc_dai_set_fmt(rtd->codec_dai, SND_SOC_DAIFMT_DSP_A |
+						      SND_SOC_DAIFMT_CBM_CFM);
 	if (ret < 0) {
-		dev_err(rtd->dev,
-			"can't set format to SND_SOC_DAIFMT_I2S, err %d\n",
-			ret);
+		dev_err(rtd->dev, "can't set format to DSP_A, err %d\n", ret);
 		return ret;
 	}
-
 	return 0;
 }
 static int be_hw_params_fixup_sd4(struct snd_soc_pcm_runtime *rtd,
@@ -388,26 +382,28 @@ static int be_hw_params_fixup_sd5(struct snd_soc_pcm_runtime *rtd,
 
 	int ret;
 
-	struct snd_interval *rate = hw_param_interval(params,
-			SNDRV_PCM_HW_PARAM_RATE);
-	struct snd_interval *channels = hw_param_interval(params,
-						SNDRV_PCM_HW_PARAM_CHANNELS);
+	struct snd_interval *rate =
+	    hw_param_interval(params, SNDRV_PCM_HW_PARAM_RATE);
+	struct snd_interval *channels =
+	    hw_param_interval(params, SNDRV_PCM_HW_PARAM_CHANNELS);
 
 	/*  48k, stereo */
-	rate->min = rate->max = 48000;
-	channels->min = channels->max = 8;
-	dev_dbg(rtd->dev,"[AK7738 SD5] -------------------------------rate: %d chan: %d  \n",rate->max,channels->max);
-	/* set 32 bit */
-	mask = hw_param_mask(params, SNDRV_PCM_HW_PARAM_FORMAT);
-	snd_mask_none(mask);
-	snd_mask_set(mask, SNDRV_PCM_FORMAT_S24_LE);
+	rate->min = rate->max = 8000;
+	channels->min = channels->max = 2;
+	dev_dbg(
+	    rtd->dev,
+	    "[AK7738 SD5] -------------------------------rate: %d chan: %d  \n",
+	    rate->max, channels->max);
 
 	ret = snd_soc_dai_set_fmt(rtd->codec_dai,
-				  SND_SOC_DAIFMT_DSP_A|SND_SOC_DAIFMT_CBM_CFM);
+				  SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_CBM_CFM);
 	if (ret < 0) {
-		dev_err(rtd->dev, "can't set format to DSP_A, err %d\n", ret);
+		dev_err(rtd->dev,
+			"can't set format to SND_SOC_DAIFMT_I2S, err %d\n",
+			ret);
 		return ret;
 	}
+
 	return 0;
 }
 
@@ -447,7 +443,7 @@ static int be_hw_params_fixup_tas6424(struct snd_soc_pcm_runtime *rtd,
 	return 0;
 }
 
-static int x9_ref_ak7738_rtd_init(struct snd_soc_pcm_runtime *rtd) {
+static int x9_ref04_ak7738_rtd_init(struct snd_soc_pcm_runtime *rtd) {
 	int ret;
 	dev_dbg(rtd->dev,"[i2s sc] int fixed cpu -----%s -- %p %p %p----------------------- \n",rtd->cpu_dai->name,rtd->cpu_dai,rtd->cpu_dai->driver,rtd->cpu_dai->driver->ops->set_tdm_slot);
 	ret = snd_soc_dai_set_tdm_slot(rtd->cpu_dai, 0xFF, 0x3, 8, 32);
@@ -458,7 +454,7 @@ static int x9_ref_ak7738_rtd_init(struct snd_soc_pcm_runtime *rtd) {
 	return 0;
 }
 
-static struct snd_soc_dai_link snd_x9_ref_soc_dai_links[] = {
+static struct snd_soc_dai_link snd_x9_ref04_soc_dai_links[] = {
     /* Front End DAI links */
     {
 	.name = "x9_hifi",
@@ -469,7 +465,8 @@ static struct snd_soc_dai_link snd_x9_ref_soc_dai_links[] = {
 	.dynamic = 1,
 	.codec_name = "snd-soc-dummy",
 	.codec_dai_name = "snd-soc-dummy-dai",
-	.init = x9_ref_ak7738_rtd_init,
+	.init = x9_ref04_ak7738_rtd_init,
+	//.dai_fmt = SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_CBM_CFM,
 	.dai_fmt = SND_SOC_DAIFMT_DSP_A | SND_SOC_DAIFMT_CBM_CFM,
 	.trigger = {SND_SOC_DPCM_TRIGGER_POST, SND_SOC_DPCM_TRIGGER_POST},
 	.dpcm_playback = 1,
@@ -478,7 +475,7 @@ static struct snd_soc_dai_link snd_x9_ref_soc_dai_links[] = {
     {
 	.name = "x9_dsp_bt",
 	.stream_name = "x9 bt hfp stream",
-	.cpu_dai_name = "ak7738-aif3",
+	.cpu_dai_name = "ak7738-aif5",
 	.codec_name = "snd-soc-dummy",
 	.codec_dai_name = "snd-soc-dummy-dai",
 	.dai_fmt = SND_SOC_DAIFMT_DSP_A | SND_SOC_DAIFMT_CBM_CFM,
@@ -497,12 +494,11 @@ static struct snd_soc_dai_link snd_x9_ref_soc_dai_links[] = {
 	.codec_name = "ak7738.0-001c",
 	.codec_dai_name = "ak7738-aif2",
 	.be_hw_params_fixup = be_hw_params_fixup_sd2,
-	.init = x9_ref_ak7738_init,
-	.dai_fmt = SND_SOC_DAIFMT_DSP_A | SND_SOC_DAIFMT_CBM_CFM,
-	.ops = &x9_ref_ak7738_ops,
+	.init = x9_ref04_ak7738_init,
+	.dai_fmt = SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_CBM_CFM,
+	.ops = &x9_ref04_ak7738_ops,
 	.ignore_suspend = 1,
 	.ignore_pmdown_time = 1,
-	.dpcm_playback = 1,
 	.dpcm_capture = 1,
     },
     {
@@ -514,24 +510,24 @@ static struct snd_soc_dai_link snd_x9_ref_soc_dai_links[] = {
 	.codec_name = "ak7738.0-001c",
 	.codec_dai_name = "ak7738-aif4",
 	.be_hw_params_fixup = be_hw_params_fixup_sd4,
-	.dai_fmt = SND_SOC_DAIFMT_DSP_A |
-		   SND_SOC_DAIFMT_CBM_CFM,
-	.ops = &x9_ref_ak7738_ops,
+	.dai_fmt = SND_SOC_DAIFMT_DSP_A | SND_SOC_DAIFMT_CBM_CFM,
+	.ops = &x9_ref04_ak7738_ops,
 	.ignore_suspend = 1,
 	.ignore_pmdown_time = 1,
 	.dpcm_capture = 1,
+	.dpcm_playback = 1,
     },
     {
-	.name = "dsp sd5",
+	.name = "dsp sd3",
 	.id = 3,
 	.cpu_dai_name = "snd-soc-dummy-dai",
 	.platform_name = "snd-soc-dummy",
 	.no_pcm = 1,
 	.codec_name = "ak7738.0-001c",
-	.codec_dai_name = "ak7738-aif5",
-	.be_hw_params_fixup = be_hw_params_fixup_sd5,
+	.codec_dai_name = "ak7738-aif3",
+	.be_hw_params_fixup = be_hw_params_fixup_sd3,
 	.dai_fmt = SND_SOC_DAIFMT_DSP_A | SND_SOC_DAIFMT_CBM_CFM,
-	.ops = &x9_ref_ak7738_ops,
+	.ops = &x9_ref04_ak7738_ops,
 	.ignore_suspend = 1,
 	.ignore_pmdown_time = 1,
 	.dpcm_playback = 1,
@@ -544,9 +540,8 @@ static struct snd_soc_dai_link snd_x9_ref_soc_dai_links[] = {
 	.no_pcm = 1,
 	.codec_name = "xf6020.0-0047",
 	.codec_dai_name = "xf6020-codec",
-	.dai_fmt = SND_SOC_DAIFMT_DSP_A |
-		   SND_SOC_DAIFMT_CBS_CFS,
-	.ops = &x9_ref_ak7738_ops,
+	.dai_fmt = SND_SOC_DAIFMT_DSP_A | SND_SOC_DAIFMT_CBS_CFS,
+	.ops = &x9_ref04_ak7738_ops,
 	.ignore_suspend = 1,
 	.ignore_pmdown_time = 1,
 	.dpcm_capture = 1,
@@ -559,11 +554,10 @@ static struct snd_soc_dai_link snd_x9_ref_soc_dai_links[] = {
 	.no_pcm = 1,
 	.codec_name = "tas6424.0-006a",
 	.codec_dai_name = "tas6424-amplifier",
-	.init = x9_ref_tas6424_init,
+	.init = x9_ref04_tas6424_init,
 	.be_hw_params_fixup = be_hw_params_fixup_tas6424,
-	.dai_fmt =
-	    SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_CBS_CFS,
-	.ops = &x9_ref_tas6424_ops,
+	.dai_fmt = SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_CBS_CFS,
+	.ops = &x9_ref04_tas6424_ops,
 	.ignore_suspend = 1,
 	.ignore_pmdown_time = 1,
 	.dpcm_playback = 1,
@@ -584,39 +578,34 @@ static struct snd_soc_dai_link snd_x9_ref_soc_dai_links[] = {
 };
 /*-Init Machine Driver
  * ---------------------------------------------------------------------*/
-#define SND_X9_MACH_DRIVER "x9-ref-ak7738"
+#define SND_X9_MACH_DRIVER "x9-ref04-ak7738"
 #define SND_CARD_NAME SND_X9_MACH_DRIVER
 /*Sound Card Driver
  * ------------------------------------------------------------------------*/
-static struct snd_soc_card x9_ref_ak7738_card = {
+static struct snd_soc_card x9_ref04_ak7738_card = {
     .name = SND_CARD_NAME,
 
-    .dai_link = snd_x9_ref_soc_dai_links,
-    .num_links = ARRAY_SIZE(snd_x9_ref_soc_dai_links),
-    .dapm_widgets = sd_x9_ref_dapm_widgets,
-    .num_dapm_widgets = ARRAY_SIZE(sd_x9_ref_dapm_widgets),
-    .dapm_routes = sd_x9_ref_dapm_map,
-    .num_dapm_routes = ARRAY_SIZE(sd_x9_ref_dapm_map),
-
-    .controls = snd_x9_ak7738_controls,
-    .num_controls = ARRAY_SIZE(snd_x9_ak7738_controls),
-
-    .late_probe = x9_ref_late_probe,
+    .dai_link = snd_x9_ref04_soc_dai_links,
+    .num_links = ARRAY_SIZE(snd_x9_ref04_soc_dai_links),
+    .dapm_widgets = sd_x9_ref04_dapm_widgets,
+    .num_dapm_widgets = ARRAY_SIZE(sd_x9_ref04_dapm_widgets),
+    .dapm_routes = sd_x9_ref04_dapm_map,
+    .num_dapm_routes = ARRAY_SIZE(sd_x9_ref04_dapm_map),
+    .late_probe = x9_ref04_late_probe,
 };
 
 /*GPIO probe use this function to set gpio. */
 static int x9_gpio_probe(struct snd_soc_card *card)
 {
-	int ret = 0;
-	return ret;
+	return 0;
 }
 
 
 
 /*ALSA machine driver probe functions.*/
-static int x9_ref_ak7738_probe(struct platform_device *pdev)
+static int x9_ref04_ak7738_probe(struct platform_device *pdev)
 {
-	struct snd_soc_card *card = &x9_ref_ak7738_card;
+	struct snd_soc_card *card = &x9_ref04_ak7738_card;
 	struct device *dev = &pdev->dev;
 
 	int ret;
@@ -644,58 +633,58 @@ static int x9_ref_ak7738_probe(struct platform_device *pdev)
 	return ret;
 }
 
-static int x9_ref_ak7738_remove(struct platform_device *pdev)
+static int x9_ref04_ak7738_remove(struct platform_device *pdev)
 {
 	snd_card_free(platform_get_drvdata(pdev));
-	dev_info(&pdev->dev, "%s x9_ref_ak7738_removed\n", __func__);
+	dev_info(&pdev->dev, "%s x9_ref04_ak7738_removed\n", __func__);
 	return 0;
 }
 
 #ifdef CONFIG_PM
 /*pm suspend operation */
-static int snd_x9_ref_ak7738_suspend(struct platform_device *pdev,
+static int snd_x9_ref04_ak7738_suspend(struct platform_device *pdev,
 				     pm_message_t state)
 {
 	dev_info(&pdev->dev, "%s snd_x9_suspend\n", __func__);
 	return 0;
 }
 /*pm resume operation */
-static int snd_x9_ref_ak7738_resume(struct platform_device *pdev)
+static int snd_x9_ref04_ak7738_resume(struct platform_device *pdev)
 {
 	dev_info(&pdev->dev, "%s snd_x9_resume\n", __func__);
 	return 0;
 }
 #endif
 
-static const struct of_device_id x9_ref_ak7738_dt_match[] = {
+static const struct of_device_id x9_ref04_ak7738_dt_match[] = {
     {
-	.compatible = "semidrive,x9-ref-ak7738",
+	.compatible = "semidrive,x9-ref04-ak7738",
     },
 };
-MODULE_DEVICE_TABLE(of, x9_ref_hs_dt_match);
+MODULE_DEVICE_TABLE(of, x9_ref04_hs_dt_match);
 
-static struct platform_driver x9_ref_ak7738_mach_driver = {
+static struct platform_driver x9_ref04_ak7738_mach_driver = {
     .driver =
 	{
 	    .name = SND_X9_MACH_DRIVER,
-	    .of_match_table = x9_ref_ak7738_dt_match,
+	    .of_match_table = x9_ref04_ak7738_dt_match,
 #ifdef CONFIG_PM
 	    .pm = &snd_soc_pm_ops,
 #endif
 	},
 
-    .probe = x9_ref_ak7738_probe,
-    .remove = x9_ref_ak7738_remove,
+    .probe = x9_ref04_ak7738_probe,
+    .remove = x9_ref04_ak7738_remove,
 #ifdef CONFIG_PM
 
-    .suspend = snd_x9_ref_ak7738_suspend,
-    .resume = snd_x9_ref_ak7738_resume,
+    .suspend = snd_x9_ref04_ak7738_suspend,
+    .resume = snd_x9_ref04_ak7738_resume,
 #endif
 };
 
-module_platform_driver(x9_ref_ak7738_mach_driver);
+module_platform_driver(x9_ref04_ak7738_mach_driver);
 
 MODULE_AUTHOR("Shao Yi <yi.shao@semidrive.com>");
-MODULE_DESCRIPTION("X9 ALSA SoC ref ak7738 machine driver");
+MODULE_DESCRIPTION("X9 ALSA SoC ref 04 ak7738 machine driver");
 MODULE_LICENSE("GPL");
-MODULE_ALIAS("platform:x9 ref ak7738 alsa mach");
+MODULE_ALIAS("platform:x9 ref 04 ak7738 alsa mach");

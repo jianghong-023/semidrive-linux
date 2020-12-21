@@ -1449,6 +1449,7 @@ static struct snd_soc_dai_driver snd_afe_dais[] = {
 		.channels_max = 8,
 	    },
 	.ops = &snd_afe_dai_ops,
+	.symmetric_rates = 1,
     },
     {
 	.name = "snd-afe-sc-i2s-dai1",
@@ -1471,6 +1472,7 @@ static struct snd_soc_dai_driver snd_afe_dais[] = {
 		.channels_max = 8,
 	    },
 	.ops = &snd_afe_dai_ops,
+	.symmetric_rates = 1,
     },
 };
 
