@@ -16,7 +16,7 @@
 #include <linux/soc/semidrive/mb_msg.h>
 
 #define MB_MAX_RPROC	(8)
-#define MB_MAX_CHANS	(8)
+#define MB_MAX_CHANS	(16)
 #define MB_MAX_MSGS		(4)
 #define MB_MAX_NAMES	(16)
 #define MB_BUF_LEN		(4096)
