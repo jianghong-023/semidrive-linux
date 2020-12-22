@@ -42,10 +42,10 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */ /**************************************************************************/
 
-#if !defined (__KERNELDISPLAY_H__)
-#define __KERNELDISPLAY_H__
+#if !defined(KERNELDISPLAY_H)
+#define KERNELDISPLAY_H
 
-#if defined (__cplusplus)
+#if defined(__cplusplus)
 extern "C" {
 #endif
 
@@ -78,7 +78,7 @@ Please refer to the more comprehensive '3rd Party Display Integration Guide'
 for an architecture overview and an explanation of the data flow between a
 client process, Services and the 3rd party display driver. It also contains
 descriptions about how to make use of the client side interface that is supposed
-to be integrated in some kind of display manager like e.g. the Rogue DDK WSEGL
+to be integrated in some kind of display manager like e.g. PowerVR Graphics DDK WSEGL
 window manager.
 
 The documented functions are split into different parts:
@@ -361,7 +361,7 @@ typedef PVRSRV_ERROR (*ContextConfigureCheck)(IMG_HANDLE hDisplayContext,
 @Input          ahBuffers               Array of buffers (one for
                                         each display plane)
 
-@Input          ui32DisplayPeriod		The number of VSync periods this
+@Input          ui32DisplayPeriod       The number of VSync periods this
                                         configuration should be displayed for
 
 @Input          hConfigData             Config handle which gets passed to
@@ -636,7 +636,7 @@ typedef PVRSRV_ERROR (*AcquireKernelMappingData)(IMG_HANDLE hBuffer, IMG_HANDLE 
 typedef PVRSRV_ERROR (*MapMemoryObject)(IMG_HANDLE hBuffer, IMG_HANDLE *phMemObj, void **ppvClientAddr);
 typedef PVRSRV_ERROR (*UnmapMemoryObject)(IMG_HANDLE hBuffer);
 
-#if defined(USING_HYPERVISOR)
+#if (RGX_NUM_OS_SUPPORTED > 1)
 typedef IMG_HANDLE (*GetPmr)(IMG_HANDLE hBuffer, size_t ulOffset);
 #endif
 #endif
@@ -697,7 +697,7 @@ typedef struct _DC_DEVICE_FUNCTIONS_
 	MapMemoryObject             pfnMapMemoryObject;
 	UnmapMemoryObject           pfnUnmapMemoryObject;
 
-#if defined(USING_HYPERVISOR)
+#if (RGX_NUM_OS_SUPPORTED > 1)
 	GetPmr                      pfnGetPmr;
 #endif
 #endif
@@ -817,11 +817,11 @@ void DCImportBufferRelease(IMG_HANDLE hImport,
 
 
 
-#if defined (__cplusplus)
+#if defined(__cplusplus)
 }
 #endif
 
-#endif/* #if !defined (__KERNELDISPLAY_H__) */
+#endif /* KERNELDISPLAY_H */
 
 /******************************************************************************
  End of file (kerneldisplay.h)

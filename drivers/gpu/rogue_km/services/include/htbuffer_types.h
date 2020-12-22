@@ -44,18 +44,18 @@ COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
 IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */ /**************************************************************************/
-#ifndef __HTBUFFER_TYPES_H__
-#define __HTBUFFER_TYPES_H__
+#ifndef HTBUFFER_TYPES_H
+#define HTBUFFER_TYPES_H
 
-#if defined (__cplusplus)
+#if defined(__cplusplus)
 extern "C" {
 #endif
 
 #include "img_defs.h"
 #include "htbuffer_sf.h"
 
-/* the group flags array of ints large enough to store all the group flags */
-#define HTB_FLAG_NUM_EL ( ((HTB_GROUP_DBG-1) / HTB_FLAG_NUM_BITS_IN_EL) + 1 )
+/* The group flags array of ints large enough to store all the group flags */
+#define HTB_FLAG_NUM_EL (((HTB_GROUP_DBG-1) / HTB_FLAG_NUM_BITS_IN_EL) + 1)
 extern IMG_INTERNAL HTB_FLAG_EL_T g_auiHTBGroupEnable[HTB_FLAG_NUM_EL];
 
 #define HTB_GROUP_ENABLED(SF) (g_auiHTBGroupEnable[HTB_LOG_GROUP_FLAG_GROUP(HTB_SF_GID(SF))] & HTB_LOG_GROUP_FLAG(HTB_SF_GID(SF)))
@@ -82,8 +82,7 @@ typedef enum
 	 */
 	HTB_OPMODE_DROPOLDEST,
 
-	/*! Block write if buffer is full
-	 */
+	/*! Block write if buffer is full */
 	HTB_OPMODE_BLOCK,
 
 	HTB_OPMODE_LAST = HTB_OPMODE_BLOCK
@@ -98,27 +97,22 @@ typedef enum
 	/*! Undefined log mode, used if update is not applied */
 	HTB_LOGMODE_UNDEF = 0,
 
-	/*! Log trace messages for all PIDs.
-	 */
+	/*! Log trace messages for all PIDs. */
 	HTB_LOGMODE_ALLPID,
 
-	/*! Log trace messages for specific PIDs only.
-	 */
+	/*! Log trace messages for specific PIDs only. */
 	HTB_LOGMODE_RESTRICTEDPID,
 
 	HTB_LOGMODE_LAST = HTB_LOGMODE_RESTRICTEDPID
 } HTB_LOGMODE_CTRL;
 
 
-#if defined (__cplusplus)
+#if defined(__cplusplus)
 }
 #endif
 
-#endif /* __HTBUFFER_TYPES_H__ */
+#endif /* HTBUFFER_TYPES_H */
 
-/*****************************************************************************
- End of file (htbuffer.h)
-*****************************************************************************/
-
-
-
+/******************************************************************************
+ End of file (htbuffer_types.h)
+******************************************************************************/

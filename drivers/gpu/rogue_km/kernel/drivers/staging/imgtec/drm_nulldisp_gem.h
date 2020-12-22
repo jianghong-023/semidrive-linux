@@ -1,4 +1,3 @@
-/* -*- mode: c; indent-tabs-mode: t; c-basic-offset: 8; tab-width: 8 -*- */
 /* vi: set ts=8 sw=8 sts=8: */
 /*************************************************************************/ /*!
 @File
@@ -47,7 +46,18 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #include <linux/version.h>
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 5, 0))
+#include <drm/drm_device.h>
+#include <drm/drm_file.h>
+#include <linux/types.h>
+#include <linux/vmalloc.h>
+
+struct dma_buf_attachment;
+struct vm_area_struct;
+struct vm_fault;
+#else
 #include <drm/drmP.h>
+#endif
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 18, 0))
 #include <drm/drm_gem.h>
@@ -56,7 +66,10 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 int nulldisp_gem_object_get_pages(struct drm_gem_object *obj);
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 11, 0))
-int nulldisp_gem_object_vm_fault(struct vm_fault *vmf);
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(4, 17, 0))
+typedef int vm_fault_t;
+#endif
+vm_fault_t nulldisp_gem_object_vm_fault(struct vm_fault *vmf);
 #else
 int nulldisp_gem_object_vm_fault(struct vm_area_struct *vma,
 				 struct vm_fault *vmf);
@@ -83,9 +96,11 @@ nulldisp_gem_prime_import_sg_table(struct drm_device *dev,
 #endif
 				   struct sg_table *sgt);
 
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 4, 0))
 struct dma_buf *nulldisp_gem_prime_export(struct drm_device *dev,
 					  struct drm_gem_object *obj,
 					  int flags);
+#endif
 
 void *nulldisp_gem_prime_vmap(struct drm_gem_object *obj);
 
@@ -94,8 +109,10 @@ void nulldisp_gem_prime_vunmap(struct drm_gem_object *obj, void *vaddr);
 int nulldisp_gem_prime_mmap(struct drm_gem_object *obj,
 			    struct vm_area_struct *vma);
 
-struct reservation_object *
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 4, 0))
+struct dma_resv *
 nulldisp_gem_prime_res_obj(struct drm_gem_object *obj);
+#endif
 
 int nulldisp_gem_dumb_create(struct drm_file *file,
 			     struct drm_device *dev,
@@ -107,7 +124,7 @@ int nulldisp_gem_dumb_map_offset(struct drm_file *file,
 				 uint64_t *offset);
 
 /* internal interfaces */
-struct reservation_object *nulldisp_gem_get_resv(struct drm_gem_object *obj);
+struct dma_resv *nulldisp_gem_get_resv(struct drm_gem_object *obj);
 
 int nulldisp_gem_object_mmap_ioctl(struct drm_device *dev,
 				   void *data,

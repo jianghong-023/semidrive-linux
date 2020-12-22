@@ -46,7 +46,6 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #include "info_page_defs.h"
 
-#define PVRSRV_CACHE_OP_GLOBAL				0x4 /*!< Extends cache_ops.h with explicit global flush w/ invalidate */
 #define PVRSRV_CACHE_OP_TIMELINE			0x8 /*!< Request SW_SYNC timeline notification when executed */
 
 #define CACHEFLUSH_ISA_X86					0x1	/*!< x86/x64 specific UM range-based cache flush */
@@ -64,10 +63,6 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #if (CACHEFLUSH_ISA_TYPE == CACHEFLUSH_ISA_X86) || (CACHEFLUSH_ISA_TYPE == CACHEFLUSH_ISA_ARM64)
 #define CACHEFLUSH_ISA_SUPPORTS_UM_FLUSH		/*!< x86/x86_64/ARM64 supports user-mode d-cache flush */
-#endif
-
-#if !defined(__mips__)
-#define CACHEFLUSH_ISA_SUPPORTS_GLOBAL_FLUSH	/*!< MIPS32/64 has no concept of a global d-cache flush */
 #endif
 
 #endif	/* _OS_CPU_CACHE_H_ */

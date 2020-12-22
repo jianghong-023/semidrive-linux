@@ -108,9 +108,9 @@ HeapCfgHeapDetails(CONNECTION_DATA * psConnection,
 				   IMG_CHAR *pszHeapNameOut,
 				   IMG_DEV_VIRTADDR *psDevVAddrBaseOut,
 				   IMG_DEVMEM_SIZE_T *puiHeapLengthOut,
+				   IMG_DEVMEM_SIZE_T *puiReservedRegionLengthOut,
 				   IMG_UINT32 *puiLog2DataPageSizeOut,
-				   IMG_UINT32 *puiLog2ImportAlignmentOut,
-				   IMG_UINT32 *puiLog2TilingStrideFactorOut)
+				   IMG_UINT32 *puiLog2ImportAlignmentOut)
 {
 	DEVMEM_HEAP_BLUEPRINT *psHeapBlueprint;
 
@@ -129,9 +129,9 @@ HeapCfgHeapDetails(CONNECTION_DATA * psConnection,
 	OSSNPrintf(pszHeapNameOut, uiHeapNameBufSz, "%s", psHeapBlueprint->pszName);
 	*psDevVAddrBaseOut = psHeapBlueprint->sHeapBaseAddr;
 	*puiHeapLengthOut = psHeapBlueprint->uiHeapLength;
+	*puiReservedRegionLengthOut = psHeapBlueprint->uiReservedRegionLength;
 	*puiLog2DataPageSizeOut = psHeapBlueprint->uiLog2DataPageSize;
 	*puiLog2ImportAlignmentOut = psHeapBlueprint->uiLog2ImportAlignment;
-	*puiLog2TilingStrideFactorOut = psHeapBlueprint->uiLog2TilingStrideFactor;
 
 	return PVRSRV_OK;
 }

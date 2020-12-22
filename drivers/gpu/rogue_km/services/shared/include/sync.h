@@ -41,13 +41,13 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */ /**************************************************************************/
 
-#ifndef _SYNC_
-#define _SYNC_
+#ifndef SYNC_H
+#define SYNC_H
 
 #include "img_types.h"
 #include "img_defs.h"
 #include "pvrsrv_error.h"
-#include <powervr/sync_external.h>
+#include "sync_prim_internal.h"
 #include "pdumpdefs.h"
 #include "dllist.h"
 #include "pvr_debug.h"
@@ -77,7 +77,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 /*****************************************************************************/
 PVRSRV_ERROR
 SyncPrimContextCreate(SHARED_DEV_CONNECTION hDevConnection,
-					  PSYNC_PRIM_CONTEXT	*hSyncPrimContext);
+                      PSYNC_PRIM_CONTEXT    *hSyncPrimContext);
 
 /*************************************************************************/ /*!
 @Function       SyncPrimContextDestroy
@@ -111,9 +111,9 @@ SyncPrimContextDestroy(PSYNC_PRIM_CONTEXT hSyncPrimContext);
 */
 /*****************************************************************************/
 PVRSRV_ERROR
-SyncPrimAlloc(PSYNC_PRIM_CONTEXT		hSyncPrimContext,
-			  PVRSRV_CLIENT_SYNC_PRIM	**ppsSync,
-			  const IMG_CHAR 			*pszClassName);
+SyncPrimAlloc(PSYNC_PRIM_CONTEXT      hSyncPrimContext,
+              PVRSRV_CLIENT_SYNC_PRIM **ppsSync,
+              const IMG_CHAR          *pszClassName);
 
 #if defined(__KERNEL__)
 /*************************************************************************/ /*!
@@ -134,9 +134,9 @@ SyncPrimAlloc(PSYNC_PRIM_CONTEXT		hSyncPrimContext,
 */
 /*****************************************************************************/
 PVRSRV_ERROR
-SyncPrimAllocForServerSync(PSYNC_PRIM_CONTEXT   hSyncPrimContext,
-						PVRSRV_CLIENT_SYNC_PRIM **ppsSync,
-						const IMG_CHAR          *pszClassName);
+SyncPrimAllocForServerSync(PSYNC_PRIM_CONTEXT      hSyncPrimContext,
+                           PVRSRV_CLIENT_SYNC_PRIM **ppsSync,
+                           const IMG_CHAR          *pszClassName);
 #endif
 
 /*************************************************************************/ /*!
@@ -186,55 +186,6 @@ PVRSRV_ERROR
 SyncPrimNoHwUpdate(PVRSRV_CLIENT_SYNC_PRIM *psSync, IMG_UINT32 ui32Value);
 #endif
 
-PVRSRV_ERROR
-SyncPrimServerAlloc(SYNC_BRIDGE_HANDLE hBridge,
-					PVRSRV_CLIENT_SYNC_PRIM **ppsSync,
-					const IMG_CHAR		*pszClassName
-					PVR_DBG_FILELINE_PARAM);
-
-PVRSRV_ERROR
-SyncPrimServerGetStatus(IMG_UINT32 ui32SyncCount,
-						PVRSRV_CLIENT_SYNC_PRIM **papsSync,
-						IMG_UINT32 *pui32UID,
-						IMG_UINT32 *pui32FWAddr,
-						IMG_UINT32 *pui32CurrentOp,
-						IMG_UINT32 *pui32NextOp);
-
-#if defined(SUPPORT_SERVER_SYNC_IMPL)
-PVRSRV_ERROR
-SyncPrimServerQueueOp(PVRSRV_CLIENT_SYNC_PRIM_OP *psSyncOp);
-#endif
-
-PVRSRV_ERROR
-SyncPrimIsServerSync(PVRSRV_CLIENT_SYNC_PRIM *psSync, IMG_BOOL *pbServerSync);
-
-IMG_HANDLE
-SyncPrimGetServerHandle(PVRSRV_CLIENT_SYNC_PRIM *psSync);
-
-
-#if defined(SUPPORT_SERVER_SYNC_IMPL)
-PVRSRV_ERROR
-SyncPrimOpCreate(IMG_UINT32 ui32SyncCount,
-				 PVRSRV_CLIENT_SYNC_PRIM **papsSyncPrim,
-				 PSYNC_OP_COOKIE *ppsCookie);
-
-PVRSRV_ERROR
-SyncPrimOpTake(PSYNC_OP_COOKIE psCookie,
-			   IMG_UINT32 ui32SyncCount,
-			   PVRSRV_CLIENT_SYNC_PRIM_OP *pasSyncOp);
-
-PVRSRV_ERROR
-SyncPrimOpReady(PSYNC_OP_COOKIE psCookie,
-				IMG_BOOL *pbReady);
-
-PVRSRV_ERROR
-SyncPrimOpComplete(PSYNC_OP_COOKIE psCookie);
-
-IMG_INTERNAL
-PVRSRV_ERROR SyncPrimOpDestroy(PSYNC_OP_COOKIE psCookie);
-
-#endif
-
 #if defined(PDUMP)
 /*************************************************************************/ /*!
 @Function       SyncPrimPDump
@@ -253,10 +204,10 @@ SyncPrimPDump(PVRSRV_CLIENT_SYNC_PRIM *psSync);
 @Function       SyncPrimPDumpValue
 
 @Description    PDump the ui32Value as the value of the synchronisation
-				primitive (regardless of the current value).
+                primitive (regardless of the current value).
 
 @Input          psSync          The synchronisation primitive to PDump
-@Input			ui32Value		Value to give to the sync prim on the pdump
+@Input          ui32Value       Value to give to the sync prim on the pdump
 
 @Return         None
 */
@@ -286,26 +237,6 @@ SyncPrimPDumpPol(PVRSRV_CLIENT_SYNC_PRIM *psSync,
 				 IMG_UINT32 ui32Mask,
 				 PDUMP_POLL_OPERATOR eOperator,
 				 IMG_UINT32 ui32PDumpFlags);
-
-#if defined(SUPPORT_SERVER_SYNC_IMPL)
-/*************************************************************************/ /*!
-@Function       SyncPrimOpPDumpPol
-
-@Description    Do a PDump poll all the synchronisation primitives on this
-				Operation cookie.
-
-@Input          psCookie                Operation cookie
-
-@Input          ui32PDumpFlags          PDump flags
-
-@Return         None
-*/
-/*****************************************************************************/
-void
-SyncPrimOpPDumpPol(PSYNC_OP_COOKIE psCookie,
-				 PDUMP_POLL_OPERATOR eOperator,
-				 IMG_UINT32 ui32PDumpFlags);
-#endif
 
 /*************************************************************************/ /*!
 @Function       SyncPrimPDumpCBP
@@ -381,6 +312,5 @@ SyncPrimPDumpCBP(PVRSRV_CLIENT_SYNC_PRIM *psSync,
 	PVR_UNREFERENCED_PARAMETER(uiPacketSize);
 	PVR_UNREFERENCED_PARAMETER(uiBufferSize);
 }
-#endif	/* PDUMP */
-#endif	/* _PVRSRV_SYNC_ */
-
+#endif /* PDUMP */
+#endif /* SYNC_H */

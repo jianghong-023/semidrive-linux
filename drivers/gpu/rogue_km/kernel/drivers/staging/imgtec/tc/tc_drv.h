@@ -1,4 +1,3 @@
-/* -*- mode: c; indent-tabs-mode: t; c-basic-offset: 8; tab-width: 8 -*- */
 /* vi: set ts=8 sw=8 sts=8: */
 /*************************************************************************/ /*!
 @Codingstyle    LinuxKernel
@@ -96,6 +95,8 @@ int tc_sys_strings(struct device *dev,
 	size_t size_pci_ver, char *str_macro_ver, size_t size_macro_ver);
 int tc_core_clock_speed(struct device *dev);
 
+unsigned int tc_odin_subvers(struct device *dev);
+
 #define APOLLO_DEVICE_NAME_PDP   "apollo_pdp"
 #define ODN_DEVICE_NAME_PDP      "odin_pdp"
 
@@ -115,6 +116,15 @@ struct tc_pdp_platform_data {
 	 */
 	resource_size_t pdp_heap_memory_base;
 	resource_size_t pdp_heap_memory_size;
+
+	/* Used to export host address instead of pdp address, depends on the
+	 * TC memory mode.
+	 *
+	 * PDP phys address space is from 0 to end of local device memory,
+	 * however if the TC is configured to operate in hybrid mode then the
+	 * GPU is configured to match the CPU phys address space view.
+	 */
+	bool dma_map_export_host_addr;
 };
 
 #if defined(SUPPORT_RGX)
@@ -126,6 +136,8 @@ struct tc_rogue_platform_data {
 	struct ion_device *ion_device;
 	int ion_heap_id;
 #endif
+	/* The testchip memory mode (LOCAL, HOST or HYBRID) */
+	int mem_mode;
 
 	/* The base address of the testchip memory (CPU physical address) -
 	 * used to convert from CPU-Physical to device-physical addresses

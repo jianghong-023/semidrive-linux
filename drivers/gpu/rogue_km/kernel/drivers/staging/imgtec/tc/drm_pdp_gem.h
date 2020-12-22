@@ -1,4 +1,3 @@
-/* -*- mode: c; indent-tabs-mode: t; c-basic-offset: 8; tab-width: 8 -*- */
 /* vi: set ts=8 sw=8 sts=8: */
 /*************************************************************************/ /*!
 @File
@@ -45,14 +44,47 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #if !defined(__DRM_PDP_GEM_H__)
 #define __DRM_PDP_GEM_H__
 
+#include <linux/dma-buf.h>
 #include <linux/version.h>
+
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 5, 0))
+#include <drm/drm_device.h>
+#include <drm/drm_file.h>
+#else
 #include <drm/drmP.h>
+#endif
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 18, 0))
 #include <drm/drm_gem.h>
 #endif
 
+#include "drm_pdp_drv.h"
+#include "pvr_dma_resv.h"
+
 struct pdp_gem_private;
+
+struct pdp_gem_object {
+	struct drm_gem_object base;
+
+	/* Non-null if backing originated from this driver */
+	struct drm_mm_node *vram;
+
+	/* Non-null if backing was imported */
+	struct sg_table *sgt;
+
+	bool dma_map_export_host_addr;
+	phys_addr_t cpu_addr;
+	dma_addr_t dev_addr;
+
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 2, 0))
+	struct dma_resv _resv;
+#endif
+	struct dma_resv *resv;
+
+	bool cpu_prep;
+};
+
+#define to_pdp_obj(obj) container_of(obj, struct pdp_gem_object, base)
 
 struct pdp_gem_private *pdp_gem_init(struct drm_device *dev);
 
@@ -71,10 +103,18 @@ int pdp_gem_object_cpu_fini_ioctl(struct drm_device *dev, void *data,
 				  struct drm_file *file);
 
 /* drm driver functions */
+struct drm_gem_object *pdp_gem_object_create(struct drm_device *dev,
+					     struct pdp_gem_private *gem_priv,
+					     size_t size,
+					     u32 flags);
+
 void pdp_gem_object_free_priv(struct pdp_gem_private *gem_priv,
 			      struct drm_gem_object *obj);
 
-struct dma_buf *pdp_gem_prime_export(struct drm_device *dev,
+struct dma_buf *pdp_gem_prime_export(
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 4, 0))
+				     struct drm_device *dev,
+#endif
 				     struct drm_gem_object *obj,
 				     int flags);
 
@@ -96,13 +136,16 @@ int pdp_gem_dumb_map_offset(struct drm_file *file, struct drm_device *dev,
 
 /* vm operation functions */
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 11, 0))
-int pdp_gem_object_vm_fault(struct vm_fault *vmf);
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(4, 17, 0))
+typedef int vm_fault_t;
+#endif
+vm_fault_t pdp_gem_object_vm_fault(struct vm_fault *vmf);
 #else
 int pdp_gem_object_vm_fault(struct vm_area_struct *vma, struct vm_fault *vmf);
 #endif
 
 /* internal interfaces */
-struct reservation_object *pdp_gem_get_resv(struct drm_gem_object *obj);
+struct dma_resv *pdp_gem_get_resv(struct drm_gem_object *obj);
 u64 pdp_gem_get_dev_addr(struct drm_gem_object *obj);
 
 #endif /* !defined(__DRM_PDP_GEM_H__) */

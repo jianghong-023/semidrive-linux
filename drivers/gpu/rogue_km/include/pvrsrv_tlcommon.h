@@ -62,7 +62,7 @@ typedef IMG_HANDLE PVRSRVTL_SD;
 
 /*! Packet lengths are always rounded up to a multiple of 8 bytes */
 #define PVRSRVTL_PACKET_ALIGNMENT		8U
-#define PVRSRVTL_ALIGN(x)				((x+PVRSRVTL_PACKET_ALIGNMENT-1) & ~(PVRSRVTL_PACKET_ALIGNMENT-1))
+#define PVRSRVTL_ALIGN(x)				(((x)+PVRSRVTL_PACKET_ALIGNMENT-1) & ~(PVRSRVTL_PACKET_ALIGNMENT-1))
 
 
 /*! A packet is made up of a header structure followed by the data bytes.
@@ -178,25 +178,29 @@ typedef enum
  * p may be any address type.
  */
 #define GET_PACKET_DATA_LEN(p)	\
-	((IMG_UINT32) ((PVRSRVTL_PPACKETHDR)(p))->uiTypeSize & PVRSRVTL_PACKETHDR_SIZE_MASK)
+	((IMG_UINT32) ((PVRSRVTL_PPACKETHDR) (void *) (p))->uiTypeSize & PVRSRVTL_PACKETHDR_SIZE_MASK)
 
 
 /*! Returns a IMG_BYTE* pointer to the first byte of data in the packet */
 #define GET_PACKET_DATA_PTR(p)	\
-	((IMG_PBYTE) (((size_t)p) + sizeof(PVRSRVTL_PACKETHDR)))
+	(((IMG_UINT8 *) (void *) (p)) + sizeof(PVRSRVTL_PACKETHDR))
+
+/*! Turns the packet address p into a PVRSRVTL_PPACKETHDR pointer type.
+ */
+#define GET_PACKET_HDR(p)		((PVRSRVTL_PPACKETHDR) ((void *) (p)))
 
 /*! Given a PVRSRVTL_PPACKETHDR address, return the address of the next pack
  *  It is up to the caller to determine if the new address is within the
  *  packet buffer.
  */
 #define GET_NEXT_PACKET_ADDR(p) \
-	((PVRSRVTL_PPACKETHDR) (((IMG_UINT8 *)p) + sizeof(PVRSRVTL_PACKETHDR) + \
-	(((((PVRSRVTL_PPACKETHDR)p)->uiTypeSize & PVRSRVTL_PACKETHDR_SIZE_MASK) + \
-	(PVRSRVTL_PACKET_ALIGNMENT-1)) & (~(PVRSRVTL_PACKET_ALIGNMENT-1)))))
-
-/*! Turns the packet address p into a PVRSRVTL_PPACKETHDR pointer type.
- */
-#define GET_PACKET_HDR(p)		((PVRSRVTL_PPACKETHDR)(p))
+	GET_PACKET_HDR( \
+		GET_PACKET_DATA_PTR(p) + \
+		( \
+			(GET_PACKET_DATA_LEN(p) + (PVRSRVTL_PACKET_ALIGNMENT-1)) & \
+			(~(PVRSRVTL_PACKET_ALIGNMENT-1)) \
+		) \
+	)
 
 /*! Get the type of the packet. p is of type PVRSRVTL_PPACKETHDR.
  */

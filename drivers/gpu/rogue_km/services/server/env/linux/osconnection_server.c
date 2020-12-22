@@ -51,14 +51,14 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #include <linux/sched.h>
 
-#if defined (SUPPORT_ION)
+#if defined(SUPPORT_ION)
 #include <linux/err.h>
 #include PVR_ANDROID_ION_HEADER
 
 /*
 	The ion device (the base object for all requests)
 	gets created by the system and we acquire it via
-	linux specific functions provided by the system layer
+	Linux specific functions provided by the system layer
 */
 #include "ion_sys.h"
 #endif
@@ -97,8 +97,8 @@ PVRSRV_ERROR OSConnectionPrivateDataInit(IMG_HANDLE *phOsPrivateData, void *pvOS
 
 	psEnvConnection->psIonData = psIonConnection;
 	/*
-		We can have more then one connection per process so we need more then
-		the PID to have a unique name
+		We can have more than one connection per process, so we need
+		more than the PID to have a unique name.
 	*/
 	psEnvConnection->psIonData->psIonDev = IonDevAcquire();
 	OSSNPrintf(psEnvConnection->psIonData->azIonClientName, ION_CLIENT_NAME_SIZE, "pvr_ion_client-%p-%d", *phOsPrivateData, OSGetCurrentClientProcessIDKM());
@@ -144,7 +144,7 @@ PVRSRV_ERROR OSConnectionPrivateDataDeInit(IMG_HANDLE hOsPrivateData)
 }
 
 
-PVRSRV_DEVICE_NODE *OSGetDevData(CONNECTION_DATA *psConnection)
+PVRSRV_DEVICE_NODE *OSGetDevNode(CONNECTION_DATA *psConnection)
 {
 	ENV_CONNECTION_DATA *psEnvConnection;
 

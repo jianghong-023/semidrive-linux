@@ -61,26 +61,18 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  * agnostic.
  */
 PVRSRV_ERROR
-PhysmemNewLocalRamBackedPMR(PVRSRV_DEVICE_NODE *psDevNode,
-							IMG_DEVMEM_SIZE_T uiSize,
-							IMG_DEVMEM_SIZE_T uiChunkSize,
-							IMG_UINT32 ui32NumPhysChunks,
-							IMG_UINT32 ui32NumVirtChunks,
-							IMG_UINT32 *pui32MappingTable,
-							IMG_UINT32 uiLog2PageSize,
-							PVRSRV_MEMALLOCFLAGS_T uiFlags,
-							const IMG_CHAR *pszAnnotation,
-							IMG_PID uiPid,
-							PMR **ppsPMRPtr);
-
-#if defined(SUPPORT_GPUVIRT_VALIDATION)
-/*
- * Define some helper list functions for the virtualization validation code
- */
-
-void	InsertPidOSidsCoupling(IMG_PID pId, IMG_UINT32 ui32OSid, IMG_UINT32 ui32OSidReg, IMG_BOOL bOSidAxiProt);
-void	RetrieveOSidsfromPidList(IMG_PID pId, IMG_UINT32 *pui32OSid, IMG_UINT32 *pui32OSidReg, IMG_BOOL *pbOSidAxiProt);
-void	RemovePidOSidCoupling(IMG_PID pId);
-#endif
+PhysmemNewLocalRamBackedPMR(CONNECTION_DATA *psConnection,
+                            PVRSRV_DEVICE_NODE *psDevNode,
+                            IMG_DEVMEM_SIZE_T uiSize,
+                            IMG_DEVMEM_SIZE_T uiChunkSize,
+                            IMG_UINT32 ui32NumPhysChunks,
+                            IMG_UINT32 ui32NumVirtChunks,
+                            IMG_UINT32 *pui32MappingTable,
+                            IMG_UINT32 uiLog2PageSize,
+                            PVRSRV_MEMALLOCFLAGS_T uiFlags,
+                            const IMG_CHAR *pszAnnotation,
+                            IMG_PID uiPid,
+                            PMR **ppsPMRPtr,
+                            IMG_UINT32 ui32PDumpFlags);
 
 #endif /* #ifndef _SRVSRV_PHYSMEM_LMA_H_ */

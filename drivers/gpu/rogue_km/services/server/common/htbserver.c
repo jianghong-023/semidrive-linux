@@ -351,7 +351,7 @@ HTBInit(void)
 	g_sCtrl.bLogDropSignalled = IMG_FALSE;
 
 	eError = OSSpinLockCreate(&g_sCtrl.hRepeatMarkerLock);
-	PVR_LOGR_IF_ERROR(eError, "OSSpinLockCreate");
+	PVR_LOG_RETURN_IF_ERROR(eError, "OSSpinLockCreate");
 
 	g_sCtrl.bInitDone = IMG_TRUE;
 
@@ -513,7 +513,7 @@ HTBControlKM(
 				g_sCtrl.ui32BufferSize,
 				_LookupFlags(HTB_OPMODE_DROPOLDEST) | g_ui32TLBaseFlags,
 				_OnTLReaderOpenCallback, NULL, NULL, NULL);
-		PVR_LOGR_IF_ERROR(eError, "TLStreamCreate");
+		PVR_LOG_RETURN_IF_ERROR(eError, "TLStreamCreate");
 		g_bConfigured = IMG_TRUE;
 	}
 
@@ -526,7 +526,7 @@ HTBControlKM(
 			OSReleaseThreadQuanta();
 			eError = TLStreamReconfigure(g_hTLStream, _LookupFlags(g_sCtrl.eOpMode | g_ui32TLBaseFlags));
 		}
-		PVR_LOGR_IF_ERROR(eError, "TLStreamReconfigure");
+		PVR_LOG_RETURN_IF_ERROR(eError, "TLStreamReconfigure");
 	}
 
 	if ( ui32EnablePID )
@@ -643,10 +643,7 @@ HTBSyncPartitionMarker(
 					((IMG_UINT32)((g_sCtrl.ui64SyncOSTS>>32)&0xffffffff)), ((IMG_UINT32)(g_sCtrl.ui64SyncOSTS&0xffffffff)),
 					((IMG_UINT32)((g_sCtrl.ui64SyncCRTS>>32)&0xffffffff)), ((IMG_UINT32)(g_sCtrl.ui64SyncCRTS&0xffffffff)),
 					g_sCtrl.ui32SyncCalcClkSpd);
-			if (PVRSRV_OK != eError)
-			{
-				PVR_DPF((PVR_DBG_WARNING, "%s() failed (%s) in %s()", "HTBLog", PVRSRVGETERRORSTRING(eError), __func__));
-			}
+			PVR_WARN_IF_ERROR(eError, "HTBLog");
 		}
 	}
 }
@@ -684,10 +681,7 @@ HTBSyncPartitionMarkerRepeat(
 					((IMG_UINT32)((ui64SyncOSTS>>32)&0xffffffffU)), ((IMG_UINT32)(ui64SyncOSTS&0xffffffffU)),
 					((IMG_UINT32)((ui64SyncCRTS>>32)&0xffffffffU)), ((IMG_UINT32)(ui64SyncCRTS&0xffffffffU)),
 					ui32ClkSpeed);
-			if (PVRSRV_OK != eError)
-			{
-				PVR_DPF((PVR_DBG_WARNING, "%s() failed (%s) in %s()", "HTBLog", PVRSRVGETERRORSTRING(eError), __func__));
-			}
+			PVR_WARN_IF_ERROR(eError, "HTBLog");
 		}
 	}
 }
@@ -731,11 +725,7 @@ HTBSyncScale(
 		/*
 		 * Don't spam the log with non-failure cases
 		 */
-		if (PVRSRV_OK != eError)
-		{
-			PVR_DPF((PVR_DBG_WARNING, "%s() failed (%s) in %s()", "HTBLog",
-				PVRSRVGETERRORSTRING(eError), __func__));
-		}
+		PVR_WARN_IF_ERROR(eError, "HTBLog");
 	}
 }
 
@@ -768,7 +758,7 @@ HTBLogKM(
 		IMG_UINT32 * aui32Args
 )
 {
-	IMG_UINT64 ui64SpinLockFlags;
+	OS_SPINLOCK_FLAGS uiSpinLockFlags;
 	IMG_UINT32 ui32ReturnFlags = 0;
 
 	/* Local snapshot variables of global counters */
@@ -786,17 +776,14 @@ HTBLogKM(
 	 * hence with these constraints this design is unlikely to get
 	 * PVRSRV_ERROR_TLPACKET_SIZE_LIMIT_EXCEEDED error
 	 */
-	PVRSRV_ERROR eError;
+	PVRSRV_ERROR eError = PVRSRV_ERROR_NOT_ENABLED;
 	IMG_UINT32 ui32RetryCount = HTB_LOG_RETRY_COUNT;
 	IMG_UINT32 * pui32Message = aui32MessageBuffer;
 	IMG_UINT32 ui32MessageSize = 4 * (HTB_LOG_HEADER_SIZE+ui32NumArgs);
 
-	eError = PVRSRV_ERROR_INVALID_PARAMS;
-
-	PVR_LOGG_IF_FALSE(ui32NumArgs == HTB_SF_PARAMNUM(SF), "ui32NumArgs invalid", ReturnError);
-	PVR_LOGG_IF_FALSE(!(ui32NumArgs != 0 && aui32Args == NULL), "aui32Args invalid", ReturnError);
-
-	eError = PVRSRV_ERROR_NOT_ENABLED;
+	PVR_LOG_GOTO_IF_INVALID_PARAM(aui32Args != NULL, eError, ReturnError);
+	PVR_LOG_GOTO_IF_INVALID_PARAM(ui32NumArgs == HTB_SF_PARAMNUM(SF), eError, ReturnError);
+	PVR_LOG_GOTO_IF_INVALID_PARAM(ui32NumArgs <= HTB_LOG_MAX_PARAMS, eError, ReturnError);
 
 	if ( g_hTLStream
 			&& ( 0 == PID || ~0 == PID || HTB_LOGMODE_ALLPID == g_sCtrl.eLogMode || _ValidPID(PID) )
@@ -838,7 +825,7 @@ HTBLogKM(
 
 	if (SF == HTB_SF_CTRL_FWSYNC_MARK_SCALE)
 	{
-		OSSpinLockAcquire(g_sCtrl.hRepeatMarkerLock, &ui64SpinLockFlags);
+		OSSpinLockAcquire(g_sCtrl.hRepeatMarkerLock, uiSpinLockFlags);
 
 		/* If a marker is being placed reset byte count from last marker */
 		g_sCtrl.ui32ByteCount = 0;
@@ -846,11 +833,11 @@ HTBLogKM(
 		g_sCtrl.ui64CRTS = (IMG_UINT64)aui32Args[HTB_ARG_CRTS_PT1] << 32 | aui32Args[HTB_ARG_CRTS_PT2];
 		g_sCtrl.ui32ClkSpeed = aui32Args[HTB_ARG_CLKSPD];
 
-		OSSpinLockRelease(g_sCtrl.hRepeatMarkerLock, ui64SpinLockFlags);
+		OSSpinLockRelease(g_sCtrl.hRepeatMarkerLock, uiSpinLockFlags);
 	}
 	else
 	{
-		OSSpinLockAcquire(g_sCtrl.hRepeatMarkerLock, &ui64SpinLockFlags);
+		OSSpinLockAcquire(g_sCtrl.hRepeatMarkerLock, uiSpinLockFlags);
 		/* Increase global count */
 		g_sCtrl.ui32ByteCount += ui32MessageSize;
 
@@ -865,14 +852,14 @@ HTBLogKM(
 			ui32ClkSpeedSnap = g_sCtrl.ui32ClkSpeed;
 			/* Reset global variable counter */
 			g_sCtrl.ui32ByteCount = 0;
-			OSSpinLockRelease(g_sCtrl.hRepeatMarkerLock, ui64SpinLockFlags);
+			OSSpinLockRelease(g_sCtrl.hRepeatMarkerLock, uiSpinLockFlags);
 
 			/* Produce a repeat marker */
 			HTBSyncPartitionMarkerRepeat(g_sCtrl.ui32SyncMarker, ui64OSTSSnap, ui64CRTSSnap, ui32ClkSpeedSnap);
 		}
 		else
 		{
-			OSSpinLockRelease(g_sCtrl.hRepeatMarkerLock, ui64SpinLockFlags);
+			OSSpinLockRelease(g_sCtrl.hRepeatMarkerLock, uiSpinLockFlags);
 		}
 	}
 
@@ -880,4 +867,19 @@ ReturnError:
 	return eError;
 }
 
+/*************************************************************************/ /*!
+ @Function      HTBIsConfigured
+ @Description   Determine if HTB stream has been configured
+
+ @Input         none
+
+ @Return        IMG_FALSE       Stream has not been configured
+                IMG_TRUE        Stream has been configured
+
+*/ /**************************************************************************/
+IMG_BOOL
+HTBIsConfigured(void)
+{
+	return g_bConfigured;
+}
 /* EOF */

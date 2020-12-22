@@ -56,6 +56,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "pmr.h"
 #include "pmr_impl.h"
 #include "physmem.h"
+#include "cache_km.h"
 
 #include "kernel_compatibility.h"
 
@@ -859,7 +860,7 @@ static inline PVRSRV_ERROR PhysmemValidateParam( IMG_DEVMEM_SIZE_T uiSize,
 			PVRSRV_MEMALLOCFLAG_POISON_ON_ALLOC |
 			PVRSRV_MEMALLOCFLAG_POISON_ON_FREE))
 	{
-		PVR_DPF((PVR_DBG_ERROR, "%s: Write Attribute not supported. Passed Flags: 0x%x ",
+		PVR_DPF((PVR_DBG_ERROR, "%s: Write Attribute not supported. Passed Flags: 0x%"PVRSRV_MEMALLOCFLAGS_FMTSPEC,
 				__func__, uiFlags));
 		return PVRSRV_ERROR_INVALID_FLAGS;
 	}
@@ -905,9 +906,9 @@ PhysmemWrapExtMemOS(CONNECTION_DATA * psConnection,
 			uiTotalNumPages = (uiSize >> PAGE_SHIFT),
 			i = 0;
 
-	eError = PhysmemValidateParam( uiSize,
-                                   pvCpuVAddr,
-                                   uiFlags);
+	eError = PhysmemValidateParam(uiSize,
+	                              pvCpuVAddr,
+	                              uiFlags);
 	if (eError != PVRSRV_OK)
 	{
 		return eError;

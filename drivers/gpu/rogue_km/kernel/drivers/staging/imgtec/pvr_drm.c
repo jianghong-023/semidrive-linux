@@ -1,4 +1,3 @@
-/* -*- mode: c; indent-tabs-mode: t; c-basic-offset: 8; tab-width: 8 -*- */
 /* vi: set ts=8 sw=8 sts=8: */
 /*************************************************************************/ /*!
 @File
@@ -42,16 +41,25 @@ COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
 IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */ /**************************************************************************/
+#include <linux/version.h>
 
 #include <drm/drm.h>
+
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 5, 0))
+#include <drm/drm_drv.h>
+#include <drm/drm_ioctl.h>
+#include <drm/drm_print.h>
+#include <linux/dma-mapping.h>
+#else
 #include <drm/drmP.h> /* include before drm_crtc.h for kernels older than 3.9 */
+#endif
+
 #include <drm/drm_crtc.h>
 #include <linux/device.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/platform_device.h>
 #include <linux/pm.h>
-#include <linux/version.h>
 
 #include "module_common.h"
 #include "pvr_drm.h"
@@ -73,7 +81,7 @@ static int pvr_pm_suspend(struct device *dev)
 
 	DRM_DEBUG_DRIVER("device %p\n", dev);
 
-	return PVRSRVCommonDeviceSuspend(priv->dev_node);
+	return PVRSRVDeviceSuspend(priv->dev_node);
 }
 
 static int pvr_pm_resume(struct device *dev)
@@ -83,7 +91,7 @@ static int pvr_pm_resume(struct device *dev)
 
 	DRM_DEBUG_DRIVER("device %p\n", dev);
 
-	return PVRSRVCommonDeviceResume(priv->dev_node);
+	return PVRSRVDeviceResume(priv->dev_node);
 }
 
 const struct dev_pm_ops pvr_pm_ops = {
@@ -118,23 +126,27 @@ int pvr_drm_load(struct drm_device *ddev, unsigned long flags)
 		deviceId = ddev->primary->index;
 #endif
 
-	priv = kmalloc(sizeof(*priv), GFP_KERNEL);
+	priv = kzalloc(sizeof(*priv), GFP_KERNEL);
 	if (!priv) {
 		err = -ENOMEM;
 		goto err_exit;
 	}
 	ddev->dev_private = priv;
 
+	if (!ddev->dev->dma_parms)
+		ddev->dev->dma_parms = &priv->dma_parms;
+	dma_set_max_seg_size(ddev->dev, DMA_BIT_MASK(32));
+
 #if defined(SUPPORT_BUFFER_SYNC) || defined(SUPPORT_NATIVE_FENCE_SYNC)
 	priv->fence_status_wq = create_freezable_workqueue("pvr_fce_status");
 	if (!priv->fence_status_wq) {
 		DRM_ERROR("failed to create fence status workqueue\n");
 		err = -ENOMEM;
-		goto err_free_priv;
+		goto err_unset_dma_parms;
 	}
 #endif
 
-	srv_err = PVRSRVDeviceCreate(ddev->dev, deviceId, &priv->dev_node);
+	srv_err = PVRSRVCommonDeviceCreate(ddev->dev, deviceId, &priv->dev_node);
 	if (srv_err != PVRSRV_OK) {
 		DRM_ERROR("failed to create device node for device %p (%s)\n",
 			  ddev->dev, PVRSRVGetErrorString(srv_err));
@@ -145,7 +157,7 @@ int pvr_drm_load(struct drm_device *ddev, unsigned long flags)
 		goto err_workqueue_destroy;
 	}
 
-	err = PVRSRVCommonDeviceInit(priv->dev_node);
+	err = PVRSRVDeviceInit(priv->dev_node);
 	if (err) {
 		DRM_ERROR("device %p initialisation failed (err=%d)\n",
 			  ddev->dev, err);
@@ -157,12 +169,14 @@ int pvr_drm_load(struct drm_device *ddev, unsigned long flags)
 	return 0;
 
 err_device_destroy:
-	PVRSRVDeviceDestroy(priv->dev_node);
+	PVRSRVCommonDeviceDestroy(priv->dev_node);
 err_workqueue_destroy:
 #if defined(SUPPORT_BUFFER_SYNC) || defined(SUPPORT_NATIVE_FENCE_SYNC)
 	destroy_workqueue(priv->fence_status_wq);
-err_free_priv:
+err_unset_dma_parms:
 #endif
+	if (ddev->dev->dma_parms == &priv->dma_parms)
+		ddev->dev->dma_parms = NULL;
 	kfree(priv);
 err_exit:
 	return err;
@@ -183,13 +197,16 @@ void pvr_drm_unload(struct drm_device *ddev)
 
 	drm_mode_config_cleanup(ddev);
 
-	PVRSRVCommonDeviceDeinit(priv->dev_node);
+	PVRSRVDeviceDeinit(priv->dev_node);
 
-	PVRSRVDeviceDestroy(priv->dev_node);
+	PVRSRVCommonDeviceDestroy(priv->dev_node);
 
 #if defined(SUPPORT_BUFFER_SYNC) || defined(SUPPORT_NATIVE_FENCE_SYNC)
 	destroy_workqueue(priv->fence_status_wq);
 #endif
+
+	if (ddev->dev->dma_parms == &priv->dma_parms)
+		ddev->dev->dma_parms = NULL;
 
 	kfree(priv);
 	ddev->dev_private = NULL;
@@ -209,7 +226,7 @@ static int pvr_drm_open(struct drm_device *ddev, struct drm_file *dfile)
 		return -ENOENT;
 	}
 
-	err = PVRSRVCommonDeviceOpen(priv->dev_node, dfile);
+	err = PVRSRVDeviceOpen(priv->dev_node, dfile);
 	if (err)
 		module_put(THIS_MODULE);
 
@@ -220,16 +237,13 @@ static void pvr_drm_release(struct drm_device *ddev, struct drm_file *dfile)
 {
 	struct pvr_drm_private *priv = ddev->dev_private;
 
-	PVRSRVCommonDeviceRelease(priv->dev_node, dfile);
+	PVRSRVDeviceRelease(priv->dev_node, dfile);
 
 	module_put(THIS_MODULE);
 }
 
 /*
  * The DRM global lock is taken for ioctls unless the DRM_UNLOCKED flag is set.
- * If you revise one of the driver specific ioctls, or add a new one, that has
- * DRM_UNLOCKED set then consider whether the gPVRSRVLock mutex needs to be
- * taken.
  */
 static struct drm_ioctl_desc pvr_drm_ioctls[] = {
 	DRM_IOCTL_DEF_DRV(PVR_SRVKM_CMD, PVRSRV_BridgeDispatchKM, DRM_RENDER_ALLOW | DRM_UNLOCKED)
@@ -252,12 +266,6 @@ static const struct file_operations pvr_drm_fops = {
 	.owner			= THIS_MODULE,
 	.open			= drm_open,
 	.release		= drm_release,
-	/*
-	 * FIXME:
-	 * Wrap this in a function that checks enough data has been
-	 * supplied with the ioctl (e.g. _IOCDIR(nr) != _IOC_NONE &&
-	 * _IOC_SIZE(nr) == size).
-	 */
 	.unlocked_ioctl		= drm_ioctl,
 #if defined(CONFIG_COMPAT)
 	.compat_ioctl		= pvr_compat_ioctl,

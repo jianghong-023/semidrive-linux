@@ -45,28 +45,28 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #ifndef SRVCLIENT_DEVICEMEM_H
 #define SRVCLIENT_DEVICEMEM_H
 
-/********************************************************************************
- *                                                                              *
- *   +------------+   +------------+    +--------------+      +--------------+  *
- *   | a   sub-   |   | a   sub-   |    |  an          |      | allocation   |  *
- *   | allocation |   | allocation |    |  allocation  |      | also mapped  |  *
- *   |            |   |            |    |  in proc 1   |      | into proc 2  |  *
- *   +------------+   +------------+    +--------------+      +--------------+  *
- *             |         |                     |                     |          *
- *          +--------------+            +--------------+      +--------------+  *
- *          | page   gran- |            | page   gran- |      | page   gran- |  *
- *          | ular mapping |            | ular mapping |      | ular mapping |  *
- *          +--------------+            +--------------+      +--------------+  *
- *                 |                                 |          |               *
- *                 |                                 |          |               *
- *                 |                                 |          |               *
- *          +--------------+                       +--------------+             *
- *          |              |                       |              |             *
- *          | A  "P.M.R."  |                       | A  "P.M.R."  |             *
- *          |              |                       |              |             *
- *          +--------------+                       +--------------+             *
- *                                                                              *
- ********************************************************************************/
+/******************************************************************************
+ *                                                                            *
+ *  +------------+   +------------+      +--------------+   +--------------+  *
+ *  | a   sub-   |   | a   sub-   |      |  an          |   | allocation   |  *
+ *  | allocation |   | allocation |      |  allocation  |   | also mapped  |  *
+ *  |            |   |            |      |  in proc 1   |   | into proc 2  |  *
+ *  +------------+   +------------+      +--------------+   +--------------+  *
+ *            |         |                       |                  |          *
+ *         +--------------+              +--------------+   +--------------+  *
+ *         | page   gran- |              | page   gran- |   | page   gran- |  *
+ *         | ular mapping |              | ular mapping |   | ular mapping |  *
+ *         +--------------+              +--------------+   +--------------+  *
+ *                |                                   |       |               *
+ *                |                                   |       |               *
+ *                |                                   |       |               *
+ *         +--------------+                       +--------------+            *
+ *         |              |                       |              |            *
+ *         | A  "P.M.R."  |                       | A  "P.M.R."  |            *
+ *         |              |                       |              |            *
+ *         +--------------+                       +--------------+            *
+ *                                                                            *
+ ******************************************************************************/
 
 /*
     All device memory allocations are ultimately a view upon (not
@@ -118,9 +118,6 @@ typedef IMG_UINT32 DEVMEM_HEAPCFGID;
 #define DEVMEM_HEAPCFG_META 1
 
 
-
-
-
 /*
   In order to call the server side functions, we need a bridge handle.
   We abstract that here, as we may wish to change its form.
@@ -128,7 +125,7 @@ typedef IMG_UINT32 DEVMEM_HEAPCFGID;
 
 typedef IMG_HANDLE DEVMEM_BRIDGE_HANDLE;
 
-/**************************************************************************/ /*!
+/*************************************************************************/ /*!
 @Function       DevmemUnpin
 @Description    This is the counterpart to DevmemPin(). It is meant to be
                 called before repinning an allocation.
@@ -139,11 +136,11 @@ typedef IMG_HANDLE DEVMEM_BRIDGE_HANDLE;
 
 @Return         PVRSRV_ERROR:   PVRSRV_OK on success and the memory is
                                 registered to be reclaimed. Error otherwise.
-*/ /***************************************************************************/
+*/ /**************************************************************************/
 IMG_INTERNAL PVRSRV_ERROR
 DevmemUnpin(DEVMEM_MEMDESC *psMemDesc);
 
-/**************************************************************************/ /*!
+/*************************************************************************/ /*!
 @Function       DevmemPin
 @Description    This is the counterpart to DevmemUnpin(). It is meant to be
                 called after unpinning an allocation.
@@ -160,7 +157,7 @@ DevmemUnpin(DEVMEM_MEMDESC *psMemDesc);
                                 was allocated.
 
                                 A different error otherwise.
-*/ /***************************************************************************/
+*/ /**************************************************************************/
 IMG_INTERNAL PVRSRV_ERROR
 DevmemPin(DEVMEM_MEMDESC *psMemDesc);
 
@@ -172,7 +169,7 @@ IMG_INTERNAL PVRSRV_ERROR
 DevmemGetSize(DEVMEM_MEMDESC *psMemDesc,
 			  IMG_DEVMEM_SIZE_T* puiSize);
 
-IMG_INTERNAL PVRSRV_ERROR
+IMG_INTERNAL void
 DevmemGetAnnotation(DEVMEM_MEMDESC *psMemDesc,
 			        IMG_CHAR **pszAnnotation);
 
@@ -183,34 +180,31 @@ DevmemGetAnnotation(DEVMEM_MEMDESC *psMemDesc,
  *
  * This must be called before any heap is created in this context
  *
- * Caller to provide bridge handle which will be squirreled away
- * internally and used for all future operations on items from this
- * memory context.  Caller also to provide devicenode handle, as this
- * is used for MMU configuration and also to determine the heap
- * configuration for the auto-instantiated heaps.
+ * Caller to provide bridge handle which will be recorded internally and used
+ * for all future operations on items from this memory context.  Caller also
+ * to provide devicenode handle, as this is used for MMU configuration and
+ * also to determine the heap configuration for the auto-instantiated heaps.
  *
- * Note that when compiled in services/server, the hBridge is not used
- * and is thrown away by the "fake" direct bridge.  (This may change.
- * It is recommended that NULL be passed for the handle for now)
+ * Note that when compiled in services/server, the hBridge is not used and
+ * is thrown away by the "fake" direct bridge.  (This may change. It is
+ * recommended that NULL be passed for the handle for now.)
  *
- * hDeviceNode and uiHeapBlueprintID shall together dictate which
- * heap-config to use. bMCUFenceAllocation specifies if the context
- * requires a MCU Fence allocation setup.
+ * hDeviceNode and uiHeapBlueprintID shall together dictate which heap-config
+ * to use.
  *
  * This will cause the server side counterpart to be created also.
  *
- * If you call DevmemCreateContext() (and the call succeeds) you
- * are promising that you will later call Devmem_ContextDestroy(),
- * except for abnormal process termination in which case it is
- * expected it will be destroyed as part of handle clean up.
+ * If you call DevmemCreateContext() (and the call succeeds) you are promising
+ * that you will later call Devmem_ContextDestroy(), except for abnormal
+ * process termination in which case it is expected it will be destroyed as
+ * part of handle clean up.
  *
- * Caller to provide storage for the pointer to the NEWDEVMEM_CONTEXT
- * object thusly created.
+ * Caller to provide storage for the pointer to the newly created
+ * NEWDEVMEM_CONTEXT object.
  */
-extern PVRSRV_ERROR
+PVRSRV_ERROR
 DevmemCreateContext(SHARED_DEV_CONNECTION hDevConnection,
                     DEVMEM_HEAPCFGID uiHeapBlueprintID,
-                    IMG_BOOL bMCUFenceAllocation,
                     DEVMEM_CONTEXT **ppsCtxPtr);
 
 /*
@@ -235,7 +229,7 @@ DevmemReleaseDevPrivData(DEVMEM_CONTEXT *psCtx);
  *
  * Undoes that done by DevmemCreateContext()
  */
-extern PVRSRV_ERROR
+PVRSRV_ERROR
 DevmemDestroyContext(DEVMEM_CONTEXT *psCtx);
 
 /*
@@ -250,6 +244,9 @@ DevmemDestroyContext(DEVMEM_CONTEXT *psCtx);
  * This will cause MMU code to set up data structures for the heap,
  * but may not cause page tables to be modified until allocations are
  * made from the heap.
+ *
+ * uiReservedRegionLength Reserved address space for static VAs shared
+ * between clients and firmware
  *
  * The "Quantum" is both the device MMU page size to be configured for
  * this heap, and the unit multiples of which "quantized" allocations
@@ -267,11 +264,12 @@ DevmemDestroyContext(DEVMEM_CONTEXT *psCtx);
  * supported quantum sizes in that case shall be dictated by the OS
  * specific implementation of PhysmemNewOSRamBackedPMR() (see)
  */
-extern PVRSRV_ERROR
+PVRSRV_ERROR
 DevmemCreateHeap(DEVMEM_CONTEXT *psCtxPtr,
                  /* base and length of heap */
                  IMG_DEV_VIRTADDR sBaseAddress,
                  IMG_DEVMEM_SIZE_T uiLength,
+                 IMG_DEVMEM_SIZE_T uiReservedRegionLength,
                  /* log2 of allocation quantum, i.e. "page" size.
                     All allocations (that go to server side) are
                     multiples of this.  We use a client-side RA to
@@ -279,9 +277,6 @@ DevmemCreateHeap(DEVMEM_CONTEXT *psCtxPtr,
                  IMG_UINT32 ui32Log2Quantum,
                  /* The minimum import alignment for this heap */
                  IMG_UINT32 ui32Log2ImportAlignment,
-                 /* (For tiling heaps) the factor to use to convert
-                    alignment to optimum buffer stride */
-                 IMG_UINT32 ui32Log2TilingStrideFactor,
                  /* Name of heap for debug */
                  /* N.B.  Okay to exist on caller's stack - this
                     func takes a copy if it needs it. */
@@ -296,7 +291,7 @@ DevmemCreateHeap(DEVMEM_CONTEXT *psCtxPtr,
  * N.B. All allocations must have been freed and all mappings must
  * have been unmapped before invoking this call
  */
-extern PVRSRV_ERROR
+PVRSRV_ERROR
 DevmemDestroyHeap(DEVMEM_HEAP *psHeap);
 
 /*
@@ -380,6 +375,19 @@ DevmemAllocateSparse(SHARED_DEV_CONNECTION hDevConnection,
                      const IMG_CHAR *pszText,
                      DEVMEM_MEMDESC **ppsMemDescPtr);
 
+PVRSRV_ERROR
+DevmemSubAllocateAndMap(IMG_UINT8 uiPreAllocMultiplier,
+			DEVMEM_HEAP *psHeap,
+			IMG_DEVMEM_SIZE_T uiSize,
+			IMG_DEVMEM_ALIGN_T uiAlign,
+			DEVMEM_FLAGS_T uiFlags,
+			const IMG_CHAR *pszText,
+			DEVMEM_MEMDESC **ppsMemDescPtr,
+			IMG_DEV_VIRTADDR *psDevVirtAddr);
+
+#define DevmemAllocateAndMap(...) \
+	DevmemSubAllocateAndMap(DEVMEM_NO_PRE_ALLOCATE_MULTIPLIER, __VA_ARGS__)
+
 /*
  * DevmemFree()
  *
@@ -390,8 +398,11 @@ DevmemAllocateSparse(SHARED_DEV_CONNECTION hDevConnection,
  * properly refcounted, so the caller does not have to care.
  */
 
-extern IMG_BOOL
+IMG_BOOL
 DevmemFree(DEVMEM_MEMDESC *psMemDesc);
+
+IMG_BOOL
+DevmemReleaseDevAddrAndFree(DEVMEM_MEMDESC *psMemDesc);
 
 /*
 	DevmemMapToDevice:
@@ -422,6 +433,18 @@ DevmemMapToDeviceAddress(DEVMEM_MEMDESC *psMemDesc,
                          IMG_DEV_VIRTADDR sDevVirtAddr);
 
 /*
+	DevmemGetDevVirtAddr
+
+	Obtain the MemDesc's device virtual address.
+	This function _must_ be called after DevmemMapToDevice(Address)
+	and is expected to be used be functions which didn't allocate
+	the MemDesc but need to know it's address.
+	It will PVR_ASSERT if no device mapping exists and 0 is returned.
+ */
+IMG_DEV_VIRTADDR
+DevmemGetDevVirtAddr(DEVMEM_MEMDESC *psMemDesc);
+
+/*
 	DevmemAcquireDevVirtAddr
 
 	Acquire the MemDesc's device virtual address.
@@ -431,13 +454,14 @@ DevmemMapToDeviceAddress(DEVMEM_MEMDESC *psMemDesc,
  */
 PVRSRV_ERROR DevmemAcquireDevVirtAddr(DEVMEM_MEMDESC *psMemDesc,
                                       IMG_DEV_VIRTADDR *psDevVirtAddrRet);
+
 /*
  * DevmemReleaseDevVirtAddr()
  *
  * give up the licence to use the device virtual address that was
  * acquired by "Acquire" or "MapToDevice"
  */
-extern void
+void
 DevmemReleaseDevVirtAddr(DEVMEM_MEMDESC *psMemDesc);
 
 /*
@@ -469,7 +493,7 @@ void DevmemReacquireCpuVirtAddr(DEVMEM_MEMDESC *psMemDesc,
  * give up the licence to use the cpu virtual address that was granted
  * with the "Get" call.
  */
-extern void
+void
 DevmemReleaseCpuVirtAddr(DEVMEM_MEMDESC *psMemDesc);
 
 #if defined(SUPPORT_INSECURE_EXPORT)
@@ -533,7 +557,7 @@ DevmemUnmakeLocalImportHandle(SHARED_DEV_CONNECTION hDevConnection,
    this device has.  Note that there is no acquire/release semantics
    required, as this data is guaranteed to be constant for the
    lifetime of the device node */
-extern PVRSRV_ERROR
+PVRSRV_ERROR
 DevmemHeapConfigCount(SHARED_DEV_CONNECTION hDevConnection,
                       IMG_UINT32 *puiNumHeapConfigsOut);
 
@@ -541,7 +565,7 @@ DevmemHeapConfigCount(SHARED_DEV_CONNECTION hDevConnection,
    config on this device has.  Note that there is no acquire/release
    semantics required, as this data is guaranteed to be constant for
    the lifetime of the device node */
-extern PVRSRV_ERROR
+PVRSRV_ERROR
 DevmemHeapCount(SHARED_DEV_CONNECTION hDevConnection,
                 IMG_UINT32 uiHeapConfigIndex,
                 IMG_UINT32 *puiNumHeapsOut);
@@ -552,7 +576,7 @@ DevmemHeapCount(SHARED_DEV_CONNECTION hDevConnection,
    semantics required, as this data is guaranteed to be constant for
    the lifetime of the device node.
  */
-extern PVRSRV_ERROR
+PVRSRV_ERROR
 DevmemHeapConfigName(SHARED_DEV_CONNECTION hsDevConnection,
                      IMG_UINT32 uiHeapConfigIndex,
                      IMG_CHAR *pszConfigNameOut,
@@ -566,7 +590,7 @@ DevmemHeapConfigName(SHARED_DEV_CONNECTION hsDevConnection,
    Note that there is no acquire/release semantics required, as this
    data is guaranteed to be constant for the lifetime of the device
    node. */
-extern PVRSRV_ERROR
+PVRSRV_ERROR
 DevmemHeapDetails(SHARED_DEV_CONNECTION hDevConnection,
                   IMG_UINT32 uiHeapConfigIndex,
                   IMG_UINT32 uiHeapIndex,
@@ -574,9 +598,9 @@ DevmemHeapDetails(SHARED_DEV_CONNECTION hDevConnection,
                   IMG_UINT32 uiHeapNameBufSz,
                   IMG_DEV_VIRTADDR *psDevVAddrBaseOut,
                   IMG_DEVMEM_SIZE_T *puiHeapLengthOut,
+                  IMG_DEVMEM_SIZE_T *puiReservedRegionLengthOut,
                   IMG_UINT32 *puiLog2DataPageSize,
-                  IMG_UINT32 *puiLog2ImportAlignmentOut,
-                  IMG_UINT32 *puiLog2TilingStrideFactor);
+                  IMG_UINT32 *puiLog2ImportAlignmentOut);
 
 /*
  * Devmem_FindHeapByName()
@@ -585,7 +609,7 @@ DevmemHeapDetails(SHARED_DEV_CONNECTION hDevConnection,
  * context.  "automagic" heaps are those that are born with the
  * context from a blueprint
  */
-extern PVRSRV_ERROR
+PVRSRV_ERROR
 DevmemFindHeapByName(const DEVMEM_CONTEXT *psCtx,
                      const IMG_CHAR *pszHeapName,
                      DEVMEM_HEAP **ppsHeapRet);
@@ -600,24 +624,24 @@ PVRSRV_ERROR
 DevmemGetHeapBaseDevVAddr(DEVMEM_HEAP *psHeap,
 			  IMG_DEV_VIRTADDR *pDevVAddr);
 
-extern PVRSRV_ERROR
+PVRSRV_ERROR
 DevmemLocalGetImportHandle(DEVMEM_MEMDESC *psMemDesc,
 			   IMG_HANDLE *phImport);
 
-extern PVRSRV_ERROR
+PVRSRV_ERROR
 DevmemGetImportUID(DEVMEM_MEMDESC *psMemDesc,
-						   IMG_UINT64 *pui64UID);
+		   IMG_UINT64 *pui64UID);
 
 PVRSRV_ERROR
 DevmemGetReservation(DEVMEM_MEMDESC *psMemDesc,
-				IMG_HANDLE *hReservation);
+		     IMG_HANDLE *hReservation);
 
 IMG_INTERNAL PVRSRV_ERROR
 DevmemGetPMRData(DEVMEM_MEMDESC *psMemDesc,
 		IMG_HANDLE *hPMR,
 		IMG_DEVMEM_OFFSET_T *puiPMROffset);
 
-IMG_INTERNAL PVRSRV_ERROR
+IMG_INTERNAL void
 DevmemGetFlags(DEVMEM_MEMDESC *psMemDesc,
 				DEVMEM_FLAGS_T *puiFlags);
 
@@ -640,6 +664,16 @@ IMG_INTERNAL PVRSRV_ERROR
 DevmemGetFaultAddress(DEVMEM_CONTEXT *psContext,
                       IMG_DEV_VIRTADDR *psFaultAddress);
 
+IMG_INTERNAL PVRSRV_ERROR
+DevmemFlushDeviceSLCRange(DEVMEM_MEMDESC *psMemDesc,
+                          IMG_DEV_VIRTADDR sDevVAddr,
+                          IMG_DEVMEM_SIZE_T uiSize,
+                          IMG_BOOL bInvalidate);
+
+IMG_INTERNAL PVRSRV_ERROR
+DevmemInvalidateFBSCTable(DEVMEM_CONTEXT *psContext,
+                          IMG_UINT64 ui64FBSCEntries);
+
 /* DevmemGetHeapLog2PageSize()
  *
  * Get the page size used for a certain heap.
@@ -647,16 +681,7 @@ DevmemGetFaultAddress(DEVMEM_CONTEXT *psContext,
 IMG_UINT32
 DevmemGetHeapLog2PageSize(DEVMEM_HEAP *psHeap);
 
-/* DevmemGetHeapTilingProperties()
- *
- * Get the import alignment and tiling stride factor used for a certain heap.
- */
-IMG_UINT32
-DevmemGetHeapTilingProperties(DEVMEM_HEAP *psHeap,
-                              IMG_UINT32 *puiLog2ImportAlignment,
-                              IMG_UINT32 *puiLog2TilingStrideFactor);
-
-/**************************************************************************/ /*!
+/*************************************************************************/ /*!
 @Function       RegisterDevMemPFNotify
 @Description    Registers that the application wants to be signaled when a page
                 fault occurs.
@@ -667,23 +692,38 @@ DevmemGetHeapTilingProperties(DEVMEM_HEAP *psHeap,
 @Input          bRegister      If true, register. If false, de-register.
 @Return         PVRSRV_ERROR:  PVRSRV_OK on success. Otherwise, a PVRSRV_
                                error code
-*/ /***************************************************************************/
+*/ /**************************************************************************/
 IMG_INTERNAL PVRSRV_ERROR
 RegisterDevmemPFNotify(DEVMEM_CONTEXT *psContext,
                        IMG_UINT32     ui32PID,
                        IMG_BOOL       bRegister);
 
-/**************************************************************************/ /*!
+/*************************************************************************/ /*!
 @Function       GetMaxDevMemSize
 @Description    Get the amount of device memory on current platform
-		(memory size in Bytes)
+                (memory size in Bytes)
 @Output         puiLMASize            LMA memory size
 @Output         puiUMASize            UMA memory size
 @Return         Error code
-*/ /***************************************************************************/
+*/ /**************************************************************************/
 IMG_INTERNAL PVRSRV_ERROR
 GetMaxDevMemSize(SHARED_DEV_CONNECTION hDevConnection,
 		 IMG_DEVMEM_SIZE_T *puiLMASize,
 		 IMG_DEVMEM_SIZE_T *puiUMASize);
+
+/*************************************************************************/ /*!
+@Function       DevmemHeapSetPremapStatus
+@Description    In some special cases like virtualisation, a device memory heap
+			    must be entirely backed by physical memory and mapped into the
+				device's virtual address space. This is done at context creation.
+			    When objects are allocated from such a heap, the mapping part
+			    must be skipped. The 'bPremapped' flag dictates if allocations
+			    are to be mapped or not.
+
+@Input          psHeap            Device memory heap to be updated
+@Input          IsPremapped       The premapping status to be set
+*/ /**************************************************************************/
+IMG_INTERNAL void
+DevmemHeapSetPremapStatus(DEVMEM_HEAP *psHeap, IMG_BOOL IsPremapped);
 
 #endif /* #ifndef SRVCLIENT_DEVICEMEM_H */

@@ -1,4 +1,3 @@
-/* -*- mode: c; indent-tabs-mode: t; c-basic-offset: 8; tab-width: 8 -*- */
 /* vi: set ts=8 sw=8 sts=8: */
 /*************************************************************************/ /*!
 @File           plato_drv.h
@@ -129,6 +128,11 @@ struct plato_pdp_platform_data {
 	 */
 	resource_size_t pdp_heap_memory_base;
 	resource_size_t pdp_heap_memory_size;
+
+	/* Used to export host address instead of pdp address,
+	 * defaults to false.
+	 */
+	bool dma_map_export_host_addr;
 };
 
 struct plato_hdmi_platform_data {

@@ -1,4 +1,3 @@
-/* -*- mode: c; indent-tabs-mode: t; c-basic-offset: 8; tab-width: 8 -*- */
 /* vi: set ts=8 sw=8 sts=8: */
 /*************************************************************************/ /*!
 @File           pvr_sync.c
@@ -42,11 +41,6 @@ COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
 IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */ /**************************************************************************/
-
-/* General TODO:
- * - check if OSAcquireBridgeLock/OSReleaseridgeLock is still necessary?
- * - can the deferred freeing made simpler now?
- * - remove pool (after timeline moved to DevVars)? */
 
 #include "pvr_drv.h"
 #include "pvr_fd_sync_kernel.h"
@@ -156,7 +150,11 @@ static inline ktime_t sync_pt_get_timestamp(struct sync_pt *pt)
 		} \
 	} while (0)
 
+#if defined(PDUMP)
+#define SYNC_MAX_POOL_SIZE 0
+#else
 #define SYNC_MAX_POOL_SIZE 10
+#endif
 
 enum {
 	SYNC_TL_TYPE = 0,
@@ -169,7 +167,6 @@ enum {
 /* Services client sync prim wrapper. This is used to hold debug information
  * and make it possible to cache unused syncs.
  */
-/* TODO: this needs to go */
 struct pvr_sync_native_sync_prim {
 	/* List for the sync pool support. */
 	struct list_head list;
@@ -393,7 +390,7 @@ static struct {
 
 /* List of timelines created by this driver */
 static LIST_HEAD(timeline_list);
-static DEFINE_MUTEX(timeline_list_mutex);
+static DEFINE_SPINLOCK(timeline_list_lock);
 
 /* Sync pool support */
 static LIST_HEAD(sync_pool_free_list);
@@ -791,11 +788,11 @@ static void pvr_sync_debug_request(void *hDebugRequestHandle,
 	};
 
 	if (DD_VERB_LVL_ENABLED(ui32VerbLevel, DEBUG_REQUEST_VERBOSITY_MEDIUM)) {
-		/* if timeline_list_mutex and pvr_sync_pt_active_list_spinlock
-		 * are acquired together timeline_list_mutex must be always acquired
+		/* if timeline_list_lock and pvr_sync_pt_active_list_spinlock
+		 * are acquired together timeline_list_lock must be always acquired
 		 * first */
-		mutex_lock(&timeline_list_mutex);
-		spin_lock_irqsave(&pvr_sync_pt_active_list_spinlock, flags);
+		spin_lock_irqsave(&timeline_list_lock, flags);
+		spin_lock(&pvr_sync_pt_active_list_spinlock);
 
 		PVR_DUMPDEBUG_LOG(pfnDumpDebugPrintf, pvDumpDebugFile,
 				  "------[ Native Fence Sync: timelines ]------");
@@ -847,8 +844,8 @@ static void pvr_sync_debug_request(void *hDebugRequestHandle,
 			}
 		}
 
-		spin_unlock_irqrestore(&pvr_sync_pt_active_list_spinlock, flags);
-		mutex_unlock(&timeline_list_mutex);
+		spin_unlock(&pvr_sync_pt_active_list_spinlock);
+		spin_unlock_irqrestore(&timeline_list_lock, flags);
 	}
 }
 
@@ -952,7 +949,7 @@ static void pvr_sync_timeline_defer_free(struct pvr_sync_timeline_kernel_pair *k
 	queue_work(pvr_sync_data.defer_free_wq, &pvr_sync_data.defer_free_work);
 }
 
-/* This function assumes the timeline_list_mutex is held while it runs */
+/* This function assumes the timeline_list_lock is held while it runs */
 
 static void pvr_sync_destroy_timeline_locked(struct kref *kref)
 {
@@ -961,7 +958,7 @@ static void pvr_sync_destroy_timeline_locked(struct kref *kref)
 		container_of(kref, struct pvr_sync_timeline, kref);
 
 	pvr_sync_timeline_defer_free(timeline->kernel);
-	/* timeline_list_mutex is already locked so it's safe to acquire
+	/* timeline_list_lock is already locked so it's safe to acquire
 	 * this here */
 	spin_lock_irqsave(&pvr_sync_pt_active_list_spinlock, flags);
 	list_del(&timeline->sync_list);
@@ -996,6 +993,7 @@ static void pvr_sw_sync_destroy_timeline(struct kref *kref)
 static void pvr_sync_release_timeline(struct sync_timeline *obj)
 {
 	struct pvr_sync_timeline *timeline = get_timeline(obj);
+	unsigned long flags;
 
 	/* If pvr_sync_open failed after calling sync_timeline_create, this
 	 * can be called with a timeline that has not got a timeline sync
@@ -1010,11 +1008,11 @@ static void pvr_sync_release_timeline(struct sync_timeline *obj)
 	if (timeline->kernel->fence_sync)
 		check_for_sync_prim(timeline->kernel->fence_sync);
 
-	/* Take timeline_list_mutex before clearing timeline->obj, to
+	/* Take timeline_list_lock before clearing timeline->obj, to
 	 * avoid the chance of doing so while the list is being iterated
 	 * by pvr_sync_update_all_timelines().
 	 */
-	mutex_lock(&timeline_list_mutex);
+	spin_lock_irqsave(&timeline_list_lock, flags);
 
 	/* Whether or not we're the last reference, obj is going away
 	 * after this function returns, so remove our back reference
@@ -1027,7 +1025,7 @@ static void pvr_sync_release_timeline(struct sync_timeline *obj)
 	 */
 	kref_put(&timeline->kref, pvr_sync_destroy_timeline_locked);
 
-	mutex_unlock(&timeline_list_mutex);
+	spin_unlock_irqrestore(&timeline_list_lock, flags);
 }
 
 /* The print_obj() and print_pt() functions have been removed, so we're forced
@@ -1466,6 +1464,7 @@ static int pvr_sync_open(struct inode *inode, struct file *file)
 	struct pvr_sync_timeline *timeline;
 	char task_comm[TASK_COMM_LEN];
 	int err = -ENOMEM;
+	unsigned long flags;
 
 	get_task_comm(task_comm, current);
 
@@ -1496,9 +1495,9 @@ static int pvr_sync_open(struct inode *inode, struct file *file)
 	kref_init(&timeline->kref);
 	INIT_LIST_HEAD(&timeline->sync_list);
 
-	mutex_lock(&timeline_list_mutex);
+	spin_lock_irqsave(&timeline_list_lock, flags);
 	list_add_tail(&timeline->list, &timeline_list);
-	mutex_unlock(&timeline_list_mutex);
+	spin_unlock_irqrestore(&timeline_list_lock, flags);
 
 	DPF("%s: # %s", __func__, debug_info_timeline(timeline));
 
@@ -1914,6 +1913,86 @@ err_out:
 	return err;
 }
 
+#if defined(PDUMP)
+static enum PVRSRV_ERROR
+pvr_sync_fence_get_checkpoints(PVRSRV_FENCE fence_to_pdump, u32 *nr_checkpoints,
+				struct _SYNC_CHECKPOINT ***checkpoint_handles)
+{
+	enum PVRSRV_ERROR err;
+	struct sync_fence *sync_fence;
+	struct sync_pt *sync_pt;
+	struct pvr_sync_kernel_pair *sync_kernel;
+	u32 points_on_fence = 0;
+	struct _SYNC_CHECKPOINT **next_checkpoint;
+	struct _SYNC_CHECKPOINT **checkpoints = NULL;
+	int j = 0;
+
+	if (!nr_checkpoints || !checkpoint_handles) {
+		err = PVRSRV_ERROR_INVALID_PARAMS;
+		goto err_out;
+	}
+
+	if (fence_to_pdump < 0) {
+		/* Null fence passed, so return 0 checkpoints */
+		err = PVRSRV_ERROR_INVALID_PARAMS;
+		goto err_out;
+	}
+
+	sync_fence = sync_fence_fdget(fence_to_pdump);
+	if (!sync_fence) {
+		pr_err("pvr_sync2: %s: Failed to read sync private data for fd %d\n",
+			__func__, fence_to_pdump);
+		err = PVRSRV_ERROR_HANDLE_NOT_FOUND;
+		goto err_out;
+	}
+
+	/* Alloc memory to hold list of PSYNC_CHECKPOINTs */
+	checkpoints = kmalloc_array(MAX_SYNC_CHECKPOINTS_PER_FENCE,
+				      sizeof(*checkpoints), GFP_KERNEL);
+	if (!checkpoints) {
+		pr_err("pvr_sync2: %s: Failed to alloc memory for returned list of sync checkpoints\n",
+			__func__);
+		err = PVRSRV_ERROR_OUT_OF_MEMORY;
+		goto err_put_fence;
+	}
+
+	next_checkpoint = checkpoints;
+
+	(void)j;
+	for_each_sync_pt(sync_pt, sync_fence, j) {
+		struct pvr_sync_pt *pvr_pt = NULL;
+
+		/* Make sure that we do not overrun the memory we allocated */
+		if (points_on_fence >= MAX_SYNC_CHECKPOINTS_PER_FENCE) {
+			pr_err("pvr_sync2: Maximum number of sync checkpoints in a fence exceeded (greater than %d)", MAX_SYNC_CHECKPOINTS_PER_FENCE);
+			err = PVRSRV_ERROR_INVALID_PARAMS;
+			kfree(*checkpoint_handles);
+			goto err_put_fence;
+		}
+
+		if (is_pvr_timeline_pt(sync_pt)) {
+			pvr_pt = (struct pvr_sync_pt *)sync_pt;
+			sync_kernel = pvr_pt->sync_data->kernel;
+			if (!sync_kernel) {
+				continue;
+			}
+			*next_checkpoint = sync_kernel->fence_sync->client_sync_checkpoint;
+			next_checkpoint++;
+			points_on_fence++;
+		}
+	}
+
+	*checkpoint_handles = checkpoints;
+	*nr_checkpoints = points_on_fence;
+	err = PVRSRV_OK;
+err_put_fence:
+		sync_fence_put(sync_fence);
+err_out:
+	return err;
+
+}
+#endif
+
 static u32
 pvr_sync_dump_info_on_stalled_ufos(u32 nr_ufos, u32 *vaddrs)
 {
@@ -2211,9 +2290,6 @@ pvr_sync_clean_freelist(void)
 
 	spin_unlock_irqrestore(&timeline_free_list_spinlock, flags);
 
-#if defined(PVRSRV_USE_BRIDGE_LOCK)
-	OSAcquireBridgeLock();
-#endif
 
 	list_for_each_entry_safe(kernel, k, &unlocked_free_checkpoint_list, list) {
 		list_del(&kernel->list);
@@ -2239,9 +2315,6 @@ pvr_sync_clean_freelist(void)
 		kfree(tl_kernel);
 	}
 
-#if defined(PVRSRV_USE_BRIDGE_LOCK)
-	OSReleaseBridgeLock();
-#endif
 	/* sync_fence_put() must be called from process/WQ context
 	 * because it uses fput(), which is not allowed to be called
 	 * from interrupt context in kernels <3.6.
@@ -2326,16 +2399,17 @@ void pvr_sync_update_all_timelines(void *command_complete_handle)
 {
 	struct pvr_sync_timeline *timeline, *n;
 	u32 num_signalled = 0;
+	unsigned long flags;
 
-	mutex_lock(&timeline_list_mutex);
+	spin_lock_irqsave(&timeline_list_lock, flags);
 
 	list_for_each_entry(timeline, &timeline_list, list) {
 		/* If a timeline is destroyed via pvr_sync_release_timeline()
 		 * in parallel with a call to pvr_sync_update_all_timelines(),
-		 * the timeline_list_mutex will block destruction of the
+		 * the timeline_list_lock will block destruction of the
 		 * 'timeline' pointer. Use kref_get_unless_zero() to detect
 		 * and handle this race. Skip the timeline if it's being
-		 * destroyed, blocked only on the timeline_list_mutex.
+		 * destroyed, blocked only on the timeline_list_lock.
 		 */
 		timeline->valid =
 			kref_get_unless_zero(&timeline->kref) ? true : false;
@@ -2359,7 +2433,7 @@ void pvr_sync_update_all_timelines(void *command_complete_handle)
 		 * we use NULL / non-NULL consistently with the if() and call
 		 * to sync_timeline_signal() -- the timeline->obj can't be
 		 * freed (pvr_sync_release_timeline() will be stuck waiting
-		 * for the timeline_list_mutex) but it might have been made
+		 * for the timeline_list_lock) but it might have been made
 		 * invalid by the base sync driver, in which case this call
 		 * will bounce harmlessly.
 		 */
@@ -2368,11 +2442,11 @@ void pvr_sync_update_all_timelines(void *command_complete_handle)
 			num_signalled++;
 		}
 
-		/* We're already holding the timeline_list_mutex */
+		/* We're already holding the timeline_list_lock */
 		kref_put(&timeline->kref, pvr_sync_destroy_timeline_locked);
 	}
 
-	mutex_unlock(&timeline_list_mutex);
+	spin_unlock_irqrestore(&timeline_list_lock, flags);
 }
 
 enum PVRSRV_ERROR pvr_sync_init(struct device *dev)
@@ -2394,24 +2468,15 @@ enum PVRSRV_ERROR pvr_sync_init(struct device *dev)
 		goto err_out;
 	}
 
-#if defined(PVRSRV_USE_BRIDGE_LOCK)
-	OSAcquireBridgeLock();
-#endif
 
 	error = SyncPrimContextCreate(priv->dev_node,
 				      &pvr_sync_data.sync_prim_context);
 	if (error != PVRSRV_OK) {
 		pr_err("pvr_sync2: %s: Failed to create sync prim context (%s)\n",
 		       __func__, PVRSRVGetErrorString(error));
-#if defined(PVRSRV_USE_BRIDGE_LOCK)
-		OSReleaseBridgeLock();
-#endif
 		goto err_release_event_object;
 	}
 
-#if defined(PVRSRV_USE_BRIDGE_LOCK)
-	OSReleaseBridgeLock();
-#endif
 
 	/* Initialise struct and register with sync_checkpoint.c */
 	pvr_sync_data.sync_checkpoint_ops.pfnFenceResolve = pvr_sync_resolve_fence;
@@ -2427,6 +2492,9 @@ enum PVRSRV_ERROR pvr_sync_init(struct device *dev)
 	pvr_sync_data.sync_checkpoint_ops.pfnSignalWaiters = NULL;
 #endif
 	strlcpy(pvr_sync_data.sync_checkpoint_ops.pszImplName, "pvr_sync2", SYNC_CHECKPOINT_IMPL_MAX_STRLEN);
+#if defined(PDUMP)
+	pvr_sync_data.sync_checkpoint_ops.pfnSyncFenceGetCheckpoints = pvr_sync_fence_get_checkpoints;
+#endif
 
 	SyncCheckpointRegisterFunctions(&pvr_sync_data.sync_checkpoint_ops);
 
@@ -2487,13 +2555,7 @@ err_unregister_cmd_complete:
 err_destroy_defer_free_wq:
 	destroy_workqueue(pvr_sync_data.defer_free_wq);
 err_free_sync_context:
-#if defined(PVRSRV_USE_BRIDGE_LOCK)
-	OSAcquireBridgeLock();
-#endif
 	SyncPrimContextDestroy(pvr_sync_data.sync_prim_context);
-#if defined(PVRSRV_USE_BRIDGE_LOCK)
-	OSReleaseBridgeLock();
-#endif
 err_release_event_object:
 	PVRSRVReleaseGlobalEventObjectKM(pvr_sync_data.event_object_handle);
 err_out:
@@ -2517,16 +2579,10 @@ void pvr_sync_deinit(void)
 	 */
 	destroy_workqueue(pvr_sync_data.defer_free_wq);
 
-#if defined(PVRSRV_USE_BRIDGE_LOCK)
-	OSAcquireBridgeLock();
-#endif
 	sync_pool_clear();
 
 	SyncPrimContextDestroy(pvr_sync_data.sync_prim_context);
 
-#if defined(PVRSRV_USE_BRIDGE_LOCK)
-	OSReleaseBridgeLock();
-#endif
 
 	PVRSRVReleaseGlobalEventObjectKM(pvr_sync_data.event_object_handle);
 }

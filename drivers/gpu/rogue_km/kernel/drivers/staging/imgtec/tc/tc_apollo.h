@@ -1,4 +1,3 @@
-/* -*- mode: c; indent-tabs-mode: t; c-basic-offset: 8; tab-width: 8 -*- */
 /* vi: set ts=8 sw=8 sts=8: */
 /*************************************************************************/ /*!
 @Codingstyle    LinuxKernel
@@ -54,7 +53,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 int apollo_init(struct tc_device *tc, struct pci_dev *pdev,
 		int core_clock, int mem_clock, int sys_clock,
 		int pdp_mem_size, int secure_mem_size,
-		int mem_latency, int mem_wresp_latency);
+		int mem_latency, int mem_wresp_latency, int mem_mode);
 int apollo_cleanup(struct tc_device *tc);
 
 int apollo_register_pdp_device(struct tc_device *tc);

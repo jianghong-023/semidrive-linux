@@ -42,13 +42,14 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */ /**************************************************************************/
 
 #include "osfunc_common.h"
+#include "img_defs.h"
 
 /* This workaround is only *required* on ARM64. Avoid building or including
  * it by default on other architectures, unless the 'safe memcpy' test flag
  * is enabled. (The code should work on other architectures.)
  */
 
-#if defined(__arm64__) || defined(__aarch64__) || defined (PVRSRV_DEVMEM_TEST_SAFE_MEMSETCPY)
+
 
 /* NOTE: This C file is compiled with -ffreestanding to avoid pattern matching
  *       by the compiler to stdlib functions, and it must only use the below
@@ -75,6 +76,8 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #define BITS_PER_BYTE (8)
 #endif /* BITS_PER_BYTE */
 
+/* Loading or storing 16 or 32 bytes is only supported on 64-bit machines. */
+#if DEVICE_MEMSETCPY_ALIGN_IN_BYTES > 8
 typedef __uint128_t uint128_t;
 
 typedef struct
@@ -82,6 +85,7 @@ typedef struct
 	uint128_t ui128DataFields[2];
 }
 uint256_t;
+#endif
 
 #endif
 
@@ -89,15 +93,18 @@ uint256_t;
  * due to its requirement on __attribute__((vector_size(n))), typeof() and
  * __SIZEOF__ macros.
  */
+
 #if defined(__GNUC__)
 
+#ifndef MIN
 #define MIN(a, b) \
  ({__typeof(a) _a = (a); __typeof(b) _b = (b); _a > _b ? _b : _a;})
+#endif
 
 #if !defined(DEVICE_MEMSETCPY_ALIGN_IN_BYTES)
 #define DEVICE_MEMSETCPY_ALIGN_IN_BYTES __SIZEOF_LONG__
 #endif
-#if DEVICE_MEMSETCPY_ALIGN_IN_BYTES % 2 != 0
+#if (DEVICE_MEMSETCPY_ALIGN_IN_BYTES & (DEVICE_MEMSETCPY_ALIGN_IN_BYTES - 1)) != 0
 #error "DEVICE_MEMSETCPY_ALIGN_IN_BYTES must be a power of 2"
 #endif
 #if DEVICE_MEMSETCPY_ALIGN_IN_BYTES < 4
@@ -108,7 +115,7 @@ uint256_t;
 #error No support for architectures where void* and long are sized differently
 #endif
 
-#if   __SIZEOF_LONG__ >  DEVICE_MEMSETCPY_ALIGN_IN_BYTES
+#if   __SIZEOF_LONG__ > DEVICE_MEMSETCPY_ALIGN_IN_BYTES
 /* Meaningless, and harder to do correctly */
 # error Cannot handle DEVICE_MEMSETCPY_ALIGN_IN_BYTES < sizeof(long)
 typedef unsigned long block_t;
@@ -214,8 +221,8 @@ void DeviceMemCopy(void *pvDst, const void *pvSrc, size_t uSize)
 			 */
 			if (uSize >= sizeof(int))
 			{
-				volatile int *piSrc = (int *)pcSrc;
-				volatile int *piDst = (int *)pcDst;
+				volatile int *piSrc = (int *)((void *)pcSrc);
+				volatile int *piDst = (int *)((void *)pcDst);
 
 				while (uSize >= sizeof(int))
 				{
@@ -223,16 +230,16 @@ void DeviceMemCopy(void *pvDst, const void *pvSrc, size_t uSize)
 					uSize -= sizeof(int);
 				}
 
-				pcSrc = (char *)piSrc;
-				pcDst = (char *)piDst;
+				pcSrc = (char *)((void *)piSrc);
+				pcDst = (char *)((void *)piDst);
 			}
 		}
 	}
 
 	if (bBlockCopy && uSize >= sizeof(block_t))
 	{
-		volatile block_t *pSrc = (block_t *)pcSrc;
-		volatile block_t *pDst = (block_t *)pcDst;
+		volatile block_t *pSrc = (block_t *)((void *)pcSrc);
+		volatile block_t *pDst = (block_t *)((void *)pcDst);
 
 #if defined(DEVICE_MEMSETCPY_ARM64)
 		NSHLD();
@@ -258,8 +265,8 @@ void DeviceMemCopy(void *pvDst, const void *pvSrc, size_t uSize)
 		NSHST();
 #endif
 
-		pcSrc = (char *)pSrc;
-		pcDst = (char *)pDst;
+		pcSrc = (char *)((void *)pSrc);
+		pcDst = (char *)((void *)pDst);
 	}
 
 	while (uSize)
@@ -290,7 +297,7 @@ void DeviceMemSet(void *pvDst, unsigned char ui8Value, size_t uSize)
 
 	if (uSize >= sizeof(block_t))
 	{
-		volatile block_t *pDst = (block_t *)pcDst;
+		volatile block_t *pDst = (block_t *)((void *)pcDst);
 		size_t i, uBlockSize;
 #if defined(DEVICE_MEMSETCPY_ARM64)
 		typedef block_half_t BLK_t;
@@ -340,7 +347,7 @@ void DeviceMemSet(void *pvDst, unsigned char ui8Value, size_t uSize)
 		NSHST();
 #endif
 
-		pcDst = (char *)pDst;
+		pcDst = (char *)((void *)pDst);
 	}
 
 	while (uSize)
@@ -350,11 +357,11 @@ void DeviceMemSet(void *pvDst, unsigned char ui8Value, size_t uSize)
 	}
 }
 
-#else /* !defined(__GNUC__) */
+#endif /* defined(__GNUC__) */
 
 /* Potentially very slow (but safe) fallbacks for non-GNU C compilers */
-
-void DeviceMemCopy(void *pvDst, const void *pvSrc, size_t uSize)
+IMG_INTERNAL
+void DeviceMemCopyBytes(void *pvDst, const void *pvSrc, size_t uSize)
 {
 	volatile const char *pcSrc = pvSrc;
 	volatile char *pcDst = pvDst;
@@ -366,7 +373,8 @@ void DeviceMemCopy(void *pvDst, const void *pvSrc, size_t uSize)
 	}
 }
 
-void DeviceMemSet(void *pvDst, unsigned char ui8Value, size_t uSize)
+IMG_INTERNAL
+void DeviceMemSetBytes(void *pvDst, unsigned char ui8Value, size_t uSize)
 {
 	volatile char *pcDst = pvDst;
 
@@ -377,6 +385,65 @@ void DeviceMemSet(void *pvDst, unsigned char ui8Value, size_t uSize)
 	}
 }
 
-#endif /* !defined(__GNUC__) */
+#if !defined(__QNXNTO__) /* Ignore Neutrino as it uses strlcpy */
 
-#endif /* defined(__arm64__) || defined(__aarch64__) || defined (PVRSRV_DEVMEM_TEST_SAFE_MEMSETCPY) */
+#if defined(__KERNEL__) && defined(LINUX)
+/*
+ * In case of Linux kernel-mode in a debug build, choose the variant
+ * of StringLCopy that uses strlcpy and logs truncation via a stack dump.
+ * For Linux kernel-mode in a release build, strlcpy alone is used.
+ */
+#if defined(DEBUG)
+IMG_INTERNAL
+size_t StringLCopy(IMG_CHAR *pszDest, const IMG_CHAR *pszSrc, size_t uDataSize)
+{
+	/*
+	 * Let strlcpy handle any truncation cases correctly.
+	 * We will definitely get a NUL-terminated string set in pszDest
+	 */
+	size_t  uSrcSize = strlcpy(pszDest, pszSrc, uDataSize);
+
+#if defined(PVR_DEBUG_STRLCPY)
+	/* Handle truncation by dumping calling stack if debug allows */
+	if (uSrcSize >= uDataSize)
+	{
+		PVR_DPF((PVR_DBG_WARNING,
+			"%s: String truncated Src = '<%s>' %ld bytes, Dest = '%s'",
+			__func__, pszSrc, (long)uDataSize, pszDest));
+		OSDumpStack();
+	}
+#endif /* defined(PVR_DEBUG_STRLCPY) && defined(DEBUG) */
+
+	return uSrcSize;
+}
+#endif /* defined(DEBUG) */
+
+#else /* defined(__KERNEL__) && defined(LINUX) */
+/*
+ * For every other platform, make use of the strnlen and strncpy
+ * implementation of StringLCopy.
+ * NOTE: It is crucial to avoid memcpy as this has a hidden side-effect of
+ * dragging in whatever the build-environment flavour of GLIBC is which can
+ * cause unexpected failures for host-side command execution.
+ */
+IMG_INTERNAL
+size_t StringLCopy(IMG_CHAR *pszDest, const IMG_CHAR *pszSrc, size_t uDataSize)
+{
+	size_t uSrcSize = strnlen(pszSrc, uDataSize);
+
+	(void)strncpy(pszDest, pszSrc, uSrcSize);
+	if (uSrcSize == uDataSize)
+	{
+		pszDest[uSrcSize-1] = '\0';
+	}
+	else
+	{
+		pszDest[uSrcSize] = '\0';
+	}
+
+	return uSrcSize;
+}
+
+#endif /* defined(__KERNEL__) && defined(LINUX) */
+
+#endif /* !defined(__QNXNTO__) */

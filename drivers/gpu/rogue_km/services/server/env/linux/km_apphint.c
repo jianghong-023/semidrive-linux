@@ -41,7 +41,7 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */ /**************************************************************************/
 
-#include "pvr_debugfs.h"
+#include "di_server.h"
 #include "pvr_uaccess.h"
 #include <linux/moduleparam.h>
 #include <linux/workqueue.h>
@@ -96,9 +96,11 @@ struct apphint_lookup {
 };
 
 static const struct apphint_lookup fwt_logtype_tbl[] = {
-	{ "trace", 2},
-	{ "tbi", 1},
+	{ "trace", 0},
 	{ "none", 0}
+#if defined(SUPPORT_TBI_INTERFACE)
+	, { "tbi", 1}
+#endif
 };
 
 static const struct apphint_lookup fwt_loggroup_tbl[] = {
@@ -123,6 +125,7 @@ static const struct apphint_lookup htb_logmode_tbl[] = {
 	{ "restricted", HTB_LOGMODE_RESTRICTEDPID}
 };
 
+__maybe_unused
 static const struct apphint_lookup timecorr_clk_tbl[] = {
 	{ "mono", 0 },
 	{ "mono_raw", 1 },
@@ -194,6 +197,7 @@ struct apphint_work {
 static const struct apphint_init_data init_data_buildvar[] = {
 #define X(a, b, c, d, e) \
 	{APPHINT_ID_ ## a, APPHINT_CLASS_ ## c, #a, {.b=d} },
+	APPHINT_LIST_BUILDVAR_COMMON
 	APPHINT_LIST_BUILDVAR
 #undef X
 };
@@ -201,6 +205,7 @@ static const struct apphint_init_data init_data_buildvar[] = {
 static const struct apphint_init_data init_data_modparam[] = {
 #define X(a, b, c, d, e) \
 	{APPHINT_ID_ ## a, APPHINT_CLASS_ ## c, #a, {.b=d} },
+	APPHINT_LIST_MODPARAM_COMMON
 	APPHINT_LIST_MODPARAM
 #undef X
 };
@@ -208,6 +213,7 @@ static const struct apphint_init_data init_data_modparam[] = {
 static const struct apphint_init_data init_data_debugfs[] = {
 #define X(a, b, c, d, e) \
 	{APPHINT_ID_ ## a, APPHINT_CLASS_ ## c, #a, {.b=d} },
+	APPHINT_LIST_DEBUGFS_COMMON
 	APPHINT_LIST_DEBUGFS
 #undef X
 };
@@ -215,6 +221,7 @@ static const struct apphint_init_data init_data_debugfs[] = {
 static const struct apphint_init_data init_data_debugfs_device[] = {
 #define X(a, b, c, d, e) \
 	{APPHINT_ID_ ## a, APPHINT_CLASS_ ## c, #a, {.b=d} },
+	APPHINT_LIST_DEBUGFS_DEVICE_COMMON
 	APPHINT_LIST_DEBUGFS_DEVICE
 #undef X
 };
@@ -252,16 +259,16 @@ static const struct apphint_class_state class_state[] = {
 static struct apphint_state
 {
 	struct workqueue_struct *workqueue;
-	PPVR_DEBUGFS_DIR_DATA debugfs_device_rootdir[APPHINT_DEVICES_MAX];
-	PPVR_DEBUGFS_ENTRY_DATA debugfs_device_entry[APPHINT_DEVICES_MAX][APPHINT_DEBUGFS_DEVICE_ID_MAX];
-	PPVR_DEBUGFS_DIR_DATA debugfs_rootdir;
-	PPVR_DEBUGFS_ENTRY_DATA debugfs_entry[APPHINT_DEBUGFS_ID_MAX];
-	PPVR_DEBUGFS_DIR_DATA buildvar_rootdir;
-	PPVR_DEBUGFS_ENTRY_DATA buildvar_entry[APPHINT_BUILDVAR_ID_MAX];
+	DI_GROUP *debugfs_device_rootdir[APPHINT_DEVICES_MAX];
+	DI_ENTRY *debugfs_device_entry[APPHINT_DEVICES_MAX][APPHINT_DEBUGFS_DEVICE_ID_MAX];
+	DI_GROUP *debugfs_rootdir;
+	DI_ENTRY *debugfs_entry[APPHINT_DEBUGFS_ID_MAX];
+	DI_GROUP *buildvar_rootdir;
+	DI_ENTRY *buildvar_entry[APPHINT_BUILDVAR_ID_MAX];
 
-	int num_devices;
+	unsigned num_devices;
 	PVRSRV_DEVICE_NODE *devices[APPHINT_DEVICES_MAX];
-	int initialized;
+	unsigned initialized;
 
 	/* Array contains value space for 1 copy of all apphint values defined
 	 * (for device 1) and N copies of device specific apphint values for
@@ -498,7 +505,7 @@ static int apphint_read(char *buffer, size_t count, APPHINT_ID ue,
 			}
 		}
 		if (i == size) {
-			if (strlen(arg) == 0) {
+			if (OSStringLength(arg) == 0) {
 				PVR_DPF((PVR_DBG_ERROR,
 					"%s: No value set for AppHint",
 					__func__));
@@ -551,7 +558,7 @@ static int apphint_read(char *buffer, size_t count, APPHINT_ID ue,
 	{
 		/* buffer may include '\n', remove it */
 		char *string = strsep(&buffer, "\n");
-		size_t len = strlen(string);
+		size_t len = OSStringLength(string);
 
 		if (!len) {
 			result = -EINVAL;
@@ -560,13 +567,13 @@ static int apphint_read(char *buffer, size_t count, APPHINT_ID ue,
 
 		++len;
 
-		value->STRING = kmalloc(len, GFP_KERNEL);
+		value->STRING = kmalloc(len , GFP_KERNEL);
 		if (!value->STRING) {
 			result = -ENOMEM;
 			goto err_exit;
 		}
 
-		strlcpy(value->STRING, string, len);
+		OSStringLCopy(value->STRING, string, len);
 		break;
 	}
 	default:
@@ -788,7 +795,7 @@ static const struct kernel_param_ops apphint_kparam_fops = {
 };
 
 /*
- * call module_param_cb() for all AppHints listed in APPHINT_LIST_MODPARAM
+ * call module_param_cb() for all AppHints listed in APPHINT_LIST_MODPARAM_COMMON + APPHINT_LIST_MODPARAM
  * apphint_modparam_class_ ## resolves to apphint_modparam_enable() except for
  * AppHint classes that have been disabled.
  */
@@ -798,6 +805,7 @@ static const struct kernel_param_ops apphint_kparam_fops = {
 
 #define X(a, b, c, d, e) \
 	apphint_modparam_class_ ##c(a, APPHINT_ID_ ## a, 0444)
+	APPHINT_LIST_MODPARAM_COMMON
 	APPHINT_LIST_MODPARAM
 #undef X
 
@@ -805,7 +813,7 @@ static const struct kernel_param_ops apphint_kparam_fops = {
 *******************************************************************************
  Debugfs get (seq file) operations - supporting functions
 ******************************************************************************/
-static void *apphint_seq_start(struct seq_file *s, loff_t *pos)
+static void *apphint_di_start(OSDI_IMPL_ENTRY *s, IMG_UINT64 *pos)
 {
 	if (*pos == 0) {
 		/* We want only one entry in the sequence, one call to show() */
@@ -817,13 +825,13 @@ static void *apphint_seq_start(struct seq_file *s, loff_t *pos)
 	return NULL;
 }
 
-static void apphint_seq_stop(struct seq_file *s, void *v)
+static void apphint_di_stop(OSDI_IMPL_ENTRY *s, void *v)
 {
 	PVR_UNREFERENCED_PARAMETER(s);
 	PVR_UNREFERENCED_PARAMETER(v);
 }
 
-static void *apphint_seq_next(struct seq_file *s, void *v, loff_t *pos)
+static void *apphint_di_next(OSDI_IMPL_ENTRY *s, void *v, IMG_UINT64 *pos)
 {
 	PVR_UNREFERENCED_PARAMETER(s);
 	PVR_UNREFERENCED_PARAMETER(v);
@@ -831,14 +839,15 @@ static void *apphint_seq_next(struct seq_file *s, void *v, loff_t *pos)
 	return NULL;
 }
 
-static int apphint_seq_show(struct seq_file *s, void *v)
+static int apphint_di_show(OSDI_IMPL_ENTRY *s, void *v)
 {
 	IMG_CHAR km_buffer[APPHINT_BUFFER_SIZE];
 	int result;
+	void *private = DIGetPrivData(s);
 
 	PVR_UNREFERENCED_PARAMETER(v);
 
-	result = apphint_write(km_buffer, APPHINT_BUFFER_SIZE, s->private);
+	result = apphint_write(km_buffer, APPHINT_BUFFER_SIZE, private);
 	if (result < 0) {
 		PVR_DPF((PVR_DBG_ERROR, "%s: failure", __func__));
 	} else {
@@ -846,31 +855,23 @@ static int apphint_seq_show(struct seq_file *s, void *v)
 		result += snprintf(km_buffer + result,
 				APPHINT_BUFFER_SIZE - result,
 				"\n");
-		seq_puts(s, km_buffer);
+		DIPuts(s, km_buffer);
 	}
 
 	/* have to return 0 to see output */
 	return (result < 0) ? result : 0;
 }
 
-static const struct seq_operations apphint_seq_fops = {
-	.start = apphint_seq_start,
-	.stop  = apphint_seq_stop,
-	.next  = apphint_seq_next,
-	.show  = apphint_seq_show,
-};
-
 /*
 *******************************************************************************
  Debugfs supporting functions
 ******************************************************************************/
+
 /**
- * apphint_set - Handle a debugfs value update
+ * apphint_set - Handle a DI value update
  */
-static ssize_t apphint_set(const char __user *buffer,
-			    size_t count,
-			    loff_t *ppos,
-			    void *data)
+static IMG_INT64 apphint_set(const IMG_CHAR *buffer, IMG_UINT64 count,
+                             IMG_UINT64 *ppos, void *data)
 {
 	APPHINT_ID id;
 	union apphint_value value;
@@ -882,18 +883,17 @@ static ssize_t apphint_set(const char __user *buffer,
 		return -EIO;
 
 	if (count >= APPHINT_BUFFER_SIZE) {
-		PVR_DPF((PVR_DBG_ERROR, "%s: String too long (%zd)",
+		PVR_DPF((PVR_DBG_ERROR, "%s: String too long (%" IMG_INT64_FMTSPECd ")",
 			__func__, count));
 		result = -EINVAL;
 		goto err_exit;
 	}
 
-	if (pvr_copy_from_user(km_buffer, buffer, count)) {
-		PVR_DPF((PVR_DBG_ERROR, "%s: Copy of user data failed",
-			__func__));
-		result = -EFAULT;
-		goto err_exit;
-	}
+	/* apphint_read() modifies the buffer so we need to copy it */
+	memcpy(km_buffer, buffer, count);
+	/* count is larger than real buffer by 1 because DI framework appends
+	 * a '\0' character at the end, but here we're ignoring this */
+	count -= 1;
 	km_buffer[count] = '\0';
 
 	get_apphint_id_from_action_addr(action, &id);
@@ -910,15 +910,21 @@ err_exit:
  * apphint_debugfs_init - Create the specified debugfs entries
  */
 static int apphint_debugfs_init(const char *sub_dir,
-		int device_num,
+		unsigned device_num,
 		unsigned init_data_size,
 		const struct apphint_init_data *init_data,
-		PPVR_DEBUGFS_DIR_DATA parentdir,
-		PPVR_DEBUGFS_DIR_DATA *rootdir, PPVR_DEBUGFS_ENTRY_DATA *entry)
+		DI_GROUP *parentdir,
+		DI_GROUP **rootdir,
+		DI_ENTRY *entry[])
 {
-	int result = 0;
+	PVRSRV_ERROR result;
 	unsigned i;
 	int device_value_offset = device_num * APPHINT_DEBUGFS_DEVICE_ID_MAX;
+	const DI_ITERATOR_CB iterator = {
+		.pfnStart = apphint_di_start, .pfnStop = apphint_di_stop,
+		.pfnNext  = apphint_di_next,  .pfnShow = apphint_di_show,
+		.pfnWrite = apphint_set
+	};
 
 	if (*rootdir) {
 		PVR_DPF((PVR_DBG_WARNING,
@@ -927,8 +933,7 @@ static int apphint_debugfs_init(const char *sub_dir,
 		goto err_exit;
 	}
 
-	result = PVRDebugFSCreateEntryDir(sub_dir, parentdir,
-					  rootdir);
+	result = DICreateGroup(sub_dir, parentdir, rootdir);
 	if (result < 0) {
 		PVR_DPF((PVR_DBG_WARNING,
 			"Failed to create \"%s\" DebugFS directory.", sub_dir));
@@ -939,19 +944,20 @@ static int apphint_debugfs_init(const char *sub_dir,
 		if (!class_state[init_data[i].class].enabled)
 			continue;
 
-		result = PVRDebugFSCreateFile(init_data[i].name,
+		result = DICreateEntry(init_data[i].name,
 				*rootdir,
-				&apphint_seq_fops,
-				apphint_set,
-				NULL,
+				&iterator,
 				(void *) &apphint.val[init_data[i].id + device_value_offset],
+				DI_ENTRY_TYPE_GENERIC,
 				&entry[i]);
-		if (result < 0) {
+		if (result != PVRSRV_OK) {
 			PVR_DPF((PVR_DBG_WARNING,
 				"Failed to create \"%s/%s\" DebugFS entry.",
 				sub_dir, init_data[i].name));
 		}
 	}
+
+	return 0;
 
 err_exit:
 	return result;
@@ -961,18 +967,19 @@ err_exit:
  * apphint_debugfs_deinit- destroy the debugfs entries
  */
 static void apphint_debugfs_deinit(unsigned num_entries,
-		PPVR_DEBUGFS_DIR_DATA *rootdir, PPVR_DEBUGFS_ENTRY_DATA *entry)
+		DI_GROUP **rootdir,
+		DI_ENTRY *entry[])
 {
 	unsigned i;
 
 	for (i = 0; i < num_entries; i++) {
 		if (entry[i]) {
-			PVRDebugFSRemoveFile(&entry[i]);
+			DIDestroyEntry(entry[i]);
 		}
 	}
 
 	if (*rootdir) {
-		PVRDebugFSRemoveEntryDir(rootdir);
+		DIDestroyGroup(*rootdir);
 		*rootdir = NULL;
 	}
 }
@@ -1010,7 +1017,7 @@ static IMG_BOOL is_apphint_value_equal(const APPHINT_DATA_TYPE data_type,
 		case APPHINT_DATA_TYPE_BOOL:
 			return left->BOOL == right->BOOL;
 		case APPHINT_DATA_TYPE_STRING:
-			return (strcmp(left->STRING, right->STRING) == 0 ? IMG_TRUE : IMG_FALSE);
+			return (OSStringNCompare(left->STRING, right->STRING, OSStringLength(right->STRING) + 1) == 0 ? IMG_TRUE : IMG_FALSE);
 		default:
 			PVR_DPF((PVR_DBG_WARNING, "%s: unhandled data type (%d)", __func__, data_type));
 			return IMG_FALSE;
@@ -1165,7 +1172,7 @@ int pvr_apphint_device_register(PVRSRV_DEVICE_NODE *device)
 {
 	int result, i;
 	char device_num[APPHINT_BUFFER_SIZE];
-	int device_value_offset;
+	unsigned device_value_offset;
 
 	if (!apphint.initialized) {
 		result = -EAGAIN;
@@ -1177,7 +1184,7 @@ int pvr_apphint_device_register(PVRSRV_DEVICE_NODE *device)
 		goto err_out;
 	}
 
-	result = snprintf(device_num, APPHINT_BUFFER_SIZE, "%d", apphint.num_devices);
+	result = snprintf(device_num, APPHINT_BUFFER_SIZE, "%u", apphint.num_devices);
 	if (result < 0) {
 		PVR_DPF((PVR_DBG_WARNING,
 			"snprintf failed (%d)", result));
@@ -1242,6 +1249,8 @@ void pvr_apphint_device_unregister(PVRSRV_DEVICE_NODE *device)
 	                       apphint.debugfs_device_entry[i]);
 
 	apphint.devices[i] = NULL;
+
+	WARN_ON(apphint.num_devices==0);
 	apphint.num_devices--;
 }
 
@@ -1326,10 +1335,84 @@ int pvr_apphint_get_string(APPHINT_ID ue, IMG_CHAR *pBuffer, size_t size)
 {
 	int error = -ERANGE;
 	if (ue < APPHINT_ID_MAX && apphint.val[ue].stored.STRING) {
-		if (strlcpy(pBuffer, apphint.val[ue].stored.STRING, size) < size) {
+		if (OSStringLCopy(pBuffer, apphint.val[ue].stored.STRING, size) < size) {
 			error = 0;
 		}
 	}
+	return error;
+}
+
+int pvr_apphint_set_uint64(APPHINT_ID ue, IMG_UINT64 Val)
+{
+	int error = -ERANGE;
+
+	if ((ue < APPHINT_ID_MAX) &&
+		(param_lookup[ue].data_type == APPHINT_DATA_TYPE_UINT64)) {
+
+		if (apphint.val[ue].set.UINT64) {
+			apphint.val[ue].set.UINT64(apphint.val[ue].device, apphint.val[ue].private_data, Val);
+		} else {
+			apphint.val[ue].stored.UINT64 = Val;
+		}
+		error = 0;
+	}
+
+	return error;
+}
+
+int pvr_apphint_set_uint32(APPHINT_ID ue, IMG_UINT32 Val)
+{
+	int error = -ERANGE;
+
+	if ((ue < APPHINT_ID_MAX) &&
+		(param_lookup[ue].data_type == APPHINT_DATA_TYPE_UINT32)) {
+
+		if (apphint.val[ue].set.UINT32) {
+			apphint.val[ue].set.UINT32(apphint.val[ue].device, apphint.val[ue].private_data, Val);
+		} else {
+			apphint.val[ue].stored.UINT32 = Val;
+		}
+		error = 0;
+	}
+
+	return error;
+}
+
+int pvr_apphint_set_bool(APPHINT_ID ue, IMG_BOOL Val)
+{
+	int error = -ERANGE;
+
+	if ((ue < APPHINT_ID_MAX) &&
+		(param_lookup[ue].data_type == APPHINT_DATA_TYPE_BOOL)) {
+
+		error = 0;
+		if (apphint.val[ue].set.BOOL) {
+			apphint.val[ue].set.BOOL(apphint.val[ue].device, apphint.val[ue].private_data, Val);
+		} else {
+			apphint.val[ue].stored.BOOL = Val;
+		}
+	}
+
+	return error;
+}
+
+int pvr_apphint_set_string(APPHINT_ID ue, IMG_CHAR *pBuffer, size_t size)
+{
+	int error = -ERANGE;
+
+	if ((ue < APPHINT_ID_MAX) &&
+		((param_lookup[ue].data_type == APPHINT_DATA_TYPE_STRING) &&
+		apphint.val[ue].stored.STRING)) {
+
+		if (apphint.val[ue].set.STRING) {
+			error = apphint.val[ue].set.STRING(apphint.val[ue].device, apphint.val[ue].private_data, pBuffer);
+		} else {
+			if (strlcpy(apphint.val[ue].stored.STRING, pBuffer, size) < size) {
+				error = 0;
+			}
+		}
+	}
+
 	return error;
 }
 

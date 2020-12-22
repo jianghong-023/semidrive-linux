@@ -49,15 +49,11 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 /* CacheOp information page entries */
 #define CACHEOP_INFO_IDX_START     0x00
-#define CACHEOP_INFO_GFSEQNUM0     (CACHEOP_INFO_IDX_START + 0) /*!< Current global flush sequence number */
-#define CACHEOP_INFO_GFSEQNUM1     (CACHEOP_INFO_IDX_START + 1) /*!< Validity global flush sequence number */
-#define CACHEOP_INFO_UMRBFONLY     (CACHEOP_INFO_IDX_START + 2) /*!< Use UM flush only (i.e no KM GF) */
-#define CACHEOP_INFO_UMKMTHRESHLD  (CACHEOP_INFO_IDX_START + 3) /*!< UM=>KM routing threshold in bytes */
-#define CACHEOP_INFO_KMGFTHRESHLD  (CACHEOP_INFO_IDX_START + 4) /*!< KM/GF threshold in bytes */
-#define CACHEOP_INFO_KMDFTHRESHLD  (CACHEOP_INFO_IDX_START + 5) /*!< KM/DF threshold in bytes */
-#define CACHEOP_INFO_LINESIZE      (CACHEOP_INFO_IDX_START + 6) /*!< CPU data cache line size */
-#define CACHEOP_INFO_PGSIZE        (CACHEOP_INFO_IDX_START + 7) /*!< CPU MMU page size */
-#define CACHEOP_INFO_IDX_END       (CACHEOP_INFO_IDX_START + 8)
+#define CACHEOP_INFO_UMKMTHRESHLD  (CACHEOP_INFO_IDX_START + 1) /*!< UM=>KM routing threshold in bytes */
+#define CACHEOP_INFO_KMDFTHRESHLD  (CACHEOP_INFO_IDX_START + 2) /*!< KM/DF threshold in bytes */
+#define CACHEOP_INFO_LINESIZE      (CACHEOP_INFO_IDX_START + 3) /*!< CPU data cache line size */
+#define CACHEOP_INFO_PGSIZE        (CACHEOP_INFO_IDX_START + 4) /*!< CPU MMU page size */
+#define CACHEOP_INFO_IDX_END       (CACHEOP_INFO_IDX_START + 5)
 
 /* HWPerf information page entries */
 #define HWPERF_INFO_IDX_START      (CACHEOP_INFO_IDX_END)
@@ -68,16 +64,8 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #define HWPERF_FILTER_VULKAN_IDX   (HWPERF_INFO_IDX_START + 4)
 #define HWPERF_INFO_IDX_END        (HWPERF_INFO_IDX_START + 5)
 
-/* BVNC of the core */
-#define CORE_ID_IDX_START                   (HWPERF_INFO_IDX_END)
-#define CORE_ID_BRANCH                      (CORE_ID_IDX_START + 0)
-#define CORE_ID_VERSION                     (CORE_ID_IDX_START + 1)
-#define CORE_ID_NUMBER_OF_SCALABLE_UNITS    (CORE_ID_IDX_START + 2)
-#define CORE_ID_CONFIG                      (CORE_ID_IDX_START + 3)
-#define CORE_ID_IDX_END                     (CORE_ID_IDX_START + 4)
-
 /* timeout values */
-#define TIMEOUT_INFO_IDX_START               (CORE_ID_IDX_END)
+#define TIMEOUT_INFO_IDX_START               (HWPERF_INFO_IDX_END)
 #define TIMEOUT_INFO_VALUE_RETRIES           (TIMEOUT_INFO_IDX_START + 0)
 #define TIMEOUT_INFO_VALUE_TIMEOUT_MS        (TIMEOUT_INFO_IDX_START + 1)
 #define TIMEOUT_INFO_CONDITION_RETRIES       (TIMEOUT_INFO_IDX_START + 2)
@@ -86,8 +74,14 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #define TIMEOUT_INFO_EVENT_OBJECT_TIMEOUT_MS (TIMEOUT_INFO_IDX_START + 5)
 #define TIMEOUT_INFO_IDX_END                 (TIMEOUT_INFO_IDX_START + 6)
 
+/* Bridge Info */
+#define BRIDGE_INFO_IDX_START                (TIMEOUT_INFO_IDX_END)
+#define BRIDGE_INFO_RGX_BRIDGES              (BRIDGE_INFO_IDX_START + 0)
+#define BRIDGE_INFO_PVR_BRIDGES              (BRIDGE_INFO_IDX_START + 1)
+#define BRIDGE_INFO_IDX_END                  (BRIDGE_INFO_IDX_START + 2)
+
 /* Debug features */
-#define DEBUG_FEATURE_FLAGS                  (TIMEOUT_INFO_IDX_END)
+#define DEBUG_FEATURE_FLAGS                  (BRIDGE_INFO_IDX_END)
 #define DEBUG_FEATURE_FULL_SYNC_TRACKING_ENABLED	0x1
 #define DEBUG_FEATURE_PAGE_FAULT_DEBUG_ENABLED		0x2
 #define DEBUG_FEATURE_FLAGS_IDX_END          (DEBUG_FEATURE_FLAGS + 1)

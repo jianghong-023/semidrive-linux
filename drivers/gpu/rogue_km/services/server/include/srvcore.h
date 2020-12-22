@@ -41,8 +41,8 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */ /***************************************************************************/
 
-#ifndef __BRIDGED_PVR_BRIDGE_H__
-#define __BRIDGED_PVR_BRIDGE_H__
+#ifndef SRVCORE_H
+#define SRVCORE_H
 
 #include "lock_types.h"
 #include "connection_server.h"
@@ -55,44 +55,43 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 PVRSRV_ERROR
 CopyFromUserWrapper(CONNECTION_DATA *psConnection,
-					IMG_UINT32 ui32DispatchTableEntry,
-					void *pvDest,
-					void __user *pvSrc,
-					IMG_UINT32 ui32Size);
+                    IMG_UINT32 ui32DispatchTableEntry,
+                    void *pvDest,
+                    void __user *pvSrc,
+                    IMG_UINT32 ui32Size);
 PVRSRV_ERROR
 CopyToUserWrapper(CONNECTION_DATA *psConnection,
-				  IMG_UINT32 ui32DispatchTableEntry,
-				  void __user *pvDest,
-				  void *pvSrc,
-				  IMG_UINT32 ui32Size);
+                  IMG_UINT32 ui32DispatchTableEntry,
+                  void __user *pvDest,
+                  void *pvSrc,
+                  IMG_UINT32 ui32Size);
 
 IMG_INT
 DummyBW(IMG_UINT32 ui32DispatchTableEntry,
-		void *psBridgeIn,
-		void *psBridgeOut,
-		CONNECTION_DATA *psConnection);
+        IMG_UINT8 *psBridgeIn,
+        IMG_UINT8 *psBridgeOut,
+        CONNECTION_DATA *psConnection);
 
 typedef IMG_INT (*BridgeWrapperFunction)(IMG_UINT32 ui32DispatchTableEntry,
-									 void *psBridgeIn,
-									 void *psBridgeOut,
+									 IMG_UINT8 *psBridgeIn,
+									 IMG_UINT8 *psBridgeOut,
 									 CONNECTION_DATA *psConnection);
 
 typedef struct _PVRSRV_BRIDGE_DISPATCH_TABLE_ENTRY
 {
 	BridgeWrapperFunction pfFunction; /*!< The wrapper function that validates the ioctl
-										arguments before calling into srvkm proper */
-	POS_LOCK	hBridgeLock;	/*!< The bridge lock which needs to be acquired
-						before calling the above wrapper */
-	IMG_BOOL    bUseLock;                 /*!< Specify whether to use a bridge lock at all */
+	                                    arguments before calling into srvkm proper */
+	POS_LOCK hBridgeLock; /*!< The bridge lock which needs to be acquired
+                                   before calling the above wrapper */
 #if defined(DEBUG_BRIDGE_KM)
 	const IMG_CHAR *pszIOCName; /*!< Name of the ioctl: e.g. "PVRSRV_BRIDGE_CONNECT_SERVICES" */
 	const IMG_CHAR *pszFunctionName; /*!< Name of the wrapper function: e.g. "PVRSRVConnectBW" */
-	const IMG_CHAR *pszBridgeLockName;	/*!< Name of bridge lock which will be acquired */
+	const IMG_CHAR *pszBridgeLockName; /*!< Name of bridge lock which will be acquired */
 	IMG_UINT32 ui32CallCount; /*!< The total number of times the ioctl has been called */
 	IMG_UINT32 ui32CopyFromUserTotalBytes; /*!< The total number of bytes copied from
-											 userspace within this ioctl */
+	                                         userspace within this ioctl */
 	IMG_UINT32 ui32CopyToUserTotalBytes; /*!< The total number of bytes copied from
-										   userspace within this ioctl */
+	                                       userspace within this ioctl */
 	IMG_UINT64 ui64TotalTimeNS; /*!< The total amount of time spent in this bridge function */
 	IMG_UINT64 ui64MaxTimeNS; /*!< The maximum amount of time for a single call to this bridge function */
 #endif
@@ -112,23 +111,22 @@ void BridgeDispatchTableStartOffsetsInit(void);
 
 void
 _SetDispatchTableEntry(IMG_UINT32 ui32BridgeGroup,
-					   IMG_UINT32 ui32Index,
-					   const IMG_CHAR *pszIOCName,
-					   BridgeWrapperFunction pfFunction,
-					   const IMG_CHAR *pszFunctionName,
-					   POS_LOCK hBridgeLock,
-					   const IMG_CHAR* pszBridgeLockName,
-					   IMG_BOOL bUseLock);
+                       IMG_UINT32 ui32Index,
+                       const IMG_CHAR *pszIOCName,
+                       BridgeWrapperFunction pfFunction,
+                       const IMG_CHAR *pszFunctionName,
+                       POS_LOCK hBridgeLock,
+                       const IMG_CHAR* pszBridgeLockName);
 void
 UnsetDispatchTableEntry(IMG_UINT32 ui32BridgeGroup,
-					   	IMG_UINT32 ui32Index);
+                        IMG_UINT32 ui32Index);
 
 
 /* PRQA S 0884,3410 2*/ /* macro relies on the lack of brackets */
 #define SetDispatchTableEntry(ui32BridgeGroup, ui32Index, pfFunction,\
-					hBridgeLock, bUseLock) \
+					hBridgeLock) \
 	_SetDispatchTableEntry(ui32BridgeGroup, ui32Index, #ui32Index, (BridgeWrapperFunction)pfFunction, #pfFunction,\
-							(POS_LOCK)hBridgeLock, #hBridgeLock, bUseLock )
+							(POS_LOCK)hBridgeLock, #hBridgeLock)
 
 #define DISPATCH_TABLE_GAP_THRESHOLD 5
 
@@ -153,21 +151,20 @@ extern PVRSRV_BRIDGE_GLOBAL_STATS g_BridgeGlobalStats;
 PVRSRV_ERROR BridgeDispatcherInit(void);
 void BridgeDispatcherDeinit(void);
 
-PVRSRV_ERROR BridgedDispatchKM(CONNECTION_DATA * psConnection,
-					  PVRSRV_BRIDGE_PACKAGE   * psBridgePackageKM);
-
+PVRSRV_ERROR
+BridgedDispatchKM(CONNECTION_DATA * psConnection,
+                  PVRSRV_BRIDGE_PACKAGE   * psBridgePackageKM);
 
 PVRSRV_ERROR
 PVRSRVConnectKM(CONNECTION_DATA *psConnection,
                 PVRSRV_DEVICE_NODE * psDeviceNode,
-				IMG_UINT32 ui32Flags,
-				IMG_UINT32 ui32ClientBuildOptions,
-				IMG_UINT32 ui32ClientDDKVersion,
-				IMG_UINT32 ui32ClientDDKBuild,
-				IMG_UINT8  *pui8KernelArch,
-				IMG_UINT32 *ui32CapabilityFlags,
-				IMG_UINT32 *ui32PVRBridges,
-				IMG_UINT32 *ui32RGXBridges);
+                IMG_UINT32 ui32Flags,
+                IMG_UINT32 ui32ClientBuildOptions,
+                IMG_UINT32 ui32ClientDDKVersion,
+                IMG_UINT32 ui32ClientDDKBuild,
+                IMG_UINT8  *pui8KernelArch,
+                IMG_UINT32 *ui32CapabilityFlags,
+                IMG_UINT64 *ui64PackedBvnc);
 
 PVRSRV_ERROR
 PVRSRVDisconnectKM(void);
@@ -180,8 +177,8 @@ PVRSRVReleaseGlobalEventObjectKM(IMG_HANDLE hGlobalEventObject);
 
 PVRSRV_ERROR
 PVRSRVDumpDebugInfoKM(CONNECTION_DATA *psConnection,
-					  PVRSRV_DEVICE_NODE *psDeviceNode,
-					  IMG_UINT32 ui32VerbLevel);
+                      PVRSRV_DEVICE_NODE *psDeviceNode,
+                      IMG_UINT32 ui32VerbLevel);
 
 PVRSRV_ERROR
 PVRSRVGetDevClockSpeedKM(CONNECTION_DATA * psConnection,
@@ -190,7 +187,7 @@ PVRSRVGetDevClockSpeedKM(CONNECTION_DATA * psConnection,
 
 PVRSRV_ERROR
 PVRSRVHWOpTimeoutKM(CONNECTION_DATA *psConnection,
-					PVRSRV_DEVICE_NODE *psDeviceNode);
+                    PVRSRV_DEVICE_NODE *psDeviceNode);
 
 PVRSRV_ERROR PVRSRVAlignmentCheckKM(CONNECTION_DATA *psConnection,
                                     PVRSRV_DEVICE_NODE * psDeviceNode,
@@ -201,12 +198,18 @@ PVRSRV_ERROR PVRSRVGetDeviceStatusKM(CONNECTION_DATA *psConnection,
                                      PVRSRV_DEVICE_NODE *psDeviceNode,
                                      IMG_UINT32 *pui32DeviceStatus);
 
+PVRSRV_ERROR PVRSRVGetMultiCoreInfoKM(CONNECTION_DATA *psConnection,
+                                     PVRSRV_DEVICE_NODE *psDeviceNode,
+                                     IMG_UINT32 ui32CapsSize,
+                                     IMG_UINT32 *pui32NumCores,
+                                     IMG_UINT64 *pui64Caps);
+
 PVRSRV_ERROR PVRSRVFindProcessMemStatsKM(IMG_PID pid,
                                          IMG_UINT32 ui32ArrSize,
                                          IMG_BOOL bAllProcessStats,
                                          IMG_UINT32 *ui32MemoryStats);
 
-#endif /* __BRIDGED_PVR_BRIDGE_H__ */
+#endif /* SRVCORE_H */
 
 /******************************************************************************
  End of file (srvcore.h)

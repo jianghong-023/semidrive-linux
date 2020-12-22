@@ -76,13 +76,6 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  * using OSEventObjectDumpdebugInfo API */
 // #define LINUX_EVENT_OBJECT_STATS
 
-#if defined(PVRSRV_USE_BRIDGE_LOCK)
-/* Returns pointer to task_struct that belongs to thread which acquired
- * bridge lock. */
-extern struct task_struct *BridgeLockGetOwner(void);
-extern IMG_BOOL BridgeLockIsLocked(void);
-#endif
-
 
 typedef struct PVRSRV_LINUX_EVENT_OBJECT_LIST_TAG
 {
@@ -258,7 +251,7 @@ PVRSRV_ERROR LinuxEventObjectAdd(IMG_HANDLE hOSEventObjectList, IMG_HANDLE *phOS
 	psLinuxEventObject->ui32EventSignalCountPrevious = atomic_read(&psLinuxEventObjectList->sEventSignalCount);
 
 #ifdef LINUX_EVENT_OBJECT_STATS
-	PVR_LOGR_IF_ERROR(OSLockCreate(&psLinuxEventObject->hLock), "OSLockCreate");
+	PVR_LOG_RETURN_IF_ERROR(OSLockCreate(&psLinuxEventObject->hLock), "OSLockCreate");
 	psLinuxEventObject->ui32ScheduleAvoided = 0;
 	psLinuxEventObject->ui32ScheduleCalled = 0;
 	psLinuxEventObject->ui32ScheduleSleptFully = 0;
@@ -366,13 +359,9 @@ void LinuxEventObjectDumpDebugInfo(IMG_HANDLE hOSEventObject)
 ******************************************************************************/
 PVRSRV_ERROR LinuxEventObjectWait(IMG_HANDLE hOSEventObject,
                                   IMG_UINT64 ui64Timeoutus,
-                                  IMG_BOOL bHoldBridgeLock,
                                   IMG_BOOL bFreezable)
 {
 	IMG_UINT32 ui32EventSignalCount;
-#if defined(PVRSRV_USE_BRIDGE_LOCK)
-	IMG_BOOL bReleasePVRLock;
-#endif
 	PVRSRV_DATA *psPVRSRVData = PVRSRVGetPVRSRVData();
 	IMG_UINT32 ui32Remainder;
 	long timeOutJiffies;
@@ -425,20 +414,6 @@ PVRSRV_ERROR LinuxEventObjectWait(IMG_HANDLE hOSEventObject,
 			break;
 		}
 
-#if defined(PVRSRV_USE_BRIDGE_LOCK)
-		/* Check thread holds the current PVR/bridge lock before obeying the
-		 * 'release before deschedule' behaviour. Some threads choose not to
-		 * hold the bridge lock in their implementation.
-		 */
-		bReleasePVRLock = (!bHoldBridgeLock && BridgeLockIsLocked() && current == BridgeLockGetOwner());
-		if (bReleasePVRLock)
-		{
-			OSReleaseBridgeLock();
-		}
-#else
-		PVR_UNREFERENCED_PARAMETER(bHoldBridgeLock);
-#endif
-
 #ifdef LINUX_EVENT_OBJECT_STATS
 		bScheduleCalled = IMG_TRUE;
 #endif
@@ -449,12 +424,6 @@ PVRSRV_ERROR LinuxEventObjectWait(IMG_HANDLE hOSEventObject,
 			_TryToFreeze();
 		}
 
-#if defined(PVRSRV_USE_BRIDGE_LOCK)
-		if (bReleasePVRLock)
-		{
-			OSAcquireBridgeLock();
-		}
-#endif
 #if defined(DEBUG)
 		psLinuxEventObject->ui32Stats++;
 #endif

@@ -80,7 +80,6 @@ void trace_rogue_ufo_updates(IMG_UINT64 ui64OSTimestamp,
 							 IMG_UINT32 ui32IntJobRef,
 							 IMG_UINT32 ui32UFOCount,
 							 const RGX_HWPERF_UFO_DATA_ELEMENT *puData);
-#endif
 
 void trace_rogue_ufo_checks_success(IMG_UINT64 ui64OSTimestamp,
 									IMG_UINT32 ui32FWCtx,
@@ -97,8 +96,16 @@ void trace_rogue_ufo_checks_fail(IMG_UINT64 ui64OSTimestamp,
 								 IMG_BOOL bPrEvent,
 								 IMG_UINT32 ui32UFOCount,
 								 const RGX_HWPERF_UFO_DATA_ELEMENT *puData);
+#endif /* if defined(SUPPORT_RGX) */
 
-#else  /* CONFIG_TRACE_EVENTS */
+void TracepointUpdateGPUMemGlobal(IMG_UINT8 ui8GPUId,
+								  IMG_UINT64 ui64Size);
+
+void TracepointUpdateGPUMemPerProcess(IMG_UINT8 ui8GPUId,
+									  IMG_UINT32 ui32Pid,
+									  IMG_UINT64 ui64Size);
+
+#else /* CONFIG_TRACE_EVENTS */
 static inline
 bool trace_rogue_are_fence_checks_traced(void)
 {
@@ -149,7 +156,6 @@ void trace_rogue_ufo_updates(IMG_UINT64 ui64OSTimestamp,
 							 const RGX_HWPERF_UFO_DATA_ELEMENT *puData)
 {
 }
-#endif
 
 static inline
 void trace_rogue_ufo_checks_success(IMG_UINT64 ui64OSTimestamp,
@@ -172,6 +178,21 @@ void trace_rogue_ufo_checks_fail(IMG_UINT64 ui64OSTimestamp,
 								 const RGX_HWPERF_UFO_DATA_ELEMENT *puData)
 {
 }
+#endif /* if defined(SUPPORT_RGX)*/
+
+static inline
+void TracepointUpdateGPUMemGlobal(IMG_UINT8 ui8GPUId,
+								  IMG_UINT64 ui64Size)
+{
+}
+
+static inline
+void TracepointUpdateGPUMemPerProcess(IMG_UINT8 ui8GPUId,
+									  IMG_UINT32 ui32Pid,
+									  IMG_UINT64 ui64Size)
+{
+}
+
 #endif /* CONFIG_TRACE_EVENTS */
 
 #endif /* TRACE_EVENTS_H */

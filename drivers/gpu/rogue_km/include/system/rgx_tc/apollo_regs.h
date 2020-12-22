@@ -41,124 +41,10 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */ /**************************************************************************/
 
-#if !defined(__APOLLO_REGS_H__)
-#define __APOLLO_REGS_H__
+#if !defined(APOLLO_REGS_H)
+#define APOLLO_REGS_H
 
-/*
- * The core clock speed is passed through a multiplier depending on the TC version.
- *
- * On TC_ES1: Multiplier = x3, final speed = 270MHz
- * On TC_ES2: Multiplier = x6, final speed = 540MHz
- * On TCF5:   Multiplier = 1x final speed = 45MHz
- *
- *
- * The base (unmultiplied speed) can be adjusted using a module parameter called "sys_core_clk_speed",
- * a number in Hz.
- *
- * As an example:
- *
- * PVR_SRVKM_PARAMS="sys_core_clk_speed=60000000" /etc/init.d/rc.pvr start
- *
- * would result in a core speed of 60MHz xMultiplier.
- *
- *
- * The memory clock is unmultiplied and can be adjusted using a module parameter called
- * "sys_mem_clk_speed", this should be the number in Hz for the memory clock speed.
- *
- * As an example:
- *
- * PVR_SRVKM_PARAMS="sys_mem_clk_speed=100000000" /etc/init.d/rc.pvr start
- *
- * would attempt to start the driver with the memory clock speed set to 100MHz.
- *
- *
- * Same applies to the system interface clock speed sys_sysif_clk_speed.
- * Needed for TCF5 but not for TC_ES2/ES1.
- * As an example:
- *
- * PVR_SRVKM_PARAMS="sys_mem_clk_speed=45000000" /etc/init.d/rc.pvr start
- *
- * would attempt to start the driver with the system clock speed set to 45MHz.
- *
- *
- * All parameters can be specified at once, eg:
- * PVR_SRVKM_PARAMS="sys_mem_clk_speed=MEMORY_SPEED sys_core_clk_speed=CORE_SPEED sys_mem_clk_speed=SYSIF_SPEED" /etc/init.d/rc.pvr start
- */
-
-#define RGX_TC_SYS_CLOCK_SPEED		(25000000) /*< At the moment just used for TCF5 */
-
-#if defined(TC_APOLLO_TCF5_22_46_54_330)
- #undef RGX_TC_SYS_CLOCK_SPEED
- #define RGX_TC_CORE_CLOCK_SPEED	(100000000)
- #define RGX_TC_MEM_CLOCK_SPEED		(45000000)
- #define RGX_TC_SYS_CLOCK_SPEED		(45000000)
-#elif defined(TC_APOLLO_TCF5_22_49_21_16) || defined(TC_APOLLO_TCF5_22_50_22_29) || \
-      defined(TC_APOLLO_TCF5_22_60_22_29) || defined(TC_APOLLO_TCF5_22_69_22_25) || \
-      defined(TC_APOLLO_TCF5_22_75_22_25)
- #define RGX_TC_CORE_CLOCK_SPEED	(20000000)
- #define RGX_TC_MEM_CLOCK_SPEED		(50000000)
-#elif defined(TC_APOLLO_TCF5_22_62_21_16) || defined(TC_APOLLO_TCF5_22_80_21_19) || \
-      defined(TC_APOLLO_TCF5_22_97_22_225)
- #define RGX_TC_CORE_CLOCK_SPEED	(20000000)
- #define RGX_TC_MEM_CLOCK_SPEED		(45000000)
-#elif defined(TC_APOLLO_TCF5_22_67_54_30)  || defined(TC_APOLLO_TCF5_22_63_54_330)
- #define RGX_TC_CORE_CLOCK_SPEED	(100000000)
- #define RGX_TC_MEM_CLOCK_SPEED		(45000000)
-#elif defined(TC_APOLLO_TCF5_22_70_208_316) || defined(TC_APOLLO_TCF5_22_89_204_18)
- #define RGX_TC_CORE_CLOCK_SPEED	(50000000)
- #define RGX_TC_MEM_CLOCK_SPEED		(25000000)
-#elif defined(TC_APOLLO_TCF5_22_73_104_312) || defined(TC_APOLLO_TCF5_22_78_104_212)
- #define RGX_TC_CORE_CLOCK_SPEED	(50000000)
- #define RGX_TC_MEM_CLOCK_SPEED		(40000000)
-#elif defined(TC_APOLLO_TCF5_22_76_104_12)
- #define RGX_TC_CORE_CLOCK_SPEED	(50000000)
- #define RGX_TC_MEM_CLOCK_SPEED		(50000000)
-#elif defined(TC_APOLLO_TCF5_22_81_104_12)
- #define RGX_TC_CORE_CLOCK_SPEED	(50000000)
- #define RGX_TC_MEM_CLOCK_SPEED		(45000000)
-#elif defined(TC_APOLLO_TCF5_22_86_104_218)
- #define RGX_TC_CORE_CLOCK_SPEED	(30000000)
- #define RGX_TC_MEM_CLOCK_SPEED		(40000000)
-#elif defined(TC_APOLLO_TCF5_22_88_104_318)
- #define RGX_TC_CORE_CLOCK_SPEED	(28000000)
- #define RGX_TC_MEM_CLOCK_SPEED		(40000000)
-#elif defined(TC_APOLLO_TCF5_22_96_104_618)
- #define RGX_TC_CORE_CLOCK_SPEED	(35000000)
- #define RGX_TC_MEM_CLOCK_SPEED		(45000000)
-#elif defined(TC_APOLLO_TCF5_22_98_54_230)
- #define RGX_TC_CORE_CLOCK_SPEED	(100000000)
- #define RGX_TC_MEM_CLOCK_SPEED		(40000000)
-#elif defined(TC_APOLLO_TCF5_22_102_54_38)
- #define RGX_TC_CORE_CLOCK_SPEED	(80000000)
- #define RGX_TC_MEM_CLOCK_SPEED		(25000000)
-#elif defined(TC_APOLLO_TCF5_24_12_104_2)
- #define RGX_TC_CORE_CLOCK_SPEED	(100000000)
- #define RGX_TC_MEM_CLOCK_SPEED		(50000000)
-#elif defined(TC_APOLLO_TCF5_BVNC_NOT_SUPPORTED)
- /* TC TCF5 (22.*) fallback frequencies */
- #undef RGX_TC_SYS_CLOCK_SPEED
- #define RGX_TC_CORE_CLOCK_SPEED	(20000000)
- #define RGX_TC_MEM_CLOCK_SPEED		(50000000)
- #define RGX_TC_SYS_CLOCK_SPEED		(25000000)
-#elif defined(TC_APOLLO_TCF5_REFERENCE)
- /* TC TCF5 (Reference bitfile) */
- #undef RGX_TC_SYS_CLOCK_SPEED
- #define RGX_TC_CORE_CLOCK_SPEED	(50000000)
- #define RGX_TC_MEM_CLOCK_SPEED		(50000000)
- #define RGX_TC_SYS_CLOCK_SPEED		(45000000)
-#elif defined(TC_APOLLO_BONNIE)
- /* TC Bonnie */
- #define RGX_TC_CORE_CLOCK_SPEED	(18000000)
- #define RGX_TC_MEM_CLOCK_SPEED		(65000000)
-#elif defined(TC_APOLLO_ES2)
- /* TC ES2 */
- #define RGX_TC_CORE_CLOCK_SPEED	(90000000)
- #define RGX_TC_MEM_CLOCK_SPEED		(104000000)
-#else
- /* TC ES1 */
- #define RGX_TC_CORE_CLOCK_SPEED	(90000000)
- #define RGX_TC_MEM_CLOCK_SPEED		(65000000)
-#endif
+#include "apollo_clocks.h"
 
 /* TC TCF5 */
 #define TC5_SYS_APOLLO_REG_PCI_BASENUM (1)
@@ -172,8 +58,8 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #define TC5_SYS_APOLLO_REG_HDMI_SIZE   (0x1C)
 
 /* TC ES2 */
-#define TCF_TEMP_SENSOR_SPI_OFFSET 	0xe
-#define TCF_TEMP_SENSOR_TO_C(raw) 	(((raw) * 248 / 4096) - 54)
+#define TCF_TEMP_SENSOR_SPI_OFFSET	0xe
+#define TCF_TEMP_SENSOR_TO_C(raw)	(((raw) * 248 / 4096) - 54)
 
 /* Number of bytes that are broken */
 #define SYS_DEV_MEM_BROKEN_BYTES	(1024 * 1024)
@@ -200,8 +86,8 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #define APOLLO_FLASH_DATA_WRITE_OFFSET	(0x4050)
 #define APOLLO_FLASH_RESET_OFFSET	(0x4060)
 
-#define APOLLO_FLASH_FIFO_STATUS_MASK 	 (0xF)
-#define APOLLO_FLASH_FIFO_STATUS_SHIFT 	 (0)
+#define APOLLO_FLASH_FIFO_STATUS_MASK	 (0xF)
+#define APOLLO_FLASH_FIFO_STATUS_SHIFT	 (0)
 #define APOLLO_FLASH_PROGRAM_STATUS_MASK (0xF)
 #define APOLLO_FLASH_PROGRAM_STATUS_SHIFT (16)
 
@@ -219,4 +105,4 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 /* Device memory (including HP mapping) on base register 2 */
 #define SYS_DEV_MEM_PCI_BASENUM		(2)
 
-#endif /* if !defined(__APOLLO_REGS_H__) */
+#endif /* APOLLO_REGS_H */

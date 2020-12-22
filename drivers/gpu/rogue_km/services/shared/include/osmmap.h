@@ -42,30 +42,30 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */ /**************************************************************************/
 
-#ifndef _OSMMAP_H_
-#define _OSMMAP_H_
+#ifndef OSMMAP_H
+#define OSMMAP_H
 
 #include <powervr/mem_types.h>
 
 #include "img_types.h"
 #include "pvrsrv_error.h"
 
-/**************************************************************************/ /*!
+/*************************************************************************/ /*!
 @Function       OSMMapPMR
 @Description    Maps the specified PMR into CPU memory so that it may be
                 accessed by the user process.
                 Whether the memory is mapped read only, read/write, or not at
                 all, is dependent on the PMR itself.
                 The PMR handle is opaque to the user, and lower levels of this
-                stack ensure that the handle is private to this process, such that
-                this API cannot be abused to gain access to other people's PMRs.
-                The OS implementation of this function should return the virtual
-                address and length for the User to use. The "PrivData" is to be
-                stored opaquely by the caller (N.B. he should make no assumptions,
-                in particular, NULL is a valid handle) and given back to the
-                call to OSMUnmapPMR.
-                The OS implementation is free to use the PrivData handle for any
-                purpose it sees fit.
+                stack ensure that the handle is private to this process, such
+                that this API cannot be abused to gain access to other people's
+                PMRs. The OS implementation of this function should return the
+                virtual address and length for the User to use. The "PrivData"
+                is to be stored opaquely by the caller (N.B. he should make no
+                assumptions, in particular, NULL is a valid handle) and given
+                back to the call to OSMUnmapPMR.
+                The OS implementation is free to use the PrivData handle for
+                any purpose it sees fit.
 @Input          hBridge              The bridge handle.
 @Input          hPMR                 The handle of the PMR to be mapped.
 @Input          uiPMRLength          The size of the PMR.
@@ -78,8 +78,8 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 @Output         ppvMappingAddressOut The returned mapping.
 @Output         puiMappingLengthOut  The size of the returned mapping.
 @Return         PVRSRV_OK on success, failure code otherwise.
- */ /**************************************************************************/
-extern PVRSRV_ERROR
+ */ /*************************************************************************/
+PVRSRV_ERROR
 OSMMapPMR(IMG_HANDLE hBridge,
           IMG_HANDLE hPMR,
           IMG_DEVMEM_SIZE_T uiPMRLength,
@@ -88,7 +88,7 @@ OSMMapPMR(IMG_HANDLE hBridge,
           void **ppvMappingAddressOut,
           size_t *puiMappingLengthOut);
 
-/**************************************************************************/ /*!
+/*************************************************************************/ /*!
 @Function       OSMUnmapPMR
 @Description    Unmaps the specified PMR from CPU memory.
                 This function is the counterpart to OSMMapPMR.
@@ -104,20 +104,12 @@ OSMMapPMR(IMG_HANDLE hBridge,
 @Input          pvMappingAddress     The address to be unmapped.
 @Input          uiMappingLength      The size to be unmapped.
 @Return         PVRSRV_OK on success, failure code otherwise.
- */ /**************************************************************************/
-/*
-   FIXME:
-   perhaps this function should take _only_ the hOSMMapPrivData arg,
-   and the implementation is required to store any of the other data
-   items that it requires to do the unmap?
-*/
-extern void
+ */ /*************************************************************************/
+void
 OSMUnmapPMR(IMG_HANDLE hBridge,
             IMG_HANDLE hPMR,
             IMG_HANDLE hOSMMapPrivData,
             void *pvMappingAddress,
             size_t uiMappingLength);
 
-
-#endif /* _OSMMAP_H_ */
-
+#endif /* OSMMAP_H */

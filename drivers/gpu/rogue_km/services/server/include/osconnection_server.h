@@ -54,7 +54,7 @@ PVRSRV_ERROR OSConnectionPrivateDataDeInit(IMG_HANDLE hOsPrivateData);
 
 PVRSRV_ERROR OSConnectionSetHandleOptions(PVRSRV_HANDLE_BASE *psHandleBase);
 
-PVRSRV_DEVICE_NODE* OSGetDevData(CONNECTION_DATA *psConnection);
+PVRSRV_DEVICE_NODE* OSGetDevNode(CONNECTION_DATA *psConnection);
 
 #else	/* defined(__linux__) || defined(__QNXNTO__) || defined(INTEGRITY_OS) */
 #ifdef INLINE_IS_PRAGMA
@@ -64,7 +64,7 @@ PVRSRV_DEVICE_NODE* OSGetDevData(CONNECTION_DATA *psConnection);
 @Function       OSConnectionPrivateDataInit
 @Description    Allocates and initialises any OS-specific private data
                 relating to a connection.
-                Called from PVRSRVConnectionConnect().
+                Called from PVRSRVCommonConnectionConnect().
 @Input          pvOSData            pointer to any OS private data
 @Output         phOsPrivateData     handle to the created connection
                                     private data
@@ -107,9 +107,9 @@ static INLINE PVRSRV_ERROR OSConnectionSetHandleOptions(PVRSRV_HANDLE_BASE *psHa
 }
 
 #ifdef INLINE_IS_PRAGMA
-#pragma inline(OSGetDevData)
+#pragma inline(OSGetDevNode)
 #endif
-static INLINE PVRSRV_DEVICE_NODE* OSGetDevData(CONNECTION_DATA *psConnection)
+static INLINE PVRSRV_DEVICE_NODE* OSGetDevNode(CONNECTION_DATA *psConnection)
 {
 	PVR_UNREFERENCED_PARAMETER(psConnection);
 

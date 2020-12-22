@@ -1,4 +1,3 @@
-/* -*- mode: c; indent-tabs-mode: t; c-basic-offset: 8; tab-width: 8 -*- */
 /* vi: set ts=8 sw=8 sts=8: */
 /*************************************************************************/ /*!
 @File
@@ -128,6 +127,7 @@ struct pvr_fence {
 	struct list_head fence_head;
 	struct list_head signal_head;
 	struct dma_fence_cb cb;
+	struct rcu_head rcu;
 };
 
 extern const struct dma_fence_ops pvr_fence_ops;

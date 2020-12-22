@@ -123,9 +123,6 @@ PVRSRV_ERROR IMG_CALLCONV SCPCreate(PVRSRV_DEVICE_NODE *psDevNode,
 */
 /*****************************************************************************/
 PVRSRV_ERROR IMG_CALLCONV SCPAllocCommand(SCP_CONTEXT *psSCPContext,
-										  IMG_UINT32 ui32SyncPrimCount,
-										  SERVER_SYNC_PRIMITIVE **papsSync,
-										  IMG_BOOL *pabUpdate,
 										  PVRSRV_FENCE iAcquireFence,
 										  SCPReady pfnCommandReady,
 										  SCPDo pfnCommandDo,

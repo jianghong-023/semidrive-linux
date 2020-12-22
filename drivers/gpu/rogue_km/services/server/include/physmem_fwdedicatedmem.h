@@ -43,8 +43,8 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */ /***************************************************************************/
 
-#ifndef _PHYSMEM_FWDEDICATEDMEM_H_
-#define _PHYSMEM_FWDEDICATEDMEM_H_
+#ifndef PHYSMEM_FWDEDICATEDMEM_H
+#define PHYSMEM_FWDEDICATEDMEM_H
 
 #include "img_types.h"
 #include "pvrsrv_error.h"
@@ -58,12 +58,11 @@ PVRSRV_ERROR PhysmemInitFWDedicatedMem(PVRSRV_DEVICE_NODE *psDeviceNode,
 void PhysmemDeinitFWDedicatedMem(PVRSRV_DEVICE_NODE *psDeviceNode);
 #endif
 
-PVRSRV_ERROR PhysmemNewFWDedicatedMemPMR(PVRSRV_DEVICE_NODE *psDevNode,
+PVRSRV_ERROR PhysmemNewFWDedicatedMemPMR(CONNECTION_DATA *psConnection,
+                                         PVRSRV_DEVICE_NODE *psDevNode,
                                          IMG_DEVMEM_SIZE_T uiSize,
                                          PMR_LOG2ALIGN_T uiLog2Align,
                                          PVRSRV_MEMALLOCFLAGS_T uiFlags,
                                          PMR **ppsPMRPtr);
 
-#endif /* _PHYSMEM_FWDEDICATEDMEM_H_ */
-
-
+#endif /* PHYSMEM_FWDEDICATEDMEM_H */

@@ -1,4 +1,3 @@
-/* -*- mode: c; indent-tabs-mode: t; c-basic-offset: 8; tab-width: 8 -*- */
 /* vi: set ts=8 sw=8 sts=8: */
 /*************************************************************************/ /*!
 @File
@@ -95,7 +94,8 @@ enum nlpvrdpy_attr {
 };
 #define NLPVRDPY_ATTR_MAX  (__NLPVRDPY_ATTR_MAX - 1)
 
-static struct nla_policy nlpvrdpy_policy[NLPVRDPY_ATTR_MAX + 1] = {
+static struct nla_policy __attribute__((unused))
+nlpvrdpy_policy[NLPVRDPY_ATTR_MAX + 1] = {
 	[NLPVRDPY_ATTR_NAME]                = { .type = NLA_STRING },
 	[NLPVRDPY_ATTR_MINOR]               = { .type = NLA_U32 },
 	[NLPVRDPY_ATTR_NUM_PLANES]          = { .type = NLA_U8  },

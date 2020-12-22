@@ -41,8 +41,8 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */ /**************************************************************************/
 
-#ifndef __TLSERVER_H_
-#define __TLSERVER_H_
+#ifndef TLSERVER_H
+#define TLSERVER_H
 
 #include "img_defs.h"
 #include "pvr_debug.h"
@@ -90,9 +90,8 @@ PVRSRV_ERROR TLServerWriteDataKM(PTL_STREAM_DESC psSD,
                                  IMG_UINT32 ui32Size,
                                  IMG_BYTE *pui8Data);
 
-#endif /* __TLSERVER_H_ */
+#endif /* TLSERVER_H */
 
-/*****************************************************************************
+/******************************************************************************
  End of file (tlserver.h)
-*****************************************************************************/
-
+******************************************************************************/

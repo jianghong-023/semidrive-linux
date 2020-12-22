@@ -42,6 +42,16 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include <linux/version.h>
 #include <linux/sched.h>
 
+#if defined(CONFIG_TRACE_GPU_MEM) || defined(PVRSRV_ENABLE_GPU_MEM_TRACEPOINT)
+#if !defined(CONFIG_TRACE_GPU_MEM)
+#define CREATE_TRACE_POINTS
+#include <trace/events/gpu_mem.h>
+#undef CREATE_TRACE_POINTS
+#else /* !defined(CONFIG_TRACE_GPU_MEM) */
+#include <trace/events/gpu_mem.h>
+#endif /* !defined(CONFIG_TRACE_GPU_MEM) */
+#endif /* defined(CONFIG_TRACE_GPU_MEM) || defined(PVRSRV_ENABLE_GPU_MEM_TRACEPOINT) */
+
 #include "img_types.h"
 #include "trace_events.h"
 #include "rogue_trace_events.h"
@@ -146,12 +156,10 @@ void trace_rogue_ufo_updates(IMG_UINT64 ui64OSTimestamp,
 		trace_rogue_ufo_update(ui64OSTimestamp, ui32FWCtx,
 				ui32IntJobRef,
 				ui32ExtJobRef,
-				ui32IntJobRef,
 				puData->sUpdate.ui32FWAddr,
 				puData->sUpdate.ui32OldValue,
 				puData->sUpdate.ui32NewValue);
-		puData = (RGX_HWPERF_UFO_DATA_ELEMENT *) (((IMG_BYTE *) puData)
-				+ sizeof(puData->sUpdate));
+		puData = IMG_OFFSET_ADDR(puData, sizeof(puData->sUpdate));
 	}
 }
 
@@ -169,19 +177,18 @@ void trace_rogue_ufo_checks_success(IMG_UINT64 ui64OSTimestamp,
 		if (bPrEvent)
 		{
 			trace_rogue_ufo_pr_check_success(ui64OSTimestamp, ui32FWCtx,
-					ui32IntJobRef, ui32ExtJobRef, ui32IntJobRef,
+					ui32IntJobRef, ui32ExtJobRef,
 					puData->sCheckSuccess.ui32FWAddr,
 					puData->sCheckSuccess.ui32Value);
 		}
 		else
 		{
 			trace_rogue_ufo_check_success(ui64OSTimestamp, ui32FWCtx,
-					ui32IntJobRef, ui32ExtJobRef, ui32IntJobRef,
+					ui32IntJobRef, ui32ExtJobRef,
 					puData->sCheckSuccess.ui32FWAddr,
 					puData->sCheckSuccess.ui32Value);
 		}
-		puData = (RGX_HWPERF_UFO_DATA_ELEMENT *) (((IMG_BYTE *) puData)
-				+ sizeof(puData->sCheckSuccess));
+		puData = IMG_OFFSET_ADDR(puData, sizeof(puData->sCheckSuccess));
 	}
 }
 
@@ -199,7 +206,7 @@ void trace_rogue_ufo_checks_fail(IMG_UINT64 ui64OSTimestamp,
 		if (bPrEvent)
 		{
 			trace_rogue_ufo_pr_check_fail(ui64OSTimestamp, ui32FWCtx,
-					ui32IntJobRef, ui32ExtJobRef, ui32IntJobRef,
+					ui32IntJobRef, ui32ExtJobRef,
 					puData->sCheckFail.ui32FWAddr,
 					puData->sCheckFail.ui32Value,
 					puData->sCheckFail.ui32Required);
@@ -207,13 +214,12 @@ void trace_rogue_ufo_checks_fail(IMG_UINT64 ui64OSTimestamp,
 		else
 		{
 			trace_rogue_ufo_check_fail(ui64OSTimestamp, ui32FWCtx,
-					ui32IntJobRef, ui32ExtJobRef, ui32IntJobRef,
+					ui32IntJobRef, ui32ExtJobRef,
 					puData->sCheckFail.ui32FWAddr,
 					puData->sCheckFail.ui32Value,
 					puData->sCheckFail.ui32Required);
 		}
-		puData = (RGX_HWPERF_UFO_DATA_ELEMENT *) (((IMG_BYTE *) puData)
-				+ sizeof(puData->sCheckFail));
+		puData = IMG_OFFSET_ADDR(puData, sizeof(puData->sCheckFail));
 	}
 }
 #endif
@@ -240,3 +246,20 @@ int PVRGpuTraceEnableFirmwareActivityCallbackWrapper(void)
 	return 0;
 }
 #endif /* (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 10, 0)) */
+
+void TracepointUpdateGPUMemGlobal(IMG_UINT8 ui8GPUId,
+								  IMG_UINT64 ui64Size)
+{
+#if defined(CONFIG_TRACE_GPU_MEM) || defined(PVRSRV_ENABLE_GPU_MEM_TRACEPOINT)
+	trace_gpu_mem_total(ui8GPUId, 0, ui64Size);
+#endif /* defined(CONFIG_TRACE_GPU_MEM) || defined(PVRSRV_ENABLE_GPU_MEM_TRACEPOINT) */
+}
+
+void TracepointUpdateGPUMemPerProcess(IMG_UINT8 ui8GPUId,
+									  IMG_UINT32 ui32Pid,
+									  IMG_UINT64 ui64Size)
+{
+#if defined(CONFIG_TRACE_GPU_MEM) || defined(PVRSRV_ENABLE_GPU_MEM_TRACEPOINT)
+	trace_gpu_mem_total(ui8GPUId, ui32Pid, ui64Size);
+#endif /* defined(CONFIG_TRACE_GPU_MEM) || defined(PVRSRV_ENABLE_GPU_MEM_TRACEPOINT) */
+}

@@ -41,7 +41,7 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */ /**************************************************************************/
 
-#if !defined (PVRSRV_ERROR_H)
+#if !defined(PVRSRV_ERROR_H)
 #define PVRSRV_ERROR_H
 
 /*!
@@ -58,4 +58,4 @@ typedef enum PVRSRV_ERROR
 
 } PVRSRV_ERROR;
 
-#endif /* !defined (PVRSRV_ERROR_H) */
+#endif /* !defined(PVRSRV_ERROR_H) */

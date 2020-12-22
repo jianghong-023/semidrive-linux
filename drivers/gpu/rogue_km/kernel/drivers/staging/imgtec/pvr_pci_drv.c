@@ -1,4 +1,3 @@
-/* -*- mode: c; indent-tabs-mode: t; c-basic-offset: 8; tab-width: 8 -*- */
 /* vi: set ts=8 sw=8 sts=8: */
 /*************************************************************************/ /*!
 @File
@@ -43,10 +42,17 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */ /**************************************************************************/
 
+#include <linux/version.h>
+
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 5, 0))
+#include <drm/drm_drv.h>
+#include <drm/drm_print.h>
+#else
 #include <drm/drmP.h>
+#endif
+
 #include <linux/module.h>
 #include <linux/pci.h>
-#include <linux/version.h>
 
 #include "module_common.h"
 #include "pvr_drv.h"
@@ -157,7 +163,7 @@ static void pvr_shutdown(struct pci_dev *pdev)
 
 	DRM_DEBUG_DRIVER("device %p\n", &pdev->dev);
 
-	PVRSRVCommonDeviceShutdown(priv->dev_node);
+	PVRSRVDeviceShutdown(priv->dev_node);
 }
 
 static const struct pci_device_id pvr_pci_ids[] = {
@@ -194,7 +200,7 @@ static int __init pvr_init(void)
 	pvr_drm_pci_driver.set_busid = drm_pci_set_busid;
 #endif
 
-	err = PVRSRVCommonDriverInit();
+	err = PVRSRVDriverInit();
 	if (err)
 		return err;
 
@@ -214,7 +220,7 @@ static void __exit pvr_exit(void)
 #else
 	drm_pci_exit(&pvr_drm_pci_driver, &pvr_pci_driver);
 #endif
-	PVRSRVCommonDriverDeinit();
+	PVRSRVDriverDeinit();
 
 	DRM_DEBUG_DRIVER("done\n");
 }

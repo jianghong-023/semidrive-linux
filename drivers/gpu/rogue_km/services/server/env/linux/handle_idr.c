@@ -1,8 +1,8 @@
 /*************************************************************************/ /*!
 @File
-@Title		Resource Handle Manager - IDR Back-end
+@Title          Resource Handle Manager - IDR Back-end
 @Copyright      Copyright (c) Imagination Technologies Ltd. All Rights Reserved
-@Description	Provide IDR based resource handle management back-end
+@Description    Provide IDR based resource handle management back-end
 @License        Dual MIT/GPLv2
 
 The contents of this file are subject to the MIT license as set out below.
@@ -213,7 +213,7 @@ static PVRSRV_ERROR ReleaseHandle(HANDLE_IMPL_BASE *psBase,
 
  @Input		psBase - Pointer to handle base structure
 		hHandle - Handle from which data should be retrieved
-                ppvData - Points to a void data pointer
+		ppvData - Points to a void data pointer
 
  @Output	ppvData - Points to a void data pointer
 
@@ -302,7 +302,7 @@ static PVRSRV_ERROR IterateOverHandles(HANDLE_IMPL_BASE *psBase, PFN_HANDLE_ITER
 
  @Description	Enable purging for a given handle base
 
- @Input 	psBase - pointer to handle base structure
+ @Input		psBase - pointer to handle base structure
 
  @Return	Error code or PVRSRV_OK
 
@@ -322,7 +322,7 @@ static PVRSRV_ERROR EnableHandlePurging(HANDLE_IMPL_BASE *psBase)
 
  @Description	Purge handles for a given handle base
 
- @Input 	psBase - Pointer to handle base structure
+ @Input		psBase - Pointer to handle base structure
 
  @Return	Error code or PVRSRV_OK
 
@@ -342,7 +342,7 @@ static PVRSRV_ERROR PurgeHandles(HANDLE_IMPL_BASE *psBase)
 
  @Description	Create a handle base structure
 
- @Input 	ppsBase - pointer to handle base structure pointer
+ @Input		ppsBase - pointer to handle base structure pointer
 
  @Output	ppsBase - points to handle base structure pointer
 
@@ -381,7 +381,7 @@ static PVRSRV_ERROR CreateHandleBase(HANDLE_IMPL_BASE **ppsBase)
 
  @Description	Destroy a handle base structure
 
- @Input 	psBase - pointer to handle base structure
+ @Input		psBase - pointer to handle base structure
 
  @Return	Error code or PVRSRV_OK
 

@@ -1,4 +1,3 @@
-/* -*- mode: c; indent-tabs-mode: t; c-basic-offset: 8; tab-width: 8 -*- */
 /* vi: set ts=8 sw=8 sts=8: */
 /*************************************************************************/ /*!
 @File
@@ -47,7 +46,15 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #define __PVR_DRV_H__
 
 #include <linux/version.h>
+
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 5, 0))
+#include <drm/drm_device.h>
+#include <drm/drm_file.h>
+#include <linux/device.h>
+#else
 #include <drm/drmP.h>
+#endif
+
 #include <linux/pm.h>
 
 struct file;
@@ -58,6 +65,15 @@ struct vm_area_struct;
 /* This structure is used to store Linux specific per-device information. */
 struct pvr_drm_private {
 	struct _PVRSRV_DEVICE_NODE_ *dev_node;
+
+	/*
+	 * This is needed for devices that don't already have their own dma
+	 * parameters structure, e.g. platform devices, and, if necessary, will
+	 * be assigned to the 'struct device' during device initialisation. It
+	 * should therefore never be accessed directly via this structure as
+	 * this may not be the version of dma parameters in use.
+	 */
+	struct device_dma_parameters dma_parms;
 
 #if defined(SUPPORT_BUFFER_SYNC) || defined(SUPPORT_NATIVE_FENCE_SYNC)
 	struct workqueue_struct *fence_status_wq;

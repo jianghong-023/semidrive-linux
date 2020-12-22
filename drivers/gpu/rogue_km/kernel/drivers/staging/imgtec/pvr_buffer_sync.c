@@ -1,4 +1,3 @@
-/* -*- mode: c; indent-tabs-mode: t; c-basic-offset: 8; tab-width: 8 -*- */
 /* vi: set ts=8 sw=8 sts=8: */
 /*************************************************************************/ /*!
 @File
@@ -44,9 +43,9 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */ /**************************************************************************/
 
 #include <linux/dma-buf.h>
-#include <linux/reservation.h>
 
 #include "services_kernel_client.h"
+#include "pvr_dma_resv.h"
 #include "pvr_buffer_sync.h"
 #include "pvr_buffer_sync_shared.h"
 #include "pvr_drv.h"
@@ -54,9 +53,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 
 struct pvr_buffer_sync_context {
-#if !defined(PVRSRV_USE_BRIDGE_LOCK)
 	struct mutex ctx_lock;
-#endif
 	struct pvr_fence_context *fence_ctx;
 	struct ww_acquire_ctx acquire_ctx;
 };
@@ -80,7 +77,7 @@ struct pvr_buffer_sync_append_data {
 };
 
 
-static struct reservation_object *
+static struct dma_resv *
 pmr_reservation_object_get(struct _PMR_ *pmr)
 {
 	struct dma_buf *dmabuf;
@@ -97,13 +94,11 @@ pvr_buffer_sync_pmrs_lock(struct pvr_buffer_sync_context *ctx,
 			  u32 nr_pmrs,
 			  struct _PMR_ **pmrs)
 {
-	struct reservation_object *resv, *cresv = NULL, *lresv = NULL;
+	struct dma_resv *resv, *cresv = NULL, *lresv = NULL;
 	int i, err;
 	struct ww_acquire_ctx *acquire_ctx = &ctx->acquire_ctx;
 
-#if !defined(PVRSRV_USE_BRIDGE_LOCK)
 	mutex_lock(&ctx->ctx_lock);
-#endif
 
 	ww_acquire_init(acquire_ctx, &reservation_ww_class);
 retry:
@@ -155,9 +150,7 @@ fail:
 
 	ww_acquire_fini(acquire_ctx);
 
-#if !defined(PVRSRV_USE_BRIDGE_LOCK)
 	mutex_unlock(&ctx->ctx_lock);
-#endif
 	return err;
 }
 
@@ -166,7 +159,7 @@ pvr_buffer_sync_pmrs_unlock(struct pvr_buffer_sync_context *ctx,
 			    u32 nr_pmrs,
 			    struct _PMR_ **pmrs)
 {
-	struct reservation_object *resv;
+	struct dma_resv *resv;
 	int i;
 	struct ww_acquire_ctx *acquire_ctx = &ctx->acquire_ctx;
 
@@ -179,17 +172,15 @@ pvr_buffer_sync_pmrs_unlock(struct pvr_buffer_sync_context *ctx,
 
 	ww_acquire_fini(acquire_ctx);
 
-#if !defined(PVRSRV_USE_BRIDGE_LOCK)
 	mutex_unlock(&ctx->ctx_lock);
-#endif
 }
 
 static u32
 pvr_buffer_sync_pmrs_fence_count(u32 nr_pmrs, struct _PMR_ **pmrs,
 				 u32 *pmr_flags)
 {
-	struct reservation_object *resv;
-	struct reservation_object_list *resv_list;
+	struct dma_resv *resv;
+	struct dma_resv_list *resv_list;
 	struct dma_fence *fence;
 	u32 fence_count = 0;
 	bool exclusive;
@@ -202,8 +193,8 @@ pvr_buffer_sync_pmrs_fence_count(u32 nr_pmrs, struct _PMR_ **pmrs,
 		if (WARN_ON_ONCE(!resv))
 			continue;
 
-		resv_list = reservation_object_get_list(resv);
-		fence = reservation_object_get_excl(resv);
+		resv_list = dma_resv_get_list(resv);
+		fence = dma_resv_get_excl(resv);
 
 		if (fence &&
 		    (!exclusive || !resv_list || !resv_list->shared_count))
@@ -224,8 +215,8 @@ pvr_buffer_sync_check_fences_create(struct pvr_fence_context *fence_ctx,
 				    u32 *pmr_flags)
 {
 	struct pvr_buffer_sync_check_data *data;
-	struct reservation_object *resv;
-	struct reservation_object_list *resv_list;
+	struct dma_resv *resv;
+	struct dma_resv_list *resv_list;
 	struct dma_fence *fence;
 	u32 fence_count;
 	bool exclusive;
@@ -252,17 +243,17 @@ pvr_buffer_sync_check_fences_create(struct pvr_fence_context *fence_ctx,
 
 		exclusive = !!(pmr_flags[i] & PVR_BUFFER_FLAG_WRITE);
 		if (!exclusive) {
-			err = reservation_object_reserve_shared(resv
+			err = dma_resv_reserve_shared(resv
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 0, 0))
-								, 1
+						      , 1
 #endif
 				);
 			if (err)
 				goto err_destroy_fences;
 		}
 
-		resv_list = reservation_object_get_list(resv);
-		fence = reservation_object_get_excl(resv);
+		resv_list = dma_resv_get_list(resv);
+		fence = dma_resv_get_excl(resv);
 
 		if (fence &&
 		    (!exclusive || !resv_list || !resv_list->shared_count)) {
@@ -283,7 +274,7 @@ pvr_buffer_sync_check_fences_create(struct pvr_fence_context *fence_ctx,
 		if (exclusive && resv_list) {
 			for (j = 0; j < resv_list->shared_count; j++) {
 				fence = rcu_dereference_protected(resv_list->shared[j],
-								  reservation_object_held(resv));
+								  dma_resv_held(resv));
 				data->fences[data->nr_fences++] =
 					pvr_fence_create_from_fence(fence_ctx,
 								    sync_checkpoint_ctx,
@@ -347,9 +338,7 @@ pvr_buffer_sync_context_create(struct device *dev, const char *name)
 		goto err_free_ctx;
 	}
 
-#if !defined(PVRSRV_USE_BRIDGE_LOCK)
 	mutex_init(&ctx->ctx_lock);
-#endif
 
 	return ctx;
 
@@ -422,8 +411,8 @@ pvr_buffer_sync_resolve_and_create_fences(struct pvr_buffer_sync_context *ctx,
 		return -ENOMEM;
 
 	data->ctx = ctx;
-	data->pmrs = (struct _PMR_ **)((char *)data + data_size);
-	data->pmr_flags = (u32 *)((char *)data->pmrs + pmrs_size);
+	data->pmrs = (struct _PMR_ **)(void *)(data + 1);
+	data->pmr_flags = (u32 *)(void *)(data->pmrs + nr_pmrs);
 
 	/*
 	 * It's expected that user space will provide a set of unique PMRs
@@ -507,7 +496,7 @@ pvr_buffer_sync_resolve_and_create_fences(struct pvr_buffer_sync_context *ctx,
 	*update_checkpoints_out = pvr_fence_get_checkpoint(data->update_fence);
 	*data_out = data;
 
-	return err;
+	return 0;
 
 err_free_fence_checkpoints:
 	kfree(fence_checkpoints);
@@ -523,7 +512,7 @@ err_free_data:
 void
 pvr_buffer_sync_kick_succeeded(struct pvr_buffer_sync_append_data *data)
 {
-	struct reservation_object *resv;
+	struct dma_resv *resv;
 	int i;
 
 	dma_fence_enable_sw_signaling(&data->update_fence->base);
@@ -537,14 +526,14 @@ pvr_buffer_sync_kick_succeeded(struct pvr_buffer_sync_append_data *data)
 			PVR_FENCE_TRACE(&data->update_fence->base,
 					"added exclusive fence (%s) to resv %p\n",
 					data->update_fence->name, resv);
-			reservation_object_add_excl_fence(resv,
-							  &data->update_fence->base);
+			dma_resv_add_excl_fence(resv,
+						&data->update_fence->base);
 		} else if (data->pmr_flags[i] & PVR_BUFFER_FLAG_READ) {
 			PVR_FENCE_TRACE(&data->update_fence->base,
 					"added non-exclusive fence (%s) to resv %p\n",
 					data->update_fence->name, resv);
-			reservation_object_add_shared_fence(resv,
-								&data->update_fence->base);
+			dma_resv_add_shared_fence(resv,
+						  &data->update_fence->base);
 		}
 	}
 

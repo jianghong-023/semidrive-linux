@@ -1,4 +1,3 @@
-/* -*- mode: c; indent-tabs-mode: t; c-basic-offset: 8; tab-width: 8 -*- */
 /* vi: set ts=8 sw=8 sts=8: */
 /*************************************************************************/ /*!
 @File           ion_lma_heap.h
@@ -51,6 +50,17 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0))
 #include PVR_ANDROID_ION_PRIV_HEADER
+#endif
+
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 1, 0))
+struct ion_platform_heap {
+	enum ion_heap_type type;
+	unsigned int id;
+	const char *name;
+	phys_addr_t base;
+	size_t size;
+	void *priv;
+};
 #endif
 
 struct ion_heap *ion_lma_heap_create(struct ion_platform_heap *heap_data,

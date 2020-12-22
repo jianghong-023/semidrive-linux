@@ -1,4 +1,3 @@
-/* -*- mode: c; indent-tabs-mode: t; c-basic-offset: 8; tab-width: 8 -*- */
 /* vi: set ts=8 sw=8 sts=8: */
 /*************************************************************************/ /*!
 @File           pvr_sync_file.c
@@ -435,8 +434,6 @@ pvr_sync_rollback_fence_data(PVRSRV_FENCE fence_to_rollback,
 
 	put_unused_fd(fence_to_rollback);
 
-	pvr_fence_destroy(pvr_fence);
-
 	return PVRSRV_OK;
 }
 
@@ -590,6 +587,77 @@ static void pvr_sync_check_state(void)
 }
 #endif /* defined(PVRSRV_SYNC_CHECKPOINT_CCB) */
 
+#if defined(PDUMP)
+static enum PVRSRV_ERROR
+pvr_sync_fence_get_checkpoints(PVRSRV_FENCE fence_to_pdump, u32 *nr_checkpoints,
+				struct _SYNC_CHECKPOINT ***checkpoint_handles)
+{
+	struct dma_fence **fences = NULL;
+	struct dma_fence *fence;
+	struct pvr_fence *pvr_fence;
+	struct _SYNC_CHECKPOINT **checkpoints = NULL;
+	unsigned int i, num_fences, num_used_fences = 0;
+	enum PVRSRV_ERROR err;
+
+	if (fence_to_pdump < 0) {
+		err =  PVRSRV_ERROR_INVALID_PARAMS;
+		goto err_out;
+	}
+
+	if (!nr_checkpoints || !checkpoint_handles) {
+		pr_err(FILE_NAME ": %s: Invalid input checkpoint pointer\n",
+			__func__);
+		err =  PVRSRV_ERROR_INVALID_PARAMS;
+		goto err_out;
+	}
+
+	fence = sync_file_get_fence(fence_to_pdump);
+	if (!fence) {
+		pr_err(FILE_NAME ": %s: Failed to read sync private data for fd %d\n",
+			__func__, fence_to_pdump);
+		err = PVRSRV_ERROR_HANDLE_NOT_FOUND;
+		goto err_out;
+	}
+
+	if (dma_fence_is_array(fence)) {
+		struct dma_fence_array *array = to_dma_fence_array(fence);
+
+		fences = array->fences;
+		num_fences = array->num_fences;
+	} else {
+		fences = &fence;
+		num_fences = 1;
+	}
+
+	checkpoints = kmalloc_array(num_fences, sizeof(*checkpoints),
+			      GFP_KERNEL);
+	if (!checkpoints) {
+		pr_err("pvr_sync_file: %s: Failed to alloc memory for returned list of sync checkpoints\n",
+			__func__);
+		err = PVRSRV_ERROR_OUT_OF_MEMORY;
+		goto err_put_fence;
+	}
+
+	for (i = 0; i < num_fences; i++) {
+		pvr_fence = to_pvr_fence(fences[i]);
+		if (!pvr_fence) {
+			continue;
+		}
+		checkpoints[num_used_fences] = pvr_fence_get_checkpoint(pvr_fence);
+		++num_used_fences;
+	}
+
+	*checkpoint_handles = checkpoints;
+	*nr_checkpoints = num_used_fences;
+	err =  PVRSRV_OK;
+
+err_put_fence:
+	dma_fence_put(fence);
+err_out:
+	return err;
+}
+#endif
+
 static long pvr_sync_ioctl_rename(struct pvr_sync_timeline *timeline,
 	void __user *user_data)
 {
@@ -668,7 +736,7 @@ static long pvr_sync_ioctl_sw_create_fence(struct pvr_sync_timeline *timeline,
 	if (!sync_file) {
 		pr_err(FILE_NAME ": %s: Failed to create a sync point (%d)\n",
 			__func__, fd);
-		 err = -ENOMEM;
+		err = -ENOMEM;
 		goto err_put_fence;
 	}
 
@@ -837,6 +905,9 @@ enum PVRSRV_ERROR pvr_sync_init(struct device *dev)
 	pvr_sync_data.sync_checkpoint_ops.pfnSignalWaiters = NULL;
 #endif /* defined(PVRSRV_SYNC_CHECKPOINT_CCB) */
 	strlcpy(pvr_sync_data.sync_checkpoint_ops.pszImplName, "pvr_sync_file", SYNC_CHECKPOINT_IMPL_MAX_STRLEN);
+#if defined(PDUMP)
+	pvr_sync_data.sync_checkpoint_ops.pfnSyncFenceGetCheckpoints = pvr_sync_fence_get_checkpoints;
+#endif
 
 	SyncCheckpointRegisterFunctions(&pvr_sync_data.sync_checkpoint_ops);
 
@@ -1006,9 +1077,9 @@ static void _dump_sync_point(struct dma_fence *fence,
 
 	PVR_DUMPDEBUG_LOG(dump_debug_printf,
 					  dump_debug_file,
-					  "<%p> Seq#=%u TS=%s State=%s TLN=%s",
+					  "<%p> Seq#=%llu TS=%s State=%s TLN=%s",
 					  fence,
-					  fence->seqno,
+					  (u64) fence->seqno,
 					  time,
 					  (signaled) ? "Signalled" : "Active",
 					  fence_ops->get_timeline_name(fence));

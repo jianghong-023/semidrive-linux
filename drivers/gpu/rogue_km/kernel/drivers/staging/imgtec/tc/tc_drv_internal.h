@@ -1,4 +1,3 @@
-/* -*- mode: c; indent-tabs-mode: t; c-basic-offset: 8; tab-width: 8 -*- */
 /* vi: set ts=8 sw=8 sts=8: */
 /*************************************************************************/ /*!
 @Codingstyle    LinuxKernel
@@ -87,7 +86,8 @@ enum tc_version_t {
 	APOLLO_VERSION_TCF_5,
 	APOLLO_VERSION_TCF_BONNIE,
 	ODIN_VERSION_TCF_BONNIE,
-	ODIN_VERSION_FPGA
+	ODIN_VERSION_FPGA,
+	ODIN_VERSION_ORION,
 };
 
 struct tc_interrupt_handler {
@@ -111,6 +111,9 @@ struct tc_device {
 
 	enum tc_version_t version;
 	bool odin;
+	bool orion;
+
+	int mem_mode;
 
 	struct tc_io_region tcf;
 	struct tc_io_region tcf_pll;

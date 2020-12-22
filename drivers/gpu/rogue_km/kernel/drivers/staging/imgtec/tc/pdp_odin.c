@@ -1,4 +1,3 @@
-/* -*- mode: c; indent-tabs-mode: t; c-basic-offset: 8; tab-width: 8 -*- */
 /* vi: set ts=8 sw=8 sts=8: */
 /*************************************************************************/ /*!
 @Codingstyle    LinuxKernel
@@ -47,6 +46,8 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "pdp_odin.h"
 #include "odin_defs.h"
 #include "odin_regs.h"
+#include "orion_defs.h"
+#include "orion_regs.h"
 
 #define ODIN_PLL_REG(n)	((n) - ODN_PDP_P_CLK_OUT_DIVIDER_REG1)
 
@@ -83,6 +84,21 @@ static const struct odin_displaymode odin_modes[] = {
 	{.w = 1024, .h = 768, .id = 1, .m = 13, .od1 = 20, .od2 = 10},
 	{.w = 800, .h = 600, .id = 2, .m = 20, .od1 = 25, .od2 = 7},
 	{.w = 640, .h = 480, .id = 1, .m = 12, .od1 = 48, .od2 = 9},
+	{.w = 0, .h = 0, .id = 0, .m = 0, .od1 = 0, .od2 = 0}
+};
+
+/*
+ * For Orion, only the listed modes below are supported.
+ * 1920x1080 mode is currently not supported.
+ */
+static const struct odin_displaymode orion_modes[] = {
+	{.w = 1280, .h = 720, .id = 5, .m = 37, .od1 = 10, .od2 = 7},
+	{.w = 1280, .h = 1024, .id = 1, .m = 12, .od1 = 11, .od2 = 10},
+	{.w = 1440, .h = 900, .id = 5, .m = 53, .od1 = 10, .od2 = 9},
+	{.w = 1280, .h = 960, .id = 5, .m = 51, .od1 = 10, .od2 = 9},
+	{.w = 1024, .h = 768, .id = 3, .m = 33, .od1 = 17, .od2 = 10},
+	{.w = 800, .h = 600, .id = 2, .m = 24, .od1 = 31, .od2 = 12},
+	{.w = 640, .h = 480, .id = 1, .m = 12, .od1 = 50, .od2 = 12},
 	{.w = 0, .h = 0, .id = 0, .m = 0, .od1 = 0, .od2 = 0}
 };
 
@@ -319,15 +335,22 @@ static void get_odin_clock_settings(u32 value, u32 *lo_time, u32 *hi_time,
 	*lo_time = lt;
 }
 
-static const struct odin_displaymode *get_odin_mode(int w, int h)
+static const struct odin_displaymode *get_odin_mode(int w, int h,
+						    enum pdp_odin_subversion pv)
 {
+	struct odin_displaymode *pdp_modes;
 	int n = 0;
 
-	do {
-		if ((odin_modes[n].w == w) && (odin_modes[n].h == h))
-			return odin_modes+n;
+	if (pv == PDP_ODIN_ORION)
+		pdp_modes = (struct odin_displaymode *)orion_modes;
+	else
+		pdp_modes = (struct odin_displaymode *)odin_modes;
 
-	} while (odin_modes[n++].w);
+	do {
+		if ((pdp_modes[n].w == w) && (pdp_modes[n].h == h))
+			return pdp_modes+n;
+
+	} while (pdp_modes[n++].w);
 
 	return NULL;
 }
@@ -336,7 +359,8 @@ bool pdp_odin_clocks_set(struct device *dev,
 			 void __iomem *pdp_reg, void __iomem *pll_reg,
 			 u32 clock_freq,
 			 void __iomem *odn_core_reg,
-			 u32 hdisplay, u32 vdisplay)
+			 u32 hdisplay, u32 vdisplay,
+			 enum pdp_odin_subversion pdpsubv)
 {
 	u32 value;
 	const struct odin_displaymode *odispl;
@@ -349,7 +373,7 @@ bool pdp_odin_clocks_set(struct device *dev,
 	core_rev = pdp_rreg32(odn_core_reg, ODN_PDP_CORE_REV_OFFSET);
 	dev_info(dev, "Odin-PDP CORE_REV %08X\n", core_rev);
 
-	odispl = get_odin_mode(hdisplay, vdisplay);
+	odispl = get_odin_mode(hdisplay, vdisplay, pdpsubv);
 	if (!odispl) {
 		dev_err(dev, "Display mode not supported.\n");
 		return false;
@@ -375,10 +399,17 @@ bool pdp_odin_clocks_set(struct device *dev,
 	 * Set the PDP1 bit of ODN_CORE_INTERNAL_RESETN low to reset.
 	 * set bit 3 to 0 (active low)
 	 */
-	value = core_rreg32(odn_core_reg, ODN_CORE_INTERNAL_RESETN);
-	value = REG_VALUE_LO(value, 1, ODN_INTERNAL_RESETN_PDP1_SHIFT,
-			     ODN_INTERNAL_RESETN_PDP1_MASK);
-	core_wreg32(odn_core_reg, ODN_CORE_INTERNAL_RESETN, value);
+	if (pdpsubv == PDP_ODIN_ORION) {
+		value = core_rreg32(odn_core_reg, SRS_CORE_SOFT_RESETN);
+		value = REG_VALUE_LO(value, 1, SRS_SOFT_RESETN_PDP_SHIFT,
+				     SRS_SOFT_RESETN_PDP_MASK);
+		core_wreg32(odn_core_reg, SRS_CORE_SOFT_RESETN, value);
+	} else {
+		value = core_rreg32(odn_core_reg, ODN_CORE_INTERNAL_RESETN);
+		value = REG_VALUE_LO(value, 1, ODN_INTERNAL_RESETN_PDP1_SHIFT,
+				     ODN_INTERNAL_RESETN_PDP1_MASK);
+		core_wreg32(odn_core_reg, ODN_CORE_INTERNAL_RESETN, value);
+	}
 
 	/*
 	 * Hold the PDP MMCM in reset while changing the clock regs.
@@ -386,8 +417,8 @@ bool pdp_odin_clocks_set(struct device *dev,
 	 */
 	value = core_rreg32(odn_core_reg, ODN_CORE_CLK_GEN_RESET);
 	value = REG_VALUE_SET(value, 0x1,
-			      ODN_INTERNAL_RESETN_PDP1_SHIFT,
-			      ODN_INTERNAL_RESETN_PDP1_MASK);
+			      ODN_CLK_GEN_RESET_PDP_MMCM_SHIFT,
+			      ODN_CLK_GEN_RESET_PDP_MMCM_MASK);
 	core_wreg32(odn_core_reg, ODN_CORE_CLK_GEN_RESET, value);
 
 	/* Pixel clock Input divider */
@@ -436,6 +467,19 @@ bool pdp_odin_clocks_set(struct device *dev,
 	value = REG_VALUE_SET(value, edge,
 			      ODN_PDP_PCLK_ODIV2_EDGE_SHIFT,
 			      ODN_PDP_PCLK_ODIV2_EDGE_MASK);
+	if (pdpsubv == PDP_ODIN_ORION) {
+		/*
+		 * Fractional divide for PLL registers currently does not work
+		 * on Sirius, as duly mentioned on the TRM. However, owing to
+		 * what most likely is a design flaw in the RTL, the
+		 * following register and a later one have their fractional
+		 * divide fields set to values other than 0 by default,
+		 * unlike on Odin. This prevents the PDP device from working
+		 * on Orion
+		 */
+		value = REG_VALUE_LO(value, 0x1F, SRS_PDP_PCLK_ODIV2_FRAC_SHIFT,
+				     SRS_PDP_PCLK_ODIV2_FRAC_MASK);
+	}
 	pll_wreg32(pll_reg, ODIN_PLL_REG(ODN_PDP_P_CLK_OUT_DIVIDER_REG2),
 		   value);
 
@@ -464,6 +508,11 @@ bool pdp_odin_clocks_set(struct device *dev,
 	value = REG_VALUE_SET(value, edge,
 			      ODN_PDP_PCLK_MUL2_EDGE_SHIFT,
 			      ODN_PDP_PCLK_MUL2_EDGE_MASK);
+	if (pdpsubv == PDP_ODIN_ORION) {
+		/* Zero out fractional divide fields */
+		value = REG_VALUE_LO(value, 0x1F, SRS_PDP_PCLK_MUL2_FRAC_SHIFT,
+				     SRS_PDP_PCLK_MUL2_FRAC_MASK);
+	}
 	pll_wreg32(pll_reg, ODIN_PLL_REG(ODN_PDP_P_CLK_MULTIPLIER_REG2),
 		   value);
 
@@ -500,8 +549,8 @@ bool pdp_odin_clocks_set(struct device *dev,
 	 * Set the PDP1 bit of ODN_CORE_CLK_GEN_RESET to 0.
 	 */
 	value = core_rreg32(odn_core_reg, ODN_CORE_CLK_GEN_RESET);
-	value = REG_VALUE_LO(value, 1, ODN_INTERNAL_RESETN_PDP1_SHIFT,
-			     ODN_INTERNAL_RESETN_PDP1_MASK);
+	value = REG_VALUE_LO(value, 1, ODN_CLK_GEN_RESET_PDP_MMCM_SHIFT,
+			     ODN_CLK_GEN_RESET_PDP_MMCM_MASK);
 	core_wreg32(odn_core_reg, ODN_CORE_CLK_GEN_RESET, value);
 
 	/*
@@ -533,10 +582,17 @@ bool pdp_odin_clocks_set(struct device *dev,
 	 * Take Odin-PDP1 out of reset:
 	 * Set the PDP1 bit of ODN_CORE_INTERNAL_RESETN to 1.
 	 */
-	value = core_rreg32(odn_core_reg, ODN_CORE_INTERNAL_RESETN);
-	value = REG_VALUE_SET(value, 1, ODN_INTERNAL_RESETN_PDP1_SHIFT,
-			      ODN_INTERNAL_RESETN_PDP1_MASK);
-	core_wreg32(odn_core_reg, ODN_CORE_INTERNAL_RESETN, value);
+	if (pdpsubv == PDP_ODIN_ORION) {
+		value = core_rreg32(odn_core_reg, SRS_CORE_SOFT_RESETN);
+		value = REG_VALUE_SET(value, 1, SRS_SOFT_RESETN_PDP_SHIFT,
+				     SRS_SOFT_RESETN_PDP_MASK);
+		core_wreg32(odn_core_reg, SRS_CORE_SOFT_RESETN, value);
+	} else {
+		value = core_rreg32(odn_core_reg, ODN_CORE_INTERNAL_RESETN);
+		value = REG_VALUE_SET(value, 1, ODN_INTERNAL_RESETN_PDP1_SHIFT,
+				      ODN_INTERNAL_RESETN_PDP1_MASK);
+		core_wreg32(odn_core_reg, ODN_CORE_INTERNAL_RESETN, value);
+	}
 
 	return true;
 }
@@ -774,7 +830,7 @@ void pdp_odin_set_surface(struct device *dev, void __iomem *pdp_reg,
 	} else {
 		blend_mode = 0x0; /* 0b00 = no blending */
 	}
-	value = REG_VALUE_SET(0x0, blend_mode,
+	value = REG_VALUE_SET(value, blend_mode,
 			      GRPH_CTRL_GRPH_BLEND_SHIFT[plane],
 			      GRPH_CTRL_GRPH_BLEND_MASK[plane]);
 

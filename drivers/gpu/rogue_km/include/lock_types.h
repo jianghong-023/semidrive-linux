@@ -41,8 +41,8 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */ /**************************************************************************/
 
-#ifndef _LOCK_TYPES_H_
-#define _LOCK_TYPES_H_
+#ifndef LOCK_TYPES_H
+#define LOCK_TYPES_H
 
 /* In Linux kernel mode we are using the kernel mutex implementation directly
  * with macros. This allows us to use the kernel lockdep feature for lock
@@ -55,6 +55,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  * isn't ideal and usually you wouldn't do that in kernel code. */
 typedef struct mutex *POS_LOCK;
 typedef struct rw_semaphore *POSWR_LOCK;
+typedef spinlock_t *POS_SPINLOCK;
 typedef atomic_t ATOMIC_T;
 
 #else /* defined(LINUX) && defined(__KERNEL__) */
@@ -72,7 +73,7 @@ typedef struct _OSWR_LOCK_ {
 #if defined(LINUX)
 	typedef struct _OS_ATOMIC {IMG_INT32 counter;} ATOMIC_T;
 #elif defined(__QNXNTO__)
-	typedef struct _OS_ATOMIC {IMG_UINT32 counter;} ATOMIC_T;
+	typedef struct _OS_ATOMIC {IMG_INT32 counter;} ATOMIC_T;
 #elif defined(_WIN32)
 	/*
 	 * Dummy definition. WDDM doesn't use Services, but some headers
@@ -81,11 +82,11 @@ typedef struct _OSWR_LOCK_ {
 	typedef struct _OS_ATOMIC {IMG_INT32 counter;} ATOMIC_T;
 #elif defined(INTEGRITY_OS)
 	/* Only lower 32bits are used in OS ATOMIC APIs to have consistent behaviour across all OS */
-	typedef struct _OS_ATOMIC {IMG_UINT64 counter;} ATOMIC_T;
+	typedef struct _OS_ATOMIC {IMG_INT64 counter;} ATOMIC_T;
 #else
 	#error "Please type-define an atomic lock for this environment"
 #endif
 
 #endif /* defined(LINUX) && defined(__KERNEL__) */
 
-#endif /* _LOCK_TYPES_H_ */
+#endif /* LOCK_TYPES_H */

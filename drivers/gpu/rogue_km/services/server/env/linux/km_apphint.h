@@ -41,8 +41,8 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */ /**************************************************************************/
 
-#ifndef __KM_APPHINT_H__
-#define __KM_APPHINT_H__
+#ifndef KM_APPHINT_H
+#define KM_APPHINT_H
 
 #if defined(__cplusplus)
 extern "C" {
@@ -62,6 +62,11 @@ int pvr_apphint_get_uint64(APPHINT_ID ue, IMG_UINT64 *pVal);
 int pvr_apphint_get_uint32(APPHINT_ID ue, IMG_UINT32 *pVal);
 int pvr_apphint_get_bool(APPHINT_ID ue, IMG_BOOL *pVal);
 int pvr_apphint_get_string(APPHINT_ID ue, IMG_CHAR *pBuffer, size_t size);
+
+int pvr_apphint_set_uint64(APPHINT_ID ue, IMG_UINT64 Val);
+int pvr_apphint_set_uint32(APPHINT_ID ue, IMG_UINT32 Val);
+int pvr_apphint_set_bool(APPHINT_ID ue, IMG_BOOL Val);
+int pvr_apphint_set_string(APPHINT_ID ue, IMG_CHAR *pBuffer, size_t size);
 
 void pvr_apphint_register_handlers_uint64(APPHINT_ID id,
 	PVRSRV_ERROR (*query)(const PVRSRV_DEVICE_NODE *device, const void *private_data, IMG_UINT64 *value),
@@ -87,9 +92,8 @@ void pvr_apphint_register_handlers_string(APPHINT_ID id,
 #if defined(__cplusplus)
 }
 #endif
-#endif /* __KM_APPHINT_H__ */
+#endif /* KM_APPHINT_H */
 
 /******************************************************************************
- End of file (apphint.h)
+ End of file (km_apphint.h)
 ******************************************************************************/
-

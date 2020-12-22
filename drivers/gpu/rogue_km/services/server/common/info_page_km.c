@@ -68,19 +68,19 @@ PVRSRV_ERROR InfoPageCreate(PVRSRV_DATA *psData)
                                       uiMemFlags,
                                       "PVRSRVInfoPage",
                                       &psData->psInfoPageMemDesc);
-    PVR_LOGG_IF_ERROR(eError, "DevmemAllocateExportable", e0);
+    PVR_LOG_GOTO_IF_ERROR(eError, "DevmemAllocateExportable", e0);
 
     eError =  DevmemAcquireCpuVirtAddr(psData->psInfoPageMemDesc,
                                        (void **) &psData->pui32InfoPage);
-    PVR_LOGG_IF_ERROR(eError, "DevmemAllocateExportable", e0);
+    PVR_LOG_GOTO_IF_ERROR(eError, "DevmemAllocateExportable", e0);
 
     /* Look-up the memory descriptor PMR handle */
     eError = DevmemLocalGetImportHandle(psData->psInfoPageMemDesc,
                                         (void **) &psData->psInfoPagePMR);
-    PVR_LOGG_IF_ERROR(eError, "DevmemLocalGetImportHandle", e0);
+    PVR_LOG_GOTO_IF_ERROR(eError, "DevmemLocalGetImportHandle", e0);
 
     eError = OSLockCreate(&psData->hInfoPageLock);
-    PVR_LOGG_IF_ERROR(eError, "OSLockCreate", e0);
+    PVR_LOG_GOTO_IF_ERROR(eError, "OSLockCreate", e0);
 
     return PVRSRV_OK;
 
@@ -114,9 +114,9 @@ PVRSRV_ERROR PVRSRVAcquireInfoPageKM(PMR **ppsPMR)
 {
     PVRSRV_DATA *psData = PVRSRVGetPVRSRVData();
 
-    PVR_LOGR_IF_FALSE(psData->psInfoPageMemDesc != NULL, "invalid MEMDESC"
+    PVR_LOG_RETURN_IF_FALSE(psData->psInfoPageMemDesc != NULL, "invalid MEMDESC"
                       " handle", PVRSRV_ERROR_INVALID_PARAMS);
-    PVR_LOGR_IF_FALSE(psData->psInfoPagePMR != NULL, "invalid PMR handle",
+    PVR_LOG_RETURN_IF_FALSE(psData->psInfoPagePMR != NULL, "invalid PMR handle",
                       PVRSRV_ERROR_INVALID_PARAMS);
 
     /* Copy the PMR import handle back */

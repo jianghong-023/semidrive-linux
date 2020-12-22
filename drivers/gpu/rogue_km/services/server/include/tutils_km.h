@@ -75,6 +75,16 @@ PVRSRV_ERROR SyncCheckpointTestIoctlKM(CONNECTION_DATA *psConnection,
 				  IMG_UINT32  *puiOut2,
 				  IMG_UINT8   *puiOut3);
 
+IMG_EXPORT
+PVRSRV_ERROR DevmemIntAllocHostMemKM(IMG_DEVMEM_SIZE_T ui32Size,
+                                     IMG_UINT32 ui32Flags,
+                                     IMG_UINT32 ui32LableLength,
+                                     const IMG_CHAR *pszAllocLabel,
+                                     PMR **ppsPMR);
+
+PVRSRV_ERROR DevmemIntFreeHostMemKM(PMR *psPMR);
+
+IMG_EXPORT
 PVRSRV_ERROR PowerTestIoctlKM(IMG_UINT32  uiCmd,
 				  IMG_UINT32  uiIn1,
 				  IMG_UINT32  uiIn2,
@@ -107,13 +117,6 @@ PVRSRV_ERROR TestIOCTLSyncFbSWFenceCreate(CONNECTION_DATA * psConnection,
                                           PVRSRV_FENCE *piFence);
 
 
-PVRSRV_ERROR DevmemIntAllocHostMemKM(IMG_DEVMEM_SIZE_T ui32Size,
-                                     IMG_UINT32 ui32Flags,
-                                     IMG_UINT32 ui32LableLength,
-                                     IMG_PCHAR pszAllocLabel,
-                                     PMR **ppsPMR);
-
-PVRSRV_ERROR DevmemIntFreeHostMemKM(PMR *psPMR);
 
 PVRSRV_ERROR TestIOCTLSyncSWTimelineFenceCreateKM(CONNECTION_DATA * psConnection,
                                                   PVRSRV_DEVICE_NODE *psDevNode,

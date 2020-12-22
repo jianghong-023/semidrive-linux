@@ -39,10 +39,10 @@ COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
 IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */ /**************************************************************************/
-#ifndef __HTBUFFER_INIT_H__
-#define __HTBUFFER_INIT_H__
+#ifndef HTBUFFER_INIT_H
+#define HTBUFFER_INIT_H
 
-#if defined (__cplusplus)
+#if defined(__cplusplus)
 extern "C" {
 #endif
 
@@ -104,13 +104,11 @@ HTBControl(
 	HTB_OPMODE_CTRL eOpMode
 );
 
-#if defined (__cplusplus)
+#if defined(__cplusplus)
 }
 #endif
 
-#endif /* __HTBUFFER_INIT_H__ */
+#endif /* HTBUFFER_INIT_H */
 /*****************************************************************************
  End of file (htbuffer_init.h)
 *****************************************************************************/
-
-

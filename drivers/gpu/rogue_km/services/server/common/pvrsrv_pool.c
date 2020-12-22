@@ -86,19 +86,11 @@ PVRSRV_ERROR PVRSRVPoolCreate(PVRSRV_POOL_ALLOC_FUNC *pfnAlloc,
 	PVRSRV_ERROR eError;
 
 	psPool = OSAllocMem(sizeof(PVRSRV_POOL));
-
-	if (psPool == NULL)
-	{
-		eError = PVRSRV_ERROR_OUT_OF_MEMORY;
-		goto err_alloc;
-	}
+	PVR_GOTO_IF_NOMEM(psPool, eError, err_alloc);
 
 	eError = OSLockCreate(&psPool->hLock);
 
-	if (eError != PVRSRV_OK)
-	{
-		goto err_lock_create;
-	}
+	PVR_GOTO_IF_ERROR(eError, err_lock_create);
 
 	psPool->uiMaxEntries = ui32MaxEntries;
 	psPool->uiNumBusy = 0;
@@ -143,19 +135,26 @@ void PVRSRVPoolDestroy(PVRSRV_POOL *psPool)
 
 	OSLockDestroy(psPool->hLock);
 
-	while (psPool->uiNumFree)
+	if (psPool->uiNumFree)
 	{
 		PVRSRV_POOL_ENTRY *psEntry;
 		DLLIST_NODE *psChosenNode;
 
 		psChosenNode = dllist_get_next_node(&psPool->sFreeList);
-		dllist_remove_node(psChosenNode);
 
-		psEntry = IMG_CONTAINER_OF(psChosenNode, PVRSRV_POOL_ENTRY, sNode);
+		while (psChosenNode)
+		{
+			dllist_remove_node(psChosenNode);
 
-		_DestroyPoolEntry(psPool, psEntry);
+			psEntry = IMG_CONTAINER_OF(psChosenNode, PVRSRV_POOL_ENTRY, sNode);
+			_DestroyPoolEntry(psPool, psEntry);
 
-		psPool->uiNumFree--;
+			psPool->uiNumFree--;
+
+			psChosenNode = dllist_get_next_node(&psPool->sFreeList);
+		}
+
+		PVR_ASSERT(psPool->uiNumFree == 0);
 	}
 
 	OSFreeMem(psPool);
@@ -168,21 +167,13 @@ static PVRSRV_ERROR _CreateNewPoolEntry(PVRSRV_POOL *psPool,
 	PVRSRV_ERROR eError;
 
 	psNewEntry = OSAllocMem(sizeof(PVRSRV_POOL_ENTRY));
-
-	if (psNewEntry == NULL)
-	{
-		eError = PVRSRV_ERROR_OUT_OF_MEMORY;
-		goto err_allocmem;
-	}
+	PVR_GOTO_IF_NOMEM(psNewEntry, eError, err_allocmem);
 
 	dllist_init(&psNewEntry->sNode);
 
 	eError = psPool->pfnAlloc(psPool->pvPrivData, &psNewEntry->pvData);
 
-	if (eError != PVRSRV_OK)
-	{
-		goto err_pfn_alloc;
-	}
+	PVR_GOTO_IF_ERROR(eError, err_pfn_alloc);
 
 	*ppsEntry = psNewEntry;
 
@@ -200,30 +191,26 @@ PVRSRV_ERROR PVRSRVPoolGet(PVRSRV_POOL *psPool,
 {
 	PVRSRV_POOL_ENTRY *psEntry;
 	PVRSRV_ERROR eError = PVRSRV_OK;
+	DLLIST_NODE *psChosenNode;
 
 	OSLockAcquire(psPool->hLock);
 
-	/* check if we already have a free element ready */
-	if (psPool->uiNumFree)
-	{
-		DLLIST_NODE *psChosenNode;
-		psChosenNode = dllist_get_next_node(&psPool->sFreeList);
-		dllist_remove_node(psChosenNode);
-
-		psEntry = IMG_CONTAINER_OF(psChosenNode, PVRSRV_POOL_ENTRY, sNode);
-
-		psPool->uiNumFree--;
-	}
-	else
+	psChosenNode = dllist_get_next_node(&psPool->sFreeList);
+	if (unlikely(psChosenNode == NULL))
 	{
 		/* no available elements in the pool. try to create one */
 
 		eError = _CreateNewPoolEntry(psPool, &psEntry);
 
-		if (eError != PVRSRV_OK)
-		{
-			goto out_unlock;
-		}
+		PVR_GOTO_IF_ERROR(eError, out_unlock);
+	}
+	else
+	{
+		dllist_remove_node(psChosenNode);
+
+		psEntry = IMG_CONTAINER_OF(psChosenNode, PVRSRV_POOL_ENTRY, sNode);
+
+		psPool->uiNumFree--;
 	}
 
 #if defined(DEBUG) || defined(SUPPORT_VALIDATION)
@@ -271,4 +258,3 @@ PVRSRV_ERROR PVRSRVPoolPut(PVRSRV_POOL *psPool, PVRSRV_POOL_TOKEN hToken)
 
 	return eError;
 }
-

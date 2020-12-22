@@ -62,7 +62,7 @@ do { \
 	char aszBuffer[512]; /* maximum message buffer size */ \
 	vsnprintf(aszBuffer, sizeof(aszBuffer), fmt, args); \
 	seq_puts(seq_file, aszBuffer); \
-} while(0)
+} while (0)
 #endif /* (LINUX_VERSION_CODE < KERNEL_VERSION(3, 6, 0)) */
 
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(3, 7, 0))
@@ -83,7 +83,7 @@ do { \
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 19, 0))
 
 /* Linux 3.19 removed get_unused_fd() */
-/* get_unused_fd_flags  was introduced in 3.7 */
+/* get_unused_fd_flags was introduced in 3.7 */
 #define get_unused_fd() get_unused_fd_flags(0)
 
 #endif /* (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 19, 0)) */
@@ -164,7 +164,7 @@ do { \
  */
 #define drm_crtc_send_vblank_event(crtc, e) drm_send_vblank_event((crtc)->dev, drm_crtc_index(crtc), e)
 
-/* seq_has_overflowed() was introduced in 3.19-rc1 but the structure elements
+/* seq_has_overflowed() was introduced in 3.19 but the structure elements
  * have been available since 2.x
  */
 #include <linux/seq_file.h>
@@ -189,6 +189,13 @@ static inline bool seq_has_overflowed(struct seq_file *m)
 
 #endif /* (LINUX_VERSION_CODE < KERNEL_VERSION(4, 0, 0)) */
 
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(4, 3, 0))
+#define drm_fb_helper_unregister_fbi(fb_helper) \
+	({ \
+		if ((fb_helper) && (fb_helper)->fbdev) \
+			unregister_framebuffer((fb_helper)->fbdev); \
+	})
+#endif
 
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(4, 4, 0))
 
@@ -274,6 +281,8 @@ static inline bool seq_has_overflowed(struct seq_file *m)
 
 /* Linux 4.9 changed the second argument to a drm_file pointer */
 #define drm_vma_node_is_allowed(node, file_priv) drm_vma_node_is_allowed(node, (file_priv)->filp)
+#define drm_vma_node_allow(node, file_priv) drm_vma_node_allow(node, (file_priv)->filp)
+#define drm_vma_node_revoke(node, file_priv) drm_vma_node_revoke(node, (file_priv)->filp)
 
 #endif /* (LINUX_VERSION_CODE < KERNEL_VERSION(4, 9, 0)) */
 
@@ -282,6 +291,8 @@ static inline bool seq_has_overflowed(struct seq_file *m)
 #define drm_mm_insert_node(mm, node, size) drm_mm_insert_node(mm, node, size, 0, DRM_MM_SEARCH_DEFAULT)
 
 #define drm_helper_mode_fill_fb_struct(dev, fb, mode_cmd) drm_helper_mode_fill_fb_struct(fb, mode_cmd)
+#define drm_fb_helper_init(dev, helper, max_conn_count) \
+	drm_fb_helper_init(dev, helper, 1, max_conn_count)
 
 /*
  * In Linux Kernels >= 4.12 for x86 another level of page tables has been

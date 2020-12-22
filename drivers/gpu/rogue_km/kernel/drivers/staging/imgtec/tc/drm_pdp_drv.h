@@ -1,4 +1,3 @@
-/* -*- mode: c; indent-tabs-mode: t; c-basic-offset: 8; tab-width: 8 -*- */
 /* vi: set ts=8 sw=8 sts=8: */
 /*************************************************************************/ /*!
 @File
@@ -48,7 +47,12 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include <linux/version.h>
 #include <linux/wait.h>
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 5, 0))
+#include <drm/drm_fourcc.h>
+#else
 #include <drm/drmP.h>
+#endif
+
 #include <drm/drm_crtc.h>
 #include <drm/drm_crtc_helper.h>
 #include <drm/drm_fb_helper.h>
@@ -78,8 +82,14 @@ struct plato_pdp_platform_data;
 
 struct pdp_drm_private {
 	struct drm_device *dev;
+#if defined(CONFIG_DRM_FBDEV_EMULATION)
+	struct pdp_fbdev *fbdev;
+#endif
 
 	enum pdp_version version;
+
+	/* differentiate Orion from base Odin PDP */
+	enum pdp_odin_subversion subversion;
 
 	/* created by pdp_gem_init */
 	struct pdp_gem_private	*gem_priv;
@@ -127,15 +137,28 @@ struct pdp_crtc {
 #define to_pdp_crtc(crtc) container_of(crtc, struct pdp_crtc, base)
 
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0))
+struct drm_gem_object;
+
 struct pdp_framebuffer {
 	struct drm_framebuffer base;
 	struct drm_gem_object *obj[1];
 };
 
 #define to_pdp_framebuffer(fb) container_of(fb, struct pdp_framebuffer, base)
+#define to_drm_framebuffer(fb) (&(fb)->base)
 #else
 #define pdp_framebuffer drm_framebuffer
 #define to_pdp_framebuffer(fb) (fb)
+#define to_drm_framebuffer(fb) (fb)
+#endif
+
+#if defined(CONFIG_DRM_FBDEV_EMULATION)
+struct pdp_fbdev {
+	struct drm_fb_helper helper;
+	struct pdp_framebuffer fb;
+	struct pdp_drm_private *priv;
+	u8 preferred_bpp;
+};
 #endif
 
 static inline u32 pdp_drm_fb_cpp(struct drm_framebuffer *fb)
@@ -186,4 +209,13 @@ int pdp_modeset_late_init(struct pdp_drm_private *dev_priv);
 void pdp_modeset_early_cleanup(struct pdp_drm_private *dev_priv);
 void pdp_modeset_late_cleanup(struct pdp_drm_private *dev_priv);
 
+#if defined(CONFIG_DRM_FBDEV_EMULATION)
+struct pdp_fbdev *pdp_fbdev_create(struct pdp_drm_private *dev);
+void pdp_fbdev_destroy(struct pdp_fbdev *fbdev);
+#endif
+
+int pdp_modeset_validate_init(struct pdp_drm_private *dev_priv,
+			      struct drm_mode_fb_cmd2 *mode_cmd,
+			      struct pdp_framebuffer *pdp_fb,
+			      struct drm_gem_object *obj);
 #endif /* !defined(__DRM_PDP_DRV_H__) */

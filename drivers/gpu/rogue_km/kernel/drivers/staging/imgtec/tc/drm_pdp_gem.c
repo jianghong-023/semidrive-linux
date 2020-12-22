@@ -1,4 +1,3 @@
-/* -*- mode: c; indent-tabs-mode: t; c-basic-offset: 8; tab-width: 8 -*- */
 /* vi: set ts=8 sw=8 sts=8: */
 /*************************************************************************/ /*!
 @File
@@ -42,8 +41,15 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */ /**************************************************************************/
 
+#include <linux/version.h>
+
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 5, 0))
+#include <drm/drm_drv.h>
+#include <drm/drm_prime.h>
+#include <linux/platform_device.h>
+#endif
+
 #include <linux/dma-buf.h>
-#include <linux/reservation.h>
 #include <linux/slab.h>
 #include <linux/mutex.h>
 #include <linux/capability.h>
@@ -56,30 +62,9 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "tc_drv.h"
 #endif
 
-#include "drm_pdp_drv.h"
 #include "drm_pdp_gem.h"
 #include "pdp_drm.h"
 #include "kernel_compatibility.h"
-
-struct pdp_gem_object {
-	struct drm_gem_object base;
-
-	/* Non-null if backing originated from this driver */
-	struct drm_mm_node *vram;
-
-	/* Non-null if backing was imported */
-	struct sg_table *sgt;
-
-	phys_addr_t cpu_addr;
-	dma_addr_t dev_addr;
-
-	struct reservation_object _resv;
-	struct reservation_object *resv;
-
-	bool cpu_prep;
-};
-
-#define to_pdp_obj(obj) container_of(obj, struct pdp_gem_object, base)
 
 #if defined(SUPPORT_PLATO_DISPLAY)
 	typedef struct plato_pdp_platform_data pdp_gem_platform_data;
@@ -94,7 +79,8 @@ struct pdp_gem_private {
 
 static struct pdp_gem_object *
 pdp_gem_private_object_create(struct drm_device *dev,
-			      size_t size)
+			      size_t size,
+			      struct dma_resv *resv)
 {
 	struct pdp_gem_object *pdp_obj;
 
@@ -104,16 +90,21 @@ pdp_gem_private_object_create(struct drm_device *dev,
 	if (!pdp_obj)
 		return ERR_PTR(-ENOMEM);
 
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 2, 0))
+	if (!resv)
+		dma_resv_init(&pdp_obj->_resv);
+#else
+	pdp_obj->base.resv = resv;
+#endif
 	drm_gem_private_object_init(dev, &pdp_obj->base, size);
-	reservation_object_init(&pdp_obj->_resv);
 
 	return pdp_obj;
 }
 
-static struct drm_gem_object *pdp_gem_object_create(struct drm_device *dev,
-					struct pdp_gem_private *gem_priv,
-					size_t size,
-					u32 flags)
+struct drm_gem_object *pdp_gem_object_create(struct drm_device *dev,
+					     struct pdp_gem_private *gem_priv,
+					     size_t size,
+					     u32 flags)
 {
 	pdp_gem_platform_data *pdata =
 		to_platform_device(dev->dev)->dev.platform_data;
@@ -121,7 +112,7 @@ static struct drm_gem_object *pdp_gem_object_create(struct drm_device *dev,
 	struct drm_mm_node *node;
 	int err = 0;
 
-	pdp_obj = pdp_gem_private_object_create(dev, size);
+	pdp_obj = pdp_gem_private_object_create(dev, size, NULL);
 	if (!pdp_obj) {
 		err = -ENOMEM;
 		goto err_exit;
@@ -142,20 +133,25 @@ static struct drm_gem_object *pdp_gem_object_create(struct drm_device *dev,
 	pdp_obj->vram = node;
 	pdp_obj->dev_addr = pdp_obj->vram->start;
 	pdp_obj->cpu_addr = pdata->memory_base + pdp_obj->dev_addr;
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 2, 0))
 	pdp_obj->resv = &pdp_obj->_resv;
+#else
+	pdp_obj->resv = pdp_obj->base.resv;
+#endif
+	pdp_obj->dma_map_export_host_addr = pdata->dma_map_export_host_addr;
 
 	return &pdp_obj->base;
 
 err_free_node:
 	kfree(node);
 err_unref:
-	drm_gem_object_put_unlocked(&pdp_obj->base);
+	pdp_gem_object_free_priv(gem_priv, &pdp_obj->base);
 err_exit:
 	return ERR_PTR(err);
 }
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 11, 0))
-int pdp_gem_object_vm_fault(struct vm_fault *vmf)
+vm_fault_t pdp_gem_object_vm_fault(struct vm_fault *vmf)
 #else
 int pdp_gem_object_vm_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
 #endif
@@ -203,9 +199,10 @@ void pdp_gem_object_free_priv(struct pdp_gem_private *gem_priv,
 
 	drm_gem_free_mmap_offset(obj);
 
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 2, 0))
 	if (&pdp_obj->_resv == pdp_obj->resv)
-		reservation_object_fini(pdp_obj->resv);
-
+		dma_resv_fini(&pdp_obj->_resv);
+#endif
 	if (pdp_obj->vram) {
 		mutex_lock(&gem_priv->vram_lock);
 		drm_mm_remove_node(pdp_obj->vram);
@@ -251,7 +248,11 @@ pdp_gem_prime_map_dma_buf(struct dma_buf_attachment *attach,
 	if (sg_alloc_table(sgt, 1, GFP_KERNEL))
 		goto err_free_sgt;
 
-	sg_dma_address(sgt->sgl) = pdp_obj->dev_addr;
+	if (pdp_obj->dma_map_export_host_addr)
+		sg_dma_address(sgt->sgl) = pdp_obj->cpu_addr;
+	else
+		sg_dma_address(sgt->sgl) = pdp_obj->dev_addr;
+
 	sg_dma_len(sgt->sgl) = obj->size;
 
 	return sgt;
@@ -277,11 +278,13 @@ static void *pdp_gem_prime_kmap_atomic(struct dma_buf *dma_buf,
 }
 #endif
 
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 6, 0))
 static void *pdp_gem_prime_kmap(struct dma_buf *dma_buf,
 				unsigned long page_num)
 {
 	return NULL;
 }
+#endif
 
 static int pdp_gem_prime_mmap(struct dma_buf *dma_buf,
 			      struct vm_area_struct *vma)
@@ -337,7 +340,9 @@ static const struct dma_buf_ops pdp_gem_prime_dmabuf_ops = {
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(4, 19, 0))
 	.map_atomic	= pdp_gem_prime_kmap_atomic,
 #endif
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 6, 0))
 	.map		= pdp_gem_prime_kmap,
+#endif
 #else
 	.kmap_atomic	= pdp_gem_prime_kmap_atomic,
 	.kmap		= pdp_gem_prime_kmap,
@@ -363,8 +368,8 @@ pdp_gem_lookup_our_object(struct drm_file *file, u32 handle,
 
 	if (obj->import_attach) {
 		/*
-		 * The dmabuf associated with the object is not one of
-		 * ours. Our own buffers are handled differently on import.
+		 * The dmabuf associated with the object is not one of ours.
+		 * Our own buffers are handled differently on import.
 		 */
 		drm_gem_object_put_unlocked(obj);
 		return -EINVAL;
@@ -374,7 +379,10 @@ pdp_gem_lookup_our_object(struct drm_file *file, u32 handle,
 	return 0;
 }
 
-struct dma_buf *pdp_gem_prime_export(struct drm_device *dev,
+struct dma_buf *pdp_gem_prime_export(
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 4, 0))
+				     struct drm_device *dev,
+#endif
 				     struct drm_gem_object *obj,
 				     int flags)
 {
@@ -388,10 +396,14 @@ struct dma_buf *pdp_gem_prime_export(struct drm_device *dev,
 	export_info.resv = pdp_obj->resv;
 	export_info.priv = obj;
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0))
+	return drm_gem_dmabuf_export(obj->dev, &export_info);
+#else
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 9, 0))
 	return drm_gem_dmabuf_export(dev, &export_info);
 #else
 	return dma_buf_export(&export_info);
+#endif
 #endif
 #else
 	return dma_buf_export(obj, &pdp_gem_prime_dmabuf_ops, obj->size,
@@ -430,7 +442,9 @@ pdp_gem_prime_import_sg_table(struct drm_device *dev,
 	struct pdp_gem_object *pdp_obj;
 	int err;
 
-	pdp_obj = pdp_gem_private_object_create(dev, attach->dmabuf->size);
+	pdp_obj = pdp_gem_private_object_create(dev,
+						attach->dmabuf->size,
+						attach->dmabuf->resv);
 	if (!pdp_obj) {
 		err = -ENOMEM;
 		goto err_exit;
@@ -555,7 +569,7 @@ void pdp_gem_cleanup(struct pdp_gem_private *gem_priv)
 	kfree(gem_priv);
 }
 
-struct reservation_object *pdp_gem_get_resv(struct drm_gem_object *obj)
+struct dma_resv *pdp_gem_get_resv(struct drm_gem_object *obj)
 {
 	return (to_pdp_obj(obj)->resv);
 }
@@ -651,17 +665,17 @@ int pdp_gem_object_cpu_prep_ioctl(struct drm_device *dev, void *data,
 	if (wait) {
 		long lerr;
 
-		lerr = reservation_object_wait_timeout_rcu(pdp_obj->resv,
-							   write,
-							   true,
-							   30 * HZ);
+		lerr = dma_resv_wait_timeout_rcu(pdp_obj->resv,
+						 write,
+						 true,
+						 30 * HZ);
 		if (!lerr)
 			err = -EBUSY;
 		else if (lerr < 0)
 			err = lerr;
 	} else {
-		if (!reservation_object_test_signaled_rcu(pdp_obj->resv,
-							  write))
+		if (!dma_resv_test_signaled_rcu(pdp_obj->resv,
+						write))
 			err = -EBUSY;
 	}
 
@@ -709,4 +723,3 @@ exit_unlock:
 	mutex_unlock(&dev->struct_mutex);
 	return err;
 }
-

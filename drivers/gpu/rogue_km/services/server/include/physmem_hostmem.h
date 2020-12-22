@@ -41,7 +41,7 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */ /**************************************************************************/
 
-#if !defined (__PHYSMEM_HOSTMEM_H__)
+#if !defined(__PHYSMEM_HOSTMEM_H__)
 #define __PHYSMEM_HOSTMEM_H__
 
 #include "pvrsrv_device.h"
@@ -51,4 +51,4 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 PVRSRV_DEVICE_CONFIG* HostMemGetDeviceConfig(void);
 
-#endif /* !defined (__PHYSMEM_HOSTMEM_H__) */
+#endif /* !defined(__PHYSMEM_HOSTMEM_H__) */

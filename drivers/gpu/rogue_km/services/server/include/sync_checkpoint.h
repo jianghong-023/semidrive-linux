@@ -41,8 +41,8 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */ /**************************************************************************/
 
-#ifndef _SYNC_CHECKPOINT_
-#define _SYNC_CHECKPOINT_
+#ifndef SYNC_CHECKPOINT_H
+#define SYNC_CHECKPOINT_H
 
 #include "img_types.h"
 #include "pvrsrv_error.h"
@@ -90,6 +90,11 @@ typedef IMG_BOOL (*PFN_SYNC_CHECKPOINT_UFO_HAS_SIGNALLED_FN)(IMG_UINT32 ui32FwAd
 typedef PVRSRV_ERROR (*PFN_SYNC_CHECKPOINT_SIGNAL_WAITERS_FN)(void);
 typedef void (*PFN_SYNC_CHECKPOINT_CHECK_STATE_FN)(void);
 #endif
+#if defined(PDUMP)
+typedef PVRSRV_ERROR (*PFN_SYNC_CHECKPOINT_FENCE_GETCHECKPOINTS_FN)(PVRSRV_FENCE iFence,
+									IMG_UINT32 *puiNumCheckpoints,
+									PSYNC_CHECKPOINT **papsCheckpoints);
+#endif
 
 #define SYNC_CHECKPOINT_IMPL_MAX_STRLEN 20
 
@@ -108,6 +113,9 @@ typedef struct
 	PFN_SYNC_CHECKPOINT_SIGNAL_WAITERS_FN pfnSignalWaiters;
 #endif
 	IMG_CHAR pszImplName[SYNC_CHECKPOINT_IMPL_MAX_STRLEN];
+#if defined(PDUMP)
+	PFN_SYNC_CHECKPOINT_FENCE_GETCHECKPOINTS_FN pfnSyncFenceGetCheckpoints;
+#endif
 } PFN_SYNC_CHECKPOINT_STRUCT;
 
 PVRSRV_ERROR SyncCheckpointRegisterFunctions(PFN_SYNC_CHECKPOINT_STRUCT *psSyncCheckpointPfns);
@@ -345,7 +353,9 @@ SyncCheckpointRollbackFromUFO(PPVRSRV_DEVICE_NODE psDevNode, IMG_UINT32 ui32FwAd
 */
 /*****************************************************************************/
 IMG_BOOL
-SyncCheckpointUFOHasSignalled(PPVRSRV_DEVICE_NODE psDevNode, IMG_UINT32 ui32FwAddr, IMG_UINT32 ui32Value);
+SyncCheckpointUFOHasSignalled(PPVRSRV_DEVICE_NODE psDevNode,
+                              IMG_UINT32 ui32FwAddr,
+                              IMG_UINT32 ui32Value);
 
 /*************************************************************************/ /*!
 @Function       SyncCheckpointCheckState
@@ -386,7 +396,8 @@ SyncCheckpointSignalWaiters(void);
 */
 /*****************************************************************************/
 IMG_BOOL
-SyncCheckpointIsSignalled(PSYNC_CHECKPOINT psSyncCheckpoint, IMG_UINT32 ui32FenceSyncFlags);
+SyncCheckpointIsSignalled(PSYNC_CHECKPOINT psSyncCheckpoint,
+                          IMG_UINT32 ui32FenceSyncFlags);
 
 /*************************************************************************/ /*!
 @Function       SyncCheckpointIsErrored
@@ -402,7 +413,8 @@ SyncCheckpointIsSignalled(PSYNC_CHECKPOINT psSyncCheckpoint, IMG_UINT32 ui32Fenc
 */
 /*****************************************************************************/
 IMG_BOOL
-SyncCheckpointIsErrored(PSYNC_CHECKPOINT psSyncCheckpoint, IMG_UINT32 ui32FenceSyncFlags);
+SyncCheckpointIsErrored(PSYNC_CHECKPOINT psSyncCheckpoint,
+                        IMG_UINT32 ui32FenceSyncFlags);
 
 /*************************************************************************/ /*!
 @Function       SyncCheckpointTakeRef
@@ -465,7 +477,12 @@ SyncCheckpointDropRef(PSYNC_CHECKPOINT psSyncCheckpoint);
 */
 /*****************************************************************************/
 PVRSRV_ERROR
-SyncCheckpointResolveFence(PSYNC_CHECKPOINT_CONTEXT psSyncCheckpointContext, PVRSRV_FENCE hFence, IMG_UINT32 *pui32NumSyncCheckpoints, PSYNC_CHECKPOINT **papsSyncCheckpoints, IMG_UINT64 *puiFenceUID);
+SyncCheckpointResolveFence(PSYNC_CHECKPOINT_CONTEXT psSyncCheckpointContext,
+                           PVRSRV_FENCE hFence,
+                           IMG_UINT32 *pui32NumSyncCheckpoints,
+                           PSYNC_CHECKPOINT **papsSyncCheckpoints,
+                           IMG_UINT64 *puiFenceUID,
+                           PDUMP_FLAGS_T ui32PDumpFlags);
 
 /*************************************************************************/ /*!
 @Function       SyncCheckpointCreateFence
@@ -510,7 +527,8 @@ SyncCheckpointCreateFence(PPVRSRV_DEVICE_NODE psDeviceNode,
                           void **ppvFenceFinaliseData,
                           PSYNC_CHECKPOINT *psNewSyncCheckpoint,
                           void **ppvTimelineUpdateSyncPrim,
-                          IMG_UINT32 *pui32TimelineUpdateValue);
+                          IMG_UINT32 *pui32TimelineUpdateValue,
+                          PDUMP_FLAGS_T ui32PDumpFlags);
 
 /*************************************************************************/ /*!
 @Function       SyncCheckpointRollbackFenceData
@@ -636,7 +654,7 @@ SyncCheckpointNoHWUpdateTimelines(void *pvPrivateData);
                                       implementation.
 
 @Return         PVRSRV_OK if a valid pointer is provided in pui32NumSyncOwnedUFOs.
-				PVRSRV_ERROR_INVALID_PARAMS if a NULL value is provided in
+                PVRSRV_ERROR_INVALID_PARAMS if a NULL value is provided in
                 pui32NumSyncOwnedUFOs.
                 PVRSRV_ERROR_SYNC_NATIVESYNC_NOT_REGISTERED if the OS native
                 sync has not registered a callback function.
@@ -664,23 +682,6 @@ const IMG_CHAR *
 SyncCheckpointGetStateString(PSYNC_CHECKPOINT psSyncCheckpoint);
 
 /*************************************************************************/ /*!
-@Function       SyncCheckpointPDumpPol
-
-@Description    Called to insert a poll into the PDump script on a given
-                sync checkpoint being signalled or errored.
-
-@Input          psSyncCheckpoint        Synchronisation checkpoint for
-                                        PDump to poll on
-
-@Input          ui32PDumpFlags          PDump flags
-
-@Return         PVRSRV_OK if a valid sync checkpoint was provided.
-*/
-/*****************************************************************************/
-PVRSRV_ERROR
-SyncCheckpointPDumpPol(PSYNC_CHECKPOINT psSyncCheckpoint, PDUMP_FLAGS_T ui32PDumpFlags);
-
-/*************************************************************************/ /*!
 @Function       SyncCheckpointRecordLookup
 
 @Description    Returns a debug string with information about the
@@ -699,8 +700,26 @@ SyncCheckpointPDumpPol(PSYNC_CHECKPOINT psSyncCheckpoint, PDUMP_FLAGS_T ui32PDum
 @Return         None
 */
 /*****************************************************************************/
-void SyncCheckpointRecordLookup(PPVRSRV_DEVICE_NODE psDevNode, IMG_UINT32 ui32FwAddr,
-								IMG_CHAR * pszSyncInfo, size_t len);
+void
+SyncCheckpointRecordLookup(PPVRSRV_DEVICE_NODE psDevNode,
+                           IMG_UINT32 ui32FwAddr,
+                           IMG_CHAR * pszSyncInfo, size_t len);
 
-#endif	/* _SYNC_CHECKPOINT_ */
+#if defined(PDUMP)
+/*************************************************************************/ /*!
+@Function       PVRSRVSyncCheckpointFencePDumpPolKM
 
+@Description    Called to insert a poll into the PDump script on a given
+                Fence being signalled or errored.
+
+@Input          hFence        Fence for PDump to poll on
+
+@Return         PVRSRV_OK if a valid sync checkpoint was provided.
+*/
+/*****************************************************************************/
+
+PVRSRV_ERROR PVRSRVSyncCheckpointSignalledPDumpPolKM(PVRSRV_FENCE hFence);
+
+#endif
+
+#endif	/* SYNC_CHECKPOINT_H */

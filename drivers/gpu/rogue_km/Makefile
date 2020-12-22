@@ -55,7 +55,7 @@ TOP := $(patsubst %/,%,$(dir $(abspath $(lastword $(MAKEFILE_LIST)))))
 include $(TOP)/config_kernel.mk
 
 PVRSRVKM_NAME := $(PVRSRV_MODNAME)
-bridge_base := $(TOP)/generated
+bridge_base := $(TOP)/generated/$(PVR_ARCH)/
 
 ifeq ($(CONFIG_ANDROID), y)
 ccflags-y += -DANDROID
@@ -65,32 +65,41 @@ ifeq ($(CONFIG_BUFFER_SYNC), y)
 ccflags-y += -DSUPPORT_BUFFER_SYNC
 endif
 
+ifeq ($(cc-name), clang)
+ccflags-y += -Wno-error=typedef-redefinition -Wno-error=enum-conversion
+endif
+
 ifeq ($(CONFIG_PM_DEVFREQ),y)
 ccflags-y += -DPVR_DVFS
 endif
 
 ccflags-y += -DPVR_BUILD_DIR=\"$(PVR_BUILD_DIR)\"
-ccflags-y += -DPVRSRV_VZ_NUM_OSID=$(PVRSRV_VZ_NUM_OSID)
+ccflags-y += -DRGX_NUM_OS_SUPPORTED=$(RGX_NUM_OS_SUPPORTED)
 ccflags-y += -DVMM_TYPE=$(VMM_TYPE)
 ccflags-y += -DPVR_SYSTEM=$(PVR_SYSTEM)
 ccflags-y += -DPVR_SYSTEM_CLEAN=$(PVR_SYSTEM_CLEAN)
 
 ccflags-y += -D__linux__ -include $(TOP)/config_kernel.h \
  -I$(TOP)/include \
+ -I$(TOP)/include/drm \
  -I$(TOP)/include/public \
- -I$(TOP)/hwdefs/km \
+ -I$(TOP)/include/$(PVR_ARCH) \
+ -I$(TOP)/hwdefs/$(PVR_ARCH)/km \
  -I$(TOP)/services/include \
- -I$(TOP)/services/include/shared \
+ -I$(TOP)/services/include/$(PVR_ARCH) \
+ -I$(TOP)/services/include/env/linux \
  -I$(TOP)/services/shared/include \
  -I$(TOP)/services/shared/common \
- -I$(TOP)/services/system/include \
+ -I$(TOP)/services/shared/devices/$(PVR_ARCH) \
+ -I$(TOP)/services/system/$(PVR_ARCH)/include \
  -I$(TOP)/services/server/common \
- -I$(TOP)/services/server/devices/rgx \
+ -I$(TOP)/services/server/devices/ \
+ -I$(TOP)/services/server/devices/$(PVR_ARCH) \
  -I$(TOP)/services/server/env/linux \
  -I$(TOP)/services/server/include
 
 ifeq ($(KERNEL_DRIVER_DIR),)
- ccflags-y += -I$(TOP)/services/system/$(PVR_SYSTEM)
+ ccflags-y += -I$(TOP)/services/system/$(PVR_ARCH)/$(PVR_SYSTEM)
 endif
 
 include $(TOP)/services/server/env/linux/Kbuild.mk

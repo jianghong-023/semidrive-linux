@@ -42,17 +42,16 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */ /**************************************************************************/
 
-#ifndef _SYNC_INTERNAL_
-#define _SYNC_INTERNAL_
+#ifndef SYNC_INTERNAL
+#define SYNC_INTERNAL
 
 #include "img_types.h"
 #include "img_defs.h"
-#include <powervr/sync_external.h>
 #include "ra.h"
 #include "dllist.h"
 #include "lock.h"
 #include "devicemem.h"
-
+#include "sync_prim_internal.h"
 
 #define LOCAL_SYNC_PRIM_RESET_VALUE 0
 #define LOCAL_SYNC_PRIM_POISON_VALUE 0xa5a5a5a5u
@@ -71,7 +70,7 @@ typedef struct SYNC_PRIM_CONTEXT
 	ATOMIC_T				hRefCount;	/*!< Ref count for this context */
 } SYNC_PRIM_CONTEXT;
 
-typedef struct _SYNC_PRIM_BLOCK_
+typedef struct SYNC_PRIM_BLOCK_TAG
 {
 	SYNC_PRIM_CONTEXT	*psContext;				/*!< Our copy of the services connection */
 	IMG_HANDLE			hServerSyncPrimBlock;	/*!< Server handle for this block */
@@ -83,14 +82,14 @@ typedef struct _SYNC_PRIM_BLOCK_
 	DLLIST_NODE			sListNode;				/*!< List node for the sync block list */
 } SYNC_PRIM_BLOCK;
 
-typedef enum _SYNC_PRIM_TYPE_
+typedef enum SYNC_PRIM_TYPE_TAG
 {
 	SYNC_PRIM_TYPE_UNKNOWN = 0,
 	SYNC_PRIM_TYPE_LOCAL,
 	SYNC_PRIM_TYPE_SERVER,
 } SYNC_PRIM_TYPE;
 
-typedef struct _SYNC_PRIM_LOCAL_
+typedef struct SYNC_PRIM_LOCAL_TAG
 {
 	ATOMIC_T				hRefCount;	/*!< Ref count for this sync */
 	SYNC_PRIM_BLOCK			*psSyncBlock;	/*!< Synchronisation block this primitive is allocated on */
@@ -98,29 +97,16 @@ typedef struct _SYNC_PRIM_LOCAL_
 	IMG_HANDLE				hRecord;		/*!< Sync record handle */
 } SYNC_PRIM_LOCAL;
 
-#if defined(SUPPORT_SERVER_SYNC_IMPL)
-typedef struct _SYNC_PRIM_SERVER_
-{
-	SYNC_BRIDGE_HANDLE		hBridge;			/*!< Bridge handle */
-	IMG_HANDLE				hServerSync;		/*!< Handle to the server sync */
-	IMG_UINT32				ui32FirmwareAddr;	/*!< Firmware address of the sync */
-} SYNC_PRIM_SERVER;
-#endif
-
-typedef struct _SYNC_PRIM_
+typedef struct SYNC_PRIM_TAG
 {
 	PVRSRV_CLIENT_SYNC_PRIM	sCommon;		/*!< Client visible part of the sync prim */
 	SYNC_PRIM_TYPE			eType;			/*!< Sync primitive type */
 	union {
 		SYNC_PRIM_LOCAL		sLocal;			/*!< Local sync primitive data */
-#if defined(SUPPORT_SERVER_SYNC_IMPL)
-		SYNC_PRIM_SERVER	sServer;		/*!< Server sync primitive data */
-#endif
 	} u;
 } SYNC_PRIM;
 
 
-/* FIXME this must return a correctly typed pointer */
 IMG_INTERNAL PVRSRV_ERROR
 SyncPrimGetFirmwareAddr(PVRSRV_CLIENT_SYNC_PRIM *psSync, IMG_UINT32 *pui32FwAddr);
 
@@ -129,4 +115,4 @@ IMG_INTERNAL PVRSRV_ERROR SyncPrimLocalGetHandleAndOffset(PVRSRV_CLIENT_SYNC_PRI
 							IMG_UINT32 *pui32Offset);
 
 
-#endif	/* _SYNC_INTERNAL_ */
+#endif	/* SYNC_INTERNAL */

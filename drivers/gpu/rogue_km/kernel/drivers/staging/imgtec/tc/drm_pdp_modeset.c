@@ -1,4 +1,3 @@
-/* -*- mode: c; indent-tabs-mode: t; c-basic-offset: 8; tab-width: 8 -*- */
 /* vi: set ts=8 sw=8 sts=8: */
 /*************************************************************************/ /*!
 @File
@@ -47,7 +46,13 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include <linux/moduleparam.h>
 #include <linux/version.h>
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 5, 0))
+#include <drm/drm_drv.h>
+#include <drm/drm_print.h>
+#else
 #include <drm/drmP.h>
+#endif
+
 #include <drm/drm_crtc.h>
 #include <drm/drm_crtc_helper.h>
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 18, 0))
@@ -74,6 +79,9 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #define ODIN_PDP_WIDTH_MAX		1920
 #define ODIN_PDP_HEIGHT_MAX		1080
 
+#define ORION_PDP_WIDTH_MAX		1280
+#define ORION_PDP_HEIGHT_MAX		720
+
 #define PLATO_PDP_WIDTH_MAX		1920
 #define PLATO_PDP_HEIGHT_MAX	1080
 
@@ -84,7 +92,36 @@ module_param(async_flip_enable, bool, 0444);
 MODULE_PARM_DESC(async_flip_enable,
 		 "Enable support for 'faked' async flipping (default: Y)");
 
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0))
+static inline int
+drm_mode_fb_cmd2_validate(const struct drm_mode_fb_cmd2 *mode_cmd)
+{
+	switch (mode_cmd->pixel_format) {
+	case DRM_FORMAT_ARGB8888:
+	case DRM_FORMAT_XRGB8888:
+	case DRM_FORMAT_RGB565:
+		break;
+	default:
+		DRM_ERROR_RATELIMITED("pixel format not supported (format = %u)\n",
+				      mode_cmd->pixel_format);
+		return -EINVAL;
+	}
+
+	if (mode_cmd->flags & DRM_MODE_FB_INTERLACED) {
+		DRM_ERROR_RATELIMITED("interlaced framebuffers not supported\n");
+		return -EINVAL;
+	}
+
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 1, 0))
+	if (mode_cmd->modifier[0] != DRM_FORMAT_MOD_NONE) {
+		DRM_ERROR_RATELIMITED("format modifier 0x%llx is not supported\n",
+			  mode_cmd->modifier[0]);
+		return -EINVAL;
+	}
+#endif
+
+	return 0;
+}
+
 static void pdp_framebuffer_destroy(struct drm_framebuffer *fb)
 {
 	struct pdp_framebuffer *pdp_fb = to_pdp_framebuffer(fb);
@@ -115,6 +152,44 @@ static const struct drm_framebuffer_funcs pdp_framebuffer_funcs = {
 	.dirty = NULL,
 };
 
+static inline int
+pdp_framebuffer_init(struct pdp_drm_private *dev_priv,
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 5, 0)) || \
+	(defined(CHROMIUMOS_KERNEL) && (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 18, 0)))
+		     const
+#endif
+		     struct drm_mode_fb_cmd2 *mode_cmd,
+		     struct pdp_framebuffer *pdp_fb,
+		     struct drm_gem_object *obj)
+{
+	struct drm_framebuffer *fb;
+
+	if (!pdp_fb)
+		return -EINVAL;
+
+	fb = to_drm_framebuffer(pdp_fb);
+	pdp_fb->obj[0] = obj;
+
+	drm_helper_mode_fill_fb_struct(dev_priv->dev, fb, mode_cmd);
+
+	return drm_framebuffer_init(dev_priv->dev, fb, &pdp_framebuffer_funcs);
+}
+
+int pdp_modeset_validate_init(struct pdp_drm_private *dev_priv,
+			      struct drm_mode_fb_cmd2 *mode_cmd,
+			      struct pdp_framebuffer *pdp_fb,
+			      struct drm_gem_object *obj)
+{
+	int err;
+
+	err = drm_mode_fb_cmd2_validate(mode_cmd);
+	if (err)
+		return err;
+
+	return pdp_framebuffer_init(dev_priv, mode_cmd, pdp_fb, obj);
+}
+
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0))
 static struct drm_framebuffer *
 pdp_framebuffer_create(struct drm_device *dev,
 		       struct drm_file *file,
@@ -143,11 +218,7 @@ pdp_framebuffer_create(struct drm_device *dev,
 		goto err_obj_put;
 	}
 
-	drm_helper_mode_fill_fb_struct(dev_priv->dev, &pdp_fb->base, mode_cmd);
-	pdp_fb->obj[0] = obj;
-
-	err = drm_framebuffer_init(dev_priv->dev, &pdp_fb->base,
-				   &pdp_framebuffer_funcs);
+	err = pdp_framebuffer_init(dev_priv, mode_cmd, pdp_fb, obj);
 	if (err) {
 		DRM_ERROR("failed to initialise framebuffer (err=%d)\n", err);
 		goto err_free_fb;
@@ -182,29 +253,11 @@ pdp_fb_create(struct drm_device *dev,
 			struct drm_mode_fb_cmd2 *mode_cmd)
 {
 	struct drm_framebuffer *fb;
+	int err;
 
-	switch (mode_cmd->pixel_format) {
-	case DRM_FORMAT_ARGB8888:
-	case DRM_FORMAT_XRGB8888:
-		break;
-	default:
-		DRM_ERROR_RATELIMITED("pixel format not supported (format = %u)\n",
-			  mode_cmd->pixel_format);
-		return ERR_PTR(-EINVAL);
-	}
-
-	if (mode_cmd->flags & DRM_MODE_FB_INTERLACED) {
-		DRM_ERROR_RATELIMITED("interlaced framebuffers not supported\n");
-		return ERR_PTR(-EINVAL);
-	}
-
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 1, 0))
-	if (mode_cmd->modifier[0] != DRM_FORMAT_MOD_NONE) {
-		DRM_ERROR_RATELIMITED("format modifier 0x%llx is not supported\n",
-			  mode_cmd->modifier[0]);
-		return ERR_PTR(-EINVAL);
-	}
-#endif
+	err = drm_mode_fb_cmd2_validate(mode_cmd);
+	if (err)
+		return ERR_PTR(err);
 
 	fb = drm_gem_fb_create(dev, file, mode_cmd);
 	if (IS_ERR(fb))
@@ -243,8 +296,13 @@ int pdp_modeset_early_init(struct pdp_drm_private *dev_priv)
 		dev->mode_config.max_height = PDP_HEIGHT_MAX;
 		break;
 	case PDP_VERSION_ODIN:
-		dev->mode_config.max_width = ODIN_PDP_WIDTH_MAX;
-		dev->mode_config.max_height = ODIN_PDP_HEIGHT_MAX;
+		if (dev_priv->subversion == PDP_ODIN_ORION) {
+			dev->mode_config.max_width = ORION_PDP_WIDTH_MAX;
+			dev->mode_config.max_height = ORION_PDP_HEIGHT_MAX;
+		} else {
+			dev->mode_config.max_width = ODIN_PDP_WIDTH_MAX;
+			dev->mode_config.max_height = ODIN_PDP_HEIGHT_MAX;
+		}
 		break;
 	case PDP_VERSION_PLATO:
 		dev->mode_config.max_width = PLATO_PDP_WIDTH_MAX;
@@ -329,16 +387,49 @@ err_config_cleanup:
 	return err;
 }
 
+static inline int pdp_modeset_init_fbdev(struct pdp_drm_private *dev_priv)
+{
+#if defined(CONFIG_DRM_FBDEV_EMULATION)
+	struct pdp_fbdev *fbdev;
+	int err;
+
+	fbdev = pdp_fbdev_create(dev_priv);
+	if (IS_ERR(fbdev)) {
+		DRM_ERROR("failed to create a fb device");
+		return PTR_ERR(fbdev);
+	}
+	dev_priv->fbdev = fbdev;
+
+	/*
+	 * pdpdrmfb is registered and available for userspace to use. If this
+	 * is the only or primary device, fbcon has already bound a tty to it,
+	 * and the following call will take no effect. However, this may be
+	 * essential in order to sync the display when fbcon was already bound
+	 * to a different tty (and fbdev). This triggers ->set_config() which
+	 * will in turn set up a config and then do a modeset.
+	 */
+	err = drm_fb_helper_restore_fbdev_mode_unlocked(&dev_priv->fbdev->helper);
+	if (err) {
+		DRM_ERROR("failed to set mode (err=%d)\n", err);
+		return err;
+	}
+#endif
+	return 0;
+}
+
 int pdp_modeset_late_init(struct pdp_drm_private *dev_priv)
 {
 	struct drm_device *ddev = dev_priv->dev;
+	int err;
 
 	drm_mode_config_reset(ddev);
 
+	err = pdp_modeset_init_fbdev(dev_priv);
+	if (err)
+		DRM_INFO("fbdev init failure is not fatal, continue anyway.\n");
+
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(4, 8, 0))
 	if (dev_priv->connector != NULL) {
-		int err;
-
 		err = drm_connector_register(dev_priv->connector);
 		if (err) {
 			DRM_ERROR("[CONNECTOR:%d:%s] failed to register (err=%d)\n",
@@ -362,6 +453,9 @@ void pdp_modeset_early_cleanup(struct pdp_drm_private *dev_priv)
 
 void pdp_modeset_late_cleanup(struct pdp_drm_private *dev_priv)
 {
+#if defined(CONFIG_DRM_FBDEV_EMULATION)
+	pdp_fbdev_destroy(dev_priv->fbdev);
+#endif
 	drm_mode_config_cleanup(dev_priv->dev);
 
 	DRM_DEBUG_DRIVER("cleaned up\n");

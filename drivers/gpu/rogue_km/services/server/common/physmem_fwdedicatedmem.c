@@ -127,19 +127,12 @@ PMRAcquireKernelMappingDataFWMem(PMR_IMPL_PRIVDATA pvPriv,
 	PVRSRV_ERROR eError;
 
 	eError = DevmemCPUCacheMode(psPrivData->psDeviceNode, ulFlags, &ui32CPUCacheFlags);
-	if (eError != PVRSRV_OK)
-	{
-		return eError;
-	}
+	PVR_RETURN_IF_ERROR(eError);
 
 	PVR_UNREFERENCED_PARAMETER(uiSize);
 
 	pvKernLinAddr = OSMapPhysToLin(psPrivData->sCpuPAddr, psPrivData->ui64Size, ui32CPUCacheFlags);
-
-	if (pvKernLinAddr == NULL)
-	{
-		return PVRSRV_ERROR_OUT_OF_MEMORY;
-	}
+	PVR_RETURN_IF_NOMEM(pvKernLinAddr);
 
 	*ppvKernelAddressOut = ((IMG_CHAR *) pvKernLinAddr) + uiOffset;
 	*phHandleOut = pvKernLinAddr;
@@ -182,7 +175,8 @@ static PMR_IMPL_FUNCTAB _sPMRFWMemFuncTab = {
 /*
  * Public functions
  */
-PVRSRV_ERROR PhysmemNewFWDedicatedMemPMR(PVRSRV_DEVICE_NODE *psDevNode,
+PVRSRV_ERROR PhysmemNewFWDedicatedMemPMR(CONNECTION_DATA *psConnection,
+                                         PVRSRV_DEVICE_NODE *psDevNode,
                                          IMG_DEVMEM_SIZE_T uiSize,
                                          PMR_LOG2ALIGN_T uiLog2Align,
                                          PVRSRV_MEMALLOCFLAGS_T uiFlags,
@@ -195,6 +189,8 @@ PVRSRV_ERROR PhysmemNewFWDedicatedMemPMR(PVRSRV_DEVICE_NODE *psDevNode,
 	IMG_UINT32 uiMappingTable = 0;
 	PMR_FLAGS_T uiPMRFlags;
 	PVRSRV_ERROR eError;
+
+	PVR_UNREFERENCED_PARAMETER(psConnection);
 
 	/* In this instance, we simply pass flags straight through. Generally,
 	 * uiFlags can include things that control the PMR factory, but we
@@ -227,21 +223,10 @@ PVRSRV_ERROR PhysmemNewFWDedicatedMemPMR(PVRSRV_DEVICE_NODE *psDevNode,
 	                  &uiCardAddr,
 	                  &uiActualSize,
 	                  NULL);                   /* No private handle */
-
-	if (eError != PVRSRV_OK)
-	{
-		PVR_DPF((PVR_DBG_ERROR, "%s: Memory allocation failed (%u)",
-				 __func__, eError));
-		return eError;
-	}
+	PVR_LOG_RETURN_IF_ERROR(eError, "RA_Alloc");
 
 	psPrivData = OSAllocZMem(sizeof(PMR_FWMEM_DATA));
-
-	if (psPrivData == NULL)
-	{
-		eError = PVRSRV_ERROR_OUT_OF_MEMORY;
-		goto errorOnAllocData;
-	}
+	PVR_GOTO_IF_NOMEM(psPrivData, eError, errorOnAllocData);
 
 	/*
 	 * uiLog2Align is only used to get memory with the correct alignment.
@@ -273,19 +258,11 @@ PVRSRV_ERROR PhysmemNewFWDedicatedMemPMR(PVRSRV_DEVICE_NODE *psDevNode,
 	                      PMR_TYPE_LMA,
 	                      &psPMR,
 	                      PDUMP_NONE);
-	if (eError != PVRSRV_OK)
-	{
-		goto errorOnCreatePMR;
-	}
+	PVR_GOTO_IF_ERROR(eError, errorOnCreatePMR);
 
 #if defined(PVRSRV_ENABLE_GPU_MEMORY_INFO)
 	eError = RIWritePMREntryKM(psPMR);
-	if (eError != PVRSRV_OK)
-	{
-		PVR_DPF((PVR_DBG_WARNING,
-		         "%s: Failed to write PMR entry (%s)",
-		         __func__, PVRSRVGetErrorString(eError)));
-	}
+	PVR_WARN_IF_ERROR(eError, "RIWritePMREntryKM");
 #endif
 
 	*ppsPMRPtr = psPMR;
@@ -317,14 +294,7 @@ PVRSRV_ERROR PhysmemInitFWDedicatedMem(PVRSRV_DEVICE_NODE *psDeviceNode,
 
 	eError = PhysHeapAcquire(psRGXData->uiFWMemPhysHeapID,
 	                         &psDeviceNode->psDedicatedFWMemHeap);
-
-	if (eError != PVRSRV_OK)
-	{
-		PVR_DPF((PVR_DBG_ERROR,
-				 "%s: Failed to acquire dedicated FW memory physical heap",
-				 __func__));
-		goto errorOnPhysHeapAcquire;
-	}
+	PVR_LOG_GOTO_IF_ERROR(eError, "PhysHeapAcquire", errorOnPhysHeapAcquire);
 
 	if (PhysHeapGetType(psDeviceNode->psDedicatedFWMemHeap) != PHYS_HEAP_TYPE_LMA ||
 	    PhysHeapNumberOfRegions(psDeviceNode->psDedicatedFWMemHeap) != 1)
@@ -334,43 +304,24 @@ PVRSRV_ERROR PhysmemInitFWDedicatedMem(PVRSRV_DEVICE_NODE *psDeviceNode,
 				 __func__,
 				 PhysHeapGetType(psDeviceNode->psDedicatedFWMemHeap),
 				 PhysHeapNumberOfRegions(psDeviceNode->psDedicatedFWMemHeap)));
-		eError = PVRSRV_ERROR_INVALID_HEAP;
-		goto errorOnValidatePhysHeap;
+		PVR_GOTO_WITH_ERROR(eError, PVRSRV_ERROR_INVALID_HEAP, errorOnValidatePhysHeap);
 	}
 
 	PhysHeapRegionGetSize(psDeviceNode->psDedicatedFWMemHeap, 0, &ui64Size);
 	PhysHeapRegionGetDevPAddr(psDeviceNode->psDedicatedFWMemHeap, 0, &sDevPAddr);
 
-	psDeviceNode->psDedicatedFWMemArena =
-		RA_Create("Dedicated_FW_mem",
-				  OSGetPageShift(),
-				  RA_LOCKCLASS_0,
-				  NULL, NULL, NULL,
-				  IMG_FALSE);
-
-	if (psDeviceNode->psDedicatedFWMemArena == NULL)
-	{
-		PVR_DPF((PVR_DBG_ERROR, "%s: Failed to create dedicated FW memory arena", __func__));
-		eError = PVRSRV_ERROR_OUT_OF_MEMORY;
-		goto errorOnRACreate;
-	}
-
-	if (!RA_Add(psDeviceNode->psDedicatedFWMemArena,
-				(RA_BASE_T)sDevPAddr.uiAddr,
-				(RA_LENGTH_T)ui64Size,
-				0, NULL))
-	{
-		PVR_DPF((PVR_DBG_ERROR,
-				 "%s: Failed to add memory to dedicated FW memory arena",
-				 __func__));
-		eError = PVRSRV_ERROR_OUT_OF_MEMORY;
-		goto errorOnRAAdd;
-	}
+	eError = PVRSRVCreateRegionRA(psDevConfig,
+								  &psDeviceNode->psDedicatedFWMemArena,
+								  NULL,
+								  0,
+								  sDevPAddr.uiAddr,
+								  ui64Size,
+								  0,
+								  "Dedicated Fw Mem");
+	PVR_LOG_GOTO_IF_ERROR(eError, "CreateRegionRA(DedicatedFwMem)", errorOnRACreate);
 
 	return PVRSRV_OK;
 
-errorOnRAAdd:
-	RA_Delete(psDeviceNode->psDedicatedFWMemArena);
 errorOnRACreate:
 errorOnValidatePhysHeap:
 	PhysHeapRelease(psDeviceNode->psDedicatedFWMemHeap);
@@ -380,8 +331,17 @@ errorOnPhysHeapAcquire:
 
 void PhysmemDeinitFWDedicatedMem(PVRSRV_DEVICE_NODE *psDeviceNode)
 {
-	RA_Delete(psDeviceNode->psDedicatedFWMemArena);
-	PhysHeapRelease(psDeviceNode->psDedicatedFWMemHeap);
+	/* Validate arguments before dereferencing as we are called on Init errors
+	 * as well as normal shutdown.
+	 */
+	if (psDeviceNode->psDedicatedFWMemArena)
+	{
+		RA_Delete(psDeviceNode->psDedicatedFWMemArena);
+	}
+	if (psDeviceNode->psDedicatedFWMemHeap)
+	{
+		PhysHeapRelease(psDeviceNode->psDedicatedFWMemHeap);
+	}
 }
 
 #else /* !defined(NO_HARDWARE) */
@@ -496,7 +456,8 @@ static PMR_IMPL_FUNCTAB _sPMRFWFuncTab = {
 /*
  * Public functions
  */
-PVRSRV_ERROR PhysmemNewFWDedicatedMemPMR(PVRSRV_DEVICE_NODE *psDevNode,
+PVRSRV_ERROR PhysmemNewFWDedicatedMemPMR(CONNECTION_DATA *psConnection,
+                                         PVRSRV_DEVICE_NODE *psDevNode,
                                          IMG_DEVMEM_SIZE_T uiSize,
                                          PMR_LOG2ALIGN_T uiLog2Align,
                                          PVRSRV_MEMALLOCFLAGS_T uiFlags,
@@ -524,22 +485,16 @@ PVRSRV_ERROR PhysmemNewFWDedicatedMemPMR(PVRSRV_DEVICE_NODE *psDevNode,
 	PVR_ASSERT(uiPMRFlags == (uiFlags & PVRSRV_MEMALLOCFLAGS_PMRFLAGSMASK));
 
 	psPrivData = OSAllocZMem(sizeof(PMR_FWDEDICATEDMEM_DATA));
-	if (psPrivData == NULL)
-	{
-		eError = PVRSRV_ERROR_OUT_OF_MEMORY;
-		goto errorOnAllocData;
-	}
+	PVR_GOTO_IF_NOMEM(psPrivData, eError, errorOnAllocData);
 
 	/* Get required info for the dedicated FW memory physical heap */
 	if (!psRGXData->bHasFWMemPhysHeap)
 	{
-		PVR_DPF((PVR_DBG_ERROR, "%s: Physical heap not available!", __func__));
-		eError = PVRSRV_ERROR_NOT_IMPLEMENTED;
-		goto errorOnAcquireHeap;
+		PVR_LOG_GOTO_WITH_ERROR("psRGXData->bHasFWMemPhysHeap", eError, PVRSRV_ERROR_NOT_IMPLEMENTED, errorOnAcquireHeap);
 	}
 	eError = PhysHeapAcquire(psRGXData->uiFWMemPhysHeapID,
 	                         &psPrivData->psFWMemPhysHeap);
-	if(eError != PVRSRV_OK) goto errorOnAcquireHeap;
+	PVR_GOTO_IF_ERROR(eError, errorOnAcquireHeap);
 
 	/* The alignment requested by the caller is only used to generate the
 	 * secure FW allocation pdump command with the correct alignment.
@@ -551,7 +506,8 @@ PVRSRV_ERROR PhysmemNewFWDedicatedMemPMR(PVRSRV_DEVICE_NODE *psDevNode,
 	 * to dump this memory to pdump, it doesn't need to have the alignment
 	 * requested by the caller.
 	 */
-	eError = PhysmemNewOSRamBackedPMR(psDevNode,
+	eError = PhysmemNewOSRamBackedPMR(psConnection,
+	                                  psDevNode,
 	                                  uiSize,
 	                                  uiSize,
 	                                  1,                 /* ui32NumPhysChunks */
@@ -561,11 +517,9 @@ PVRSRV_ERROR PhysmemNewFWDedicatedMemPMR(PVRSRV_DEVICE_NODE *psDevNode,
 	                                  uiFlags,
 	                                  "DEDICATEDFWMEM_OSMEM",
 	                                  OSGetCurrentClientProcessIDKM(),
-	                                  &psOSPMR);
-	if (eError != PVRSRV_OK)
-	{
-		goto errorOnCreateOSPMR;
-	}
+	                                  &psOSPMR,
+	                                  PDUMP_NONE);
+	PVR_GOTO_IF_ERROR(eError, errorOnCreateOSPMR);
 
 	/* This is the primary PMR dumped with correct memspace and alignment */
 	eError = PMRCreatePMR(psDevNode,
@@ -583,19 +537,11 @@ PVRSRV_ERROR PhysmemNewFWDedicatedMemPMR(PVRSRV_DEVICE_NODE *psDevNode,
 	                      PMR_TYPE_OSMEM,
 	                      &psPMR,
 	                      PDUMP_NONE);
-	if (eError != PVRSRV_OK)
-	{
-		goto errorOnCreatePMR;
-	}
+	PVR_GOTO_IF_ERROR(eError, errorOnCreatePMR);
 
 #if defined(PVRSRV_ENABLE_GPU_MEMORY_INFO)
 	eError = RIWritePMREntryKM(psPMR);
-	if (eError != PVRSRV_OK)
-	{
-		PVR_DPF((PVR_DBG_WARNING,
-		         "%s: Failed to write PMR entry (%s)",
-		         __func__, PVRSRVGetErrorString(eError)));
-	}
+	PVR_WARN_IF_ERROR(eError, "RIWritePMREntryKM");
 #endif
 
 	psPrivData->psOSMemPMR = psOSPMR;

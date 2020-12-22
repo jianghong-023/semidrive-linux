@@ -379,6 +379,8 @@ TLStreamReserve(IMG_HANDLE hStream,
                                   suggestion is returned in this argument which
                                   the caller can attempt to reserve again for a
                                   successful allocation.
+ @Output        pbIsReaderConnected Let writing clients know if reader is
+                                    connected or not, in case of error.
  @Return        PVRSRV_INVALID_PARAMS        NULL stream handler.
  @Return        PVRSRV_ERROR_NOT_READY       There are data previously reserved
                                              that are pending to be committed.
@@ -404,7 +406,8 @@ TLStreamReserve2(IMG_HANDLE hStream,
                 IMG_UINT8  **ppui8Data,
                 IMG_UINT32 ui32Size,
                 IMG_UINT32 ui32SizeMin,
-                IMG_UINT32* pui32Available);
+                IMG_UINT32* pui32Available,
+                IMG_BOOL* pbIsReaderConnected);
 
 /*************************************************************************/ /*!
  @Function      TLStreamReserveReturnFlags

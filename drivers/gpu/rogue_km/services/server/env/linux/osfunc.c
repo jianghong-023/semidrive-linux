@@ -48,7 +48,6 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include <linux/dma-mapping.h>
 #include <linux/io.h>
 #include <linux/mm.h>
-#include <linux/kernel.h>
 #include <linux/pagemap.h>
 #include <linux/hugetlb.h>
 #include <linux/slab.h>
@@ -84,7 +83,6 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "img_types.h"
 #include "allocmem.h"
 #include "devicemem_server_utils.h"
-#include "pvr_debugfs.h"
 #include "event.h"
 #include "linkage.h"
 #include "pvr_uaccess.h"
@@ -108,19 +106,6 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #endif /* EMULATOR */
 #endif
 
-#if defined(PVRSRV_USE_BRIDGE_LOCK)
-/*
- * Main driver lock, used to ensure driver code is single threaded. There are
- * some places where this lock must not be taken, such as in the mmap related
- * driver entry points.
- */
-static DEFINE_MUTEX(gPVRSRVLock);
-
-static void *g_pvBridgeBuffers;
-
-struct task_struct *BridgeLockGetOwner(void);
-IMG_BOOL BridgeLockIsLocked(void);
-#endif
 
 typedef struct {
 	struct task_struct *kthread;
@@ -132,6 +117,12 @@ typedef struct {
 	PFN_THREAD_DEBUG_DUMP pfnDebugDumpCB;
 	DLLIST_NODE sNode;
 } OSThreadData;
+
+void OSSuspendTaskInterruptible(void)
+{
+	set_current_state(TASK_INTERRUPTIBLE);
+	schedule();
+}
 
 static DLLIST_NODE gsThreadListHead;
 
@@ -177,7 +168,8 @@ void OSThreadDumpInfo(DUMPDEBUG_PRINTF_FUNC* pfnDumpDebugPrintf,
 }
 
 PVRSRV_ERROR OSPhyContigPagesAlloc(PVRSRV_DEVICE_NODE *psDevNode, size_t uiSize,
-							PG_HANDLE *psMemHandle, IMG_DEV_PHYADDR *psDevPAddr)
+							PG_HANDLE *psMemHandle, IMG_DEV_PHYADDR *psDevPAddr,
+							IMG_PID uiPid)
 {
 	struct device *psDev = psDevNode->psDevConfig->pvOSDevice;
 	IMG_CPU_PHYADDR sCpuPAddr;
@@ -222,7 +214,7 @@ PVRSRV_ERROR OSPhyContigPagesAlloc(PVRSRV_DEVICE_NODE *psDevNode, size_t uiSize,
 	uiSize = (1 << ui32Order) * PAGE_SIZE;
 
 	psMemHandle->u.pvHandle = psPage;
-	psMemHandle->ui32Order = ui32Order;
+	psMemHandle->uiOrder = ui32Order;
 	sCpuPAddr.uiAddr = IMG_CAST_TO_CPUPHYADDR_UINT(page_to_phys(psPage));
 
 	/*
@@ -234,17 +226,20 @@ PVRSRV_ERROR OSPhyContigPagesAlloc(PVRSRV_DEVICE_NODE *psDevNode, size_t uiSize,
 #if defined(PVRSRV_ENABLE_PROCESS_STATS)
 #if !defined(PVRSRV_ENABLE_MEMORY_STATS)
 	PVRSRVStatsIncrMemAllocStatAndTrack(PVRSRV_MEM_ALLOC_TYPE_ALLOC_PAGES_PT_UMA,
-										uiSize,
-										(IMG_UINT64)(uintptr_t) psPage,
-										OSGetCurrentClientProcessIDKM());
+	                                    uiSize,
+	                                    (IMG_UINT64)(uintptr_t) psPage,
+	                                    uiPid);
 #else
 	PVRSRVStatsAddMemAllocRecord(PVRSRV_MEM_ALLOC_TYPE_ALLOC_PAGES_PT_UMA,
 	                             psPage,
-								 sCpuPAddr,
-								 uiSize,
-								 NULL,
-								 OSGetCurrentClientProcessIDKM());
+	                             sCpuPAddr,
+	                             uiSize,
+	                             NULL,
+	                             uiPid
+	                             DEBUG_MEMSTATS_VALUES);
 #endif
+#else
+	PVR_UNREFERENCED_PARAMETER(uiPid);
 #endif
 
 	return PVRSRV_OK;
@@ -253,9 +248,10 @@ PVRSRV_ERROR OSPhyContigPagesAlloc(PVRSRV_DEVICE_NODE *psDevNode, size_t uiSize,
 void OSPhyContigPagesFree(PVRSRV_DEVICE_NODE *psDevNode, PG_HANDLE *psMemHandle)
 {
 	struct page *psPage = (struct page*) psMemHandle->u.pvHandle;
-	IMG_UINT32	uiSize, uiPageCount=0;
+	IMG_UINT32	uiSize, uiPageCount=0, ui32Order;
 
-	uiPageCount = (1 << psMemHandle->ui32Order);
+	ui32Order = psMemHandle->uiOrder;
+	uiPageCount = (1 << ui32Order);
 	uiSize = (uiPageCount * PAGE_SIZE);
 
 #if defined(PVRSRV_ENABLE_PROCESS_STATS)
@@ -269,15 +265,15 @@ void OSPhyContigPagesFree(PVRSRV_DEVICE_NODE *psDevNode, PG_HANDLE *psMemHandle)
 #endif
 #endif
 
-	__free_pages(psPage, psMemHandle->ui32Order);
-	psMemHandle->ui32Order = 0;
+	__free_pages(psPage, ui32Order);
+	psMemHandle->uiOrder = 0;
 }
 
 PVRSRV_ERROR OSPhyContigPagesMap(PVRSRV_DEVICE_NODE *psDevNode, PG_HANDLE *psMemHandle,
 						size_t uiSize, IMG_DEV_PHYADDR *psDevPAddr,
 						void **pvPtr)
 {
-	size_t actualSize = 1 << (PAGE_SHIFT + psMemHandle->ui32Order);
+	size_t actualSize = 1 << (PAGE_SHIFT + psMemHandle->uiOrder);
 	*pvPtr = kmap((struct page*)psMemHandle->u.pvHandle);
 
 	PVR_UNREFERENCED_PARAMETER(psDevPAddr);
@@ -299,7 +295,8 @@ PVRSRV_ERROR OSPhyContigPagesMap(PVRSRV_DEVICE_NODE *psDevNode, PG_HANDLE *psMem
 									 sCpuPAddr,
 									 actualSize,
 									 NULL,
-									 OSGetCurrentClientProcessIDKM());
+									 OSGetCurrentClientProcessIDKM()
+									 DEBUG_MEMSTATS_VALUES);
 	}
 #endif
 #endif
@@ -313,7 +310,7 @@ void OSPhyContigPagesUnmap(PVRSRV_DEVICE_NODE *psDevNode, PG_HANDLE *psMemHandle
 #if !defined(PVRSRV_ENABLE_MEMORY_STATS)
 	/* Mapping is done a page at a time */
 	PVRSRVStatsDecrMemAllocStat(PVRSRV_MEM_ALLOC_TYPE_VMAP_PT_UMA,
-	                            (1 << (PAGE_SHIFT + psMemHandle->ui32Order)),
+	                            (1 << (PAGE_SHIFT + psMemHandle->uiOrder)),
 	                            OSGetCurrentClientProcessIDKM());
 #else
 	PVRSRVStatsRemoveMemAllocRecord(PVRSRV_MEM_ALLOC_TYPE_VMAP_PT_UMA,
@@ -339,12 +336,15 @@ PVRSRV_ERROR OSPhyContigPagesClean(PVRSRV_DEVICE_NODE *psDevNode,
 	void* pvVirtAddrStart = kmap(psPage) + uiOffset;
 	IMG_CPU_PHYADDR sPhysStart, sPhysEnd;
 
+	IMG_UINT32 ui32Order;
+
 	if (uiLength == 0)
 	{
 		goto e0;
 	}
 
-	if ((uiOffset + uiLength) > ((1 << psMemHandle->ui32Order) * PAGE_SIZE))
+	ui32Order = psMemHandle->uiOrder;
+	if ((uiOffset + uiLength) > ((1 << ui32Order) * PAGE_SIZE))
 	{
 		PVR_DPF((PVR_DBG_ERROR,
 				"%s: Invalid size params, uiOffset %u, uiLength %u",
@@ -378,13 +378,13 @@ e0:
 #error "PVRSRV Alignment macros need to be defined for this compiler"
 #endif
 
-IMG_UINT32 OSCPUCacheAttributeSize(IMG_DCACHE_ATTRIBUTE eCacheAttribute)
+IMG_UINT32 OSCPUCacheAttributeSize(OS_CPU_CACHE_ATTRIBUTE eCacheAttribute)
 {
 	IMG_UINT32 uiSize = 0;
 
 	switch (eCacheAttribute)
 	{
-		case PVR_DCACHE_LINE_SIZE:
+		case OS_CPU_CACHE_ATTRIBUTE_LINE_SIZE:
 			uiSize = cache_line_size();
 			break;
 
@@ -398,7 +398,7 @@ IMG_UINT32 OSCPUCacheAttributeSize(IMG_DCACHE_ATTRIBUTE eCacheAttribute)
 	return uiSize;
 }
 
-IMG_UINT32 OSVSScanf(IMG_CHAR *pStr, const IMG_CHAR *pszFormat, ...)
+IMG_UINT32 OSVSScanf(const IMG_CHAR *pStr, const IMG_CHAR *pszFormat, ...)
 {
 	va_list argList;
 	IMG_INT32 iCount = 0;
@@ -412,36 +412,29 @@ IMG_UINT32 OSVSScanf(IMG_CHAR *pStr, const IMG_CHAR *pszFormat, ...)
 
 IMG_INT OSMemCmp(void *pvBufA, void *pvBufB, size_t uiLen)
 {
-	return (IMG_INT) memcmp(pvBufA, pvBufB, uiLen);
+	return (IMG_INT)memcmp(pvBufA, pvBufB, uiLen);
 }
 
-size_t OSStringLCopy(IMG_CHAR *pszDest, const IMG_CHAR *pszSrc, size_t uSize)
+size_t OSStringLCat(IMG_CHAR *pszDest, const IMG_CHAR *pszSrc, size_t uDstSize)
 {
-	size_t	uSrcSize = strlcpy(pszDest, pszSrc, uSize);
+	/*
+	 * Let strlcat handle any truncation cases correctly.
+	 * We will definitely get a NUL-terminated string set in pszDest
+	 */
+	size_t uSrcSize = strlcat(pszDest, pszSrc, uDstSize);
 
 #if defined(PVR_DEBUG_STRLCPY) && defined(DEBUG)
 	/* Handle truncation by dumping calling stack if debug allows */
-	if (uSrcSize >= uSize)
+	if (uSrcSize >= uDstSize)
 	{
 		PVR_DPF((PVR_DBG_WARNING,
 			"%s: String truncated Src = '<%s>' %ld bytes, Dest = '%s'",
-			__func__, pszSrc, (long)uSize, pszDest));
+			__func__, pszSrc, (long)uDstSize, pszDest));
 		OSDumpStack();
 	}
-#endif	/* defined (PVR_DEBUG_STRLCPY) && defined(DEBUG) */
+#endif /* defined(PVR_DEBUG_STRLCPY) && defined(DEBUG) */
 
 	return uSrcSize;
-}
-
-IMG_CHAR *OSStringNCopy(IMG_CHAR *pszDest, const IMG_CHAR *pszSrc, size_t uSize)
-{
-	/*
-	 * Let strlcpy handle any truncation cases correctly.
-	 * We will definitely get a NUL-terminated string set in pszDest
-	 */
-	(void) OSStringLCopy(pszDest, pszSrc, uSize);
-
-	return pszDest;
 }
 
 IMG_INT32 OSSNPrintf(IMG_CHAR *pStr, size_t ui32Size, const IMG_CHAR *pszFormat, ...)
@@ -471,11 +464,6 @@ size_t OSStringNLength(const IMG_CHAR *pStr, size_t uiCount)
 	return strnlen(pStr, uiCount);
 }
 
-IMG_INT32 OSStringCompare(const IMG_CHAR *pStr1, const IMG_CHAR *pStr2)
-{
-	return strcmp(pStr1, pStr2);
-}
-
 IMG_INT32 OSStringNCompare(const IMG_CHAR *pStr1, const IMG_CHAR *pStr2,
                           size_t uiSize)
 {
@@ -491,16 +479,36 @@ PVRSRV_ERROR OSStringToUINT32(const IMG_CHAR *pStr, IMG_UINT32 ui32Base,
 	return PVRSRV_OK;
 }
 
+IMG_UINT32 OSStringUINT32ToStr(IMG_CHAR *pszBuf, size_t uSize,
+							IMG_UINT32 ui32Num)
+{
+	IMG_UINT32 ui32i, ui32Len = 0, ui32NumCopy = ui32Num;
+
+	/* calculate string length required to hold the number string */
+	do
+	{
+		ui32Len++;
+		ui32NumCopy /= 10;
+	} while (ui32NumCopy != 0);
+
+	if (unlikely(ui32Len >= uSize))
+	{
+		/* insufficient buffer */
+		return 0;
+	}
+
+	for (ui32i = 0; ui32i < ui32Len; ui32i++)
+	{
+		pszBuf[ui32Len - (ui32i + 1)] = '0' + ui32Num % 10;
+		ui32Num = ui32Num / 10;
+	}
+
+	pszBuf[ui32Len] = '\0';
+	return ui32Len;
+}
+
 PVRSRV_ERROR OSInitEnvData(void)
 {
-#if defined(PVRSRV_USE_BRIDGE_LOCK)
-	/* allocate memory for the bridge buffers to be used during an ioctl */
-	g_pvBridgeBuffers = OSAllocMem(PVRSRV_MAX_BRIDGE_IN_SIZE + PVRSRV_MAX_BRIDGE_OUT_SIZE);
-	if (g_pvBridgeBuffers == NULL)
-	{
-		return PVRSRV_ERROR_OUT_OF_MEMORY;
-	}
-#endif
 
 	LinuxInitPhysmem();
 
@@ -514,28 +522,8 @@ void OSDeInitEnvData(void)
 {
 
 	LinuxDeinitPhysmem();
-#if defined(PVRSRV_USE_BRIDGE_LOCK)
-	if (g_pvBridgeBuffers)
-	{
-		/* free-up the memory allocated for bridge buffers */
-		OSFreeMem(g_pvBridgeBuffers);
-		g_pvBridgeBuffers = NULL;
-	}
-#endif
 }
 
-#if defined(PVRSRV_USE_BRIDGE_LOCK)
-PVRSRV_ERROR OSGetGlobalBridgeBuffers(void **ppvBridgeInBuffer,
-									  void **ppvBridgeOutBuffer)
-{
-	PVR_ASSERT (ppvBridgeInBuffer && ppvBridgeOutBuffer);
-
-	*ppvBridgeInBuffer = g_pvBridgeBuffers;
-	*ppvBridgeOutBuffer = *ppvBridgeInBuffer + PVRSRV_MAX_BRIDGE_IN_SIZE;
-
-	return PVRSRV_OK;
-}
-#endif
 
 void OSReleaseThreadQuanta(void)
 {
@@ -617,6 +605,15 @@ PVRSRV_ERROR OSClockMonotonicus64(IMG_UINT64 *pui64Time)
 	return PVRSRV_OK;
 }
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 6, 0))
+IMG_UINT64 OSClockMonotonicRawns64(void)
+{
+	struct timespec64 ts;
+
+	ktime_get_raw_ts64(&ts);
+	return ts.tv_sec * 1000000000 + ts.tv_nsec;
+}
+#else
 IMG_UINT64 OSClockMonotonicRawns64(void)
 {
 	struct timespec ts;
@@ -624,6 +621,7 @@ IMG_UINT64 OSClockMonotonicRawns64(void)
 	getrawmonotonic(&ts);
 	return (IMG_UINT64) ts.tv_sec * 1000000000 + ts.tv_nsec;
 }
+#endif
 
 IMG_UINT64 OSClockMonotonicRawus64(void)
 {
@@ -662,6 +660,16 @@ INLINE IMG_PID OSGetCurrentProcessID(void)
 	}
 
 	return (IMG_PID)task_tgid_nr(current);
+}
+
+INLINE IMG_PID OSGetCurrentVirtualProcessID(void)
+{
+	if (in_interrupt())
+	{
+		return KERNEL_ID;
+	}
+
+	return (IMG_PID)task_tgid_vnr(current);
 }
 
 INLINE IMG_CHAR *OSGetCurrentProcessName(void)
@@ -790,10 +798,7 @@ PVRSRV_ERROR OSInstallMISR(IMG_HANDLE *hMISRData, PFN_MISR pfnMISR,
 	MISR_DATA *psMISRData;
 
 	psMISRData = OSAllocMem(sizeof(*psMISRData));
-	if (psMISRData == NULL)
-	{
-		return PVRSRV_ERROR_OUT_OF_MEMORY;
-	}
+	PVR_LOG_RETURN_IF_NOMEM(psMISRData, "psMISRData");
 
 	psMISRData->hData = hData;
 	psMISRData->pfnMISR = pfnMISR;
@@ -924,11 +929,7 @@ PVRSRV_ERROR OSThreadCreatePriority(IMG_HANDLE *phThread,
 	PVRSRV_ERROR eError;
 
 	psOSThreadData = OSAllocZMem(sizeof(*psOSThreadData));
-	if (psOSThreadData == NULL)
-	{
-		eError = PVRSRV_ERROR_OUT_OF_MEMORY;
-		goto fail_alloc;
-	}
+	PVR_LOG_GOTO_IF_NOMEM(psOSThreadData, eError, fail_alloc);
 
 	psOSThreadData->pfnThread = pfnThread;
 	psOSThreadData->hData = hData;
@@ -996,7 +997,7 @@ void OSPanic(void)
 	BUG();
 
 #if defined(__KLOCWORK__)
-	/* Klocworks does not understand that BUG is terminal... */
+	/* Klocwork does not understand that BUG is terminal... */
 	abort();
 #endif
 }
@@ -1014,7 +1015,7 @@ OSMapPhysToLin(IMG_CPU_PHYADDR BasePAddr,
 		return NULL;
 	}
 
-	if (! PVRSRV_VZ_MODE_IS(DRIVER_MODE_NATIVE))
+	if (! PVRSRV_VZ_MODE_IS(NATIVE))
 	{
 		/*
 		  This is required to support DMA physheaps for GPU virtualization.
@@ -1039,13 +1040,13 @@ OSMapPhysToLin(IMG_CPU_PHYADDR BasePAddr,
 	switch (ui32MappingFlags)
 	{
 		case PVRSRV_MEMALLOCFLAG_CPU_UNCACHED:
-			pvLinAddr = (void __iomem *)ioremap_nocache(BasePAddr.uiAddr, ui32Bytes);
+			pvLinAddr = (void __iomem *)ioremap(BasePAddr.uiAddr, ui32Bytes);
 			break;
 		case PVRSRV_MEMALLOCFLAG_CPU_WRITE_COMBINE:
 #if defined(CONFIG_X86) || defined(CONFIG_ARM) || defined(CONFIG_ARM64)
 			pvLinAddr = (void __iomem *)ioremap_wc(BasePAddr.uiAddr, ui32Bytes);
 #else
-			pvLinAddr = (void __iomem *)ioremap_nocache(BasePAddr.uiAddr, ui32Bytes);
+			pvLinAddr = (void __iomem *)ioremap(BasePAddr.uiAddr, ui32Bytes);
 #endif
 			break;
 		case PVRSRV_MEMALLOCFLAG_CPU_CACHED:
@@ -1081,7 +1082,7 @@ OSUnMapPhysToLin(void *pvLinAddr, size_t ui32Bytes, IMG_UINT32 ui32MappingFlags)
 		return IMG_FALSE;
 	}
 
-	if (! PVRSRV_VZ_MODE_IS(DRIVER_MODE_NATIVE))
+	if (!PVRSRV_VZ_MODE_IS(NATIVE))
 	{
 		if (SysDmaCpuVAddrToDevPAddr(pvLinAddr))
 		{
@@ -1094,9 +1095,9 @@ OSUnMapPhysToLin(void *pvLinAddr, size_t ui32Bytes, IMG_UINT32 ui32MappingFlags)
 	return IMG_TRUE;
 }
 
-#define	OS_MAX_TIMERS	8
+#define OS_MAX_TIMERS	8
 
-/* Timer callback strucure used by OSAddTimer */
+/* Timer callback structure used by OSAddTimer */
 typedef struct TIMER_CALLBACK_DATA_TAG
 {
 	IMG_BOOL			bInUse;
@@ -1108,7 +1109,7 @@ typedef struct TIMER_CALLBACK_DATA_TAG
 	struct work_struct	sWork;
 }TIMER_CALLBACK_DATA;
 
-static struct workqueue_struct	*psTimerWorkQueue;
+static struct workqueue_struct *psTimerWorkQueue;
 
 static TIMER_CALLBACK_DATA sTimers[OS_MAX_TIMERS];
 
@@ -1144,7 +1145,7 @@ static void OSTimerCallbackWrapper(struct timer_list *psTimer)
 */ /**************************************************************************/
 static void OSTimerCallbackWrapper(uintptr_t uData)
 {
-	TIMER_CALLBACK_DATA	*psTimerCBData = (TIMER_CALLBACK_DATA*)uData;
+	TIMER_CALLBACK_DATA *psTimerCBData = (TIMER_CALLBACK_DATA*)uData;
 #endif
 	int res;
 
@@ -1165,7 +1166,7 @@ static void OSTimerWorkQueueCallBack(struct work_struct *psWork)
 
 IMG_HANDLE OSAddTimer(PFN_TIMER_FUNC pfnTimerFunc, void *pvData, IMG_UINT32 ui32MsTimeout)
 {
-	TIMER_CALLBACK_DATA	*psTimerCBData;
+	TIMER_CALLBACK_DATA *psTimerCBData;
 	IMG_UINT32		ui32i;
 
 	/* check callback */
@@ -1282,7 +1283,7 @@ PVRSRV_ERROR OSDisableTimer (IMG_HANDLE hTimer)
 	/*
 	 * This second flush is to catch the case where the timer ran
 	 * before we managed to delete it, in which case, it will have
-	 * queued more work for the workqueue.	Since the bActive flag
+	 * queued more work for the workqueue. Since the bActive flag
 	 * has been cleared, this second flush won't result in the
 	 * timer being rearmed.
 	 */
@@ -1294,42 +1295,19 @@ PVRSRV_ERROR OSDisableTimer (IMG_HANDLE hTimer)
 
 PVRSRV_ERROR OSEventObjectCreate(const IMG_CHAR *pszName, IMG_HANDLE *hEventObject)
 {
-	PVRSRV_ERROR eError = PVRSRV_OK;
 	PVR_UNREFERENCED_PARAMETER(pszName);
 
-	if (hEventObject)
-	{
-		if (LinuxEventObjectListCreate(hEventObject) != PVRSRV_OK)
-		{
-			 eError = PVRSRV_ERROR_OUT_OF_MEMORY;
-		}
+	PVR_LOG_RETURN_IF_INVALID_PARAM(hEventObject, "hEventObject");
 
-	}
-	else
-	{
-		PVR_DPF((PVR_DBG_ERROR, "OSEventObjectCreate: hEventObject is not a valid pointer"));
-		eError = PVRSRV_ERROR_UNABLE_TO_CREATE_EVENT;
-	}
-
-	return eError;
+	return LinuxEventObjectListCreate(hEventObject);
 }
 
 
 PVRSRV_ERROR OSEventObjectDestroy(IMG_HANDLE hEventObject)
 {
-	PVRSRV_ERROR eError = PVRSRV_OK;
+	PVR_LOG_RETURN_IF_INVALID_PARAM(hEventObject, "hEventObject");
 
-	if (hEventObject)
-	{
-		LinuxEventObjectListDestroy(hEventObject);
-	}
-	else
-	{
-		PVR_DPF((PVR_DBG_ERROR, "OSEventObjectDestroy: hEventObject is not a valid pointer"));
-		eError = PVRSRV_ERROR_INVALID_PARAMS;
-	}
-
-	return eError;
+	return LinuxEventObjectListDestroy(hEventObject);
 }
 
 #define _FREEZABLE IMG_TRUE
@@ -1339,14 +1317,13 @@ PVRSRV_ERROR OSEventObjectDestroy(IMG_HANDLE hEventObject)
  * EventObjectWaitTimeout()
  */
 static PVRSRV_ERROR EventObjectWaitTimeout(IMG_HANDLE hOSEventKM,
-										   IMG_UINT64 uiTimeoutus,
-										   IMG_BOOL bHoldBridgeLock)
+										   IMG_UINT64 uiTimeoutus)
 {
 	PVRSRV_ERROR eError;
 
 	if (hOSEventKM && uiTimeoutus > 0)
 	{
-		eError = LinuxEventObjectWait(hOSEventKM, uiTimeoutus, bHoldBridgeLock, _NON_FREEZABLE);
+		eError = LinuxEventObjectWait(hOSEventKM, uiTimeoutus, _NON_FREEZABLE);
 	}
 	else
 	{
@@ -1359,22 +1336,12 @@ static PVRSRV_ERROR EventObjectWaitTimeout(IMG_HANDLE hOSEventKM,
 
 PVRSRV_ERROR OSEventObjectWaitTimeout(IMG_HANDLE hOSEventKM, IMG_UINT64 uiTimeoutus)
 {
-	return EventObjectWaitTimeout(hOSEventKM, uiTimeoutus, IMG_FALSE);
+	return EventObjectWaitTimeout(hOSEventKM, uiTimeoutus);
 }
 
 PVRSRV_ERROR OSEventObjectWait(IMG_HANDLE hOSEventKM)
 {
 	return OSEventObjectWaitTimeout(hOSEventKM, EVENT_OBJECT_TIMEOUT_US);
-}
-
-PVRSRV_ERROR OSEventObjectWaitTimeoutAndHoldBridgeLock(IMG_HANDLE hOSEventKM, IMG_UINT64 uiTimeoutus)
-{
-	return EventObjectWaitTimeout(hOSEventKM, uiTimeoutus, IMG_TRUE);
-}
-
-PVRSRV_ERROR OSEventObjectWaitAndHoldBridgeLock(IMG_HANDLE hOSEventKM)
-{
-	return OSEventObjectWaitTimeoutAndHoldBridgeLock(hOSEventKM, EVENT_OBJECT_TIMEOUT_US);
 }
 
 PVRSRV_ERROR OSEventObjectWaitKernel(IMG_HANDLE hOSEventKM,
@@ -1386,7 +1353,7 @@ PVRSRV_ERROR OSEventObjectWaitKernel(IMG_HANDLE hOSEventKM,
 	if (hOSEventKM)
 	{
 		if (uiTimeoutus > 0)
-			eError = LinuxEventObjectWait(hOSEventKM, uiTimeoutus, IMG_FALSE,
+			eError = LinuxEventObjectWait(hOSEventKM, uiTimeoutus,
 			                              _FREEZABLE);
 		else
 			eError = LinuxEventObjectWaitUntilSignalled(hOSEventKM);
@@ -1394,7 +1361,7 @@ PVRSRV_ERROR OSEventObjectWaitKernel(IMG_HANDLE hOSEventKM,
 #else /* defined(PVRSRV_SERVER_THREADS_INDEFINITE_SLEEP) */
 	if (hOSEventKM && uiTimeoutus > 0)
 	{
-		eError = LinuxEventObjectWait(hOSEventKM, uiTimeoutus, IMG_FALSE,
+		eError = LinuxEventObjectWait(hOSEventKM, uiTimeoutus,
 		                              _FREEZABLE);
 	}
 #endif /* defined(PVRSRV_SERVER_THREADS_INDEFINITE_SLEEP) */
@@ -1417,19 +1384,13 @@ PVRSRV_ERROR OSEventObjectOpen(IMG_HANDLE hEventObject, IMG_HANDLE *phOSEvent)
 {
 	PVRSRV_ERROR eError;
 
-	PVR_LOGG_IF_FALSE(hEventObject != NULL, "Invalid hEventObject handle",
-	                  error_invalid_params);
-	PVR_LOGG_IF_FALSE(hEventObject != NULL, "Invalid phOSEvent handle pointer",
-	                  error_invalid_params);
+	PVR_LOG_RETURN_IF_INVALID_PARAM(phOSEvent, "phOSEvent");
+	PVR_LOG_GOTO_IF_INVALID_PARAM(hEventObject, eError, error);
 
 	eError = LinuxEventObjectAdd(hEventObject, phOSEvent);
-	PVR_LOGG_IF_ERROR(eError, "LinuxEventObjectAdd", error);
+	PVR_LOG_GOTO_IF_ERROR(eError, "LinuxEventObjectAdd", error);
 
 	return PVRSRV_OK;
-
-error_invalid_params:
-	eError = PVRSRV_ERROR_INVALID_PARAMS;
-	goto error;
 
 error:
 	*phOSEvent = NULL;
@@ -1438,32 +1399,16 @@ error:
 
 PVRSRV_ERROR OSEventObjectClose(IMG_HANDLE hOSEventKM)
 {
-	PVRSRV_ERROR eError;
+	PVR_LOG_RETURN_IF_INVALID_PARAM(hOSEventKM, "hOSEventKM");
 
-	PVR_LOGR_IF_FALSE(hOSEventKM != NULL, "Invalid hOSEventKM handle",
-	                  PVRSRV_ERROR_INVALID_PARAMS);
-
-	eError = LinuxEventObjectDelete(hOSEventKM);
-	PVR_LOGR_IF_ERROR(eError, "LinuxEventObjectDelete");
-
-	return PVRSRV_OK;
+	return LinuxEventObjectDelete(hOSEventKM);
 }
 
 PVRSRV_ERROR OSEventObjectSignal(IMG_HANDLE hEventObject)
 {
-	PVRSRV_ERROR eError;
+	PVR_LOG_RETURN_IF_INVALID_PARAM(hEventObject, "hEventObject");
 
-	if (hEventObject)
-	{
-		eError = LinuxEventObjectSignal(hEventObject);
-	}
-	else
-	{
-		PVR_DPF((PVR_DBG_ERROR, "OSEventObjectSignal: hOSEventKM is not a valid handle"));
-		eError = PVRSRV_ERROR_INVALID_PARAMS;
-	}
-
-	return eError;
+	return LinuxEventObjectSignal(hEventObject);
 }
 
 PVRSRV_ERROR OSCopyToUser(void *pvProcess,
@@ -1551,141 +1496,6 @@ void OSDumpStack(void)
 {
 	dump_stack();
 }
-
-#if defined(PVRSRV_USE_BRIDGE_LOCK)
-
-static struct task_struct *gsOwner;
-
-void OSAcquireBridgeLock(void)
-{
-	mutex_lock(&gPVRSRVLock);
-	gsOwner = current;
-}
-
-void OSReleaseBridgeLock(void)
-{
-	gsOwner = NULL;
-	mutex_unlock(&gPVRSRVLock);
-}
-
-struct task_struct *BridgeLockGetOwner(void)
-{
-	return gsOwner;
-}
-
-IMG_BOOL BridgeLockIsLocked(void)
-{
-	return OSLockIsLocked(&gPVRSRVLock);
-}
-
-#endif
-
-/*************************************************************************/ /*!
-@Function		OSCreateStatisticEntry
-@Description	Create a statistic entry in the specified folder.
-@Input			pszName		   String containing the name for the entry.
-@Input			pvFolder	   Reference from OSCreateStatisticFolder() of the
-							   folder to create the entry in, or NULL for the
-							   root.
-@Input			pfnStatsPrint  Pointer to function that can be used to print the
-							   values of all the statistics.
-@Input			pvData		   OS specific reference that can be used by
-							   pfnGetElement.
-@Return			Pointer void reference to the entry created, which can be
-				passed to OSRemoveStatisticEntry() to remove the entry.
-*/ /**************************************************************************/
-void *OSCreateStatisticEntry(IMG_CHAR* pszName, void *pvFolder,
-							 OS_STATS_PRINT_FUNC* pfnStatsPrint,
-							 void *pvData)
-{
-	PPVR_DEBUGFS_ENTRY_DATA psNewFile;
-	int iResult;
-
-	iResult = PVRDebugFSCreateFile( pszName,
-					(PPVR_DEBUGFS_DIR_DATA)pvFolder,
-					NULL,
-					NULL,
-					pfnStatsPrint,
-					pvData,
-					&psNewFile );
-
-	return (iResult != 0) ? NULL : psNewFile;
-
-} /* OSCreateStatisticEntry */
-
-
-/*************************************************************************/ /*!
-@Function		OSRemoveStatisticEntry
-@Description	Removes a statistic entry.
-@Input			ppvEntry  Double Pointer void reference to the entry created by
-						 OSCreateStatisticEntry().
-*/ /**************************************************************************/
-void OSRemoveStatisticEntry(void **ppvEntry)
-{
-	PPVR_DEBUGFS_ENTRY_DATA psStatEntry = (PPVR_DEBUGFS_ENTRY_DATA)(*ppvEntry);
-	PVRDebugFSRemoveFile(&psStatEntry);
-	*ppvEntry = psStatEntry;
-} /* OSRemoveStatisticEntry */
-
-#if defined(PVRSRV_ENABLE_MEMTRACK_STATS_FILE)
-void *OSCreateRawStatisticEntry(const IMG_CHAR *pszFileName, void *pvParentDir,
-                                OS_STATS_PRINT_FUNC *pfStatsPrint)
-{
-	PPVR_DEBUGFS_ENTRY_DATA psNewFile;
-	int iResult;
-
-	iResult = PVRDebugFSCreateFile( pszFileName,
-					pvParentDir,
-					NULL,
-					NULL,
-					pfStatsPrint,
-					NULL,
-					&psNewFile );
-
-	return (iResult != 0) ? NULL : psNewFile;
-}
-
-void OSRemoveRawStatisticEntry(void **ppvEntry)
-{
-	PPVR_DEBUGFS_ENTRY_DATA psStatEntry = (PPVR_DEBUGFS_ENTRY_DATA)(*ppvEntry);
-	PVRDebugFSRemoveFile(&psStatEntry);
-	*ppvEntry = psStatEntry;
-}
-#endif
-
-/*************************************************************************/ /*!
-@Function		OSCreateStatisticFolder
-@Description	Create a statistic folder to hold statistic entries.
-@Input			pszName   String containing the name for the folder.
-@Input			pvFolder  Reference from OSCreateStatisticFolder() of the folder
-						  to create the folder in, or NULL for the root.
-@Return			Pointer void reference to the folder created, which can be
-				passed to OSRemoveStatisticFolder() to remove the folder.
-*/ /**************************************************************************/
-void *OSCreateStatisticFolder(IMG_CHAR *pszName, void *pvFolder)
-{
-	PPVR_DEBUGFS_DIR_DATA psNewStatFolder = NULL;
-	int iResult;
-
-	iResult = PVRDebugFSCreateEntryDir(pszName, (PPVR_DEBUGFS_DIR_DATA)pvFolder, &psNewStatFolder);
-	return (iResult == 0) ? (void *)psNewStatFolder : NULL;
-} /* OSCreateStatisticFolder */
-
-
-/*************************************************************************/ /*!
-@Function		OSRemoveStatisticFolder
-@Description	Removes a statistic folder.
-@Input          ppvFolder  Reference from OSCreateStatisticFolder() of the
-                           folder that should be removed.
-                           This needs to be double pointer because it has to
-                           be NULLed right after memory is freed to avoid
-                           possible races and use-after-free situations.
-*/ /**************************************************************************/
-void OSRemoveStatisticFolder(void **ppvFolder)
-{
-	PVRDebugFSRemoveEntryDir((PPVR_DEBUGFS_DIR_DATA *)ppvFolder);
-} /* OSRemoveStatisticFolder */
-
 
 PVRSRV_ERROR OSChangeSparseMemCPUAddrMap(void **psPageArray,
                                          IMG_UINT64 sCpuVAddrBase,
@@ -1856,7 +1666,7 @@ PVRSRV_ERROR OSChangeSparseMemCPUAddrMap(void **psPageArray,
 	}
 
 	eError = PVRSRV_OK;
-	eFailed:
+eFailed:
 	up_write(&psMM->mmap_sem);
 
 	return eError;
@@ -1893,6 +1703,23 @@ PVRSRV_ERROR OSDebugSignalPID(IMG_UINT32 ui32PID)
 	}
 
 	return PVRSRV_OK;
+}
+
+/*************************************************************************/ /*!
+@Function       OSIsKernelThread
+@Description    This API determines if the current running thread is a kernel
+                thread (i.e. one not associated with any userland process,
+                typically an MISR handler.)
+@Return         IMG_TRUE if it is a kernel thread, otherwise IMG_FALSE.
+*/ /**************************************************************************/
+IMG_BOOL OSIsKernelThread(void)
+{
+	/*
+	 * Kernel threads have a NULL memory descriptor.
+	 *
+	 * See https://www.kernel.org/doc/Documentation/vm/active_mm.txt
+	 */
+	return current->mm == NULL;
 }
 
 void OSDumpVersionInfo(DUMPDEBUG_PRINTF_FUNC *pfnDumpDebugPrintf,

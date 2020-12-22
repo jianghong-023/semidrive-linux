@@ -1,8 +1,8 @@
 /*************************************************************************/ /*!
-@File			ri_server.h
+@File           ri_server.h
 @Title          Resource Information abstraction
 @Copyright      Copyright (c) Imagination Technologies Ltd. All Rights Reserved
-@Description	Resource Information (RI) functions
+@Description    Resource Information (RI) functions
 @License        Dual MIT/GPLv2
 
 The contents of this file are subject to the MIT license as set out below.
@@ -41,14 +41,14 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */ /**************************************************************************/
 
-#ifndef _RI_SERVER_H_
-#define _RI_SERVER_H_
+#ifndef RI_SERVER_H
+#define RI_SERVER_H
 
-#include <img_defs.h>
-#include <ri_typedefs.h>
-#include <pmr.h>
-#include <pvrsrv_error.h>
-#include <physheap.h>
+#include "img_defs.h"
+#include "ri_typedefs.h"
+#include "pmr.h"
+#include "pvrsrv_error.h"
+#include "physheap.h"
 
 PVRSRV_ERROR RIInitKM(void);
 void RIDeInitKM(void);
@@ -59,16 +59,16 @@ void RILockReleaseKM(void);
 PVRSRV_ERROR RIWritePMREntryKM(PMR *psPMR);
 
 PVRSRV_ERROR RIWritePMREntryWithOwnerKM(PMR *psPMR,
-					   	   	   	   	    IMG_PID ui32Owner);
+                                        IMG_PID ui32Owner);
 
 PVRSRV_ERROR RIWriteMEMDESCEntryKM(PMR *psPMR,
-					   	   	   	   IMG_UINT32 ui32TextBSize,
-					   	   	   	   const IMG_CHAR ai8TextB[DEVMEM_ANNOTATION_MAX_LEN],
-					   	   	   	   IMG_UINT64 uiOffset,
-					   	   	   	   IMG_UINT64 uiSize,
-					   	   	   	   IMG_BOOL bIsImport,
-					   	   	   	   IMG_BOOL bIsSuballoc,
-					   	   	   	   RI_HANDLE *phRIHandle);
+                                   IMG_UINT32 ui32TextBSize,
+                                   const IMG_CHAR ai8TextB[DEVMEM_ANNOTATION_MAX_LEN],
+                                   IMG_UINT64 uiOffset,
+                                   IMG_UINT64 uiSize,
+                                   IMG_BOOL bIsImport,
+                                   IMG_BOOL bIsSuballoc,
+                                   RI_HANDLE *phRIHandle);
 
 PVRSRV_ERROR RIWriteProcListEntryKM(IMG_UINT32 ui32TextBSize,
                                     const IMG_CHAR *psz8TextB,
@@ -77,7 +77,7 @@ PVRSRV_ERROR RIWriteProcListEntryKM(IMG_UINT32 ui32TextBSize,
                                     RI_HANDLE *phRIHandle);
 
 PVRSRV_ERROR RIUpdateMEMDESCAddrKM(RI_HANDLE hRIHandle,
-								   IMG_DEV_VIRTADDR sVAddr);
+                                   IMG_DEV_VIRTADDR sVAddr);
 
 PVRSRV_ERROR RIDeletePMREntryKM(RI_HANDLE hRIHandle);
 PVRSRV_ERROR RIDeleteMEMDESCEntryKM(RI_HANDLE hRIHandle);
@@ -92,15 +92,15 @@ PVRSRV_ERROR RIDumpProcessKM(IMG_PID pid);
 
 #if defined(DEBUG)
 PVRSRV_ERROR RIDumpProcessListKM(PMR *psPMR,
-								 IMG_PID pid,
-								 IMG_UINT64 ui64Offset,
-								 IMG_DEV_VIRTADDR *psDevVAddr);
+                                 IMG_PID pid,
+                                 IMG_UINT64 ui64Offset,
+                                 IMG_DEV_VIRTADDR *psDevVAddr);
 #endif
 
 IMG_BOOL RIGetListEntryKM(IMG_PID pid,
-						  IMG_HANDLE **ppHandle,
-						  IMG_CHAR **ppszEntryString);
+                          IMG_HANDLE **ppHandle,
+                          IMG_CHAR **ppszEntryString);
 
 IMG_INT32 RITotalAllocProcessKM(IMG_PID pid, PHYS_HEAP_TYPE ePhysHeapType);
 
-#endif /* #ifndef _RI_SERVER_H _*/
+#endif /* RI_SERVER_H */

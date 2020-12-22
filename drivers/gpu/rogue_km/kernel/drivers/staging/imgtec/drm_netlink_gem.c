@@ -1,4 +1,3 @@
-/* -*- mode: c; indent-tabs-mode: t; c-basic-offset: 8; tab-width: 8 -*- */
 /* vi: set ts=8 sw=8 sts=8: */
 /*************************************************************************/ /*!
 @File
@@ -42,13 +41,26 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */ /**************************************************************************/
 
+#include <linux/version.h>
+
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 5, 0))
+#include <drm/drm_device.h>
+#include <drm/drm_file.h>
+#endif
+
 #include "drm_netlink_gem.h"
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0))
+#include <drm/drm_vma_manager.h>
+#endif
+
 #include <linux/capability.h>
+
 #include "kernel_compatibility.h"
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 4, 0))
-int netlink_gem_mmap(struct file *file, struct vm_area_struct *vma)
+static int netlink_gem_mmap_capsys(struct file *file,
+				   struct vm_area_struct *vma)
 {
 	struct drm_file *file_priv = file->private_data;
 	struct drm_device *dev = file_priv->minor->dev;
@@ -58,8 +70,8 @@ int netlink_gem_mmap(struct file *file, struct vm_area_struct *vma)
 
 	drm_vma_offset_lock_lookup(dev->vma_offset_manager);
 	node = drm_vma_offset_exact_lookup_locked(dev->vma_offset_manager,
-					   vma->vm_pgoff,
-					   vma_pages(vma));
+						  vma->vm_pgoff,
+						  vma_pages(vma));
 	if (node) {
 		obj = container_of(node, struct drm_gem_object, vma_node);
 
@@ -72,18 +84,26 @@ int netlink_gem_mmap(struct file *file, struct vm_area_struct *vma)
 	if (!obj)
 		return -EINVAL;
 
-	/* Allow Netlink clients to mmap any object for reading */
-	if (!capable(CAP_SYS_RAWIO) || (vma->vm_flags & VM_WRITE)) {
-		if (!drm_vma_node_is_allowed(node, file_priv)) {
-			err = -EACCES;
-			goto exit_unref_obj;
-		}
+	err = drm_vma_node_allow(node, file_priv);
+	if (!err) {
+		err = drm_gem_mmap(file, vma);
+
+		drm_vma_node_revoke(node, file_priv);
 	}
 
-	err = drm_gem_mmap_obj(obj, drm_vma_node_size(node) << PAGE_SHIFT, vma);
-
-exit_unref_obj:
 	drm_gem_object_put_unlocked(obj);
+
+	return err;
+}
+
+int netlink_gem_mmap(struct file *file, struct vm_area_struct *vma)
+{
+	int err;
+
+	err = drm_gem_mmap(file, vma);
+	if (!!err && capable(CAP_SYS_RAWIO))
+		err = netlink_gem_mmap_capsys(file, vma);
+
 	return err;
 }
 #else	/* (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 4, 0)) */

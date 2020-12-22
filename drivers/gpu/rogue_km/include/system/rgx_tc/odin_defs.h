@@ -74,6 +74,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #define ODN_REG_BANK_ODN_CLK_BLK            0x0A000
 #define ODN_REG_BANK_ODN_MCU_COMMUNICATOR   0x0C000
 #define ODN_REG_BANK_DB_TYPE_ID             0x0C200
+#define ODN_REG_BANK_DB_TYPE_ID_TYPE_TCFVUOCTA   0x000000C6U
 #define ODN_REG_BANK_DB_TYPE_ID_TYPE_MASK   0x000000C0U
 #define ODN_REG_BANK_DB_TYPE_ID_TYPE_SHIFT  0x6
 #define ODN_REG_BANK_ODN_I2C                0x0E000
@@ -92,11 +93,28 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #define ODN_SPI_MST_STATUS                  0x000C
 #define ODN_SPI_MST_GO                      0x0010
 
+/* Odin C2C link regs */
+#define CR_C2C_CHANNEL_STATUS_BASEB         (0x20000)
+#define CR_C2C_CHANNEL_CTRL_BASEB           (0x20004)
+#define CR_C2C_CHANNEL_STATUS_DAUGHTB       (0x1800)
+#define CR_C2C_CHANNEL_CTRL_DAUGHTB         (0x1804)
+
+#define C2C_RESETVAL		(0xB010)
+#define C2C_DEFVAL			(0xB011)
+
+/* C2C link number of attempts and timeout */
+#define C2C_READY_WAIT_ATTEMPTS				(10)
+#define C2C_READY_WAIT_MS					(3000)
+
+/* Link status: BB = baseboard, DB = daughterboard */
+#define C2C_BB_STATUS_SHIFT		(0)
+#define C2C_BB_STATUS_OK		(1 << C2C_BB_STATUS_SHIFT)
+#define C2C_DB_STATUS_SHIFT		(4)
+#define C2C_DB_STATUS_OK		(1 << C2C_DB_STATUS_SHIFT)
+
 
 /*
    Odin CLK regs - the odn_clk_blk module defs are not auto generated
-   because it is licenced 3rd party IP from Xilinx.
-   These defs are taken from the Odin TRM.
  */
 #define ODN_PDP_P_CLK_OUT_DIVIDER_REG1           0x620
 #define ODN_PDP_PCLK_ODIV1_LO_TIME_MASK          0x0000003FU

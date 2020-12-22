@@ -1,8 +1,8 @@
 /*************************************************************************/ /*!
-@File			devicemem_history_server.h
+@File           devicemem_history_server.h
 @Title          Resource Information abstraction
 @Copyright      Copyright (c) Imagination Technologies Ltd. All Rights Reserved
-@Description	Devicemem History functions
+@Description    Devicemem History functions
 @License        Dual MIT/GPLv2
 
 The contents of this file are subject to the MIT license as set out below.
@@ -41,19 +41,17 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */ /**************************************************************************/
 
-#ifndef _DEVICEMEM_HISTORY_SERVER_H_
-#define _DEVICEMEM_HISTORY_SERVER_H_
+#ifndef DEVICEMEM_HISTORY_SERVER_H
+#define DEVICEMEM_HISTORY_SERVER_H
 
 #include "img_defs.h"
 #include "pvrsrv_error.h"
 #include "rgxmem.h"
 #include "devicemem_utils.h"
 
-extern PVRSRV_ERROR
-DevicememHistoryInitKM(void);
+PVRSRV_ERROR DevicememHistoryInitKM(void);
 
-extern void
-DevicememHistoryDeInitKM(void);
+void DevicememHistoryDeInitKM(void);
 
 PVRSRV_ERROR DevicememHistoryMapKM(PMR *psPMR,
 							IMG_UINT32 ui32Offset,
@@ -145,7 +143,7 @@ typedef struct _DEVICEMEM_HISTORY_QUERY_OUT_
 	DEVICEMEM_HISTORY_QUERY_OUT_RESULT sResults[DEVICEMEM_HISTORY_QUERY_OUT_MAX_RESULTS];
 } DEVICEMEM_HISTORY_QUERY_OUT;
 
-extern IMG_BOOL
+IMG_BOOL
 DevicememHistoryQuery(DEVICEMEM_HISTORY_QUERY_IN *psQueryIn,
                       DEVICEMEM_HISTORY_QUERY_OUT *psQueryOut,
                       IMG_UINT32 ui32PageSizeBytes,

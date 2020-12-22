@@ -266,7 +266,7 @@ IMG_UINT32 TLDiscoverStreamNodes(const IMG_CHAR *pszNamePattern,
 PTL_SNODE TLFindAndGetStreamNodeByDesc(PTL_STREAM_DESC psDesc);
 void TLReturnStreamNode(PTL_SNODE psNode);
 
-/****************************************************************************************
+/******************************************************************************
  Function Name	: TLTryRemoveStreamAndFreeStreamNode
 
  Inputs		: PTL_SNODE	Pointer to the TL_SNODE whose stream is requested
@@ -285,10 +285,10 @@ void TLReturnStreamNode(PTL_SNODE psNode);
 			cleanup of the TL_STREAM whose TL_SNODE may be removed
 
 		  Otherwise, this function does nothing
-*****************************************************************************************/
+******************************************************************************/
 IMG_BOOL  TLTryRemoveStreamAndFreeStreamNode(PTL_SNODE psRemove);
 
-/*****************************************************************************************
+/******************************************************************************
  Function Name	: TLUnrefDescAndTryFreeStreamNode
 
  Inputs		: PTL_SNODE	Pointer to the TL_SNODE whose descriptor is
@@ -305,7 +305,7 @@ IMG_BOOL  TLTryRemoveStreamAndFreeStreamNode(PTL_SNODE psRemove);
 			stream, this function removes this TL_SNODE from the TL_GLOBAL_DATA's
 			list. The caller is responsible for the cleanup of the TL_STREAM
 			whose TL_SNODE may be removed
-******************************************************************************************/
+******************************************************************************/
 IMG_BOOL TLUnrefDescAndTryFreeStreamNode(PTL_SNODE psRemove, PTL_STREAM_DESC psSD);
 
 /*
@@ -323,14 +323,14 @@ void TLStreamResetReadPos(PTL_STREAM psStream);
 DEVMEM_MEMDESC* TLStreamGetBufferPointer(PTL_STREAM psStream);
 IMG_BOOL TLStreamOutOfData(IMG_HANDLE psStream);
 
-/****************************************************************************************
+/******************************************************************************
  Function Name	: TLStreamDestroy
 
  Inputs		: PTL_STREAM	Pointer to the TL_STREAM to be destroyed
 
  Description	: This function performs all the clean-up operations required for
 			destruction of this stream
-*****************************************************************************************/
+******************************************************************************/
 void TLStreamDestroy(PTL_STREAM psStream);
 
 /*
@@ -344,4 +344,3 @@ PVRSRV_ERROR TUtilsDeinit(PVRSRV_DEVICE_NODE *psDeviceNode);
 /******************************************************************************
  End of file (tlintern.h)
 ******************************************************************************/
-
