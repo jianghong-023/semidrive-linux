@@ -70,7 +70,7 @@ ccflags-y += -Wno-error=typedef-redefinition -Wno-error=enum-conversion
 endif
 
 ifeq ($(CONFIG_PM_DEVFREQ),y)
-ccflags-y += -DPVR_DVFS
+ccflags-y += -DSUPPORT_LINUX_DVFS
 endif
 
 ccflags-y += -DPVR_BUILD_DIR=\"$(PVR_BUILD_DIR)\"
