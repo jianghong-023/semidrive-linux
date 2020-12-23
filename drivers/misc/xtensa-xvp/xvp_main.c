@@ -1975,7 +1975,7 @@ static int xrp_init_regs_v1(struct platform_device *pdev, struct xvp *xvp)
 	if (!mem)
 		return -ENODEV;
 
-	if (resource_size(mem) < 2 * PAGE_SIZE) {
+	if (resource_size(mem) < 5 * PAGE_SIZE) {
 		dev_err(xvp->dev,
 			"%s: shared memory size is too small\n",
 			__func__);
@@ -1983,8 +1983,9 @@ static int xrp_init_regs_v1(struct platform_device *pdev, struct xvp *xvp)
 	}
 
 	xvp->comm_phys = mem->start;
-	xvp->pmem = mem->start + PAGE_SIZE;
-	xvp->shared_size = resource_size(mem) - PAGE_SIZE;
+	/* start from 4 pages aligned */
+	xvp->pmem = mem->start + 0x4000;
+	xvp->shared_size = resource_size(mem) - 0x4000;
 
 	r = *mem;
 	r.end = r.start + PAGE_SIZE;
