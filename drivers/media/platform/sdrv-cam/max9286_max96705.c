@@ -1,13 +1,11 @@
 /*
- * Copyright (C) 2011-2013 Freescale Semiconductor, Inc. All Rights Reserved.
- * Copyright (C) 2014-2017 Mentor Graphics Inc.
+ * Copyright (C) 2020-2030 Semidrive, Inc. All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version.
  */
-
 #include <linux/clk.h>
 #include <linux/clk-provider.h>
 #include <linux/clkdev.h>
@@ -41,6 +39,8 @@
 
 #define AP0101_SLAVE_ID 0x5d
 #define AP0101_DEV_INDEX -4
+
+#define MAX20086_SLAVE_ID 0x28
 
 enum max9286_mode_id {
 	MAX9286_MODE_720P_1280_720 = 0,
@@ -116,6 +116,8 @@ struct max9286_dev {
 	struct i2c_client *i2c_client;
 	unsigned short addr_9286;
 	unsigned short addr_96705;
+	unsigned short addr_0101;
+	unsigned short addr_20086;
 	struct v4l2_subdev sd;
 #if 1
 	struct media_pad pads[MIPI_CSI2_SENS_VCX_PADS_NUM];
@@ -283,6 +285,65 @@ static int max96705_read_reg(struct max9286_dev *sensor, u8 idx, u8 reg,
 	*val = buf[0];
 	return 0;
 }
+
+static int max20086_write_reg(struct max9286_dev *sensor, u8 reg, u8 val)
+{
+	struct i2c_client *client = sensor->i2c_client;
+	struct i2c_msg msg;
+	u8 buf[2];
+	int ret;
+
+	client->addr = sensor->addr_20086;
+	buf[0] = reg;
+	buf[1] = val;
+	//printk("%s: reg=0x%x, val=0x%x\n", __func__, reg, val);
+	msg.addr = client->addr;
+	msg.flags = client->flags;
+	msg.buf = buf;
+	msg.len = sizeof(buf);
+
+	ret = i2c_transfer(client->adapter, &msg, 1);
+
+	if (ret < 0) {
+		dev_err(&client->dev, "%s: error: reg=0x%x, val=0x%x\n",
+			__func__, reg, val);
+		return ret;
+	}
+
+	return 0;
+}
+
+static int max20086_read_reg(struct max9286_dev *sensor, u8 reg, u8 * val)
+{
+	struct i2c_client *client = sensor->i2c_client;
+	struct i2c_msg msg[2];
+	u8 buf[1];
+	int ret;
+
+	client->addr = sensor->addr_20086;
+	buf[0] = reg;
+
+	msg[0].addr = client->addr;
+	msg[0].flags = client->flags;
+	msg[0].buf = buf;
+	msg[0].len = sizeof(buf);
+
+	msg[1].addr = client->addr;
+	msg[1].flags = client->flags | I2C_M_RD;
+	msg[1].buf = buf;
+	msg[1].len = 1;
+
+	ret = i2c_transfer(client->adapter, msg, 2);
+
+	if (ret < 0) {
+		dev_err(&client->dev, "%s: error: reg=0x%x\n", __func__, reg);
+		return ret;
+	}
+
+	*val = buf[0];
+	return 0;
+}
+
 
 static struct v4l2_subdev *max9286_get_interface_subdev(struct v4l2_subdev *sd)
 {
@@ -592,24 +653,6 @@ static int max9286_initialization(struct max9286_dev *sensor)
 	u8 val;
 	u8 link_status = 0, link_count = 0;
 	int i = 0;
-#if 0
-	struct gpio_desc *gpiod;
-
-	gpiod = devm_gpiod_get_optional(&client->dev, "pwdn", GPIOD_IN);
-
-	if (IS_ERR(gpiod)) {
-		ret = PTR_ERR(gpiod);
-
-		if (ret != -EPROBE_DEFER)
-			dev_err(&client->dev, "Failed to get %s GPIO: %d\n",
-				"pwdn", ret);
-
-		return ret;
-	}
-
-	gpiod_direction_output(gpiod, 1);
-	msleep(1);
-#endif
 
 	//csienable=0
 	max9286_write_reg(sensor, 0x15, 0x13);
@@ -687,13 +730,13 @@ static int max9286_initialization(struct max9286_dev *sensor)
 		msleep(10);
 
 		dev_err(&client->dev, "reg=0x%x, aid=0x%x\n", val,
-			(MAX96705_SLAVE_ID + MAX96705_DEV_INDEX +
+			(sensor->addr_96705 + MAX96705_DEV_INDEX +
 			 sensor->sec_9286_shift + i));
 		//Set MAX9271 new address for link 0
 		//sensor->i2c_client->addr = sensor->addr_96705;
 
 		max96705_write_reg(sensor, 0, 0x00,
-				   (MAX96705_SLAVE_ID + MAX96705_DEV_INDEX +
+				   (sensor->addr_96705 + MAX96705_DEV_INDEX +
 				    sensor->sec_9286_shift + i) << 1);
 		msleep(10);
 
@@ -774,11 +817,11 @@ static int max9286_initialization(struct max9286_dev *sensor)
 		max96705_write_reg(sensor,
 				   MAX96705_DEV_INDEX + sensor->sec_9286_shift +
 				   i, 0x9,
-				   (AP0101_SLAVE_ID + AP0101_DEV_INDEX +
+				   (sensor->addr_0101 + AP0101_DEV_INDEX +
 				    sensor->sec_9286_shift + i) << 1);
 		max96705_write_reg(sensor,
 				   MAX96705_DEV_INDEX + sensor->sec_9286_shift +
-				   i, 0xa, AP0101_SLAVE_ID << 1);
+				   i, 0xa, sensor->addr_0101 << 1);
 		msleep(10);
 	}
 
@@ -805,9 +848,7 @@ static int max9286_probe(struct i2c_client *client,
 		return -ENOMEM;
 
 	sensor->i2c_client = client;
-
 	sensor->addr_9286 = client->addr;
-	sensor->addr_96705 = 0x40;
 
 	/*
 	 * default init sequence initialize sensor to
@@ -834,8 +875,23 @@ static int max9286_probe(struct i2c_client *client,
 
 	sensor->ae_target = 52;
 
+	ret = fwnode_property_read_u16(dev_fwnode(&client->dev), "addr_20086", &sensor->addr_20086);
+	dev_info(&client->dev, "addr_20086: 0x%x, ret=%d\n", sensor->addr_20086, ret);
+	if (ret < 0) {
+		sensor->addr_20086 = MAX20086_SLAVE_ID;
+	}
+	ret = fwnode_property_read_u16(dev_fwnode(&client->dev), "addr_96705", &sensor->addr_96705);
+	dev_info(&client->dev, "addr_96705: 0x%x, ret=%d\n", sensor->addr_96705, ret);
+	if (ret < 0) {
+		sensor->addr_96705 = MAX96705_SLAVE_ID;
+	}
+	ret = fwnode_property_read_u16(dev_fwnode(&client->dev), "addr_0101", &sensor->addr_0101);
+	dev_info(&client->dev, "addr_0101: 0x%x, ret=%d\n", sensor->addr_0101, ret);
+	if (ret < 0) {
+		sensor->addr_0101 = AP0101_SLAVE_ID;
+	}
 	ret = fwnode_property_read_u32(dev_fwnode(&client->dev), "sync", &sync);
-	dev_err(&client->dev, "sync: %d, ret=%d\n", sync, ret);
+	dev_info(&client->dev, "sync: %d, ret=%d\n", sync, ret);
 
 	if (ret < 0) {
 		sync = 0;
@@ -934,7 +990,7 @@ static int max9286_probe(struct i2c_client *client,
 
 	ret = fwnode_property_read_u32(dev_fwnode(&client->dev), "sec_9286",
 				       &sec_9286);
-	dev_err(&client->dev, "sec_9286: %d, ret=%d\n", sec_9286, ret);
+	dev_info(&client->dev, "sec_9286: %d, ret=%d\n", sec_9286, ret);
 
 	if (!ret) {
 		if (sec_9286 == 1)
@@ -945,6 +1001,13 @@ static int max9286_probe(struct i2c_client *client,
 		sensor->sec_9286_shift = 0;
 	}
 
+	#if 1
+	u8 reg,val;
+	for(reg=0;reg<10;reg++){
+		max20086_read_reg(sensor, reg, &val);
+		dev_info(&client->dev, "20086: reg=%d, val=0x%x\n", reg, val);
+	}
+	#endif
 	max9286_power(sensor, 1);
 	max9286_check_chip_id(sensor);
 

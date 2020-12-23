@@ -78,17 +78,29 @@ enum scs_op_type {
 	SCS_OP_STREAM_ON,
 	SCS_OP_DQBUF,
 	SCS_OP_STREAM_OFF,
+	SCS_OP_DEV_CLOSE,
 };
 
 struct scs_ioctl_cmd {
 	u16 op;
+	u16 instance;
 	union {
+		struct {
+			u32 fmt;
+			u16 index;
+		} fmt;
 		struct {
 			u16 type;
 			u16 width;
 			u16 height;
 			u32 pixelformat;
 		} s_fmt;
+		struct {
+			u16 type;
+			u16 width;
+			u16 height;
+			u16 index;
+		} fsz;
 		struct {
 			u16 index;
 			u32 len;
@@ -100,18 +112,19 @@ struct scs_ioctl_cmd {
 
 struct scs_ioctl_result {
 	u16 op;
+	u16 instance;
 	union {
 		/** used for get_version */
 		struct {
 			u32 fmt;
-			u16 cnt;
+			u16 index;
 		} fmt;
 		/** used for get_config */
 		struct {
 			u16 type;
 			u16 width;
 			u16 height;
-			u16 cnt;
+			u16 index;
 		} fsz;
 		struct {
 			u16 type;
@@ -136,6 +149,8 @@ struct scs_ioctl_result {
 
 struct csi_dummy {
 	struct device *dev;
+	u16 instance;
+	char type[16];
 
 	struct mutex lock;
 	struct mutex q_lock;
@@ -184,8 +199,9 @@ static int sdrv_dummy_ioctl(struct csi_dummy *csi, struct scs_ioctl_cmd *c,
 	DCF_INIT_RPC_REQ(request, MOD_RPC_REQ_SCS_IOCTL);
 	//ctl->op = command;
 	memcpy(ctl, c, sizeof(*c));
+	ctl->instance = csi->instance;
 
-	dev_info(csi->dev, "%s():\n", __func__);
+	dev_info(csi->dev, "%s(): instance=%d, op=%d\n", __func__, ctl->instance, ctl->op);
 	ret = semidrive_rpcall(&request, &result);
 	if (ret < 0 || result.retcode < 0) {
 		dev_err(csi->dev, "rpcall failed=%d %d\n", ret, result.retcode);
@@ -411,12 +427,24 @@ err_alloc:
 static int sdrv_dummy_video_release(struct file *file)
 {
 	struct csi_dummy *csi = video_drvdata(file);
+	struct scs_ioctl_cmd op_ctl;
+	struct scs_ioctl_result op_ret;
+	int ret;
 
 	vb2_fop_release(file);
 
 	file->private_data = NULL;
 
-	return 0;
+	op_ctl.op = SCS_OP_DEV_CLOSE;
+
+	ret = sdrv_dummy_ioctl(csi, &op_ctl, &op_ret);
+	if (ret < 0) {
+		dev_err(csi->dev, "dev_open failed: %d\n", ret);
+		goto err;
+	}
+	dev_err(csi->dev, "dev_close ok: %d\n", ret);
+err:
+	return ret;
 }
 
 static const struct v4l2_file_operations sdrv_dummy_vid_ops = {
@@ -467,7 +495,7 @@ static int sdrv_dummy_video_enum_fmt(struct file *file, void *priv,
 	struct scs_ioctl_cmd op_ctl;
 	struct scs_ioctl_result op_ret;
 	op_ctl.op = SCS_OP_ENUM_FORMAT;
-
+	op_ctl.msg.fmt.index = f->index;
 	ret = sdrv_dummy_ioctl(csi, &op_ctl, &op_ret);
 	if (ret < 0) {
 		dev_err(csi->dev, "enum_format failed: %d\n", ret);
@@ -476,7 +504,7 @@ static int sdrv_dummy_video_enum_fmt(struct file *file, void *priv,
 	dev_info(csi->dev, "enum_format ok: %d, op_ret.msg.fmt.fmt=0x%x\n", ret,
 		op_ret.msg.fmt.fmt);
 
-	if (f->index < op_ret.msg.fmt.cnt)
+	if (f->index <= op_ret.msg.fmt.index)
 		f->pixelformat = op_ret.msg.fmt.fmt;
 	else
 		return -EINVAL;
@@ -670,7 +698,7 @@ static int sdrv_dummy_enum_framesizes(struct file *file, void *fh,
 	struct scs_ioctl_cmd op_ctl;
 	struct scs_ioctl_result op_ret;
 	op_ctl.op = SCS_OP_ENUM_FRAMESIZE;
-
+	op_ctl.msg.fsz.index = fsize->index;
 	ret = sdrv_dummy_ioctl(csi, &op_ctl, &op_ret);
 	if (ret < 0) {
 		dev_err(csi->dev, "enum_framesize failed: %d\n", ret);
@@ -680,7 +708,7 @@ static int sdrv_dummy_enum_framesizes(struct file *file, void *fh,
 		ret, op_ret.msg.fsz.type, op_ret.msg.fsz.width,
 		op_ret.msg.fsz.height);
 
-	if (fsize->index < op_ret.msg.fsz.type) {
+	if (fsize->index <= op_ret.msg.fsz.index) {
 		fsize->type = op_ret.msg.fsz.type;
 		if (fsize->type == V4L2_FRMSIZE_TYPE_DISCRETE) {
 			fsize->discrete.width = op_ret.msg.fsz.width;
@@ -793,7 +821,7 @@ int sdrv_dummy_video_register(	/*struct kstream_video *video,
 	vdev->v4l2_dev = &csi->v4l2_dev;
 	vdev->vfl_dir = VFL_DIR_RX;
 	vdev->queue = q;
-	snprintf(vdev->name, ARRAY_SIZE(vdev->name), "sdrv-kstream-0");
+	snprintf(vdev->name, ARRAY_SIZE(vdev->name), csi->type);
 	ret = video_register_device(vdev, VFL_TYPE_GRABBER, -1);
 	if (ret < 0) {
 		dev_err(csi->dev, "Failed to register video device: %d\n", ret);
@@ -818,7 +846,7 @@ static void sdrv_dummy_notify(struct mbox_client *client, void *mssg)
 	struct vb2_v4l2_buffer *vbuf;
 	struct csi_dummy *csi = container_of(client,
 					     struct csi_dummy, client);
-	dev_info(csi->dev, "%s\n", __func__);
+	dev_info(csi->dev, "%s++\n", __func__);
 
 	sd_msghdr_t *msghdr = mssg;
 
@@ -854,7 +882,7 @@ static void sdrv_dummy_notify(struct mbox_client *client, void *mssg)
 	}
 
 	spin_unlock_irqrestore(&csi->buf_lock, flags);
-	dev_info(csi->dev, "%s\n", __func__);
+	dev_info(csi->dev, "%s--\n", __func__);
 
 	return;
 }
@@ -886,8 +914,9 @@ static int sdrv_dummy_probe(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
 	struct csi_dummy *csi;
+	const char *type;
 	int ret;
-	dev_info(dev, "%s()-110: .\n", __func__);
+	dev_info(dev, "%s(): .\n", __func__);
 
 	csi = devm_kzalloc(dev, sizeof(*csi), GFP_KERNEL);
 	if (!csi)
@@ -896,6 +925,19 @@ static int sdrv_dummy_probe(struct platform_device *pdev)
 	csi->dev = dev;
 	platform_set_drvdata(pdev, csi);
 
+	/* Read instance from dts */
+	ret = of_property_read_u16(pdev->dev.of_node, "dev_id", &csi->instance);
+	if(ret < 0) {
+		dev_err(&pdev->dev, "Missing dev_id, use 0\n");
+		csi->instance = 0;
+	}
+	ret = of_property_read_string(dev->of_node, "type", &type);
+	if (ret < 0) {
+		dev_err(dev, "Missing type\n");
+		return -EINVAL;
+	}
+	strcpy(csi->type, type);
+	dev_err(dev, "%s(): csi->type=%s.\n", __func__, csi->type);
 	ret = v4l2_device_register(csi->dev, &csi->v4l2_dev);
 	if (ret < 0)
 		goto err_register_v4l2;
