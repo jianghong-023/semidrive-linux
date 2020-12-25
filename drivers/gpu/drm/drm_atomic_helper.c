@@ -2397,6 +2397,9 @@ int drm_atomic_helper_update_plane(struct drm_plane *plane,
 {
 	struct drm_atomic_state *state;
 	struct drm_plane_state *plane_state;
+	struct drm_device *dev = plane->dev;
+	struct drm_mode_config *config = &dev->mode_config;
+	struct drm_plane *p;
 	int ret = 0;
 
 	state = drm_atomic_state_alloc(plane->dev);
@@ -2404,6 +2407,19 @@ int drm_atomic_helper_update_plane(struct drm_plane *plane,
 		return -ENOMEM;
 
 	state->acquire_ctx = ctx;
+
+	drm_for_each_plane(p, dev) {
+		struct drm_plane_state *p_state;
+
+		if (p->crtc && (p->crtc->index == crtc->index)) {
+			p_state = drm_atomic_get_plane_state(state, p);
+			if (IS_ERR(p_state)) {
+				ret = PTR_ERR(p_state);
+				goto fail;
+			}
+		}
+	}
+
 	plane_state = drm_atomic_get_plane_state(state, plane);
 	if (IS_ERR(plane_state)) {
 		ret = PTR_ERR(plane_state);
