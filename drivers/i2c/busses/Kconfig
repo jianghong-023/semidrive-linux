@@ -496,6 +496,12 @@ config I2C_DAVINCI
 	  devices such as DaVinci NIC.
 	  For details please see http://www.ti.com/davinci
 
+config I2C_SD_VIRTUAL
+	tristate "Semidrive virtual I2C driver"
+	depends on RPMSG && RPMSG_SEMIDRIVE
+	help
+	  Support for SD SoC VI2C controller driver.
+
 config I2C_DESIGNWARE_CORE
 	tristate
 
