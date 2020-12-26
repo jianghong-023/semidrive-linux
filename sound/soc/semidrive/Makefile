@@ -38,3 +38,5 @@ obj-$(CONFIG_SND_X9_REF_MACH_TLV320AIC23) += x9-ref-mach-tlv320aic23.o
 
 snd-g9-ref-mach-objs := g9-ref-mach.o
 obj-$(CONFIG_SND_G9_REF_MACH) += snd-g9-ref-mach.o
+
+obj-$(CONFIG_SEMIDRIVE_AUDIO_SERVICE) += audio_service/

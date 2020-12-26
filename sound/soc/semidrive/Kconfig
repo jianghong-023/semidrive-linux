@@ -137,5 +137,12 @@ config SND_X9_CS42888
 	  Select Y if you have such device.
 	  If unsure select "N".
 
+config SEMIDRIVE_AUDIO_SERVICE
+	tristate "Semidrive dummy i2s for audio service"
+	depends on RPMSG_SEMIDRIVE
+    default n
+	---help---
+		This driver provides communication with other cores, but
+		only audio service include.
 endmenu
 
