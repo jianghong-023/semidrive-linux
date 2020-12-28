@@ -35,7 +35,7 @@
 
 static int print_i2c_msg = -1; //for debug purpose
 
-static struct rpmsg_device *g_rpmsg_device;
+static struct rpmsg_device *g_rpmsg_device = NULL;
 
 typedef struct __sd_vi2c_t {
 	struct platform_device *pdev;
@@ -344,6 +344,11 @@ static int sd_vi2c_plat_probe(struct platform_device *pdev)
 	int ret;
 	uint8_t adap_num;
 	sd_vi2c_t *sd_vi2c_p;
+
+	if (!g_rpmsg_device) {
+		pr_err("%s, vi2c no rpmsg device\n", __func__);
+		return -ENODEV;
+	}
 
 	ret = device_property_read_u8(&pdev->dev, "phy-num", &adap_num);
 	if (ret)
