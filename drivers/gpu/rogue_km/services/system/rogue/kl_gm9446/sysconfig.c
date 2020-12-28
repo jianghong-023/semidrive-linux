@@ -248,7 +248,7 @@ PVRSRV_ERROR SysDevInit(void *pvOSDevice, PVRSRV_DEVICE_CONFIG **ppsDevConfig)
 
 #if defined(LINUX)
 	int iIrq;
-	IMG_UINT32 uiClk = 0;
+	IMG_UINT32 uiClk = RGX_KUNLUN_CORE_CLOCK_SPEED;
 	IMG_UINT32 uiOsId = -1;
 	struct platform_device *psDev;
 	struct resource *psDevMemRes = NULL;

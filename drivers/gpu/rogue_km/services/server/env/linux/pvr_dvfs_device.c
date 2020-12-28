@@ -339,7 +339,9 @@ static int GetOPPValues(struct device *dev,
 	}
 
 	/* modified by semidrive begin */
-	freq = (freq <	clk_round_rate(getCoreClock(),freq))?freq:clk_round_rate(getCoreClock(),freq);
+	if (!IS_ERR_OR_NULL(getCoreClock())) {
+		freq = clk_round_rate(getCoreClock(),freq);
+	}
 	/* modified by semidrive end */
 	*min_volt = dev_pm_opp_get_voltage(opp);
 	*max_freq = *min_freq = freq_table[0] = freq;
@@ -365,7 +367,11 @@ static int GetOPPValues(struct device *dev,
 		}
 
 		/* modified by semidrive begin */
-		newFreq = (freq <	clk_round_rate(getCoreClock(),freq))?freq:clk_round_rate(getCoreClock(),freq);
+		if (!IS_ERR_OR_NULL(getCoreClock())) {
+			newFreq = clk_round_rate(getCoreClock(),freq);
+		} else {
+			newFreq = freq;
+		}
 
 		if (newFreq > freq_table[last_count - 1]) {
 			freq_table[last_count] = newFreq;
