@@ -364,7 +364,6 @@ static int dcf_dev_release(struct inode *inode, struct file *filp)
 	}
 	spin_unlock(&user->queue_lock);
 	dev_info(dev, "user=%d pid=%d released!\n", user->user_id, user->pid);
-	kfree(user);
 
 	if (atomic_dec_and_test(&eptdev->user_count)) {
 		/* Close the endpoint, if it's not already destroyed by the parent */
@@ -378,6 +377,7 @@ static int dcf_dev_release(struct inode *inode, struct file *filp)
 		dev_info(dev, "last user=%d pid=%d released!\n", user->user_id, user->pid);
 	}
 
+	kfree(user);
 	put_device(dev);
 
 	return 0;
