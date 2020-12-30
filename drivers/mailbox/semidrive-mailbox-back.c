@@ -274,7 +274,7 @@ void mbox_back_received_data(sd_msghdr_t *data, int remote_proc, int src, int de
 		return;
 
 	osid = data->osid;
-	pr_err("mbox-irq: rx p=%d o=%d s=%d d=%d l=%d\n", remote_proc, osid, src, dest, data->dat_len);
+	pr_debug("mbox-irq: rx p=%d o=%d s=%d d=%d l=%d\n", remote_proc, osid, src, dest, data->dat_len);
 
 	/* otherwise, to find a frontend */
 	if (osid == 0)
@@ -308,7 +308,7 @@ void mbox_back_received_data(sd_msghdr_t *data, int remote_proc, int src, int de
 	atomic_inc(&chan->read);
 	atomic_inc(&chan->io);
 	mbox_copy_to_frontend(chan, rx_buf, size);
-	pr_err("mbox-irq: copy to frontend=%d\n", chan->domid);
+	pr_debug("mbox-irq: copy to frontend=%d\n", chan->domid);
 
 	kfree(rx_buf);
 }
