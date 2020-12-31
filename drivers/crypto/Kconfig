@@ -689,6 +689,8 @@ config CRYPTO_DEV_BCM_SPU
 	  Secure Processing Unit (SPU). The SPU driver registers ablkcipher,
 	  ahash, and aead algorithms with the kernel cryptographic API.
 
+source "drivers/crypto/semidrive/Kconfig"
+
 source "drivers/crypto/stm32/Kconfig"
 
 config CRYPTO_DEV_SAFEXCEL

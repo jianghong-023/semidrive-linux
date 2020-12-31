@@ -28,6 +28,13 @@ struct semidrive_rng_data {
 	struct hwrng rng;
 };
 
+struct semidrive_vce_device{
+	u32 ce_id;
+	int irq;
+	void __iomem *base;
+    void __iomem *sram_base;
+};
+
 static uint32_t reg_value(uint32_t val, uint32_t src, uint32_t shift, uint32_t mask)
 {
 	return (src & ~mask) | ((val << shift) & mask);
@@ -113,8 +120,16 @@ static int semidrive_rng_probe(struct platform_device *pdev)
 	struct semidrive_rng_data *rng;
 	struct resource *res;
 	int ret;
-
+	u32 val;
+	struct device_node *np;
+	struct semidrive_vce_device *rng_device;
+	val = 0;
+	np = pdev->dev.of_node;
+	rng_device = (struct semidrive_vce_device *)platform_get_drvdata(pdev);
 	pr_info("semidrive_rng_probe enter ");
+
+	if (!rng_device)
+		return -ENOMEM;
 
 	rng = devm_kzalloc(&pdev->dev, sizeof(*rng), GFP_KERNEL);
 	if (!rng)
@@ -122,8 +137,7 @@ static int semidrive_rng_probe(struct platform_device *pdev)
 
 	platform_set_drvdata(pdev, rng);
 
-	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-	rng->base = devm_ioremap_resource(&pdev->dev, res);
+	rng->base = rng_device->base;
 
 	if (IS_ERR(rng->base))
 		return PTR_ERR(rng->base);
@@ -144,7 +158,7 @@ static int semidrive_rng_probe(struct platform_device *pdev)
 }
 
 static const struct of_device_id semidrive_rng_match[] = {
-	{ .compatible = "semidrive,silex-rng" },
+	{ .compatible = "semidrive,rngunuse" },
 	{ }
 };
 

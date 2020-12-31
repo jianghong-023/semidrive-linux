@@ -19,6 +19,13 @@ config SEMIDRIVE_SCR
 	help
 	  SemiDrive System Control Register driver.
 
+config SEMIDRIVE_VCE
+	tristate "Semidrive VCE driver"
+	depends on ARCH_SEMIDRIVE
+	default n
+	help
+	  SemiDrive virtual crypto eng driver.
+
 config SEMIDRIVE_SDPE_RPC
 	tristate "Semidrive SDPE Communication Channel"
 	depends on ARCH_SEMIDRIVE

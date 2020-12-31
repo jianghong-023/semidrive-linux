@@ -47,6 +47,13 @@ struct crypto_sm2_msg {
 	uint8_t* ret;
 } __attribute__((packed));
 
+struct semidrive_vce_device{
+	u32 ce_id;
+	int irq;
+	void __iomem *base;
+    void __iomem *sram_base;
+};
+
 //sm2 gb pattern start
 /*dB：3945208F 7B2144B1 3F36E38A C6D39F95 88939369 2860B51A 42FB81EF 4DF7C5B8*/
 uint8_t __attribute__((aligned(CACHE_LINE))) crypto_gb_prv_key[32] = "\x39\x45\x20\x8F\x7B\x21\x44\xB1\x3F\x36\xE3\x8A\xC6\xD3\x9F\x95\x88\x93\x93\x69\x28\x60\xB5\x1A\x42\xFB\x81\xEF\x4D\xF7\xC5\xB8"; //-- d
@@ -270,28 +277,23 @@ static int crypto_open(struct inode *inode, struct file *filp)
 
 	crypto = to_crypto_dev(filp->private_data);
 
-	//of_set_sys_cnt_ce(1);
-
 	if (!mutex_trylock(&(crypto->lock))) {
-		//pr_info("Device Busy\n");
+		pr_info("Device Busy\n");
 		return -EBUSY;
 	}
-	//of_set_sys_cnt_ce(2);
+
 	sm2_load_curve(crypto, &sx_ecc_sm2_curve_p256_rev, BA414EP_BIGEND);
-//	crypto_ip_test(crypto);
-	//of_set_sys_cnt_ce(3);
 	return 0;
 }
 
 
 static int crypto_release(struct inode *inode, struct file *filp)
 {
-	//pr_info("crypto_release enter ");
+	pr_info("crypto_release enter ");
 	struct crypto_dev *crypto;
 
 	crypto = to_crypto_dev(filp->private_data);
 
-	//of_set_sys_cnt_ce(2);
 	mutex_unlock(&(crypto->lock));
 	return 0;
 }
@@ -304,14 +306,6 @@ static const struct file_operations crypto_fops = {
 	.write	= crypto_write,
 	.owner		= THIS_MODULE,
 };
-
-#if 0
-static struct miscdevice crypto_misc_dev0 = {
-  	.minor		= MISC_DYNAMIC_MINOR,
-  	.name		= "crypto_dev0",
-  	.fops		= &crypto_fops
-  };
-#endif
 
 static irqreturn_t crypto_irq_handler(int irq, void *data)
 {
@@ -345,13 +339,17 @@ static int semidrive_crypto_probe(struct platform_device *pdev)
 {
 	struct crypto_dev *crypto_inst;
 	struct miscdevice *crypto_fn;
-	struct resource *ctrl_reg;
-	struct resource *sram_base;
 	int ret;
 	dev_t devt;
-	u32 ce_id;
 	int irq;
+    struct semidrive_vce_device *ce_device;
+
 	pr_info("semidrive_crypto_probe enter");
+
+	ce_device = (struct semidrive_vce_device *)platform_get_drvdata(pdev);
+
+	if (!ce_device)
+		return -ENOMEM;
 
 	crypto_inst = devm_kzalloc(&pdev->dev, sizeof(*crypto_inst), GFP_KERNEL);
 	if (!crypto_inst)
@@ -359,29 +357,25 @@ static int semidrive_crypto_probe(struct platform_device *pdev)
 
 	platform_set_drvdata(pdev, crypto_inst);
 
-	ctrl_reg = platform_get_resource_byname(pdev, IORESOURCE_MEM, "ctrl_reg");
-	crypto_inst->base = devm_ioremap_resource(&pdev->dev, ctrl_reg);
+	crypto_inst->base = ce_device->base;
 
 	if (IS_ERR(crypto_inst->base))
 		return PTR_ERR(crypto_inst->base);
 
-	sram_base = platform_get_resource_byname(pdev, IORESOURCE_MEM, "sram_base");
-	crypto_inst->sram_base = devm_ioremap_resource(&pdev->dev, sram_base);
+	crypto_inst->sram_base = ce_device->sram_base;
 
 	if (IS_ERR(crypto_inst->sram_base))
 		return PTR_ERR(crypto_inst->sram_base);
-	
-	of_property_read_u32(pdev->dev.of_node, "ce_id", &ce_id);
 
-	crypto_inst->ce_id = ce_id;
+	crypto_inst->ce_id = ce_device->ce_id;
 	crypto_inst->dev = &pdev->dev;
 
 	init_waitqueue_head(&crypto_inst->cehashwaitq);
 	init_waitqueue_head(&crypto_inst->cedmawaitq);
 	init_waitqueue_head(&crypto_inst->cepkewaitq);
 
-	irq = platform_get_irq(pdev, 0);
-	//pr_info("semidrive_crypto_probe irq =%d",irq);
+	irq = ce_device->irq;
+
 	if (irq < 0) {
 		dev_err(&pdev->dev, "Cannot get IRQ resource\n");
 		return irq;
@@ -391,12 +385,12 @@ static int semidrive_crypto_probe(struct platform_device *pdev)
 					NULL, IRQF_ONESHOT,
 					dev_name(&pdev->dev), crypto_inst);
 
-    writel(0x1f, (crypto_inst->base +REG_INTCLR_CE_(ce_id)));
+    writel(0x1f, (crypto_inst->base +REG_INTCLR_CE_(crypto_inst->ce_id)));
     //writel(0xe, (crypto_inst->base +REG_INTEN_CE_(ce_id))); //disable dma/pke intrrupt
-	writel(0x0, (crypto_inst->base +REG_INTEN_CE_(ce_id))); //disable all intrrupt
+	writel(0x0, (crypto_inst->base +REG_INTEN_CE_(crypto_inst->ce_id))); //disable all intrrupt
 
 	crypto_fn = &crypto_inst->miscdev;
-	sprintf(crypto_inst->name_buff, "semidrive-ce%d", ce_id);
+	sprintf(crypto_inst->name_buff, "semidrive-ce%d", crypto_inst->ce_id);
 
 	crypto_fn->minor = MISC_DYNAMIC_MINOR;
   	crypto_fn->name = crypto_inst->name_buff;
@@ -407,7 +401,7 @@ static int semidrive_crypto_probe(struct platform_device *pdev)
 	ret = misc_register(crypto_fn);
 
 	if (ret) {
-		dev_err(&pdev->dev, "failed to register sm2\n");
+		dev_err(&pdev->dev, "failed to register ce\n");
 		return ret;
 	}
 
@@ -415,7 +409,7 @@ static int semidrive_crypto_probe(struct platform_device *pdev)
 }
 
 static const struct of_device_id semidrive_crypto_match[] = {
-	{ .compatible = "semidrive,silex-ce1" },
+	{ .compatible = "semidrive,ceunuse" },
 	{ }
 };
 
@@ -433,4 +427,4 @@ module_platform_driver(semidrive_crypto_driver);
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("semidrive <semidrive@semidrive.com>");
-MODULE_DESCRIPTION("semidrive sm2 driver");
+MODULE_DESCRIPTION("semidrive ce driver");

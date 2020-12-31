@@ -211,4 +211,6 @@ source "drivers/mux/Kconfig"
 
 source "drivers/memdisk/Kconfig"
 
+source "drivers/crypto/Kconfig"
+
 endmenu
