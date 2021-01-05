@@ -175,7 +175,6 @@ static struct snd_soc_dai_link snd_x9_ref_soc_dai_links[] = {
 		.cpu_dai_name = "snd-afe-sc-i2s-dai0",
 		.platform_name = "30630000.i2s",
 		.codec_dai_name = "tlv320aic23-hifi",
-		.codec_name = "tlv320aic23-codec.3-001b",
 		.init = x9_ref_tlv320aic23_init,
 		.dai_fmt = SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_CBS_CFS,
 		.ops = &x9_ref_tlv320aic23_ops,
@@ -209,7 +208,9 @@ static int x9_ref_tlv320aic23_probe(struct platform_device *pdev)
 {
 	struct snd_soc_card *card = &x9_ref_tlv320aic23_card;
 	struct device *dev = &pdev->dev;
+	struct device_node *np = pdev->dev.of_node;
 	const char *dai_codec_name;
+	struct device_node *codec_np;
 
 	int ret;
 	struct snd_x9_chip_hs *chip;
@@ -229,13 +230,13 @@ static int x9_ref_tlv320aic23_probe(struct platform_device *pdev)
 	DEBUG_FUNC_PRT;
 	card->dev = dev;
 
-	ret = of_property_read_string(dev->of_node, "semidrive,codec-name", &dai_codec_name);
-	if (ret == 0)
-	{
-		dev_info(&pdev->dev, ":overwrite codec name =%s %s\n", pdev->name, dai_codec_name);
-		snd_x9_ref_soc_dai_links[0].codec_name = dai_codec_name;
-	}
 
+	codec_np = of_parse_phandle(np, "semidrive,audio-codec", 0);
+	if (!codec_np) {
+		dev_err(&pdev->dev, "failed to get codec info\n");
+		return -EINVAL;
+	}
+	snd_x9_ref_soc_dai_links[0].codec_of_node = codec_np;
 	/* Allocate chip data */
 	chip = devm_kzalloc(dev, sizeof(*chip), GFP_KERNEL);
 	if (!chip) {
