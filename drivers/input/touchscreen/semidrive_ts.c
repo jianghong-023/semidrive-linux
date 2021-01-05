@@ -60,6 +60,7 @@ enum sts_op_type {
 	STS_OP_GET_CONFIG,
 	STS_OP_SET_CONFIG,
 	STS_OP_RESET,
+	STS_OP_SET_INITED,
 };
 
 /* Do not exceed 16 bytes so far */
@@ -125,10 +126,10 @@ semidrive_sts_report_touch(struct semidrive_sts_data *ts, u8 *coor_data)
 	//dev_err(&ts->pdev->dev, "(%d %d)\n", input_x, input_y);
 	input_x -= ts->x_offset;
 	input_y -= ts->y_offset;
-	if((input_x<0) || (input_x>ts->abs_x_max))
-		return ;
-	if((input_y<0) || (input_y>ts->abs_y_max))
-		return ;
+	if ((input_x < 0) || (input_x > ts->abs_x_max))
+		return;
+	if ((input_y < 0) || (input_y > ts->abs_y_max))
+		return;
 
 	/* Inversions have to happen before axis swapping */
 	if (ts->inverted_x)
@@ -164,7 +165,7 @@ semidrive_process_events(struct semidrive_sts_data *ts, u8 *point_data)
 	int i;
 
 	touch_num = semidrive_read_input_report(ts, point_data);
-	if ((touch_num < 0) || (point_data[0]==0))
+	if ((touch_num < 0) || (point_data[0] == 0))
 		return;
 
 	/*
@@ -272,6 +273,14 @@ static int semidrive_reset(struct semidrive_sts_data *ts)
 	return 0;
 }
 
+static int semidrive_set_inited(struct semidrive_sts_data *ts)
+{
+	struct sts_ioctl_result op_ret;
+
+	semidrive_sts_ioctl(ts, STS_OP_SET_INITED, &op_ret);
+	return 0;
+}
+
 /**
  * semidrive_read_config - Read the embedded configuration of the panel
  *
@@ -370,7 +379,7 @@ static int semidrive_register_input_dev(struct semidrive_sts_data *ts)
 			    INPUT_MT_DIRECT | INPUT_MT_DROP_UNUSED);
 
 	ts->input_dev->name = "Semidrive Safe TouchScreen";
-	if(ts->dev_type == 1)
+	if (ts->dev_type == 1)
 		ts->input_dev->phys = "input/ts_aux";
 	else
 		ts->input_dev->phys = "input/ts_main";
@@ -436,7 +445,7 @@ static int semidrive_sts_probe(struct platform_device *pdev)
 
 	/* Read instance from dts */
 	ret = of_property_read_u16(pdev->dev.of_node, "touchscreen-id", &ts->instance);
-	if(ret < 0) {
+	if (ret < 0) {
 		dev_err(&pdev->dev, "Missing touchscreen id, use 0\n");
 		ts->instance = 0;
 	}
@@ -444,19 +453,33 @@ static int semidrive_sts_probe(struct platform_device *pdev)
 	ret = semidrive_reset(ts);
 	if (ret) {
 		dev_err(&pdev->dev, "reset failed: %d\n", ret);
-		return ret;
+		goto err;
 	}
 
 	ret = semidrive_read_version(ts);
 	if (ret) {
 		dev_err(&pdev->dev, "Read version failed %d\n", ret);
-		return ret;
+		goto err;
 	}
 
 	ret = semidrive_configure_dev(ts);
+	if (ret) {
+		dev_err(&pdev->dev, "configure dev failed %d\n", ret);
+		goto err;
+	}
 
-	dev_err(&pdev->dev, "%s(): done ret=%d \n", __func__, ret);
+	ret = semidrive_set_inited(ts);
+	if (ret) {
+		dev_err(&pdev->dev, "set init failed %d\n", ret);
+		goto err;
+	}
 
+	dev_err(&pdev->dev, "%s(): done ok\n", __func__);
+
+	return 0;
+
+err:
+	kfree(ts);
 	return ret;
 }
 
