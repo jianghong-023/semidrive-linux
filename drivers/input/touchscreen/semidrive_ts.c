@@ -479,7 +479,7 @@ static int semidrive_sts_probe(struct platform_device *pdev)
 	return 0;
 
 err:
-	kfree(ts);
+	devm_kfree(&pdev->dev, ts);
 	return ret;
 }
 
