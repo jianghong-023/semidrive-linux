@@ -1182,6 +1182,9 @@ static void stmmac_free_rx_buffer(struct stmmac_priv *priv, u32 queue, int i)
 {
 	struct stmmac_rx_queue *rx_q = &priv->rx_queue[queue];
 
+	if (unlikely(!rx_q->rx_skbuff))
+		return;
+
 	if (rx_q->rx_skbuff[i]) {
 		dma_unmap_single(priv->device, rx_q->rx_skbuff_dma[i],
 				 priv->dma_buf_sz, DMA_FROM_DEVICE);
@@ -1212,6 +1215,9 @@ static void stmmac_free_tx_buffer(struct stmmac_priv *priv, u32 queue, int i)
 					 tx_q->tx_skbuff_dma[i].len,
 					 DMA_TO_DEVICE);
 	}
+
+	if (unlikely(!tx_q->tx_skbuff))
+		return;
 
 	if (tx_q->tx_skbuff[i]) {
 		dev_kfree_skb_any(tx_q->tx_skbuff[i]);
@@ -1512,7 +1518,7 @@ static int alloc_dma_rx_desc_resources(struct stmmac_priv *priv)
 
 		rx_q->rx_skbuff = kmalloc_array(DMA_RX_SIZE,
 						sizeof(struct sk_buff *),
-						GFP_KERNEL);
+						GFP_KERNEL | __GFP_ZERO);
 		if (!rx_q->rx_skbuff)
 			goto err_dma;
 
@@ -1575,7 +1581,7 @@ static int alloc_dma_tx_desc_resources(struct stmmac_priv *priv)
 
 		tx_q->tx_skbuff = kmalloc_array(DMA_TX_SIZE,
 						sizeof(struct sk_buff *),
-						GFP_KERNEL);
+						GFP_KERNEL | __GFP_ZERO);
 		if (!tx_q->tx_skbuff)
 			goto err_dma;
 
