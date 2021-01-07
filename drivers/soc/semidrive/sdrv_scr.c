@@ -130,8 +130,10 @@ static struct sdrv_scr_signal *_scr_map_signal(uint32_t scr, uint32_t _signal)
 					scr_dev->addr + signal->offset, 4);
 				if (signal->base)
 					return signal;
-				else
+				else {
+					_scr_dev_unlock(signal->dev);
 					break;
+				}
 			}
 		}
 	}
