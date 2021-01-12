@@ -1670,8 +1670,8 @@ static void sdrv_stream_frm_done_isr(struct kstream_device *kstream)
 
 	if (video->vbuf_active == NULL) {
 		if (kstream->state == RUNNING)
-			WARN_ON(video->vbuf_active == NULL);
-
+			pr_err("wrong state machine! Maybe app can't get the data in time.\n");
+			//WARN_ON(video->vbuf_active == NULL);
 		return;
 	}
 

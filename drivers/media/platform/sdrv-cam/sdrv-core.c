@@ -587,11 +587,16 @@ static irqreturn_t sdrv_csi_isr(int irq, void *dev)
 		}
 	}
 
-	if (value0 & (CSI_BT_ERR_MASK | CSI_BT_FATAL_MASK | CSI_BT_COF_MASK))
+	if (value0 & (CSI_BT_ERR_MASK | CSI_BT_FATAL_MASK | CSI_BT_COF_MASK)) {
+		printk("bt err, bt fatal, bt cof error.\n");
 		sdrv_csi_bt_err_isr(csi, value0);
+	}
 
-	if (value1)
+	if (value1) {
 		sdrv_csi_int1_isr(csi, value1);
+		printk("ints.frm_cnt = 0x%x, bt_err = 0x%x, bt_fatal = 0x%x  pixel_err = 0x%x, overflow = 0x%x\n",
+			csi->ints.frm_cnt, csi->ints.bt_err, csi->ints.bt_fatal, csi->ints.pixel_err, csi->ints.overflow );
+	}
 
 	return IRQ_HANDLED;
 }
