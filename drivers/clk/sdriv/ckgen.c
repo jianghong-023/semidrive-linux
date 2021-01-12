@@ -28,11 +28,14 @@ void ckgen_ip_slice_cfg(void __iomem *base,
 	int count = MAX_POLL_COUNT;
 
 	/* 1> Set pre_en to 1'b0 to turn off the clock */
-	ctl &= ~BM_CKGEN_IP_SLICE_CTL_CG_EN;
-	clk_writel(ctl, ctl_addr);
+	if (ctl & BM_CKGEN_IP_SLICE_CTL_CG_EN) {
+		ctl &= ~BM_CKGEN_IP_SLICE_CTL_CG_EN;
+		clk_writel(ctl, ctl_addr);
 
-	while ((clk_readl(ctl_addr) & (BM_CKGEN_IP_SLICE_CTL_CG_EN_STATUS)) && count--)
-		cpu_relax();
+		while (!((ctl = clk_readl(ctl_addr)) & (BM_CKGEN_IP_SLICE_CTL_CG_EN_STATUS)) && count--)
+			cpu_relax();
+		clk_writel((ctl & ~BM_CKGEN_IP_SLICE_CTL_CG_EN_STATUS), ctl_addr);
+	}
 
 	/* 2> Change pre_mux_sel to select clock source */
 	ctl &= ~FM_CKGEN_IP_SLICE_CTL_CLK_SRC_SEL;
@@ -43,8 +46,9 @@ void ckgen_ip_slice_cfg(void __iomem *base,
 	ctl |= BM_CKGEN_IP_SLICE_CTL_CG_EN;
 	clk_writel(ctl, ctl_addr);
 	count = MAX_POLL_COUNT;
-	while (!(clk_readl(ctl_addr) & (BM_CKGEN_IP_SLICE_CTL_CG_EN_STATUS)) && count--)
+	while (!((ctl = clk_readl(ctl_addr)) & (BM_CKGEN_IP_SLICE_CTL_CG_EN_STATUS)) && count--)
 		cpu_relax();
+	clk_writel((ctl & ~BM_CKGEN_IP_SLICE_CTL_CG_EN_STATUS), ctl_addr);
 
 	/* 4>	a. Set pre_div_num */
 	ctl &= ~FM_CKGEN_IP_SLICE_CTL_PRE_DIV_NUM;
@@ -90,11 +94,14 @@ void ckgen_bus_slice_cfg(void __iomem *base,
 	if (path == PATH_A) {
 		/* B is being selected now */
 		WARN_ON(!(ctl & BM_CKGEN_BUS_SLICE_CTL_A_B_SEL));
+		if (ctl & BM_CKGEN_BUS_SLICE_CTL_CG_EN_A) {
 		/* 1> Set pre_en to 1'b0 to turn off path. */
-		ctl &= ~BM_CKGEN_BUS_SLICE_CTL_CG_EN_A;
-		clk_writel(ctl, ctl_addr);
-		while ((clk_readl(ctl_addr) & (BM_CKGEN_BUS_SLICE_CTL_CG_EN_A_STATUS)) && count--)
-			cpu_relax();
+			ctl &= ~BM_CKGEN_BUS_SLICE_CTL_CG_EN_A;
+			clk_writel(ctl, ctl_addr);
+			while (!((ctl = clk_readl(ctl_addr)) & (BM_CKGEN_BUS_SLICE_CTL_CG_EN_A_STATUS)) && count--)
+				cpu_relax();
+			clk_writel((ctl & ~BM_CKGEN_BUS_SLICE_CTL_CG_EN_A_STATUS), ctl_addr);
+		}
 		/* 2> Change pre_mux_sel to select clock source.*/
 		ctl &= ~FM_CKGEN_BUS_SLICE_CTL_CLK_SRC_SEL_A;
 		ctl |= FV_CKGEN_BUS_SLICE_CTL_CLK_SRC_SEL_A(src_sel);
@@ -103,8 +110,9 @@ void ckgen_bus_slice_cfg(void __iomem *base,
 		ctl |= BM_CKGEN_BUS_SLICE_CTL_CG_EN_A;
 		clk_writel(ctl, ctl_addr);
 		count = MAX_POLL_COUNT;
-		while (!(clk_readl(ctl_addr) & (BM_CKGEN_BUS_SLICE_CTL_CG_EN_A_STATUS)) && count--)
+		while (!((ctl = clk_readl(ctl_addr)) & (BM_CKGEN_BUS_SLICE_CTL_CG_EN_A_STATUS)) && count--)
 			cpu_relax();
+		clk_writel((ctl & ~BM_CKGEN_BUS_SLICE_CTL_CG_EN_A_STATUS), ctl_addr);
 		/* 4>	a. Set pre_div_num */
 		ctl &= ~FM_CKGEN_BUS_SLICE_CTL_PRE_DIV_NUM_A;
 		ctl |= FV_CKGEN_BUS_SLICE_CTL_PRE_DIV_NUM_A(pre_div);
@@ -118,12 +126,15 @@ void ckgen_bus_slice_cfg(void __iomem *base,
 	} else {
 		/* A is being selected now */
 		WARN_ON((ctl & BM_CKGEN_BUS_SLICE_CTL_A_B_SEL));
+		if (ctl & BM_CKGEN_BUS_SLICE_CTL_CG_EN_B) {
 		/* 1> Set pre_en to 1'b0 to turn off path. */
-		ctl &= ~BM_CKGEN_BUS_SLICE_CTL_CG_EN_B;
-		clk_writel(ctl, ctl_addr);
-		count = MAX_POLL_COUNT;
-		while ((clk_readl(ctl_addr) & (BM_CKGEN_BUS_SLICE_CTL_CG_EN_B_STATUS)) && count--)
-			cpu_relax();
+			ctl &= ~BM_CKGEN_BUS_SLICE_CTL_CG_EN_B;
+			clk_writel(ctl, ctl_addr);
+			count = MAX_POLL_COUNT;
+			while (!((ctl = clk_readl(ctl_addr)) & (BM_CKGEN_BUS_SLICE_CTL_CG_EN_B_STATUS)) && count--)
+				cpu_relax();
+			clk_writel((ctl & ~BM_CKGEN_BUS_SLICE_CTL_CG_EN_B_STATUS), ctl_addr);
+		}
 		/* 2> Change pre_mux_sel to select clock source.*/
 		ctl &= ~FM_CKGEN_BUS_SLICE_CTL_CLK_SRC_SEL_B;
 		ctl |= FV_CKGEN_BUS_SLICE_CTL_CLK_SRC_SEL_B(src_sel);
@@ -132,8 +143,9 @@ void ckgen_bus_slice_cfg(void __iomem *base,
 		ctl |= BM_CKGEN_BUS_SLICE_CTL_CG_EN_B;
 		clk_writel(ctl, ctl_addr);
 		count = MAX_POLL_COUNT;
-		while (!(clk_readl(ctl_addr) & (BM_CKGEN_BUS_SLICE_CTL_CG_EN_B_STATUS)) && count--)
+		while (!((ctl = clk_readl(ctl_addr)) & (BM_CKGEN_BUS_SLICE_CTL_CG_EN_B_STATUS)) && count--)
 			cpu_relax();
+		clk_writel((ctl & ~BM_CKGEN_BUS_SLICE_CTL_CG_EN_B_STATUS), ctl_addr);
 		/* 4>	a. Set pre_div_num */
 		ctl &= ~FM_CKGEN_BUS_SLICE_CTL_PRE_DIV_NUM_B;
 		ctl |= FV_CKGEN_BUS_SLICE_CTL_PRE_DIV_NUM_B(pre_div);
@@ -171,7 +183,7 @@ void ckgen_bus_slice_switch(void __iomem *base)
 	u32 ctl = clk_readl(ctl_addr);
 
 	/* 5> toggle pre_a_b_sel. This mux is glitch-less.
-	 * Note: Both clock from path a and be should be active when switching.
+	 * Note: Both clock from path a and b should be active when switching.
 	 */
 	if (ctl & BM_CKGEN_BUS_SLICE_CTL_A_B_SEL)
 		ctl &= ~BM_CKGEN_BUS_SLICE_CTL_A_B_SEL;
@@ -198,11 +210,14 @@ void ckgen_core_slice_cfg(void __iomem *base, u32 path,
 	if (path == PATH_A) {
 		/* B is being selected now */
 		WARN_ON(!(ctl & BM_CKGEN_CORE_SLICE_CTL_A_B_SEL));
+		if (ctl & BM_CKGEN_CORE_SLICE_CTL_CG_EN_A) {
 		/* 1> Set pre_en to 1'b0 to turn off path. */
-		ctl &= ~BM_CKGEN_CORE_SLICE_CTL_CG_EN_A;
-		clk_writel(ctl, ctl_addr);
-		while ((clk_readl(ctl_addr) & (BM_CKGEN_CORE_SLICE_CTL_CG_EN_A_STATUS)) && count--)
-			cpu_relax();
+			ctl &= ~BM_CKGEN_CORE_SLICE_CTL_CG_EN_A;
+			clk_writel(ctl, ctl_addr);
+			while (!((ctl = clk_readl(ctl_addr)) & (BM_CKGEN_CORE_SLICE_CTL_CG_EN_A_STATUS)) && count--)
+				cpu_relax();
+			clk_writel((ctl & ~BM_CKGEN_CORE_SLICE_CTL_CG_EN_A_STATUS), ctl_addr);
+		}
 		/* 2> Change pre_mux_sel to select clock source.*/
 		ctl &= ~FM_CKGEN_CORE_SLICE_CTL_CLK_SRC_SEL_A;
 		ctl |= FV_CKGEN_CORE_SLICE_CTL_CLK_SRC_SEL_A(src_sel);
@@ -211,16 +226,20 @@ void ckgen_core_slice_cfg(void __iomem *base, u32 path,
 		ctl |= BM_CKGEN_CORE_SLICE_CTL_CG_EN_A;
 		clk_writel(ctl, ctl_addr);
 		count = MAX_POLL_COUNT;
-		while (!(clk_readl(ctl_addr) & (BM_CKGEN_CORE_SLICE_CTL_CG_EN_A_STATUS)) && count--)
+		while (!((ctl = clk_readl(ctl_addr)) & (BM_CKGEN_CORE_SLICE_CTL_CG_EN_A_STATUS)) && count--)
 			cpu_relax();
+		clk_writel((ctl & ~BM_CKGEN_CORE_SLICE_CTL_CG_EN_A_STATUS), ctl_addr);
 	} else {
 		/* A is being selected now */
 		WARN_ON((ctl & BM_CKGEN_CORE_SLICE_CTL_A_B_SEL));
+		if (ctl & BM_CKGEN_CORE_SLICE_CTL_CG_EN_B) {
 		/* 1> Set pre_en to 1'b0 to turn off path. */
-		ctl &= ~BM_CKGEN_CORE_SLICE_CTL_CG_EN_B;
-		clk_writel(ctl, ctl_addr);
-		while ((clk_readl(ctl_addr) & (BM_CKGEN_CORE_SLICE_CTL_CG_EN_B_STATUS)) && count--)
-			cpu_relax();
+			ctl &= ~BM_CKGEN_CORE_SLICE_CTL_CG_EN_B;
+			clk_writel(ctl, ctl_addr);
+			while (!((ctl = clk_readl(ctl_addr)) & (BM_CKGEN_CORE_SLICE_CTL_CG_EN_B_STATUS)) && count--)
+				cpu_relax();
+			clk_writel((ctl & ~BM_CKGEN_CORE_SLICE_CTL_CG_EN_B_STATUS), ctl_addr);
+		}
 		/* 2> Change pre_mux_sel to select clock source.*/
 		ctl &= ~FM_CKGEN_CORE_SLICE_CTL_CLK_SRC_SEL_B;
 		ctl |= FV_CKGEN_CORE_SLICE_CTL_CLK_SRC_SEL_B(src_sel);
@@ -229,8 +248,9 @@ void ckgen_core_slice_cfg(void __iomem *base, u32 path,
 		ctl |= BM_CKGEN_CORE_SLICE_CTL_CG_EN_B;
 		clk_writel(ctl, ctl_addr);
 		count = MAX_POLL_COUNT;
-		while (!(clk_readl(ctl_addr) & (BM_CKGEN_CORE_SLICE_CTL_CG_EN_A_STATUS)) && count--)
+		while (!((ctl = clk_readl(ctl_addr)) & (BM_CKGEN_CORE_SLICE_CTL_CG_EN_B_STATUS)) && count--)
 			cpu_relax();
+		clk_writel((ctl & ~BM_CKGEN_CORE_SLICE_CTL_CG_EN_B_STATUS), ctl_addr);
 	}
 }
 void ckgen_core_slice_switch(void __iomem *base)
