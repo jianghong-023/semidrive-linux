@@ -718,7 +718,9 @@ static PVRSRV_ERROR RGXAcquireMipsBootldrData(PVRSRV_DEVICE_NODE *psDeviceNode,
                                               RGX_FW_BOOT_PARAMS *puFWParams)
 {
 	PVRSRV_RGXDEV_INFO *psDevInfo = (PVRSRV_RGXDEV_INFO*) psDeviceNode->pvDevice;
+	MMU_DEVICEATTRIBS *psFWMMUDevAttrs = psDevInfo->psDeviceNode->psFirmwareMMUDevAttrs;
 	IMG_DEV_PHYADDR sAddr;
+	IMG_UINT32 ui32PTSize, i;
 	PVRSRV_ERROR eError;
 	IMG_BOOL bValid;
 
@@ -735,15 +737,30 @@ static PVRSRV_ERROR RGXAcquireMipsBootldrData(PVRSRV_DEVICE_NODE *psDeviceNode,
 	/* MIPS Page Table physical address */
 	MMU_AcquireBaseAddr(psDevInfo->psKernelMMUCtx, &sAddr);
 
-	/* MIPS Page Table allocation is contiguous, only one address needs to be passed to the FW */
-	puFWParams->sMips.ui32FWPageTableNumPages = 1U;
-	puFWParams->sMips.ui32FWPageTableLog2PageSize =
-		psDevInfo->psDeviceNode->psFirmwareMMUDevAttrs->ui32BaseAlign;
+	/* MIPS Page Table allocation is contiguous. Pass one or more addresses
+	 * to the FW depending on the Page Table size and alignment. */
 
-	puFWParams->sMips.asFWPageTableAddr[0U].uiAddr = sAddr.uiAddr;
-	puFWParams->sMips.asFWPageTableAddr[1U].uiAddr = 0ULL;
-	puFWParams->sMips.asFWPageTableAddr[2U].uiAddr = 0ULL;
-	puFWParams->sMips.asFWPageTableAddr[3U].uiAddr = 0ULL;
+	ui32PTSize = (psFWMMUDevAttrs->psTopLevelDevVAddrConfig->uiNumEntriesPT)
+	             << RGXMIPSFW_LOG2_PTE_ENTRY_SIZE;
+	ui32PTSize = PVR_ALIGN(ui32PTSize, 1U << psFWMMUDevAttrs->ui32BaseAlign);
+
+	puFWParams->sMips.ui32FWPageTableLog2PageSize = psFWMMUDevAttrs->ui32BaseAlign;
+	puFWParams->sMips.ui32FWPageTableNumPages = ui32PTSize >> psFWMMUDevAttrs->ui32BaseAlign;
+
+	if (puFWParams->sMips.ui32FWPageTableNumPages > 4U)
+	{
+		PVR_DPF((PVR_DBG_ERROR, "%s: Page table cannot be mapped by the FW "
+		         "(size 0x%x, log2 page size %u, %u pages)",
+		         __func__, ui32PTSize, puFWParams->sMips.ui32FWPageTableLog2PageSize,
+		         puFWParams->sMips.ui32FWPageTableNumPages));
+		return PVRSRV_ERROR_INIT_FAILURE;
+	}
+
+	for (i = 0; i < puFWParams->sMips.ui32FWPageTableNumPages; i++)
+	{
+		puFWParams->sMips.asFWPageTableAddr[i].uiAddr =
+			sAddr.uiAddr + i * (1U << psFWMMUDevAttrs->ui32BaseAlign);
+	}
 
 	/* MIPS Stack Pointer Physical Address */
 	eError = RGXGetPhyAddr(psDevInfo->psRGXFWDataMemDesc->psImport->hPMR,
