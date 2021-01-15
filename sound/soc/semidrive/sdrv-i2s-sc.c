@@ -981,11 +981,12 @@ int snd_afe_dai_hw_params(struct snd_pcm_substream *substream,
 
 	/*Channel width fix to 32 */
 	if(afe->tdm_initialized == false){
-		regmap_write(afe->regmap, REG_CDN_I2SSC_REGS_I2S_SRATE,
-			     I2S_SC_SAMPLE_RATE_CALC(clk_get_rate(afe->clk_i2s), srate,
-						     channels,
-						     ChnWidthTable[AFE_I2S_CHN_WIDTH]) -
-				 1);
+		regmap_write(
+		    afe->regmap, REG_CDN_I2SSC_REGS_I2S_SRATE,
+		    I2S_SC_SAMPLE_RATE_CALC(clk_get_rate(afe->clk_i2s), srate,
+					    max(channels, 2),
+					    ChnWidthTable[AFE_I2S_CHN_WIDTH]) -
+			1);
 	}
 	else{
 		regmap_write(afe->regmap, REG_CDN_I2SSC_REGS_I2S_SRATE,
