@@ -460,7 +460,7 @@ static int mipi_csi2_set_phy_freq(struct sdrv_csi_mipi_csi2 *kcmc,
 	}
 	else if (kcmc->id == 1) {
 		//Set 1Gbps
-		iowrite32(g_phy_freqs[32].index, kcmc->dispmux_address + 0x68);
+		iowrite32(g_phy_freqs[i].index, kcmc->dispmux_address + 0x68);
 	}
 	else {
 		printk("wrong host id\n");
