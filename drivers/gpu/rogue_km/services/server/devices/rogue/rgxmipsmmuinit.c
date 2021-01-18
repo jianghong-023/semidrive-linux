@@ -53,6 +53,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "rgx_memallocflags.h"
 #include "pdump_km.h"
 #include "rgxdevice.h"
+#include "log2.h"
 
 /*
  * Bits of PT, PD and PC not involving addresses
@@ -210,7 +211,7 @@ PVRSRV_ERROR RGXMipsMMUInit_Register(PVRSRV_DEVICE_NODE *psDeviceNode)
 
 	sRGXMMUTopLevelDevVAddrConfig.uiPTIndexMask = IMG_UINT64_C(0xfffffff000); /* Get the PT address bits from a 40 bit virt. address (in a 64bit UINT) */
 	sRGXMMUTopLevelDevVAddrConfig.uiPTIndexShift = (IMG_UINT32)RGXMIPSFW_LOG2_PAGE_SIZE_4K;
-	sRGXMMUTopLevelDevVAddrConfig.uiNumEntriesPT = (RGX_NUM_OS_SUPPORTED << (RGXMIPSFW_LOG2_PAGETABLE_SIZE_4K + 3)) >> RGXMIPSFW_LOG2_PTE_ENTRY_SIZE;
+	sRGXMMUTopLevelDevVAddrConfig.uiNumEntriesPT = (RGX_NUM_OS_SUPPORTED << RGXMIPSFW_LOG2_PAGETABLE_SIZE_4K) >> RGXMIPSFW_LOG2_PTE_ENTRY_SIZE;
 
 /*
  *
@@ -278,7 +279,7 @@ PVRSRV_ERROR RGXMipsMMUInit_Register(PVRSRV_DEVICE_NODE *psDeviceNode)
 
 	sRGXMMUDevVAddrConfig_4KBDP.uiPTIndexMask = ~RGX_MIPS_MMUCTRL_VADDR_PT_INDEX_CLRMSK;
 	sRGXMMUDevVAddrConfig_4KBDP.uiPTIndexShift = RGX_MIPS_MMUCTRL_VADDR_PT_INDEX_SHIFT;
-	sRGXMMUDevVAddrConfig_4KBDP.uiNumEntriesPT = (RGX_NUM_OS_SUPPORTED << (RGXMIPSFW_LOG2_PAGETABLE_SIZE_4K + 3)) >> RGXMIPSFW_LOG2_PTE_ENTRY_SIZE;
+	sRGXMMUDevVAddrConfig_4KBDP.uiNumEntriesPT = (RGX_NUM_OS_SUPPORTED << RGXMIPSFW_LOG2_PAGETABLE_SIZE_4K) >> RGXMIPSFW_LOG2_PTE_ENTRY_SIZE;
 
 
 	sRGXMMUDevVAddrConfig_4KBDP.uiPageOffsetMask = IMG_UINT64_C(0x0000000fff);
@@ -638,8 +639,24 @@ PVRSRV_ERROR RGXMipsMMUInit_Register(PVRSRV_DEVICE_NODE *psDeviceNode)
 	 */
 	sRGXMMUDeviceAttributes.eMMUType = PDUMP_MMU_TYPE_MIPS_MICROAPTIV;
 	sRGXMMUDeviceAttributes.eTopLevel = MMU_LEVEL_1;
-	/* The page table fits in one big physical page as big as the page table itself */
-	sRGXMMUDeviceAttributes.ui32BaseAlign = RGXMIPSFW_LOG2_PAGETABLE_SIZE_4K + 3;
+
+
+	/*
+	 * The page table fits in one or more big physically adjacent pages,
+	 * at most as big as the page table itself.
+	 * To calculate its alignment/page size, calculate the log2 size of the page
+	 * table taking into account all OSes, then round that down to a valid MIPS
+	 * log2 page size (12, 14, 16 for a 4K, 16K, 64K page size).
+	 */
+	sRGXMMUDeviceAttributes.ui32BaseAlign =
+		(CeilLog2(RGX_NUM_OS_SUPPORTED) + RGXMIPSFW_LOG2_PAGETABLE_SIZE_4K) & ~1U;
+
+	/* 256K alignment might be too hard to achieve, fall back to 64K */
+	sRGXMMUDeviceAttributes.ui32BaseAlign =
+		MIN(sRGXMMUDeviceAttributes.ui32BaseAlign, RGXMIPSFW_LOG2_PAGE_SIZE_64K);
+
+
+
 	/* The base configuration is set to 4kB pages*/
 	sRGXMMUDeviceAttributes.psBaseConfig = &sRGXMMUPTEConfig_4KBDP;
 	sRGXMMUDeviceAttributes.psTopLevelDevVAddrConfig = &sRGXMMUTopLevelDevVAddrConfig;
