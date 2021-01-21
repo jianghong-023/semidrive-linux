@@ -25,6 +25,8 @@
 
 #define SDHCI_VENDER_AT_CTRL_REG (0x40)
 #define SDHCI_TUNE_CLK_STOP_EN_MASK BIT(16)
+#define SDHCI_TUNE_SWIN_TH_VAL_LSB (24)
+#define SDHCI_TUNE_SWIN_TH_VAL_MASK (0xFF)
 
 #define DWC_MSHC_PTR_PHY_REGS 0x300
 #define DWC_MSHC_PHY_CNFG (DWC_MSHC_PTR_PHY_REGS + 0x0)
@@ -254,17 +256,19 @@ static void emmc_card_init(struct sdhci_host *host)
 	sdhci_writew(host, reg, vender_base + SDHCI_VENDER_EMMC_CTRL_REG);
 }
 
-static inline void enable_tune_clk_stop(struct sdhci_host *host)
+static inline void dwcmshc_auto_tuning_set(struct sdhci_host *host)
 {
-	u16 reg;
+	u32 reg;
 	u16 vender_base;
 
 	/* read verder base register address */
 	vender_base = sdhci_readw(host, SDHCI_VENDOR_BASE_REG) & 0xFFF;
 
-	reg = sdhci_readw(host, vender_base + SDHCI_VENDER_AT_CTRL_REG);
+	reg = sdhci_readl(host, vender_base + SDHCI_VENDER_AT_CTRL_REG);
+	reg &= ~(SDHCI_TUNE_SWIN_TH_VAL_MASK << SDHCI_TUNE_SWIN_TH_VAL_LSB);
+	reg |= (0xF << SDHCI_TUNE_SWIN_TH_VAL_LSB);
 	reg |= SDHCI_TUNE_CLK_STOP_EN_MASK;
-	sdhci_writew(host, reg, vender_base + SDHCI_VENDER_AT_CTRL_REG);
+	sdhci_writel(host, reg, vender_base + SDHCI_VENDER_AT_CTRL_REG);
 }
 
 static void dwcmshc_set_clock(struct sdhci_host *host, unsigned int clock)
@@ -403,7 +407,7 @@ static int dwcmshc_execute_tuning(struct sdhci_host *host, u32 opcode)
 		host->tuning_delay = opcode == MMC_SEND_TUNING_BLOCK;
 
 	sdhci_reset_tuning(host);
-	enable_tune_clk_stop(host);
+	dwcmshc_auto_tuning_set(host);
 	dwcmshc_sdhci_reset(host, SDHCI_RESET_CMD | SDHCI_RESET_DATA);
 
 	/*
