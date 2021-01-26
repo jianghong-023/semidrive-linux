@@ -92,7 +92,6 @@ struct dwcmshc_priv {
 	struct clk	*bus_clk;
 	u32	 scr_signals_ddr;
 	bool	    card_is_emmc;
-	bool 		no_3_3_v;
 };
 
 static void dwcmshc_phy_pad_config(struct sdhci_host *host)
@@ -253,13 +252,6 @@ static void emmc_card_init(struct sdhci_host *host)
 	reg &= ~SDHCI_IS_EMMC_CARD_MASK;
 	reg |= priv->card_is_emmc;
 	sdhci_writew(host, reg, vender_base + SDHCI_VENDER_EMMC_CTRL_REG);
-
-	if (priv->no_3_3_v) {
-		/* Set 1.8v signal in host ctrl2 register */
-		reg = sdhci_readw(host, SDHCI_HOST_CONTROL2);
-		reg |= SDHCI_CTRL_VDD_180;
-		sdhci_writew(host, reg, SDHCI_HOST_CONTROL2);
-	}
 }
 
 static inline void enable_tune_clk_stop(struct sdhci_host *host)
@@ -346,11 +338,6 @@ static void dwcmshc_get_property(struct platform_device *pdev, struct dwcmshc_pr
 	struct device *dev = &pdev->dev;
 	u32 scr_signal;
 
-	if (device_property_present(dev, "no-3-3-v"))
-		priv->no_3_3_v = 1;
-	else
-		priv->no_3_3_v = 0;
-
 	if (device_property_present(dev, "card-is-emmc"))
 		priv->card_is_emmc = 1;
 	else
@@ -360,26 +347,6 @@ static void dwcmshc_get_property(struct platform_device *pdev, struct dwcmshc_pr
 		priv->scr_signals_ddr = scr_signal;
 	dev_info(&pdev->dev, "the ddr mode scr signal = %d\n", priv->scr_signals_ddr);
 
-}
-
-static void dwcmshc_set_power(struct sdhci_host *host, unsigned char mode,
-		     unsigned short vdd)
-{
-	u16 ctrl;
-	struct sdhci_pltfm_host *pltfm_host;
-        struct dwcmshc_priv *priv;
-
-	pltfm_host = sdhci_priv(host);
-	priv = sdhci_pltfm_priv(pltfm_host);
-
-	sdhci_set_power(host, mode, vdd);
-
-	if (priv->no_3_3_v) {
-		/* Set 1.8v signal in host ctrl2 register */
-		ctrl = sdhci_readw(host, SDHCI_HOST_CONTROL2);
-		ctrl |= SDHCI_CTRL_VDD_180;
-		sdhci_writew(host, ctrl, SDHCI_HOST_CONTROL2);
-	}
 }
 
 static unsigned int dwcmshc_get_max_clock(struct sdhci_host *host)
@@ -462,7 +429,6 @@ static int dwcmshc_execute_tuning(struct sdhci_host *host, u32 opcode)
 
 static const struct sdhci_ops sdhci_dwcmshc_ops = {
 	.set_clock		= dwcmshc_set_clock,
-	.set_power		= dwcmshc_set_power,
 	.set_bus_width		= sdhci_set_bus_width,
 	.set_uhs_signaling	= dwcmshc_set_uhs_signaling,
 	.get_max_clock		= dwcmshc_get_max_clock,
@@ -516,23 +482,9 @@ static int dwcmshc_probe(struct platform_device *pdev)
 
 	sdhci_enable_v4_mode(host);
 
-	if (priv->no_3_3_v) {
-		host->mmc->ocr_avail = MMC_VDD_165_195;
-	}
-
 	err = sdhci_add_host(host);
 	if (err)
 		goto err_clk;
-
-	if (priv->no_3_3_v) {
-		/* Disbale 3.3v signal in host flags */
-		host->flags &= ~SDHCI_SIGNALING_330;
-
-		/* Set 1.8v signal in host ctrl2 register */
-		ctrl = sdhci_readw(host, SDHCI_HOST_CONTROL2);
-		ctrl |= SDHCI_CTRL_VDD_180;
-		sdhci_writew(host, ctrl, SDHCI_HOST_CONTROL2);
-	}
 
 	return 0;
 
