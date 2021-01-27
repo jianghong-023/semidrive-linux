@@ -267,6 +267,25 @@ static struct snd_soc_dai_link snd_x9_evb_soc_dai_links[] = {
 	.init = x9_evb_tlv320aic23_init,
 	.dai_fmt = SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_CBS_CFS,
     },
+    {
+	.name = "x9_i2s_mc1",
+	.stream_name = "x9_i2s_mc",
+	.cpu_dai_name = "snd-afe-mc-i2s-dai0",
+	.cpu_name = "305c0000.i2s_mc",
+	.platform_name = "305c0000.i2s_mc",
+	.codec_name = "snd-soc-dummy",
+	.codec_dai_name = "snd-soc-dummy-dai",
+	.dai_fmt = SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_CBS_CFS,
+    },
+    {
+	.name = "x9_i2s_mc2",
+	.stream_name = "x9_i2s_mc",
+	.cpu_dai_name = "snd-afe-mc-i2s-dai0",
+	.platform_name = "305d0000.i2s_mc",
+	.codec_name = "snd-soc-dummy",
+	.codec_dai_name = "snd-soc-dummy-dai",
+	.dai_fmt = SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_CBS_CFS,
+    },
 #if 0 /* open if enable SPDIF device in dts */
 	{
 	.name = "x9_spdif1",

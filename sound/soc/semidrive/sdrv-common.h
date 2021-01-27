@@ -55,6 +55,13 @@
 #define MIN_PERIODS (2)
 #define MAX_ABUF MAX_ABUF_SIZE
 
+/* i2s mc config */
+#define MIN_I2S_MC_PERIOD_SIZE (2)
+#define MAX_I2S_MC_PERIOD_SIZE (8 * 2 * 2 * X9_I2S_MC_FIFO_SIZE)
+#define MIN_I2S_MC_PERIODS (2)
+#define MAX_I2S_MC_PERIODS (4 * X9_I2S_MC_FIFO_SIZE)
+#define MAX_I2S_MC_ABUF_SIZE (8 * 2 * 2 * X9_I2S_MC_FIFO_SIZE)
+
 #define SND_FORMATS (SNDRV_PCM_FMTBIT_S16_LE | SNDRV_PCM_FMTBIT_S24_LE |SNDRV_PCM_FMTBIT_S32_LE)
 
 #define SND_RATE SNDRV_PCM_RATE_CONTINUOUS | SNDRV_PCM_RATE_8000_48000
@@ -123,7 +130,7 @@ struct sdrv_afe_i2s_sc {
 	struct snd_pcm_substream __rcu *rx_substream;
 
 	unsigned int tx_ptr; /* next frame index in the sample buffer */
-	
+
 	unsigned int periods;
 	/* current fifo level estimate.
 	 * Doesn't have to be perfectly accurate, but must be not less than
@@ -192,6 +199,12 @@ struct sdrv_afe_i2s_mc {
 
 	/* stream is slav mode  */
 	bool is_slave;
+
+	/* multi channel config */
+	unsigned slot_width;
+	unsigned slots;
+	unsigned tx_slot_mask;
+	unsigned rx_slot_mask;
 };
 
 struct sdrv_afe_spdif {

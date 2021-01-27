@@ -18,7 +18,7 @@
  *
  */
 #include "sdrv-i2s-mc.h"
-#include "sdrv-snd-common.h"
+#include "sdrv-common.h"
 #include <linux/clk.h>
 #include <linux/device.h>
 #include <linux/io.h>
@@ -68,9 +68,6 @@ static void afe_i2s_mc_config(struct sdrv_afe_i2s_mc *afe)
 	regmap_update_bits(afe->regmap, MC_I2S_CTRL, CTRL_RSYNC_RST_MASK,
 			   (0 << CTRL_RSYNC_RST_SHIFT));
 
-	/*config cho-ch7 direction 1:transmitter 0:receiver  0x0F */
-	regmap_update_bits(afe->regmap, MC_I2S_CTRL, CTRL_TR_CFG_MASK,
-			   (0x0F << CTRL_TR_CFG_SHIFT));
 
 	if (true == afe->loopback_mode) {
 		/* TODO:	Here set up afe loop back config. */
@@ -104,8 +101,8 @@ static void afe_i2s_mc_config(struct sdrv_afe_i2s_mc *afe)
 	/*config FIFO threshold
 	Tx FIFO almost empty*/
 	regmap_update_bits(
-	    afe->regmap, MC_I2S_TFIFO_CTRL, TAEMPTY_THRESHOLD_MASK,
-	    ((I2S_MC_TX_DEPTH - 128) << TAEMPTY_THRESHOLD_SHIFT));
+		afe->regmap, MC_I2S_TFIFO_CTRL, TAEMPTY_THRESHOLD_MASK,
+		((I2S_MC_TX_DEPTH - 128) << TAEMPTY_THRESHOLD_SHIFT));
 	/*Tx FIFO almost full*/
 	regmap_update_bits(afe->regmap, MC_I2S_TFIFO_CTRL,
 			   TAFULL_THRESHOLD_MASK,
@@ -121,34 +118,60 @@ static void afe_i2s_mc_config(struct sdrv_afe_i2s_mc *afe)
 
 	regcache_sync(afe->regmap);
 
+	dev_info(afe->dev, "\n<func: %s>--line %d\n", __func__, __LINE__);
+
 	ret = regmap_read(afe->regmap, MC_I2S_CTRL, &val);
-	dev_dbg(afe->dev, "DUMP %d MC_I2S_CTRL 0x%x:(0x%x)\n", __LINE__,
+	dev_info(afe->dev, "DUMP %d MC_I2S_CTRL 0x%x:(0x%x)\n", __LINE__,
 		MC_I2S_CTRL, val);
 
+	ret = regmap_read(afe->regmap, MC_I2S_INTR_STAT, &val);
+	dev_info(afe->dev, "DUMP %d MC_I2S_INTR_STAT 0x%x: (0x%x)\n", __LINE__,
+		MC_I2S_INTR_STAT, val);
+
+	ret = regmap_read(afe->regmap, MC_I2S_SRR, &val);
+	dev_info(afe->dev, "DUMP %d MC_I2S_SRR 0x%x: (0x%x)\n", __LINE__,
+		MC_I2S_SRR, val);
+
+	ret = regmap_read(afe->regmap, MC_I2S_CID_CTRL, &val);
+	dev_info(afe->dev, "DUMP %d MC_I2S_CID_CTRL 0x%x: (0x%x)\n", __LINE__,
+		MC_I2S_CID_CTRL, val);
+
 	ret = regmap_read(afe->regmap, MC_I2S_TFIFO_CTRL, &val);
-	dev_err(afe->dev, "DUMP %d MC_I2S_TFIFO_CTRL 0x%x: (0x%x)\n", __LINE__,
+	dev_info(afe->dev, "DUMP %d MC_I2S_TFIFO_CTRL 0x%x: (0x%x)\n", __LINE__,
 		MC_I2S_TFIFO_CTRL, val);
 
 	ret = regmap_read(afe->regmap, MC_I2S_RFIFO_CTRL, &val);
-	dev_dbg(afe->dev, "DUMP %d MC_I2S_RFIFO_CTRL 0x%x: (0x%x)\n", __LINE__,
+	dev_info(afe->dev, "DUMP %d MC_I2S_RFIFO_CTRL 0x%x: (0x%x)\n", __LINE__,
 		MC_I2S_RFIFO_CTRL, val);
 
+	ret = regmap_read(afe->regmap, MC_I2S_TFIFO_STAT, &val);
+	dev_info(afe->dev, "DUMP %d MC_I2S_TFIFO_STAT 0x%x: (0x%x)\n", __LINE__,
+		MC_I2S_TFIFO_STAT, val);
+
+	ret = regmap_read(afe->regmap, MC_I2S_RFIFO_STAT, &val);
+	dev_info(afe->dev, "DUMP %d MC_I2S_RFIFO_STAT 0x%x: (0x%x)\n", __LINE__,
+		MC_I2S_RFIFO_STAT, val);
+
 	ret = regmap_read(afe->regmap, MC_I2S_DEV_CONF, &val);
-	dev_dbg(afe->dev, "DUMP %d MC_I2S_DEV_CONF 0x%x: (0x%x)\n", __LINE__,
+	dev_info(afe->dev, "DUMP %d MC_I2S_DEV_CONF 0x%x: (0x%x)\n", __LINE__,
 		MC_I2S_DEV_CONF, val);
+	dev_info(afe->dev, "<func: %s>--line %d-------end.\n\n", __func__, __LINE__);
+
 }
 
 static void afe_i2s_mc_start_capture(struct sdrv_afe_i2s_mc *afe)
 {
 	u32 ret, val;
+
 	/*Firstly,Enable i2s channel*/
 	if (true == afe->loopback_mode) {
 		/* In loopback mode enable all of channel */
-		regmap_update_bits(afe->regmap, MC_I2S_TFIFO_CTRL, CTRL_EN_MASK,
-				   (0xff << CTRL_EN_SHIFT));
+		regmap_update_bits(afe->regmap, MC_I2S_CTRL, CTRL_EN_MASK,
+					(0xff << CTRL_EN_SHIFT));
 	} else {
-		regmap_update_bits(afe->regmap, MC_I2S_TFIFO_CTRL, CTRL_EN_MASK,
-				   (I2S_MC_CAPTURE_CHAN << CTRL_EN_SHIFT));
+
+		regmap_update_bits(afe->regmap, MC_I2S_CTRL, CTRL_EN_MASK,
+					(afe->rx_slot_mask << CTRL_EN_SHIFT));
 	};
 
 	/*sync */
@@ -159,7 +182,7 @@ static void afe_i2s_mc_start_capture(struct sdrv_afe_i2s_mc *afe)
 
 	/* CID setting		 */
 	regmap_update_bits(afe->regmap, MC_I2S_CID_CTRL, I2S_MASK_MASK,
-			   (0x0 << I2S_MASK_SHIFT));
+			   (afe->rx_slot_mask << I2S_MASK_SHIFT));
 
 	regmap_update_bits(afe->regmap, MC_I2S_CID_CTRL, TFIFO_EMPTY_MASK_MASK,
 			   (0x0 << TFIFO_EMPTY_MASK_SHIFT));
@@ -190,47 +213,111 @@ static void afe_i2s_mc_start_capture(struct sdrv_afe_i2s_mc *afe)
 
 	regcache_sync(afe->regmap);
 
+	dev_info(afe->dev, "\n<func: %s>--line %d\n", __func__, __LINE__);
+
 	ret = regmap_read(afe->regmap, MC_I2S_CTRL, &val);
-	dev_dbg(afe->dev, "DUMP %d MC_I2S_CTRL 0x%x:(0x%x)\n", __LINE__,
+	dev_info(afe->dev, "DUMP %d MC_I2S_CTRL 0x%x:(0x%x)\n", __LINE__,
 		MC_I2S_CTRL, val);
 
+	ret = regmap_read(afe->regmap, MC_I2S_INTR_STAT, &val);
+	dev_info(afe->dev, "DUMP %d MC_I2S_INTR_STAT 0x%x: (0x%x)\n", __LINE__,
+		MC_I2S_INTR_STAT, val);
+
+	ret = regmap_read(afe->regmap, MC_I2S_SRR, &val);
+	dev_info(afe->dev, "DUMP %d MC_I2S_SRR 0x%x: (0x%x)\n", __LINE__,
+		MC_I2S_SRR, val);
+
 	ret = regmap_read(afe->regmap, MC_I2S_CID_CTRL, &val);
-	dev_dbg(afe->dev, "DUMP %d MC_I2S_CID_CTRL 0x%x:(0x%x)\n", __LINE__,
+	dev_info(afe->dev, "DUMP %d MC_I2S_CID_CTRL 0x%x: (0x%x)\n", __LINE__,
 		MC_I2S_CID_CTRL, val);
+
+	ret = regmap_read(afe->regmap, MC_I2S_TFIFO_CTRL, &val);
+	dev_info(afe->dev, "DUMP %d MC_I2S_TFIFO_CTRL 0x%x: (0x%x)\n", __LINE__,
+		MC_I2S_TFIFO_CTRL, val);
+
+	ret = regmap_read(afe->regmap, MC_I2S_RFIFO_CTRL, &val);
+	dev_info(afe->dev, "DUMP %d MC_I2S_RFIFO_CTRL 0x%x: (0x%x)\n", __LINE__,
+		MC_I2S_RFIFO_CTRL, val);
+
+	ret = regmap_read(afe->regmap, MC_I2S_TFIFO_STAT, &val);
+	dev_info(afe->dev, "DUMP %d MC_I2S_TFIFO_STAT 0x%x: (0x%x)\n", __LINE__,
+		MC_I2S_TFIFO_STAT, val);
+
+	ret = regmap_read(afe->regmap, MC_I2S_RFIFO_STAT, &val);
+	dev_info(afe->dev, "DUMP %d MC_I2S_RFIFO_STAT 0x%x: (0x%x)\n", __LINE__,
+		MC_I2S_RFIFO_STAT, val);
+
+	ret = regmap_read(afe->regmap, MC_I2S_DEV_CONF, &val);
+	dev_info(afe->dev, "DUMP %d MC_I2S_DEV_CONF 0x%x: (0x%x)\n", __LINE__,
+		MC_I2S_DEV_CONF, val);
+	dev_info(afe->dev, "<func: %s>--line %d-------end.\n\n", __func__, __LINE__);
 }
 
 static void afe_i2s_mc_stop_capture(struct sdrv_afe_i2s_mc *afe)
 {
 	u32 ret, val;
 	/*Disable chn0~chn7*/
-	regmap_update_bits(afe->regmap, MC_I2S_TFIFO_CTRL, CTRL_EN_MASK,
-			   (0 << CTRL_EN_SHIFT));
+	regmap_update_bits(afe->regmap, MC_I2S_CTRL, CTRL_EN_MASK,
+				(0 << CTRL_EN_SHIFT));
 	/* Then disable interrupt */
 	regmap_update_bits(afe->regmap, MC_I2S_CID_CTRL, INTREQ_MASK_MASK,
-			   (0x0 << INTREQ_MASK_SHIFT));
+				(0x0 << INTREQ_MASK_SHIFT));
+
 
 	regcache_sync(afe->regmap);
+	dev_info(afe->dev, "\n<func: %s>--line %d\n", __func__, __LINE__);
 
 	ret = regmap_read(afe->regmap, MC_I2S_CTRL, &val);
-	dev_dbg(afe->dev, "DUMP %d MC_I2S_CTRL 0x%x:(0x%x)\n", __LINE__,
+	dev_info(afe->dev, "DUMP %d MC_I2S_CTRL 0x%x:(0x%x)\n", __LINE__,
 		MC_I2S_CTRL, val);
 
+	ret = regmap_read(afe->regmap, MC_I2S_INTR_STAT, &val);
+	dev_info(afe->dev, "DUMP %d MC_I2S_INTR_STAT 0x%x: (0x%x)\n", __LINE__,
+		MC_I2S_INTR_STAT, val);
+
+	ret = regmap_read(afe->regmap, MC_I2S_SRR, &val);
+	dev_info(afe->dev, "DUMP %d MC_I2S_SRR 0x%x: (0x%x)\n", __LINE__,
+		MC_I2S_SRR, val);
+
 	ret = regmap_read(afe->regmap, MC_I2S_CID_CTRL, &val);
-	dev_dbg(afe->dev, "DUMP %d MC_I2S_CID_CTRL 0x%x:(0x%x)\n", __LINE__,
+	dev_info(afe->dev, "DUMP %d MC_I2S_CID_CTRL 0x%x: (0x%x)\n", __LINE__,
 		MC_I2S_CID_CTRL, val);
+
+	ret = regmap_read(afe->regmap, MC_I2S_TFIFO_CTRL, &val);
+	dev_info(afe->dev, "DUMP %d MC_I2S_TFIFO_CTRL 0x%x: (0x%x)\n", __LINE__,
+		MC_I2S_TFIFO_CTRL, val);
+
+	ret = regmap_read(afe->regmap, MC_I2S_RFIFO_CTRL, &val);
+	dev_info(afe->dev, "DUMP %d MC_I2S_RFIFO_CTRL 0x%x: (0x%x)\n", __LINE__,
+		MC_I2S_RFIFO_CTRL, val);
+
+	ret = regmap_read(afe->regmap, MC_I2S_TFIFO_STAT, &val);
+	dev_info(afe->dev, "DUMP %d MC_I2S_TFIFO_STAT 0x%x: (0x%x)\n", __LINE__,
+		MC_I2S_TFIFO_STAT, val);
+
+	ret = regmap_read(afe->regmap, MC_I2S_RFIFO_STAT, &val);
+	dev_info(afe->dev, "DUMP %d MC_I2S_RFIFO_STAT 0x%x: (0x%x)\n", __LINE__,
+		MC_I2S_RFIFO_STAT, val);
+
+	ret = regmap_read(afe->regmap, MC_I2S_DEV_CONF, &val);
+	dev_info(afe->dev, "DUMP %d MC_I2S_DEV_CONF 0x%x: (0x%x)\n", __LINE__,
+		MC_I2S_DEV_CONF, val);
+	dev_info(afe->dev, "<func: %s>--line %d-------end.\n\n", __func__, __LINE__);
+
 }
 
 static void afe_i2s_mc_start_playback(struct sdrv_afe_i2s_mc *afe)
 {
 	u32 ret, val;
+
 	/*Firstly,Enable i2s channel*/
 	if (true == afe->loopback_mode) {
 		/* In loopback mode enable all of channel */
-		regmap_update_bits(afe->regmap, MC_I2S_TFIFO_CTRL, CTRL_EN_MASK,
+		regmap_update_bits(afe->regmap, MC_I2S_CTRL, CTRL_EN_MASK,
 				   (0xff << CTRL_EN_SHIFT));
 	} else {
-		regmap_update_bits(afe->regmap, MC_I2S_TFIFO_CTRL, CTRL_EN_MASK,
-				   (I2S_MC_PLAYBACK_CHAN << CTRL_EN_SHIFT));
+		regmap_update_bits(afe->regmap, MC_I2S_CTRL, CTRL_EN_MASK,
+				   (afe->tx_slot_mask << CTRL_EN_SHIFT));
 	};
 
 	/*sync */
@@ -241,7 +328,7 @@ static void afe_i2s_mc_start_playback(struct sdrv_afe_i2s_mc *afe)
 
 	/* CID setting		 */
 	regmap_update_bits(afe->regmap, MC_I2S_CID_CTRL, I2S_MASK_MASK,
-			   (0x0 << I2S_MASK_SHIFT));
+			   (afe->tx_slot_mask << I2S_MASK_SHIFT));
 
 	regmap_update_bits(afe->regmap, MC_I2S_CID_CTRL, TFIFO_EMPTY_MASK_MASK,
 			   (0x0 << TFIFO_EMPTY_MASK_SHIFT));
@@ -273,70 +360,114 @@ static void afe_i2s_mc_start_playback(struct sdrv_afe_i2s_mc *afe)
 	regcache_sync(afe->regmap);
 
 	ret = regmap_read(afe->regmap, MC_I2S_CTRL, &val);
-	dev_dbg(afe->dev, "DUMP %d MC_I2S_CTRL 0x%x:(0x%x)\n", __LINE__,
+	dev_info(afe->dev, "\n<func: %s>--line %d\n", __func__, __LINE__);
+
+	ret = regmap_read(afe->regmap, MC_I2S_CTRL, &val);
+	dev_info(afe->dev, "DUMP %d MC_I2S_CTRL 0x%x:(0x%x)\n", __LINE__,
 		MC_I2S_CTRL, val);
 
+	ret = regmap_read(afe->regmap, MC_I2S_INTR_STAT, &val);
+	dev_info(afe->dev, "DUMP %d MC_I2S_INTR_STAT 0x%x: (0x%x)\n", __LINE__,
+		MC_I2S_INTR_STAT, val);
+
+	ret = regmap_read(afe->regmap, MC_I2S_SRR, &val);
+	dev_info(afe->dev, "DUMP %d MC_I2S_SRR 0x%x: (0x%x)\n", __LINE__,
+		MC_I2S_SRR, val);
+
 	ret = regmap_read(afe->regmap, MC_I2S_CID_CTRL, &val);
-	dev_dbg(afe->dev, "DUMP %d MC_I2S_CID_CTRL 0x%x:(0x%x)\n", __LINE__,
+	dev_info(afe->dev, "DUMP %d MC_I2S_CID_CTRL 0x%x: (0x%x)\n", __LINE__,
 		MC_I2S_CID_CTRL, val);
+
+	ret = regmap_read(afe->regmap, MC_I2S_TFIFO_CTRL, &val);
+	dev_info(afe->dev, "DUMP %d MC_I2S_TFIFO_CTRL 0x%x: (0x%x)\n", __LINE__,
+		MC_I2S_TFIFO_CTRL, val);
+
+	ret = regmap_read(afe->regmap, MC_I2S_RFIFO_CTRL, &val);
+	dev_info(afe->dev, "DUMP %d MC_I2S_RFIFO_CTRL 0x%x: (0x%x)\n", __LINE__,
+		MC_I2S_RFIFO_CTRL, val);
+
+	ret = regmap_read(afe->regmap, MC_I2S_TFIFO_STAT, &val);
+	dev_info(afe->dev, "DUMP %d MC_I2S_TFIFO_STAT 0x%x: (0x%x)\n", __LINE__,
+		MC_I2S_TFIFO_STAT, val);
+
+	ret = regmap_read(afe->regmap, MC_I2S_RFIFO_STAT, &val);
+	dev_info(afe->dev, "DUMP %d MC_I2S_RFIFO_STAT 0x%x: (0x%x)\n", __LINE__,
+		MC_I2S_RFIFO_STAT, val);
+
+	ret = regmap_read(afe->regmap, MC_I2S_DEV_CONF, &val);
+	dev_info(afe->dev, "DUMP %d MC_I2S_DEV_CONF 0x%x: (0x%x)\n", __LINE__,
+		MC_I2S_DEV_CONF, val);
+	dev_info(afe->dev, "<func: %s>--line %d-------end.\n\n", __func__, __LINE__);
+
 }
 
 static void afe_i2s_mc_stop_playback(struct sdrv_afe_i2s_mc *afe)
 {
 	u32 ret, val;
 	/*Disable chn0~chn7*/
-	regmap_update_bits(afe->regmap, MC_I2S_TFIFO_CTRL, CTRL_EN_MASK,
+	regmap_update_bits(afe->regmap, MC_I2S_CTRL, CTRL_EN_MASK,
 			   (0 << CTRL_EN_SHIFT));
 	/* Then disable interrupt */
 	regmap_update_bits(afe->regmap, MC_I2S_CID_CTRL, INTREQ_MASK_MASK,
 			   (0x0 << INTREQ_MASK_SHIFT));
 
 	regcache_sync(afe->regmap);
+	dev_info(afe->dev, "\n<func: %s>--line %d\n", __func__, __LINE__);
 
 	ret = regmap_read(afe->regmap, MC_I2S_CTRL, &val);
-	dev_dbg(afe->dev, "DUMP %d MC_I2S_CTRL 0x%x:(0x%x)\n", __LINE__,
+	dev_info(afe->dev, "DUMP %d MC_I2S_CTRL 0x%x:(0x%x)\n", __LINE__,
 		MC_I2S_CTRL, val);
 
+	ret = regmap_read(afe->regmap, MC_I2S_INTR_STAT, &val);
+	dev_info(afe->dev, "DUMP %d MC_I2S_INTR_STAT 0x%x: (0x%x)\n", __LINE__,
+		MC_I2S_INTR_STAT, val);
+
+	ret = regmap_read(afe->regmap, MC_I2S_SRR, &val);
+	dev_info(afe->dev, "DUMP %d MC_I2S_SRR 0x%x: (0x%x)\n", __LINE__,
+		MC_I2S_SRR, val);
+
 	ret = regmap_read(afe->regmap, MC_I2S_CID_CTRL, &val);
-	dev_dbg(afe->dev, "DUMP %d MC_I2S_CID_CTRL 0x%x:(0x%x)\n", __LINE__,
+	dev_info(afe->dev, "DUMP %d MC_I2S_CID_CTRL 0x%x: (0x%x)\n", __LINE__,
 		MC_I2S_CID_CTRL, val);
+
+	ret = regmap_read(afe->regmap, MC_I2S_TFIFO_CTRL, &val);
+	dev_info(afe->dev, "DUMP %d MC_I2S_TFIFO_CTRL 0x%x: (0x%x)\n", __LINE__,
+		MC_I2S_TFIFO_CTRL, val);
+
+	ret = regmap_read(afe->regmap, MC_I2S_RFIFO_CTRL, &val);
+	dev_info(afe->dev, "DUMP %d MC_I2S_RFIFO_CTRL 0x%x: (0x%x)\n", __LINE__,
+		MC_I2S_RFIFO_CTRL, val);
+
+	ret = regmap_read(afe->regmap, MC_I2S_TFIFO_STAT, &val);
+	dev_info(afe->dev, "DUMP %d MC_I2S_TFIFO_STAT 0x%x: (0x%x)\n", __LINE__,
+		MC_I2S_TFIFO_STAT, val);
+
+	ret = regmap_read(afe->regmap, MC_I2S_RFIFO_STAT, &val);
+	dev_info(afe->dev, "DUMP %d MC_I2S_RFIFO_STAT 0x%x: (0x%x)\n", __LINE__,
+		MC_I2S_RFIFO_STAT, val);
+
+	ret = regmap_read(afe->regmap, MC_I2S_DEV_CONF, &val);
+	dev_info(afe->dev, "DUMP %d MC_I2S_DEV_CONF 0x%x: (0x%x)\n", __LINE__,
+		MC_I2S_DEV_CONF, val);
+	dev_info(afe->dev, "<func: %s>--line %d-------end.\n\n", __func__, __LINE__);
 }
-/*
- * system timer interface
- */
 
 static const struct snd_pcm_hardware sdrv_pcm_hardware = {
-    .info = SNDRV_PCM_INFO_INTERLEAVED | SNDRV_PCM_INFO_MMAP_VALID |
-	    SNDRV_PCM_INFO_BLOCK_TRANSFER,
-    .formats = SND_FORMATS,
-    .rates = SND_RATE,
-    .rate_min = SND_RATE_MIN,
-    .rate_max = SND_RATE_MAX,
-    .channels_min = 1,
-    .channels_max = 2,
-    .period_bytes_min = 2,
-    .period_bytes_max = X9_I2S_MC_FIFO_SIZE / 2 * 8,
-    .periods_min = 2,
-    .periods_max = X9_I2S_MC_FIFO_SIZE * 8 / 2,
-    .buffer_bytes_max = X9_I2S_MC_FIFO_SIZE * 8,
-    .fifo_size = 0,
-};
 
-static const struct snd_pcm_hardware sdrv_pcm_hardware1 = {
-    .info = (SNDRV_PCM_INFO_INTERLEAVED | SNDRV_PCM_INFO_BLOCK_TRANSFER |
-	     SNDRV_PCM_INFO_MMAP_VALID),
-    .formats = SND_FORMATS,
-    .rates = SND_RATE,
-    .rate_min = SND_RATE_MIN,
-    .rate_max = SND_RATE_MAX,
-    .channels_min = SND_CHANNELS_MIN,
-    .channels_max = SND_CHANNELS_MAX,
-    .buffer_bytes_max = MAX_ABUF_SIZE,
-    .period_bytes_min = MIN_ABUF_SIZE,
-    .period_bytes_max = MAX_PERIOD_SIZE,
-    .periods_min = MIN_PERIODS,
-    .periods_max = MAX_PERIODS,
-    .fifo_size = 0,
+	.info = (SNDRV_PCM_INFO_MMAP | SNDRV_PCM_INFO_MMAP_VALID |
+		SNDRV_PCM_INFO_INTERLEAVED | SNDRV_PCM_INFO_BLOCK_TRANSFER),
+	.formats = SND_FORMATS,
+	.rates = SND_RATE,
+	.rate_min = SND_RATE_MIN,
+	.rate_max = SND_RATE_MAX,
+	.channels_min = SND_CHANNELS_MIN,
+	.channels_max = SND_CHANNELS_MAX,
+	.period_bytes_min = MIN_I2S_MC_PERIOD_SIZE,
+	.period_bytes_max = MAX_I2S_MC_PERIOD_SIZE,
+	.periods_min = MIN_I2S_MC_PERIODS,
+	.periods_max = MAX_I2S_MC_PERIODS,
+	.buffer_bytes_max = MAX_I2S_MC_ABUF_SIZE,
+	.fifo_size = 0,
 };
 
 static int sdrv_snd_pcm_open(struct snd_pcm_substream *substream)
@@ -398,8 +529,8 @@ static int sdrv_snd_pcm_trigger(struct snd_pcm_substream *substream, int cmd)
 		runtime->buffer_size, runtime->dma_area, runtime->dma_bytes,
 	   afe->regs,runtime->periods,runtime->period_size);
  */
-	printk(KERN_ERR "%s:%i ------cmd(%d)--------------\n", __func__,
-	       __LINE__, cmd);
+	dev_info(afe->dev, "%s:%i ------cmd(%d)--------------\n", __func__,
+		   __LINE__, cmd);
 	switch (cmd) {
 	case SNDRV_PCM_TRIGGER_START:
 	case SNDRV_PCM_TRIGGER_RESUME:
@@ -455,7 +586,6 @@ static irqreturn_t sdrv_i2s_mc_irq_handler(int irq, void *dev_id)
 	/* Read status to i2s_mc_status and then clear the register */
 	ret = regmap_read(afe->regmap, MC_I2S_INTR_STAT, &i2s_mc_status);
 	/* clear irq here*/
-	regmap_write(afe->regmap, MC_I2S_INTR_STAT, 0);
 
 	if (ret) {
 		dev_err(afe->dev, "%s irq status err !\n", __func__);
@@ -463,45 +593,55 @@ static irqreturn_t sdrv_i2s_mc_irq_handler(int irq, void *dev_id)
 	}
 
 	if (i2s_mc_status & INTR_TDATA_UNDERR_MASK) {
+		regmap_write(afe->regmap, MC_I2S_INTR_STAT, 0x10);
 		chan_code = (i2s_mc_status & INTR_UNDERR_CODE_MASK) >>
-			    INTR_UNDERR_CODE_SHIFT;
+				INTR_UNDERR_CODE_SHIFT;
 		dev_err(afe->dev, "i2s mc channel(0x%x) underrun !\n",
 			chan_code);
 	}
 
 	if (i2s_mc_status & INTR_RDATA_OVRERR_MASK) {
+		regmap_write(afe->regmap, MC_I2S_INTR_STAT, 0x0);
 		chan_code = (i2s_mc_status & INTR_OVRERR_CODE_MASK) >>
-			    INTR_OVRERR_CODE_SHIFT;
+				INTR_OVRERR_CODE_SHIFT;
 		dev_err(afe->dev, "i2s mc channel(0x%x) overrun !\n",
 			chan_code);
 	}
 
 	if (i2s_mc_status & INTR_TFIFO_EMPTY_MASK) {
+		regmap_write(afe->regmap, MC_I2S_INTR_STAT, 0x10);
 		dev_err(afe->dev, "i2s mc tx fifo empty !\n");
 	}
 
 	if (i2s_mc_status & INTR_TFIFO_AEMPTY_MASK) {
+		regmap_write(afe->regmap, MC_I2S_INTR_STAT, 0x10);
 		dev_err(afe->dev, "i2s mc tx fifo almost empty !\n");
 	}
 
 	if (i2s_mc_status & INTR_TFIFO_FULL_MASK) {
+		regmap_write(afe->regmap, MC_I2S_INTR_STAT, 0x10);
 		dev_err(afe->dev, "i2s mc tx fifo full !\n");
 	}
 
 	if (i2s_mc_status & INTR_TFIFO_AFULL_MASK) {
+		regmap_write(afe->regmap, MC_I2S_INTR_STAT, 0x10);
 		dev_err(afe->dev, "i2s mc tx fifo almost full !\n");
 	}
 	if (i2s_mc_status & INTR_RFIFO_EMPTY_MASK) {
+		regmap_write(afe->regmap, MC_I2S_INTR_STAT, 0x10);
 		dev_err(afe->dev, "i2s mc fifo rx fifo empty !\n");
 	}
 	if (i2s_mc_status & INTR_RFIFO_AEMPTY_MASK) {
+		regmap_write(afe->regmap, MC_I2S_INTR_STAT, 0x10);
 		dev_err(afe->dev, "i2s mc rx fifo almost empty !\n");
 	}
 
 	if (i2s_mc_status & INTR_RFIFO_FULL_MASK) {
+		regmap_write(afe->regmap, MC_I2S_INTR_STAT, 0x10);
 		dev_err(afe->dev, "i2s mc rx fifo full !\n");
 	}
 	if (i2s_mc_status & INTR_RFIFO_AFULL_MASK) {
+		regmap_write(afe->regmap, MC_I2S_INTR_STAT, 0x10);
 		dev_err(afe->dev, "i2s mc fifo almost full !\n");
 	}
 
@@ -541,18 +681,18 @@ static bool sdrv_i2s_volatile_reg(struct device *dev, unsigned int reg)
 }
 
 static const struct regmap_config sdrv_i2s_mc_regmap_config = {
-    .reg_bits = 32,
-    .reg_stride = 4,
-    .val_bits = 32,
-    .max_register = MC_I2S_POLL_STAT,
-    .writeable_reg = sdrv_i2s_mc_wr_rd_reg,
-    .readable_reg = sdrv_i2s_mc_wr_rd_reg,
-    .volatile_reg = sdrv_i2s_mc_wr_rd_reg,
-    .cache_type = REGCACHE_FLAT,
+	.reg_bits = 32,
+	.reg_stride = 4,
+	.val_bits = 32,
+	.max_register = MC_I2S_POLL_STAT,
+	.writeable_reg = sdrv_i2s_mc_wr_rd_reg,
+	.readable_reg = sdrv_i2s_mc_wr_rd_reg,
+	.volatile_reg = sdrv_i2s_mc_wr_rd_reg,
+	.cache_type = REGCACHE_FLAT,
 };
 
 int snd_afe_i2s_mc_dai_startup(struct snd_pcm_substream *substream,
-			       struct snd_soc_dai *dai)
+				   struct snd_soc_dai *dai)
 {
 	struct snd_soc_pcm_runtime *rtd;
 	struct snd_soc_dai *cpu_dai;
@@ -572,8 +712,10 @@ int snd_afe_i2s_mc_dai_hw_params(struct snd_pcm_substream *substream,
 				 struct snd_pcm_hw_params *hwparam,
 				 struct snd_soc_dai *dai)
 {
+	u32 ret, val;
 	unsigned freq, ratio, level, mc_sr;
 	unsigned long clk_rate;
+	unsigned int tx_mask, rx_mask;
 	struct device *dev = dai->dev;
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
 	struct snd_soc_dai *cpu_dai = rtd->cpu_dai;
@@ -585,26 +727,20 @@ int snd_afe_i2s_mc_dai_hw_params(struct snd_pcm_substream *substream,
 	unsigned sample_size = snd_pcm_format_width(params_format(hwparam));
 
 	DEBUG_FUNC_PRT
-	if (params_channels(hwparam) == 8) {
-		/* 8 channel */
-		DEBUG_FUNC_PRT
-		/* regmap_update_bits(afe->regmap, MC_I2S_CID_CTRL,
-		   I2S_MASK_MASK, (0x0 << I2S_MASK_SHIFT)); */
-	} else if (params_channels(hwparam) == 2) {
-		/*config data channel stereo*/
-		DEBUG_FUNC_PRT
-	} else if (params_channels(hwparam) == 1) {
-		/*config data channel mono*/
-		DEBUG_FUNC_PRT
-
-	} else {
-		return -EINVAL;
+	/* set tdm slot */
+	tx_mask = rx_mask = (1 << channels) - 1;
+	ret = snd_soc_dai_set_tdm_slot(dai, tx_mask, rx_mask, channels, sample_size);
+	if (ret < 0) {
+		dev_err(afe->dev, "Could not set tdm slot.\n");
 	}
+	dev_info(afe->dev, "%s:%i : tx_mask(0x%x) rx_mask(0x%x) slots(%d) slot_width(%d) \n", __func__,
+		   __LINE__, tx_mask, rx_mask, channels, sample_size);
+
 	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
 		/* Here calculate and fill sample rate.  */
 		clk_rate = clk_get_rate(afe->clk_i2s);
 		mc_sr =
-		    I2S_MC_SAMPLE_RATE_CALC(clk_rate, srate, I2S_MC_DATA_WIDTH);
+			I2S_MC_SAMPLE_RATE_CALC(clk_rate, srate, I2S_MC_DATA_WIDTH);
 
 		DEBUG_ITEM_PRT(mc_sr);
 		regmap_update_bits(afe->regmap, MC_I2S_SRR, TSAMPLE_RATE_MASK,
@@ -612,9 +748,9 @@ int snd_afe_i2s_mc_dai_hw_params(struct snd_pcm_substream *substream,
 
 		/* fill sample resolution.  */
 		regmap_update_bits(afe->regmap, MC_I2S_SRR, TRESOLUTION_MASK,
-				   (I2S_MC_SAMPLE_RESOLUTION_TO_CONFIG(32)
-				    << TRESOLUTION_SHIFT));
-		/*set tx substream*/
+					(I2S_MC_SAMPLE_RESOLUTION_TO_CONFIG(sample_size)
+					<< TRESOLUTION_SHIFT));
+		/* set tx substream */
 		afe->tx_substream = substream;
 		if (true == afe->is_slave) {
 			// SND_SOC_DAIFMT_CBM_CFM slave mode
@@ -631,58 +767,66 @@ int snd_afe_i2s_mc_dai_hw_params(struct snd_pcm_substream *substream,
 					   (1 << CTRL_T_MS_SHIFT));
 		}
 
+		/* set dir */
+		regmap_update_bits(afe->regmap, MC_I2S_CTRL, CTRL_TR_CFG_MASK,
+					((afe->tx_slot_mask) << CTRL_TR_CFG_SHIFT));
+
 	} else if (substream->stream == SNDRV_PCM_STREAM_CAPTURE) {
 
 		/* Here calculate and fill sample rate.  */
 		clk_rate = clk_get_rate(afe->clk_i2s);
 		mc_sr =
-		    I2S_MC_SAMPLE_RATE_CALC(clk_rate, srate, I2S_MC_DATA_WIDTH);
+			I2S_MC_SAMPLE_RATE_CALC(clk_rate, srate, I2S_MC_DATA_WIDTH);
 
 		DEBUG_ITEM_PRT(mc_sr);
 		regmap_update_bits(afe->regmap, MC_I2S_SRR, RSAMPLE_RATE_MASK,
-				   (mc_sr << RSAMPLE_RATE_SHIFT));
+					(mc_sr << RSAMPLE_RATE_SHIFT));
 
 		/* fill sample resolution.  */
 		regmap_update_bits(afe->regmap, MC_I2S_SRR, RRESOLUTION_MASK,
-				   (I2S_MC_SAMPLE_RESOLUTION_TO_CONFIG(32)
-				    << RRESOLUTION_SHIFT));
+					(I2S_MC_SAMPLE_RESOLUTION_TO_CONFIG(sample_size)
+					<< RRESOLUTION_SHIFT));
 
-		/*set rx substream */
+		/* set rx substream */
 		afe->rx_substream = substream;
 		if (true == afe->is_slave) {
 			// SND_SOC_DAIFMT_CBM_CFM slave mode
 			DEBUG_FUNC_PRT
 			regmap_update_bits(afe->regmap, MC_I2S_CTRL,
-					   CTRL_R_MS_MASK,
-					   (0 << CTRL_R_MS_SHIFT));
+						CTRL_R_MS_MASK,
+						(0 << CTRL_R_MS_SHIFT));
 
 		} else {
 			// SND_SOC_DAIFMT_CBS_CFS master mode
 			DEBUG_FUNC_PRT
 			regmap_update_bits(afe->regmap, MC_I2S_CTRL,
-					   CTRL_R_MS_MASK,
-					   (1 << CTRL_R_MS_SHIFT));
+						CTRL_R_MS_MASK,
+						(1 << CTRL_R_MS_SHIFT));
 		}
+
+		/* set dir */
+		regmap_update_bits(afe->regmap, MC_I2S_CTRL, CTRL_TR_CFG_MASK,
+					((~afe->rx_slot_mask) << CTRL_TR_CFG_SHIFT));
+
 	} else {
 		return -EINVAL;
 	}
 
 	regcache_sync(afe->regmap);
-	u32 ret, val;
 
 	ret = regmap_read(afe->regmap, MC_I2S_SRR, &val);
 	dev_info(afe->dev, "DUMP %d MC_I2S_SRR(0x%x)\n", __LINE__, val);
 
 	dev_info(
-	    afe->dev,
-	    "%s srate: %u, channels: %u, sample_size: %u, period_size: %u\n",
-	    __func__, srate, channels, sample_size, period_size);
+		afe->dev,
+		"%s srate: %u, channels: %u, sample_size: %u, period_size: %u\n",
+		__func__, srate, channels, sample_size, period_size);
 
 	return snd_soc_runtime_set_dai_fmt(rtd, rtd->dai_link->dai_fmt);
 }
 
 int snd_afe_i2s_mc_dai_prepare(struct snd_pcm_substream *substream,
-			       struct snd_soc_dai *dai)
+				   struct snd_soc_dai *dai)
 {
 	DEBUG_FUNC_PRT
 	struct sdrv_afe_i2s_mc *afe = snd_soc_dai_get_drvdata(dai);
@@ -692,10 +836,12 @@ int snd_afe_i2s_mc_dai_prepare(struct snd_pcm_substream *substream,
 
 /* snd_afe_dai_trigger */
 int snd_afe_i2s_mc_dai_trigger(struct snd_pcm_substream *substream, int cmd,
-			       struct snd_soc_dai *dai)
+				   struct snd_soc_dai *dai)
 {
 	DEBUG_FUNC_PRT
 	struct sdrv_afe_i2s_mc *afe = snd_soc_dai_get_drvdata(dai);
+	printk(KERN_INFO "%s:%i ------cmd(%d)--------------\n", __func__,
+			__LINE__, cmd);
 	switch (cmd) {
 	case SNDRV_PCM_TRIGGER_START:
 	case SNDRV_PCM_TRIGGER_PAUSE_RELEASE:
@@ -721,7 +867,7 @@ int snd_afe_i2s_mc_dai_trigger(struct snd_pcm_substream *substream, int cmd,
 	return 0;
 }
 int snd_afe_i2s_mc_dai_hw_free(struct snd_pcm_substream *substream,
-			       struct snd_soc_dai *dai)
+				   struct snd_soc_dai *dai)
 {
 	DEBUG_FUNC_PRT
 	return 0;
@@ -826,14 +972,33 @@ static int snd_afe_i2s_mc_dai_set_fmt(struct snd_soc_dai *dai, unsigned int fmt)
 	return 0;
 }
 
+static int snd_afe_i2s_mc_set_tdm_slot(struct snd_soc_dai *dai, unsigned int tx_mask,
+				unsigned int rx_mask, int slots, int slot_width)
+{
+	struct sdrv_afe_i2s_mc *afe = snd_soc_dai_get_drvdata(dai);
+
+	/* config slot width */
+	/* i2s mc has a fixed slot width which is 32-bit wide */
+	afe->slot_width = slot_width;
+
+	/* config channel mask*/
+	afe->tx_slot_mask = tx_mask;
+	afe->rx_slot_mask = rx_mask;
+	afe->slots = slots;
+
+	DEBUG_FUNC_PRT
+	return 0;
+}
+
 static struct snd_soc_dai_ops snd_afe_i2s_mc_dai_ops = {
-    .startup = snd_afe_i2s_mc_dai_startup,
-    .shutdown = snd_afe_i2s_mc_dai_shutdown,
-    .hw_params = snd_afe_i2s_mc_dai_hw_params,
-    .hw_free = snd_afe_i2s_mc_dai_hw_free,
-    .prepare = snd_afe_i2s_mc_dai_prepare,
-    .trigger = snd_afe_i2s_mc_dai_trigger,
-    .set_fmt = snd_afe_i2s_mc_dai_set_fmt,
+	.startup = snd_afe_i2s_mc_dai_startup,
+	.shutdown = snd_afe_i2s_mc_dai_shutdown,
+	.hw_params = snd_afe_i2s_mc_dai_hw_params,
+	.hw_free = snd_afe_i2s_mc_dai_hw_free,
+	.prepare = snd_afe_i2s_mc_dai_prepare,
+	.trigger = snd_afe_i2s_mc_dai_trigger,
+	.set_fmt = snd_afe_i2s_mc_dai_set_fmt,
+	.set_tdm_slot = snd_afe_i2s_mc_set_tdm_slot,
 };
 
 int snd_soc_i2s_mc_dai_probe(struct snd_soc_dai *dai)
@@ -864,41 +1029,48 @@ int snd_soc_i2s_mc_dai_remove(struct snd_soc_dai *dai)
 }
 
 static struct snd_soc_dai_driver snd_afe_dais[] = {
-    {
+	{
 	.name = "snd-afe-mc-i2s-dai0",
 	.probe = snd_soc_i2s_mc_dai_probe,
 	.remove = snd_soc_i2s_mc_dai_remove,
 	.playback =
-	    {
+		{
 		.formats = SND_FORMATS,
 		.rates = SNDRV_PCM_RATE_8000_48000,
 		.channels_min = 1,
 		.channels_max = 8,
-	    },
-	.ops = &snd_afe_i2s_mc_dai_ops,
-    },
-    {
-	.name = "snd-afe-mc-i2s-dai1",
-	.probe = snd_soc_i2s_mc_dai_probe,
-	.remove = snd_soc_i2s_mc_dai_remove,
+		},
 	.capture =
-	    {
+	{
 		.formats = SND_FORMATS,
 		.rates = SNDRV_PCM_RATE_8000_48000,
 		.channels_min = 1,
 		.channels_max = 4,
-	    },
+	},
 	.ops = &snd_afe_i2s_mc_dai_ops,
-    },
+	},
+	{
+	.name = "snd-afe-mc-i2s-dai1",
+	.probe = snd_soc_i2s_mc_dai_probe,
+	.remove = snd_soc_i2s_mc_dai_remove,
+	.capture =
+		{
+		.formats = SND_FORMATS,
+		.rates = SNDRV_PCM_RATE_8000_48000,
+		.channels_min = 1,
+		.channels_max = 4,
+		},
+	.ops = &snd_afe_i2s_mc_dai_ops,
+	},
 };
 
 static const struct snd_soc_component_driver snd_sample_soc_component = {
-    .name = DRV_NAME "-i2s-component",
+	.name = DRV_NAME "-i2s-component",
 };
 
 static int sdrv_pcm_prepare_slave_config(struct snd_pcm_substream *substream,
-				       struct snd_pcm_hw_params *params,
-				       struct dma_slave_config *slave_config)
+					   struct snd_pcm_hw_params *params,
+					   struct dma_slave_config *slave_config)
 {
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
 	struct sdrv_afe_i2s_mc *afe = snd_soc_dai_get_drvdata(rtd->cpu_dai);
@@ -928,9 +1100,9 @@ static int sdrv_pcm_prepare_slave_config(struct snd_pcm_substream *substream,
 }
 
 static const struct snd_dmaengine_pcm_config sdrv_dmaengine_pcm_config = {
-    .pcm_hardware = &sdrv_pcm_hardware,
-    .prepare_slave_config = sdrv_pcm_prepare_slave_config,
-    .prealloc_buffer_size = X9_I2S_MC_FIFO_SIZE * 8,
+	.pcm_hardware = &sdrv_pcm_hardware,
+	.prepare_slave_config = sdrv_pcm_prepare_slave_config,
+	.prealloc_buffer_size = MAX_I2S_MC_ABUF_SIZE,
 };
 
 static int snd_i2s_mc_soc_platform_probe(struct snd_soc_component *pdev)
@@ -955,13 +1127,14 @@ static void snd_i2s_mc_soc_platform_remove(struct snd_soc_component *pdev)
 
 static struct snd_soc_component_driver snd_afe_soc_component = {
 
-    .probe = snd_i2s_mc_soc_platform_probe,
-    .remove = snd_i2s_mc_soc_platform_remove,
-    /*   .pcm_new  = snd_afe_pcm_new,
+	.probe = snd_i2s_mc_soc_platform_probe,
+	.remove = snd_i2s_mc_soc_platform_remove,
+	/*   .pcm_new  = snd_afe_pcm_new,
 	.pcm_free = snd_afe_pcm_free,
 	.ops = &dummy_pcm_ops,
 	.name = DRV_NAME, */
 };
+
 static int snd_afe_i2s_mc_probe(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
@@ -981,10 +1154,16 @@ static int snd_afe_i2s_mc_probe(struct platform_device *pdev)
 
 	platform_set_drvdata(pdev, afe);
 
-	/* get i2s sc clock FPGA 0x30300000u IRQ_GIC4_I2S_SC1_INTERRUPT_NUM 90
-	 */
-	// afe->clk_i2s = devm_clk_get(&pdev->dev, NULL);
-	// DEBUG_ITEM_PRT(afe->clk_i2s->max_rate);
+	/* get clk and mclk */
+	afe->clk_i2s = devm_clk_get(&pdev->dev, "i2s-mc-clk");
+	if (IS_ERR(afe->clk_i2s))
+		return PTR_ERR(afe->clk_i2s);
+	DEBUG_ITEM_PRT(clk_get_rate(afe->clk_i2s));
+
+	afe->mclk = devm_clk_get(&pdev->dev, "i2s-mc-mclk");
+	if (IS_ERR(afe->mclk))
+		return PTR_ERR(afe->mclk);
+	DEBUG_ITEM_PRT(clk_get_rate(afe->mclk));
 
 	/* Get irq and setting */
 	irq_id = platform_get_irq(pdev, 0);
@@ -995,7 +1174,7 @@ static int snd_afe_i2s_mc_probe(struct platform_device *pdev)
 	DEBUG_ITEM_PRT(irq_id);
 
 	ret = devm_request_irq(afe->dev, irq_id, sdrv_i2s_mc_irq_handler, 0,
-			       pdev->name, (void *)afe);
+				   pdev->name, (void *)afe);
 	/*  ret = devm_request_threaded_irq(&pdev->dev, irq_id, NULL,
 									sdrv_i2s_mc_irq_handler,
 									IRQF_SHARED
@@ -1012,11 +1191,11 @@ static int snd_afe_i2s_mc_probe(struct platform_device *pdev)
 		goto err_disable;
 	}
 	DEBUG_ITEM_PRT(afe->regs);
-	printk(KERN_ERR "ALSA X9"
+	printk(KERN_INFO "ALSA X9"
 			" irq(%d) num(%d) vaddr(0x%llx) paddr(0x%llx) \n",
-	       irq_id, pdev->num_resources, afe->regs, res->start);
+			irq_id, pdev->num_resources, afe->regs, res->start);
 	afe->regmap = devm_regmap_init_mmio(&pdev->dev, afe->regs,
-					    &sdrv_i2s_mc_regmap_config);
+						&sdrv_i2s_mc_regmap_config);
 
 	if (IS_ERR(afe->regmap)) {
 		ret = PTR_ERR(afe->regmap);
@@ -1039,8 +1218,8 @@ static int snd_afe_i2s_mc_probe(struct platform_device *pdev)
 		goto err_disable;
 
 	ret = devm_snd_soc_register_component(dev, &snd_afe_soc_component,
-					      snd_afe_dais,
-					      ARRAY_SIZE(snd_afe_dais));
+						  snd_afe_dais,
+						  ARRAY_SIZE(snd_afe_dais));
 	if (ret < 0) {
 		dev_err(&pdev->dev, "couldn't register component\n");
 		goto err_disable;
@@ -1061,19 +1240,21 @@ static int snd_afe_i2s_mc_remove(struct platform_device *pdev)
 	snd_soc_unregister_platform(&pdev->dev);
 	return 0;
 }
+
 static const struct of_device_id sdrv_i2s_mc_of_match[] = {
-    {
-	.compatible = "semidrive,x9-i2s-mc",
-    },
-};
-static struct platform_driver snd_afe_i2s_mc_driver = {
-    .driver =
 	{
-	    .name = DRV_NAME "-i2s",
-	    .of_match_table = sdrv_i2s_mc_of_match,
+	.compatible = "semidrive,x9-i2s-mc",
 	},
-    .probe = snd_afe_i2s_mc_probe,
-    .remove = snd_afe_i2s_mc_remove,
+};
+
+static struct platform_driver snd_afe_i2s_mc_driver = {
+	.driver =
+	{
+		.name = DRV_NAME "-i2s",
+		.of_match_table = sdrv_i2s_mc_of_match,
+	},
+	.probe = snd_afe_i2s_mc_probe,
+	.remove = snd_afe_i2s_mc_remove,
 };
 
 module_platform_driver(snd_afe_i2s_mc_driver);
