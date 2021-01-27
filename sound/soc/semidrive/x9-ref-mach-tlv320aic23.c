@@ -219,10 +219,10 @@ static int x9_ref_tlv320aic23_probe(struct platform_device *pdev)
 		 get_part_id(PART_BOARD_ID_MIN));
 	/*FIXME:  Notice: Next part configure probe action by hwid, it is out of control of DTB.      */
 	if ((get_part_id(PART_BOARD_TYPE) != BOARD_TYPE_REF) ||
-	    (get_part_id(PART_BOARD_ID_MAJ) != 1) ||
-	    ((get_part_id(PART_BOARD_ID_MIN) != 3) &&
-	    (get_part_id(PART_BOARD_ID_MIN) != 4))) {
-		/*If it is not ref A03 board. dump_all_part_id();*/
+		(get_part_id(PART_BOARD_ID_MAJ) != 1) ||
+		((get_part_id(PART_BOARD_ID_MIN) != 3) &&
+		(get_part_id(PART_BOARD_ID_MIN) != 4))) {
+		/*If it is not ref A03/A04 board. dump_all_part_id();*/
 		return -ENXIO;
 	}
 	/*FIXME-END:  -------------------------      */

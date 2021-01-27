@@ -39,7 +39,7 @@
 #include <sound/jack.h>
 #include <linux/of_gpio.h>
 #include <sound/soc.h>
-
+#include <soc/semidrive/sdrv_boardinfo_hwid.h>
 /* -------------------------------- */
 /* definition of the chip-specific record  dma related ops*/
 struct snd_x9_chip {
@@ -612,7 +612,12 @@ static int x9_ref04_ak7738_probe(struct platform_device *pdev)
 	struct snd_x9_chip *chip;
 
 	dev_info(&pdev->dev, ": dev name =%s %s\n", pdev->name, __func__);
-
+	if ((get_part_id(PART_BOARD_TYPE) != BOARD_TYPE_REF) ||
+		(get_part_id(PART_BOARD_ID_MAJ) != 1) ||
+		(get_part_id(PART_BOARD_ID_MIN) != 4)) {
+		/*If it is not ref A04 board, exit. dump_all_part_id();*/
+		return -ENXIO;
+	}
 	DEBUG_FUNC_PRT;
 	card->dev = dev;
 
