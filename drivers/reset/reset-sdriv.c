@@ -341,11 +341,14 @@ static int reset_fill_entry(phys_addr_t start, resource_size_t size, unsigned lo
 static phys_addr_t reset_get_base_addr(const struct device_node *np, const char *name)
 {
 	const __be32 *base;
-	base = of_get_property(np, name, NULL);
+	int prop_size;
+	base = of_get_property(np, name, &prop_size);
+
 	if (!base){
 		return 0;
 	}
-	return of_read_number(base, 1);
+	prop_size /= sizeof(u32);
+	return of_read_number(base, prop_size);
 }
 
 static unsigned long reset_mem_to_index(phys_addr_t addr, phys_addr_t core, phys_addr_t module)

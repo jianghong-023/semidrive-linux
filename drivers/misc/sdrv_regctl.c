@@ -103,12 +103,14 @@ static int sdrv_regctl_probe(struct platform_device *pdev)
 
 	const __be32 *base;
 	phys_addr_t reg_base;
+	int prop_size;
 
-	base = of_get_property(dev->of_node, "common_reg_base", NULL);
+	base = of_get_property(dev->of_node, "common_reg_base", &prop_size);
 	if (!base) {
 		dev_err(dev, "can't get common reset base address\n");
 	}
-	reg_base = of_read_number(base, 1);
+	prop_size /= sizeof(u32);
+	reg_base = of_read_number(base, prop_size);
 
 	i = 0;
 	while (of_get_address(dev->of_node, i++, NULL, NULL));
