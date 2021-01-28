@@ -475,6 +475,13 @@ config BACKLIGHT_SDRV
 	  If you have an Semidrive SoC family backlight say Y to enable
 	  the backlight driver.
 
+config BACKLIGHT_SDRV_NATIVE
+	tristate "Generic PWM based Backlight Driver for the Semidriver"
+	depends on PWM
+	help
+	  If you have a Semidrive SoC family backlight adjustable by PWM, say Y to enable
+	  this driver.
+
 endif # BACKLIGHT_CLASS_DEVICE
 
 endif # BACKLIGHT_LCD_SUPPORT

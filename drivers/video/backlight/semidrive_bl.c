@@ -28,6 +28,7 @@ struct rpmsg_bl_data {
 	unsigned int	*levels;
 	bool			enabled;
 	unsigned int	scale;
+	unsigned int	bl_screen_id;
 };
 
 struct platform_rpmsg_bl_data {
@@ -35,6 +36,7 @@ struct platform_rpmsg_bl_data {
 	unsigned int dft_brightness;
 	unsigned int lth_brightness;
 	unsigned int *levels;
+	unsigned int bl_screen_id;
 };
 
 enum backlight_op_type {
@@ -47,15 +49,14 @@ struct bl_ioctl_cmd {
 	u32 op;
 	union {
 		struct {
-			u16 a;
-			u16 b;
-		} s;
-		u8 brightness;
+			u8 screenid;
+			u8 brightness;
+		} ctl;
 		u8 data[8];
 	}u;
 };
 
-static int backlight_rpc_set_brightness(int brightness)
+static int backlight_rpc_set_brightness(int brightness, int screenid)
 {
 	struct rpc_ret_msg result = {0,};
 	struct rpc_req_msg request;
@@ -64,32 +65,33 @@ static int backlight_rpc_set_brightness(int brightness)
 
 	DCF_INIT_RPC_REQ(request, MOD_RPC_REQ_BL_IOCTL);
 	ctl->op = BL_OP_SET_BRIGHT;
-	ctl->u.brightness = brightness;
+	ctl->u.ctl.screenid = screenid;
+	ctl->u.ctl.brightness = brightness;
 
 	ret = semidrive_rpcall(&request, &result);
 
 	return ret;
 }
 
-static void rpmsg_backlight_power_on(struct rpmsg_bl_data *pb, int brightness)
+static void rpmsg_backlight_power_on(struct rpmsg_bl_data *pb, int brightness, int screenid)
 {
 	if (brightness != pb->brightness) {
-		backlight_rpc_set_brightness(brightness);
+		backlight_rpc_set_brightness(brightness, screenid);
 		pb->brightness = brightness;
 		pb->enabled = !!brightness;
-		dev_info(pb->dev, "%s\n", __func__);
+		dev_info(pb->dev, "%s : screenid[%d] brightness[%d]\n", __func__, screenid, brightness);
 	}
 }
 
-static void rpmsg_backlight_power_off(struct rpmsg_bl_data *pb)
+static void rpmsg_backlight_power_off(struct rpmsg_bl_data *pb, int screenid)
 {
 	if (!pb->enabled)
 		return;
 
-	backlight_rpc_set_brightness(0);
+	backlight_rpc_set_brightness(0, screenid);
 	pb->brightness = 0;
 	pb->enabled = false;
-	dev_info(pb->dev, "%s\n", __func__);
+	dev_info(pb->dev, "%s : screenid[%d] brightness[%d]\n", __func__, screenid, pb->brightness);
 }
 
 static int rpmsg_backlight_update_status(struct backlight_device *bl)
@@ -98,14 +100,18 @@ static int rpmsg_backlight_update_status(struct backlight_device *bl)
 	int brightness = bl->props.brightness;
 
 	if (bl->props.power != FB_BLANK_UNBLANK ||
-	    bl->props.fb_blank != FB_BLANK_UNBLANK ||
-	    bl->props.state & BL_CORE_FBBLANK)
+		bl->props.fb_blank != FB_BLANK_UNBLANK ||
+		bl->props.state & BL_CORE_FBBLANK)
 		brightness = 0;
 
+	if(brightness > bl->props.max_brightness) {
+		dev_err(pb->dev, "%s : brightness ERR_INVALID_ARGS! \n", __func__);
+		return EINVAL;
+	}
 	if (brightness > 0) {
-		rpmsg_backlight_power_on(pb, brightness);
+		rpmsg_backlight_power_on(pb, brightness, pb->bl_screen_id);
 	} else
-		rpmsg_backlight_power_off(pb);
+		rpmsg_backlight_power_off(pb, pb->bl_screen_id);
 
 	return 0;
 }
@@ -134,6 +140,13 @@ static int rpmsg_backlight_parse_dt(struct device *dev,
 		return -ENODEV;
 
 	memset(data, 0, sizeof(*data));
+
+	/*read backlight screen id*/
+	ret = of_property_read_u32(node, "bl_screen-id", &data->bl_screen_id);
+	if (ret < 0) {
+		dev_err(dev, "Missing touchscreen id, use 0\n");
+		data->bl_screen_id = 0;
+	}
 
 	/* determine the number of brightness levels */
 	prop = of_find_property(node, "brightness-levels", &length);
@@ -224,12 +237,14 @@ static int rpmsg_backlight_probe(struct platform_device *pdev)
 
 	pb->dev = &pdev->dev;
 	pb->enabled = false;
+	pb->bl_screen_id = data->bl_screen_id;
 
 	memset(&props, 0, sizeof(struct backlight_properties));
 	props.type = BACKLIGHT_RAW;
 	props.max_brightness = data->max_brightness;
+	dev_info(pb->dev, "dev_name : %s\n", dev_name(&pdev->dev));
 	bl = backlight_device_register(dev_name(&pdev->dev), &pdev->dev, pb,
-				       &rpmsg_backlight_ops, &props);
+					   &rpmsg_backlight_ops, &props);
 	if (IS_ERR(bl)) {
 		dev_err(&pdev->dev, "failed to register backlight\n");
 		ret = PTR_ERR(bl);
@@ -249,21 +264,23 @@ err_alloc:
 
 static int rpmsg_backlight_remove(struct platform_device *pdev)
 {
+	struct platform_rpmsg_bl_data *data = dev_get_platdata(&pdev->dev);
 	struct backlight_device *bl = platform_get_drvdata(pdev);
 	struct rpmsg_bl_data *pb = bl_get_data(bl);
 
 	backlight_device_unregister(bl);
-	rpmsg_backlight_power_off(pb);
+	rpmsg_backlight_power_off(pb, data->bl_screen_id);
 
 	return 0;
 }
 
 static void rpmsg_backlight_shutdown(struct platform_device *pdev)
 {
+	struct platform_rpmsg_bl_data *data = dev_get_platdata(&pdev->dev);
 	struct backlight_device *bl = platform_get_drvdata(pdev);
 	struct rpmsg_bl_data *pb = bl_get_data(bl);
 
-	rpmsg_backlight_power_off(pb);
+	rpmsg_backlight_power_off(pb, data->bl_screen_id);
 }
 
 static struct platform_driver rpmsg_backlight_driver = {
