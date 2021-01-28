@@ -517,6 +517,7 @@ static void sdrv_configure_irqs(struct sdrv_gpio *gpio,
 		ct->chip.irq_disable = sdrv_irq_disable;
 		ct->chip.irq_request_resources = sdrv_irq_reqres;
 		ct->chip.irq_release_resources = sdrv_irq_relres;
+		ct->chip.flags |= IRQCHIP_SKIP_SET_WAKE;
 
 		ct->regs.ack = GPIO_INT_EDGE_CLR_PORT_X(port->idx);
 		ct->regs.mask = GPIO_INT_MASK_PORT_X(port->idx);
