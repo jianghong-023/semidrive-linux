@@ -540,6 +540,13 @@ config SEMIDRIVE_REGCTL
 	help
 	  This adds support for Semidriver SOC generic register programming.
 
+config SD_DISPLAY_MISC
+	tristate "Semidrive display misc driver"
+	depends on OF
+	default y
+	help
+		This is misc driver for display
+
 source "drivers/misc/c2port/Kconfig"
 source "drivers/misc/eeprom/Kconfig"
 source "drivers/misc/cb710/Kconfig"
