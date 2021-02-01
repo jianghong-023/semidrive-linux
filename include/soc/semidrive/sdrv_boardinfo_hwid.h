@@ -37,13 +37,22 @@ enum sd_board_type_e {//2 bit
 	BOARD_TYPE_UNKNOWN,
 	BOARD_TYPE_EVB,
 	BOARD_TYPE_REF,
-	BOARD_TYPE_CUS,
+	BOARD_TYPE_MS,
 };
 
 enum sd_boardid_major_e {//3 bit
 	BOARDID_MAJOR_UNKNOWN,
 	BOARDID_MAJOR_A,
 };
+enum sd_boardid_ms_major_e {//3 bit
+	BOARDID_MAJOR_MPS = 1,
+	BOARDID_MAJOR_TI_A01,
+};
+enum sd_boardid_ms_minor_e {//4 bit
+	BOARDID_MINOR_UNKNOWN,
+	BOARDID_MINOR_
+};
+
 struct version1 {//24 bit
 	u32 chipid: 5; //chip version
 	u32 featurecode: 2; //feature code
@@ -52,8 +61,8 @@ struct version1 {//24 bit
 	u32 pkg_type: 2; //
 	u32 revision: 2; //
 	u32 board_type: 2; //
-	u32 board_id_major: 3; //major
-	u32 board_id_minor: 4; //minor
+	u32 board_id_major: 3; //major,in ms board, this will be core boardid,
+	u32 board_id_minor: 4; //minor,in ms board, this will be base boardid,
 } __attribute__((packed));
 union version {
 	struct version1 v1;
