@@ -121,4 +121,7 @@ config DRM_PANEL_KUNLUN_SIMPLE
 	tristate "Kunlun simple panel"
 	depends on OF
 
+config DRM_PANEL_SDRV_MIPI_SIMPLE
+	tristate "Semidrive mipi simple panel"
+	depends on OF
 endmenu

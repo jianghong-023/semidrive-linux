@@ -12,3 +12,4 @@ obj-$(CONFIG_DRM_PANEL_SHARP_LQ101R1SX01) += panel-sharp-lq101r1sx01.o
 obj-$(CONFIG_DRM_PANEL_SHARP_LS043T1LE01) += panel-sharp-ls043t1le01.o
 obj-$(CONFIG_DRM_PANEL_SITRONIX_ST7789V) += panel-sitronix-st7789v.o
 obj-$(CONFIG_DRM_PANEL_KUNLUN_SIMPLE) += panel-kunlun-simple.o
+obj-$(CONFIG_DRM_PANEL_SDRV_MIPI_SIMPLE) += panel-sdrv-mipi-sample.o
