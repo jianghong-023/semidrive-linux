@@ -527,8 +527,8 @@ static int alloc_fake_buffer(void)
 
 static const struct snd_pcm_hardware sdrv_pcm_hardware = {
 
-    .info = (SNDRV_PCM_INFO_INTERLEAVED |
-	     SNDRV_PCM_INFO_BLOCK_TRANSFER),
+    .info = (SNDRV_PCM_INFO_MMAP | SNDRV_PCM_INFO_MMAP_VALID |
+	     SNDRV_PCM_INFO_INTERLEAVED | SNDRV_PCM_INFO_BLOCK_TRANSFER),
     .formats = SND_FORMATS,
     .rates = SND_RATE,
     .rate_min = SND_RATE_MIN,
