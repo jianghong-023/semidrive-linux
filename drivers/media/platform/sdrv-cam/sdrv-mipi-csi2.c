@@ -314,23 +314,23 @@ static void set_ipi_hbp(struct sdrv_csi_mipi_csi2 *kcmc, int index,
 						uint32_t val)
 {
 	switch (index) {
-		case 1:
-			dw_mipi_csi_write(kcmc, R_CSI2_IPI_HBP_TIME, val);
-			break;
+	case 1:
+		dw_mipi_csi_write(kcmc, R_CSI2_IPI_HBP_TIME, val);
+		break;
 
-		case 2:
-			dw_mipi_csi_write(kcmc, R_CSI2_IPI2_HBP_TIME, val);
-			break;
+	case 2:
+		dw_mipi_csi_write(kcmc, R_CSI2_IPI2_HBP_TIME, val);
+		break;
 
-		case 3:
-			dw_mipi_csi_write(kcmc, R_CSI2_IPI3_HBP_TIME, val);
-			break;
+	case 3:
+		dw_mipi_csi_write(kcmc, R_CSI2_IPI3_HBP_TIME, val);
+		break;
 
-		case 4:
-			dw_mipi_csi_write(kcmc, R_CSI2_IPI4_HBP_TIME, val);
+	case 4:
+		dw_mipi_csi_write(kcmc, R_CSI2_IPI4_HBP_TIME, val);
 
-		default:
-			break;
+	default:
+		break;
 	}
 }
 
@@ -338,46 +338,46 @@ static void set_ipi_hsd(struct sdrv_csi_mipi_csi2 *kcmc, int index,
 						uint32_t val)
 {
 	switch (index) {
-		case 1:
-			dw_mipi_csi_write(kcmc, R_CSI2_IPI_HSD_TIME, val);
-			break;
+	case 1:
+		dw_mipi_csi_write(kcmc, R_CSI2_IPI_HSD_TIME, val);
+		break;
 
-		case 2:
-			dw_mipi_csi_write(kcmc, R_CSI2_IPI2_HSD_TIME, val);
-			break;
+	case 2:
+		dw_mipi_csi_write(kcmc, R_CSI2_IPI2_HSD_TIME, val);
+		break;
 
-		case 3:
-			dw_mipi_csi_write(kcmc, R_CSI2_IPI3_HSD_TIME, val);
-			break;
+	case 3:
+		dw_mipi_csi_write(kcmc, R_CSI2_IPI3_HSD_TIME, val);
+		break;
 
-		case 4:
-			dw_mipi_csi_write(kcmc, R_CSI2_IPI4_HSD_TIME, val);
+	case 4:
+		dw_mipi_csi_write(kcmc, R_CSI2_IPI4_HSD_TIME, val);
 
-		default:
-			break;
+	default:
+		break;
 	}
 }
 static void set_ipi_adv_features(struct sdrv_csi_mipi_csi2 *kcmc,
 								 int index, uint32_t val)
 {
 	switch (index) {
-		case 1:
-			dw_mipi_csi_write(kcmc, R_CSI2_IPI_ADV_FEATURES, val);
-			break;
+	case 1:
+		dw_mipi_csi_write(kcmc, R_CSI2_IPI_ADV_FEATURES, val);
+		break;
 
-		case 2:
-			dw_mipi_csi_write(kcmc, R_CSI2_IPI2_ADV_FEATURES, val);
-			break;
+	case 2:
+		dw_mipi_csi_write(kcmc, R_CSI2_IPI2_ADV_FEATURES, val);
+		break;
 
-		case 3:
-			dw_mipi_csi_write(kcmc, R_CSI2_IPI3_ADV_FEATURES, val);
-			break;
+	case 3:
+		dw_mipi_csi_write(kcmc, R_CSI2_IPI3_ADV_FEATURES, val);
+		break;
 
-		case 4:
-			dw_mipi_csi_write(kcmc, R_CSI2_IPI4_ADV_FEATURES, val);
+	case 4:
+		dw_mipi_csi_write(kcmc, R_CSI2_IPI4_ADV_FEATURES, val);
 
-		default:
-			break;
+	default:
+		break;
 	}
 }
 
@@ -431,8 +431,11 @@ static int mipi_csi2_set_phy_freq(struct sdrv_csi_mipi_csi2 *kcmc,
 {
 	int phyrate;
 	int i;
+
 	phyrate = freq * lanes * 2;
-	printk("%s(): freq=%d, lanes=%d\n", __func__, freq, lanes);
+	//phyrate = freq;
+
+	printk("%s(): phyrate %dMHz, lanerate=%dMHz\n", __func__, phyrate, freq);
 
 	if ((phyrate < g_phy_freqs[0].range_l)
 			|| (phyrate > g_phy_freqs[62].range_h)) {
@@ -459,7 +462,6 @@ static int mipi_csi2_set_phy_freq(struct sdrv_csi_mipi_csi2 *kcmc,
 		iowrite32(g_phy_freqs[i].index, kcmc->dispmux_address + 0x60);
 	}
 	else if (kcmc->id == 1) {
-		//Set 1Gbps
 		iowrite32(g_phy_freqs[i].index, kcmc->dispmux_address + 0x68);
 	}
 	else {
@@ -510,26 +512,24 @@ static int mipi_csi2_s_stream(struct v4l2_subdev *sd, int enable)
 	if (!kcmc)
 		return -EINVAL;
 
+	mutex_lock(&kcmc->lock);
 	if (enable == 1) {
 		if (kcmc->active_stream_num == 0) {
 			kcmc->active_stream_num++;
-			//mipi_csi2_set_phy_freq(kcmc, kcmc->lanerate / 1000 / 1000,
-			//					   kcmc->lane_count);
 			mipi_csi2_initialization(kcmc);
 			mipi_csi2_enable(kcmc, enable);
-			msleep(10);
+			usleep_range(10000, 11000);
 			v4l2_subdev_call(sensor_sd, video, s_stream, enable);
 		} else
 			kcmc->active_stream_num++;
-	}
-	else {
+	} else {
 		kcmc->active_stream_num--;
-
 		if (kcmc->active_stream_num == 0) {
 			mipi_csi2_enable(kcmc, enable);
 			v4l2_subdev_call(sensor_sd, video, s_stream, enable);
 		}
 	}
+	mutex_unlock(&kcmc->lock);
 
 	return 0;
 }

@@ -616,6 +616,7 @@ static int sdrv_csi_probe(struct platform_device *pdev)
 	atomic_set(&csi->ref_count, 0);
 	platform_set_drvdata(pdev, csi);
 	INIT_LIST_HEAD(&csi->kstreams);
+	mutex_init(&csi->lock);
 
 	ret = sdrv_of_parse_core(pdev, csi);
 
