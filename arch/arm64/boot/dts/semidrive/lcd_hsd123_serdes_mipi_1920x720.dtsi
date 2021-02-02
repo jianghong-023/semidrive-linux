@@ -7,8 +7,8 @@
 
 		semidrive,phy_freq = <600>;  /* Mbps */
 
-		semidrive,width-mm = <68>;
-		semidrive,height-mm = <121>;
+		semidrive,width-mm = <202>;
+		semidrive,height-mm = <109>;
 
 		semidrive,initial-command = [
 			];
@@ -20,7 +20,7 @@
 
 		display-timings {
 			timing0 {
-				clock-frequency = <95000000>;
+				clock-frequency = <85714285>;
 				hactive = <1920>;
 				vactive = <720>;
 				hback-porch = <40>;
@@ -29,6 +29,7 @@
 				vfront-porch = <50>;
 				hsync-len = <40>;
 				vsync-len = <10>;
+				vrefresh = <51>;
 			};
 		};
 	};
