@@ -191,6 +191,7 @@ static ssize_t sdpe_rpc_read(struct file *filp, char __user *buf,
 	while ((pdu_skb = skb_dequeue(&sdu->pdu_queue)) != NULL) {
 		copy_to_user(buf + use, pdu_skb->data, pdu_skb->len);
 		use += pdu_skb->len;
+		kfree_skb(pdu_skb);
 	}
 
 free_rx_sdu:
