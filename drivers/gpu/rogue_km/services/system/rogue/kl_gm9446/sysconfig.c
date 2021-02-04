@@ -381,7 +381,7 @@ PVRSRV_ERROR SysDevInit(void *pvOSDevice, PVRSRV_DEVICE_CONFIG **ppsDevConfig)
 	psDevConfig->sDVFS.sDVFSDeviceCfg.pasOPPTable = NULL;
 	psDevConfig->sDVFS.sDVFSDeviceCfg.ui32OPPTableSize = 0;
 
-	psDevConfig->sDVFS.sDVFSDeviceCfg.bIdleReq = IMG_TRUE;
+	psDevConfig->sDVFS.sDVFSDeviceCfg.bIdleReq = IMG_FALSE;
 	psDevConfig->sDVFS.sDVFSDeviceCfg.pfnSetFrequency = (PFN_SYS_DEV_DVFS_SET_FREQUENCY) SetFrequency;
 	psDevConfig->sDVFS.sDVFSDeviceCfg.pfnSetVoltage = (PFN_SYS_DEV_DVFS_SET_VOLTAGE) SetVoltage;
 	psDevConfig->sDVFS.sDVFSDeviceCfg.ui32PollMs = SD_DVFS_SWITCH_INTERVAL;
