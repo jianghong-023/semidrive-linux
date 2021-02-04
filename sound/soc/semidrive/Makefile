@@ -21,6 +21,9 @@ obj-$(CONFIG_SND_X9_REF_MACH) += x9-ref-mach-ak7738.o
 snd-x9-ref04-mach-objs := x9-ref04-mach-ak7738.o
 obj-$(CONFIG_SND_X9_REF04_MACH) += x9-ref04-mach-ak7738.o
 
+snd-x9-core01-mach-objs := x9-core01-mach-ak7738.o
+obj-$(CONFIG_SND_X9_CORE01_MACH) += x9-core01-mach-ak7738.o
+
 snd-x9-ref-mach-ak4556-objs := x9-ref-mach-ak4556.o
 obj-$(CONFIG_SND_X9_REF_MACH_HS) += x9-ref-mach-ak4556.o
 
