@@ -31,7 +31,7 @@ struct sdrv_cgu_pll_clk {
 	struct clk_hw hw;
 	void __iomem *reg_base;
 	const struct sdrv_pll_rate_table *rate_table;
-	const struct sdrv_pll_rate_table params;
+	struct sdrv_pll_rate_table params;
 	bool isreadonly;
 	unsigned int rate_count;
 	spinlock_t *lock;

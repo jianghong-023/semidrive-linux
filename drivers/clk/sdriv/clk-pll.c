@@ -40,23 +40,32 @@ static unsigned long sdrv_pll_calcurate_pll_cfg(const struct sdrv_pll_rate_table
 	freq = (tmp + (rate->fbdiv*(1000000)))*(SOC_PLL_REFCLK_FREQ/(1000000))/rate->refdiv;
 	return freq;
 }
-static unsigned long sdrv_pll_get_curr_freq(struct sdrv_cgu_pll_clk *pll,
-		const struct sdrv_pll_rate_table *cur)
+static void stuff_valid_value(struct sdrv_pll_rate_table *config)
 {
-	unsigned long pll_cfg = sdrv_pll_calcurate_pll_cfg(cur);
+	int i = 0;
+	if (!(config->refdiv >= 1 && config->refdiv <= 63))
+		config->refdiv = 1;
 
-	if (pll->type == PLL_DIVA && cur->div[0] != -1)
-		return pll_cfg/(cur->div[0] + 1);
-	else if (pll->type == PLL_DIVB && cur->div[1] != -1)
-		return pll_cfg/(cur->div[1] + 1);
-	else if (pll->type == PLL_DIVC && cur->div[2] != -1)
-		return pll_cfg/(cur->div[2] + 1);
-	else if (pll->type == PLL_DIVD && cur->div[3] != -1)
-		return pll_cfg/(cur->div[3] + 1);
-	else if (pll->type == PLL_ROOT) //root
-		return pll_cfg/cur->postdiv[0]/cur->postdiv[1];
-	return 0;
+	for (i = 0; i < 2; i++) {
+		if (!(config->postdiv[i] >= 1 && config->postdiv[i] <= 7))
+			config->postdiv[i] = 1;
+	}
+
+	if (!(config->postdiv[0] >= config->postdiv[1]))
+		config->postdiv[0] = config->postdiv[1];
+
+	if (config->isint) {
+		if (!(config->fbdiv >= 16 && config->fbdiv <= 640))
+			config->fbdiv = 16;
+	} else {
+		if (!(config->fbdiv >= 20 && config->fbdiv <= 320))
+			config->fbdiv = 20;
+
+		if (!(config->frac >= 0 && config->frac <= FRACM))
+			config->frac = FRACM;
+	}
 }
+
 static unsigned long sdrv_pll_get_freq(int plltype,
 		const struct sdrv_pll_rate_table *cur)
 {
@@ -76,16 +85,21 @@ static unsigned long sdrv_pll_get_freq(int plltype,
 		return pll_cfg;
 	return 0;
 }
-
-static unsigned long sdrv_pll_get_prate(int plltype,
-		const struct sdrv_pll_rate_table *cur)
+static unsigned long sdrv_pll_get_freq_with_prate(int plltype,
+		const struct sdrv_pll_rate_table *cur, const unsigned long prate)
 {
-	unsigned long pll_cfg = sdrv_pll_calcurate_pll_cfg(cur);
-
-	if (plltype >= PLL_DIVA && plltype <= PLL_DIVD)// parent is root
-		return pll_cfg/cur->postdiv[0]/cur->postdiv[1];
-	else if (plltype == PLL_ROOT) // no parent
-		return 0;
+	if (plltype == PLL_DIVA && cur->div[0] != -1)
+		return prate/(cur->div[0] + 1);
+	else if (plltype == PLL_DIVB && cur->div[1] != -1)
+		return prate/(cur->div[1] + 1);
+	else if (plltype == PLL_DIVC && cur->div[2] != -1)
+		return prate/(cur->div[2] + 1);
+	else if (plltype == PLL_DIVD && cur->div[3] != -1)
+		return prate/(cur->div[3] + 1);
+	else if (plltype == PLL_ROOT) //root
+		return prate/cur->postdiv[0]/cur->postdiv[1];
+	else if (plltype == PLL_DUMMY_ROOT)
+		return sdrv_pll_get_freq(PLL_DUMMY_ROOT, cur);
 	return 0;
 }
 
@@ -127,7 +141,7 @@ static unsigned long sdrv_pll_recalc_rate(struct clk_hw *hw,
 	u64 rate64 = prate;
 
 	sdrv_pll_get_params(pll, &cur);
-	rate64 = sdrv_pll_get_curr_freq(pll, &cur);
+	rate64 = sdrv_pll_get_freq(pll->type, &cur);
 
 	return (unsigned long)rate64;
 }
@@ -151,7 +165,7 @@ static int sdrv_pll_is_enabled(struct clk_hw *hw)
 	//struct sdrv_cgu_pll_clk *pll = to_sdrv_cgu_pll(hw);
 	return true;
 }
-
+#if 0
 static long sdrv_pll_round_rate(struct clk_hw *hw,
 		unsigned long drate, unsigned long *prate)
 {
@@ -161,14 +175,14 @@ static long sdrv_pll_round_rate(struct clk_hw *hw,
 	unsigned long rate = 0;
 
 	for (i = 0; i < pll->rate_count; i++) {
-		rate = sdrv_pll_get_curr_freq(pll, &rate_table[i]);
+		rate = sdrv_pll_get_freq(pll->type, &rate_table[i]);
 		if (drate <= rate)
 			return rate;
 	}
 
 	return rate;
 }
-
+#endif
 static bool is_valid_pll_config(struct sdrv_pll_rate_table *conf)
 {
 	// check the pll limit
@@ -193,9 +207,8 @@ static bool is_valid_pll_config(struct sdrv_pll_rate_table *conf)
 	return true;
 }
 
-
 unsigned long pll_translate_freq_to_config(unsigned long freq, int plldiv,
-		struct sdrv_pll_rate_table *config)
+		struct sdrv_pll_rate_table *config, unsigned long *prate)
 {
 	unsigned long bestrate = 0, bestratediff = ULONG_MAX, rate;
 	unsigned long diff;
@@ -203,12 +216,14 @@ unsigned long pll_translate_freq_to_config(unsigned long freq, int plldiv,
 	struct sdrv_pll_rate_table conf;
 
 	conf = *config;
-
 	if (plldiv == PLL_DUMMY_ROOT) {
 		int fbdiv = 1, refdiv = 1;
 		int refdiv_max;
 		int fbdiv_max, fbdiv_min;
-
+		config->isint = 1;
+		config->frac = 0;
+		stuff_valid_value(config);
+		conf = *config;
 		if (conf.isint) {
 			fbdiv_min = 16;
 			fbdiv_max = 640;
@@ -252,6 +267,23 @@ unsigned long pll_translate_freq_to_config(unsigned long freq, int plldiv,
 				}
 			}
 		}
+		conf = *config;
+		if (bestrate > freq && conf.isint == 1)
+			conf.fbdiv--;
+
+		conf.frac = ((freq / 1000 * conf.refdiv / 24) - conf.fbdiv * 1000) *
+					16777216 / 1000;
+
+		if (conf.frac)
+			conf.isint = 0;
+
+		if (!is_valid_pll_config(&conf))
+			return bestrate;
+
+		rate = sdrv_pll_get_freq(plldiv, &conf);
+		*config = conf;
+		//bestrate = rate;
+		bestrate = freq;
 	} else if (plldiv == PLL_ROOT) {
 		int i, j;
 		int postdiv0div_max = 7;
@@ -273,7 +305,165 @@ unsigned long pll_translate_freq_to_config(unsigned long freq, int plldiv,
 					break;
 
 				rate = pll_translate_freq_to_config(i * j * freq,
-					PLL_DUMMY_ROOT, &conf);
+					PLL_DUMMY_ROOT, &conf, NULL);
+				diff = abs_diff(freq, rate / (i * j));
+
+				if (diff == 0) {
+					*config = conf;
+					config->postdiv[0] = i;
+					config->postdiv[1] = j;
+					*prate = i * j * freq;
+					return freq;
+				}
+
+				if (diff < bestratediff) {
+					bestratediff = diff;
+					bestdiv = (i * j);
+					bestrate = rate / bestdiv;
+					*config = conf;
+					config->postdiv[0] = i;
+					config->postdiv[1] = j;
+					*prate = i * j * freq;
+				}
+			}
+		}
+	} else if (plldiv >= PLL_DIVA && plldiv <= PLL_DIVD) {
+		int div_max  = 16;
+		int i;
+
+		maxdiv = div_max;
+		maxdiv = min(ULONG_MAX / freq, maxdiv);
+		mindiv = 1;
+		maxdiv = max(maxdiv, mindiv);
+		//initial value of bestdiv is the fix div or current div.
+		bestdiv = mindiv;
+
+		for (i = mindiv; i <= (int)maxdiv; i++) {
+			rate = pll_translate_freq_to_config(i * freq,
+				PLL_DUMMY_ROOT, &conf, NULL);
+			diff = abs_diff(freq, rate / i);
+
+			if (diff == 0) {
+				*config = conf;
+				config->div[plldiv - 1] = i - 1;
+				*prate = i * freq;
+				return freq;
+			}
+
+			if (diff < bestratediff) {
+				bestratediff = diff;
+				bestdiv = i;
+				bestrate = rate / bestdiv;
+				*config = conf;
+				config->div[plldiv - 1] = i - 1;
+				*prate = i * freq;
+			}
+		}
+	}
+	return bestrate;
+}
+
+unsigned long pll_translate_freq_to_config_with_prate(unsigned long freq, int plldiv,
+		struct sdrv_pll_rate_table *config, unsigned long prate)
+{
+	unsigned long bestrate = 0, bestratediff = ULONG_MAX, rate;
+	unsigned long diff;
+	unsigned int maxdiv = 0, mindiv, bestdiv;
+	struct sdrv_pll_rate_table conf;
+
+	conf = *config;
+
+	if (plldiv == PLL_DUMMY_ROOT) {
+		int fbdiv = 1, refdiv = 1;
+		int refdiv_max;
+		int fbdiv_max, fbdiv_min;
+
+		config->isint = 1;
+		config->frac = 0;
+		stuff_valid_value(config);
+		conf = *config;
+		if (conf.isint) {
+			fbdiv_min = 16;
+			fbdiv_max = 640;
+			refdiv_max = 4;
+		} else {
+			fbdiv_min = 20;
+			fbdiv_max = 320;
+			refdiv_max = 2;
+		}
+
+		freq = min(freq, 3200000000);
+		freq = max(freq, 800000000);
+
+		for (refdiv = 1; refdiv <= refdiv_max; refdiv++) {
+			int fbdivmin, fbdivmax;
+			int fbtmp = ((freq * refdiv / 24) -
+			(conf.frac * 1000000) / 16777216) / 1000000;
+			fbdivmin = max(fbtmp - 2, fbdiv_min);
+			fbdivmax = min(fbtmp + 2, fbdiv_max);
+
+			for (fbdiv = fbdivmin; fbdiv <= fbdivmax; fbdiv++) {
+				conf.fbdiv = fbdiv;
+				conf.refdiv = refdiv;
+
+				if (!is_valid_pll_config(&conf))
+					continue;
+
+				rate = sdrv_pll_get_freq(plldiv, &conf);
+				diff = abs_diff(freq, rate);
+				if (diff == 0) {
+					config->fbdiv = conf.fbdiv;
+					config->refdiv = conf.refdiv;
+					return freq;
+				}
+
+				if (diff < bestratediff) {
+					bestratediff = diff;
+					bestrate = rate;
+					config->fbdiv = conf.fbdiv;
+					config->refdiv = conf.refdiv;
+				}
+			}
+		}
+		conf = *config;
+
+		if (bestrate > freq && conf.isint == 1)
+			conf.fbdiv--;
+
+		conf.frac = ((freq / 1000 * conf.refdiv / 24) - conf.fbdiv * 1000) *
+					16777216 / 1000;
+
+		if (conf.frac)
+			conf.isint = 0;
+
+		if (!is_valid_pll_config(&conf))
+			return bestrate;
+
+		rate = sdrv_pll_get_freq(plldiv, &conf);
+		*config = conf;
+		bestrate = rate;
+	} else if (plldiv == PLL_ROOT) {
+		int i, j;
+		int postdiv0div_max = 7;
+		int postdiv1div_max = 7;
+
+		maxdiv = postdiv0div_max * postdiv1div_max;
+		maxdiv = min(ULONG_MAX / freq, maxdiv);
+		mindiv = 1;
+		//initial value of bestdiv is the fix div or current div.
+		bestdiv = mindiv;
+		rate = prate;
+		for (i = 1; i <= postdiv0div_max; i++) {
+			for (j = 1; j <= postdiv1div_max; j++) {
+				if (((i * j) < (int)mindiv) ||
+					((i * j) > (int)maxdiv))
+					break;
+
+				if (i < j) //post0 >= post1
+					break;
+
+				//rate = pll_translate_freq_to_config(i * j * freq,
+				//	PLL_DUMMY_ROOT, &conf);
 				diff = abs_diff(freq, rate / (i * j));
 
 				if (diff == 0) {
@@ -303,10 +493,10 @@ unsigned long pll_translate_freq_to_config(unsigned long freq, int plldiv,
 		maxdiv = max(maxdiv, mindiv);
 		//initial value of bestdiv is the fix div or current div.
 		bestdiv = mindiv;
-
+		rate = prate;
 		for (i = mindiv; i <= (int)maxdiv; i++) {
-			rate = pll_translate_freq_to_config(i * freq,
-				PLL_DUMMY_ROOT, &conf);
+			//rate = pll_translate_freq_to_config(i * freq,
+			//	PLL_DUMMY_ROOT, &conf);
 			diff = abs_diff(freq, rate / i);
 
 			if (diff == 0) {
@@ -324,7 +514,6 @@ unsigned long pll_translate_freq_to_config(unsigned long freq, int plldiv,
 			}
 		}
 	}
-
 	return bestrate;
 }
 
@@ -332,21 +521,19 @@ static long sdrv_pll_round_rate_moreprecise(struct clk_hw *hw,
 		unsigned long drate, unsigned long *prate)
 {
 	struct sdrv_cgu_pll_clk *pll = to_sdrv_cgu_pll(hw);
-	const struct sdrv_pll_rate_table *params = &pll->params;
-	int i;
+	struct sdrv_pll_rate_table *params = &pll->params;
 	unsigned long rate = 0;
 	int plltype = pll->type;
 
-	rate = pll_translate_freq_to_config(drate, plltype, params);
-	// set prate
-	*prate = sdrv_pll_get_prate(plltype, params);
+	sdrv_pll_get_params(pll, &pll->params);
+
+	rate = pll_translate_freq_to_config(drate, plltype, params, prate);
 	return rate;
 }
 static int sdrv_pll_set_rate_moreprecise(struct clk_hw *hw, unsigned long drate,
 		unsigned long prate)
 {
 	struct sdrv_cgu_pll_clk *pll = to_sdrv_cgu_pll(hw);
-	int i;
 	unsigned long rate, flags = 0;
 
 	if (pll->lock)
@@ -355,9 +542,8 @@ static int sdrv_pll_set_rate_moreprecise(struct clk_hw *hw, unsigned long drate,
 		__acquire(pll->lock);
 
 	sdrv_pll_get_params(pll, &pll->params);
-	//stuff valid params
 	//calculate
-	rate = pll_translate_freq_to_config(drate, pll->type, &pll->params);
+	rate = pll_translate_freq_to_config_with_prate(drate, pll->type, &pll->params, prate);
 
 	// check prate
 	//BUG_ON(prate != sdrv_pll_get_prate(pll->type, pll->params));
@@ -371,6 +557,23 @@ static int sdrv_pll_set_rate_moreprecise(struct clk_hw *hw, unsigned long drate,
 
 	return 0;
 }
+static unsigned long sdrv_pll_recalc_rate_moreprecise(struct clk_hw *hw,
+							 unsigned long prate)
+{
+	struct sdrv_cgu_pll_clk *pll = to_sdrv_cgu_pll(hw);
+	struct sdrv_pll_rate_table cur;
+	u64 rate64 = prate;
+
+	sdrv_pll_get_params(pll, &cur);
+	rate64 = sdrv_pll_get_freq_with_prate(pll->type, &cur, prate);
+
+	return (unsigned long)rate64;
+}
+static void sdrv_pll_init(struct clk_hw *hw)
+{
+	//struct sdrv_cgu_pll_clk *pll = to_sdrv_cgu_pll(hw);
+}
+#if 0
 
 static int sdrv_pll_set_rate(struct clk_hw *hw, unsigned long drate,
 		unsigned long prate)
@@ -387,7 +590,7 @@ static int sdrv_pll_set_rate(struct clk_hw *hw, unsigned long drate,
 
 
 	for (i = 0; i < pll->rate_count; i++) {
-		rate = sdrv_pll_get_curr_freq(pll, &rate_table[i]);
+		rate = sdrv_pll_get_freq(pll->type, &rate_table[i]);
 		if (drate <= rate) {
 			sdrv_pll_set_params(pll, &rate_table[i]);
 				if (pll->lock)
@@ -408,10 +611,6 @@ static int sdrv_pll_set_rate(struct clk_hw *hw, unsigned long drate,
 	return 0;
 }
 
-static void sdrv_pll_init(struct clk_hw *hw)
-{
-	//struct sdrv_cgu_pll_clk *pll = to_sdrv_cgu_pll(hw);
-}
 
 static const struct clk_ops sdrv_pll_clk_norate_ops = {
 	.recalc_rate = sdrv_pll_recalc_rate,
@@ -429,8 +628,9 @@ static const struct clk_ops sdrv_pll_clk_ops = {
 	.is_enabled = sdrv_pll_is_enabled,
 	.init = sdrv_pll_init,
 };
+#endif
 static const struct clk_ops sdrv_pll_clk_moreprecise_ops = {
-	.recalc_rate = sdrv_pll_recalc_rate,
+	.recalc_rate = sdrv_pll_recalc_rate_moreprecise,
 	.round_rate = sdrv_pll_round_rate_moreprecise,
 	.set_rate = sdrv_pll_set_rate_moreprecise,
 	.enable = sdrv_pll_enable,
@@ -522,7 +722,7 @@ static struct clk *sdrv_register_pll(struct device_node *np, void __iomem *base,
 
 	/* keep all plls untouched for now */
 	init.flags = CLK_IGNORE_UNUSED | CLK_GET_RATE_NOCACHE;
-	if (type == PLL_ROOT)
+	if (type == PLL_DUMMY_ROOT)
 		init.num_parents = 0;
 	else
 		init.num_parents = 1;
@@ -620,7 +820,7 @@ static void __init sdrv_pll_of_init(struct device_node *np)
 	if (!sdrv_clk_of_device_is_available(np))
 		return;
 
-	clks= kzalloc(sizeof(struct clk *)*(PLL_DIVD+1), GFP_KERNEL);
+	clks = kzalloc(sizeof(struct clk *)*(PLL_DUMMY_ROOT+1), GFP_KERNEL);
 	if (!clks)
 		return;
 	clk_data = kzalloc(sizeof(struct clk_onecell_data), GFP_KERNEL);
@@ -629,7 +829,7 @@ static void __init sdrv_pll_of_init(struct device_node *np)
 		return;
 	}
 	clk_data->clks = clks;
-	clk_data->clk_num = PLL_DIVD+1;
+	clk_data->clk_num = PLL_DUMMY_ROOT+1;
 
 	reg_base = of_iomap(np, 0);
 	if (!reg_base) {
@@ -644,27 +844,29 @@ static void __init sdrv_pll_of_init(struct device_node *np)
 			rate_table = NULL;
 		}
 	}
-	for (i = 0; i <= PLL_DIVD; i++) {
-		if (i == PLL_ROOT) {
-			sprintf(clk_name,"%s", np->name);
+	for (i = PLL_DUMMY_ROOT; i >= 0; i--) {
+		if (i == PLL_DUMMY_ROOT) {
+			sprintf(clk_name, "%s", np->name);
+		} else if (i == PLL_ROOT) {
+			sprintf(clk_name, "%s_ROOT", np->name);
 		} else if (i == PLL_DIVA) {
 			if(!of_property_read_u32(np, "sdrv,pll-diva", &div))
-				sprintf(clk_name,"%s_DIVA", np->name);
+				sprintf(clk_name, "%s_DIVA", np->name);
 			else
 				continue;
 		} else if (i == PLL_DIVB) {
 			if(!of_property_read_u32(np, "sdrv,pll-divb", &div))
-				sprintf(clk_name,"%s_DIVB", np->name);
+				sprintf(clk_name, "%s_DIVB", np->name);
 			else
 				continue;
 		} else if (i == PLL_DIVC) {
 			if(!of_property_read_u32(np, "sdrv,pll-divc", &div))
-				sprintf(clk_name,"%s_DIVC", np->name);
+				sprintf(clk_name, "%s_DIVC", np->name);
 			else
 				continue;
 		} else if (i == PLL_DIVD) {
 			if(!of_property_read_u32(np, "sdrv,pll-divd", &div))
-				sprintf(clk_name,"%s_DIVD", np->name);
+				sprintf(clk_name, "%s_DIVD", np->name);
 			else
 				continue;
 		}
