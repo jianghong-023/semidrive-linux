@@ -38,3 +38,7 @@ config VIDEO_SEMIDRIVE_MAX96722_MAX96705
 config VIDEO_SEMIDRIVE_AR0132_AP0101
 	tristate "AR0132 for Semidrive"
 	depends on VIDEO_SEMIDRIVE
+
+config VIDEO_SEMIDRIVE_DESERS_ADAPTIVE
+	tristate "self-adaptive semidrive deser driver"
+	depends on VIDEO_SEMIDRIVE
