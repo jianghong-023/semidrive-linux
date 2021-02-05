@@ -5,6 +5,7 @@ dtbo-$(CONFIG_ARCH_SEMIDRIVE) += \
 	audio-tlv320-enable.dtbo \
 	audio-ak4556-disable.dtbo \
 	audio-tlv320-disable.dtbo \
-	audio-ak7738.dtbo
+	audio-ak7738.dtbo \
+	audio-ak7738-ms.dtbo
 always          := $(dtbo-y)
 clean-files     := *.dtbo
