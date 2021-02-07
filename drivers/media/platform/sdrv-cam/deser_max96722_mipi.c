@@ -57,7 +57,7 @@ enum MAX96705_READ_WRITE {
 #define FRAMESYNC_USE
 //#define DEBUG_MAX96722
 
-reg_param_t max96722_reg[] = {
+static reg_param_t max96722_reg[] = {
 	// Begin of Script
 	// MAX96712 Link Initialization to pair with GMSL1 Serializers
 	{0x0006, 0x00, 0x0}, // Disable all links

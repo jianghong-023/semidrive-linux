@@ -202,7 +202,7 @@ typedef struct{
 #define FRAMESYNC_USE
 //#define PROBE_INIT_MAX96722
 
-max96722_param_t max96722_reg[] = {
+static max96722_param_t max96722_reg[] = {
 	// Begin of Script
 	// MAX96712 Link Initialization to pair with GMSL1 Serializers
 	{0x0006,0x00, 0x0}, // Disable all links
