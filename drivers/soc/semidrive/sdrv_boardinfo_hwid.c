@@ -172,7 +172,7 @@ char *get_hwid_friendly_name(char *hwid, int len)
 		strcat(hwid, "REF-");
 		break;
 	case BOARD_TYPE_MS:
-		strcat(hwid, "MS-");
+		strcat(hwid, "MS_");
 		break;
 	default:
 		strcat(hwid, "UNKNOWN-");
@@ -188,7 +188,7 @@ char *get_hwid_friendly_name(char *hwid, int len)
 			strcat(hwid, "MPS-");
 			break;
 		case BOARDID_MAJOR_TI_A01:
-			strcat(hwid, "TI-A01-");
+			strcat(hwid, "TI-");
 			break;
 		default:
 			strcat(hwid, "UNKNOWN-");
