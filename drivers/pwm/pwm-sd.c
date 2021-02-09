@@ -102,6 +102,7 @@ struct sd_pwm_chip
 	struct device *dev;
 	u32 cpt_rate;
 	struct clk *capt_clk;
+	struct clk *plby_clk;
 	struct regmap *regmap;
 	struct sd_pwm_compat_data *cdata;
 	struct regmap_field *tim_clk_config;
@@ -1296,6 +1297,14 @@ static int sd_pwm_probe_palyback(struct platform_device *pdev) // pwm ip
 	if (IS_ERR(pc->regmap))
 		return PTR_ERR(pc->regmap);
 
+	pc->plby_clk = devm_clk_get(dev, "plbkclk");
+	if (IS_ERR(pc->plby_clk)) {
+			dev_err(dev, "pc->plby_clk error \n");
+			return PTR_ERR(pc->plby_clk);
+	}
+
+	clk_set_rate(pc->plby_clk, DRV_PWM_HF_CLOCK_FREQ);
+
 	pc->cdata = cdata;
 	pc->dev = dev;
 
@@ -1318,7 +1327,7 @@ static int sd_pwm_probe_palyback(struct platform_device *pdev) // pwm ip
 		dev_err(dev, "pwmchip_add error!\n");
 		return ret;
 	}
-	dev_err(dev, "cdata->play_num_devs: %d", cdata->play_num_devs);
+	dev_info(dev, "cdata->play_num_devs: %d", cdata->play_num_devs);
 	for (i = 0; i < cdata->play_num_devs; i++) {
 		struct sd_play_channel *channel;
 
