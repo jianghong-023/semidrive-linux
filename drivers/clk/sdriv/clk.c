@@ -850,4 +850,16 @@ static void __init sdrv_ckgen_clk_init(struct device_node *np)
 }
 
 CLK_OF_DECLARE(sdrv_ckgen_clk, "semidrive,clkgen-composite", sdrv_ckgen_clk_init);
+#ifdef CONFIG_ARCH_SEMIDRIVE_V9
+OF_DECLARE_1(remote_clk, sdrv_ckgen_clk_remote, "semidrive,clkgen-composite-remote", sdrv_ckgen_clk_init);
+static const struct of_device_id __remote_clk_of_table_sentinel
+	__used __section(__remote_clk_of_table_end);
 
+int __init remote_clk_init(void)
+{
+	pr_err("init remote_clk_init\n");
+	of_clk_init(&__remote_clk_of_table);
+	return 0;
+}
+late_initcall(remote_clk_init);
+#endif

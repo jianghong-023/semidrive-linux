@@ -836,7 +836,7 @@ static void __init sdrv_pll_of_init(struct device_node *np)
 		pr_err("%s: failed to map address range %s\n", __func__, np->name);
 		goto err;
 	}
-	pr_debug("reg base %p\n", reg_base);
+	pr_debug("reg base %p name %s\n", reg_base, np->name);
 
 	if (!of_property_read_u32(np, "sdrv,clk-readonly", &readonly)) {
 		if(!readonly) {
@@ -893,4 +893,7 @@ err:
 }
 
 CLK_OF_DECLARE(sdrv_pll, "semidrive,pll", sdrv_pll_of_init);
+#ifdef CONFIG_ARCH_SEMIDRIVE_V9
+OF_DECLARE_1(remote_clk, sdrv_pll_remote, "semidrive,pll-remote", sdrv_pll_of_init);
+#endif
 
