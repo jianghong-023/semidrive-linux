@@ -69,6 +69,8 @@ struct sdrv_cgu_out_clk {
 int sdrv_get_clk_min_rate(const char *name, u32 *min);
 int sdrv_get_clk_max_rate(const char *name, u32 *max);
 bool sdrv_clk_of_device_is_available(const struct device_node *device);
-
+#ifdef CONFIG_ARCH_SEMIDRIVE_V9
+extern struct of_device_id __remote_clk_of_table;
+#endif
 #endif
 
