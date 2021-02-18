@@ -30,6 +30,7 @@ config SND_X9_EVB_MACH
 	tristate "ASoC Audio driver for evb platform x9"
 	depends on ARCH_SEMIDRIVE_X9
 	select SND_SDRV_AFE_I2S_SC
+	select SND_SDRV_AFE_I2S_MC
 	select SND_SDRV_AFE_SPDIF
 	select SND_SOC_GENERIC_DMAENGINE_PCM
 	help

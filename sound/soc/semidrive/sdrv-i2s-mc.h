@@ -48,9 +48,6 @@ enum { I2S_CHAN_0 = 0,
 #define I2S_MC_TX_DEPTH 512
 #define I2S_MC_RX_DEPTH 512
 
-#define I2S_MC_CAPTURE_CHAN 0x30
-#define I2S_MC_PLAYBACK_CHAN 0xF
-
 #define I2S_MC_DATA_WIDTH 32
 
 /* --------------------------------------------------------------------------
