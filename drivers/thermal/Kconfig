@@ -378,6 +378,16 @@ menu "ACPI INT340X thermal drivers"
 source drivers/thermal/int340x_thermal/Kconfig
 endmenu
 
+
+menu "semidrive(Kunlun) pvt drivers"
+config SEMIDRIVE_PVT_THERMAL
+	tristate "SEMIDRIVE PVT thermal driver"
+	depends on ARCH_SEMIDRIVE
+source "drivers/thermal/semidrive_pvt/Kconfig"
+endmenu
+
+
+
 config INTEL_BXT_PMIC_THERMAL
 	tristate "Intel Broxton PMIC thermal driver"
 	depends on X86 && INTEL_SOC_PMIC_BXTWC && REGMAP

@@ -1,0 +1,12 @@
+config SEMIDRIVE_PVT_SENSOR
+	tristate "PVT Thermal sensor driver"
+	depends on ARCH_SEMIDRIVE
+	help
+	PVT Thermal sensor on SEMIDRIVE platform.
+
+config SEMIDRIVE_PVT_DRIVER
+	tristate "Thermal sensor driver for SEMIDRIVE platform"
+	depends on SEMIDRIVE_PVT_SENSOR
+	help
+	Temperature pvt sensor on semidrive soc platform. The pvt thermal sensor driver used to
+	get temp.
