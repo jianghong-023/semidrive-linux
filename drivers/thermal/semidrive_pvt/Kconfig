@@ -1,0 +1,7 @@
+menu "semidrive thermal pvt cooling device drivers"
+source "drivers/thermal/semidrive_pvt/semidrive_budget_cooling/Kconfig"
+endmenu
+
+menu "semidrive thermal pvt sensor drivers"
+source "drivers/thermal/semidrive_pvt/semidrive_thermal/Kconfig"
+endmenu
