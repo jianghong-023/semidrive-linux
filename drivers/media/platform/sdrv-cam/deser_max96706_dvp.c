@@ -465,8 +465,12 @@ static int gpi_power(deser_dev_t *dev, int gpio, bool enable)
 
 	if (board_type == BOARD_SD507) {
 		printk("gpi sd507 board.\n");
-		if (dev->gpi_gpio)
+		if (dev->gpi_gpio) {
+			dev_err(&dev->i2c_client->dev, "has gpi_gpio\n", __func__);
 			gpiod_direction_output(dev->gpi_gpio, enable ? 1 : 0);
+		} else {
+			dev_err(&dev->i2c_client->dev, "no gpi_gpio\n", __func__);
+		}
 	} else {  //For BOARD_DB5071 PIN9
 		printk("gpi db5071 board.\n");
 		if (enable == true) {
@@ -667,6 +671,14 @@ static int max96706_initialization(deser_dev_t *sensor)
 		gpi_power(sensor, 9, 0);
 		usleep_range(100, 200);
 		gpi_power(sensor, 9, 1);
+	} else {
+		dev_err(&sensor->i2c_client->dev, "%s: no gpi_gpio\n", __func__);
+		val = 0;
+		max96705_read_reg(sensor, 0, 0x0f, &val);
+		dev_info(&sensor->i2c_client->dev, "%s: val=0x%x\n", __func__, val);
+		val |= 0x81;
+		max96705_write_reg(sensor, 0, 0x0f, val);
+		usleep_range(100, 200);
 	}
 
 	//enable dbl, hven
@@ -691,16 +703,34 @@ static int max96706_initialization(deser_dev_t *sensor)
 	val16 = 0;
 	ap0101_read_reg16(sensor, 0, reg, &val16);
 	dev_err(&client->dev, "0101, reg=0x%x, val=0x%x\n", reg, val16);
-	val16 |= 0x200;
-	ap0101_write_reg16(sensor, 0, reg, val16);
-	usleep_range(10000, 10000);
+	if ((val16 & (0x1<<10)) == 0) {
+		val16 = 0x405;
+		ap0101_write_reg16(sensor, 0, reg, val16);
+		usleep_range(10000, 11000);
 
-	for (i = 0; i < 10; i++) {
-		ret = ap0101_change_config(sensor, 0);
-		if (ret == 0)
-			break;
-		msleep(100);
+		for (i = 0; i < 10; i++) {
+			ret = ap0101_change_config(sensor, 0);
+			if (ret == 0)
+				break;
+			msleep(100);
+		}
 	}
+	val16 = 0;
+	ap0101_read_reg16(sensor, 0, reg, &val16);
+	dev_err(&client->dev, "0101, reg=0x%x, val=0x%x\n", reg, val16);
+	if ((val16 & (0x1<<9)) == 0) {
+		val16 = 0x605;
+		ap0101_write_reg16(sensor, 0, reg, val16);
+		usleep_range(10000, 11000);
+
+		for (i = 0; i < 10; i++) {
+			ret = ap0101_change_config(sensor, 0);
+			if (ret == 0)
+				break;
+			msleep(100);
+		}
+	}
+
 
 	dev_err(&client->dev, "0101, end msb. i=%d\n", i);
 
@@ -728,7 +758,7 @@ deser_para_t max96706_para = {
 	.htot		= 1320,
 	.height		= 720,
 	.vtot		= 740,
-	.mbus_code	= MEDIA_BUS_FMT_UYVY8_2X8,
+	.mbus_code	= MEDIA_BUS_FMT_YUYV8_2X8,
 	.colorspace	= V4L2_COLORSPACE_SRGB,
 	.fps		= 25,
 	.quantization = V4L2_QUANTIZATION_FULL_RANGE,
