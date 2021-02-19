@@ -2256,5 +2256,72 @@
 		sdrv,postdiv = <1>;/*TODO*/
 		status = "disabled";
 	};
-        };
+
+        PWM3: PWM3 {
+		compatible = "semidrive,clkgen-composite";
+		reg =  <0 0x3801c000 0 0x1000>;
+		#clock-cells = <0>;
+		sdrv,type =<CLK_TYPE_IP>;
+		clocks=<&RC_24M>, <&RC_RTC>, <&XTAL_24M>, <&XTAL_RTC>, <&PLL5 PLL_DIVA>, <&PLL7 PLL_DIVC>, <&PLL3 PLL_DIVA>, <&PLL6 PLL_DIVD>;
+		sdrv,prediv = <1>;/*TODO*/
+		sdrv,postdiv = <1>;/*TODO*/
+		status = "disabled";
+	};
+
+	PWM4: PWM4 {
+		compatible = "semidrive,clkgen-composite";
+		reg =  <0 0x3801d000 0 0x1000>;
+		#clock-cells = <0>;
+		sdrv,type =<CLK_TYPE_IP>;
+		clocks=<&RC_24M>, <&RC_RTC>, <&XTAL_24M>, <&XTAL_RTC>, <&PLL5 PLL_DIVA>, <&PLL7 PLL_DIVC>, <&PLL3 PLL_DIVA>, <&PLL6 PLL_DIVD>;
+		sdrv,prediv = <1>;/*TODO*/
+		sdrv,postdiv = <1>;/*TODO*/
+		status = "disabled";
+	};
+
+	PWM5: PWM5 {
+		compatible = "semidrive,clkgen-composite";
+		reg =  <0 0x3801e000 0 0x1000>;
+		#clock-cells = <0>;
+		sdrv,type =<CLK_TYPE_IP>;
+		clocks=<&RC_24M>, <&RC_RTC>, <&XTAL_24M>, <&XTAL_RTC>, <&PLL5 PLL_DIVA>, <&PLL7 PLL_DIVC>, <&PLL3 PLL_DIVA>, <&PLL6 PLL_DIVD>;
+		sdrv,prediv = <1>;/*TODO*/
+		sdrv,postdiv = <1>;/*TODO*/
+		status = "disabled";
+	};
+
+	PWM6: PWM6 {
+		compatible = "semidrive,clkgen-composite";
+		reg =  <0 0x3801f000 0 0x1000>;
+		#clock-cells = <0>;
+		sdrv,type =<CLK_TYPE_IP>;
+		clocks=<&RC_24M>, <&RC_RTC>, <&XTAL_24M>, <&XTAL_RTC>, <&PLL5 PLL_DIVA>, <&PLL7 PLL_DIVC>, <&PLL3 PLL_DIVA>, <&PLL6 PLL_DIVD>;
+		sdrv,prediv = <1>;/*TODO*/
+		sdrv,postdiv = <1>;/*TODO*/
+		status = "disabled";
+	};
+
+	PWM7: PWM7 {
+		compatible = "semidrive,clkgen-composite";
+		reg =  <0 0x38020000 0 0x1000>;
+		#clock-cells = <0>;
+		sdrv,type =<CLK_TYPE_IP>;
+		clocks=<&RC_24M>, <&RC_RTC>, <&XTAL_24M>, <&XTAL_RTC>, <&PLL5 PLL_DIVA>, <&PLL7 PLL_DIVC>, <&PLL3 PLL_DIVA>, <&PLL6 PLL_DIVD>;
+		sdrv,prediv = <1>;/*TODO*/
+		sdrv,postdiv = <1>;/*TODO*/
+		status = "disabled";
+	};
+
+	PWM8: PWM8 {
+		compatible = "semidrive,clkgen-composite";
+		reg =  <0 0x38021000 0 0x1000>;
+		#clock-cells = <0>;
+		sdrv,type =<CLK_TYPE_IP>;
+		clocks=<&RC_24M>, <&RC_RTC>, <&XTAL_24M>, <&XTAL_RTC>, <&PLL5 PLL_DIVA>, <&PLL7 PLL_DIVC>, <&PLL3 PLL_DIVA>, <&PLL6 PLL_DIVD>;
+		sdrv,prediv = <1>;/*TODO*/
+		sdrv,postdiv = <1>;/*TODO*/
+		status = "disabled";
+	};
+
+  };
 };
