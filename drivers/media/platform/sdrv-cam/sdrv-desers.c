@@ -135,8 +135,8 @@ static int deser_enum_frame_size(struct v4l2_subdev *sd,
 	if (fse->pad != 0)
 		return -EINVAL;
 
-	//if (fse->index >= MAX96722_NUM_MODES)
-	//	return -EINVAL;
+	if (fse->index >= 1)
+		return -EINVAL;
 
 	fse->min_width = sensor->fmt.width;
 	fse->max_width = fse->min_width;
@@ -161,8 +161,8 @@ static int deser_enum_frame_interval(struct v4l2_subdev *sd,
 	if (fie->pad != 0)
 		return -EINVAL;
 
-	//if (fie->index >= MAX96722_NUM_FRAMERATES)
-	//	return -EINVAL;
+	if (fie->index >= 1)
+		return -EINVAL;
 
 	tpf.numerator = 1;
 	//tpf.denominator = deser_framerates[fie->index];
