@@ -10,6 +10,7 @@ dtb-$(CONFIG_ARCH_SEMIDRIVE_X9) += x9-high-ref-serdes-vm-ivi-vgpu.dtb
 dtb-$(CONFIG_ARCH_SEMIDRIVE_X9) += x9-high-ref-serdes-vm-ivi.dtb
 dtb-$(CONFIG_ARCH_SEMIDRIVE_X9) += x9h-ms-serdes-vm-ivi-3sin1.dtb
 dtb-$(CONFIG_ARCH_SEMIDRIVE_X9) += x9h-ms-serdes-vm-ivi.dtb
+dtb-$(CONFIG_ARCH_SEMIDRIVE_X9) += x9h-ms-serdes-vm-ivi-db5071.dtb
 always		:= $(dtb-y)
 subdir-y	:= $(dts-dirs)
 clean-files	:= *.dtb
