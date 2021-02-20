@@ -891,4 +891,18 @@ config XILINX_XADC
 	  The driver can also be build as a module. If so, the module will be called
 	  xilinx-xadc.
 
+config SDRV_ADC
+	tristate "SemiDrive SDRV ADC driver"
+	depends on ARCH_SEMIDRIVE
+	depends on HAS_IOMEM
+	select IIO_BUFFER
+	select IIO_TRIGGER
+	select IIO_CONFIGFS
+	select IIO_SYSFS_TRIGGER
+	help
+	  Say yes here to build support for SDRV ADC.
+
+	  This driver can also be built as a module. If so, the module will be
+	  called sdrv-adc.
+
 endmenu
