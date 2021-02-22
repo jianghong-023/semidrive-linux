@@ -698,7 +698,6 @@ out:
 }
 
 static struct rpmsg_device_id rpmsg_proto_id_table[] = {
-	{ .name	= "ipcc-echo" },
 	{ .name	= "safety,vcan" },
 	{ .name = "safety,vi2c" },
 	{ },
