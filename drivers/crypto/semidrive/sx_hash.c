@@ -5,12 +5,12 @@
 */
 #include <linux/kernel.h>
 
-#include <ce_reg.h>
-#include <ce.h>
-#include <sx_hash.h>
-#include <sram_conf.h>
-#include <sx_errors.h>
-#include <sx_dma.h>
+#include "ce_reg.h"
+#include "ce.h"
+#include "sx_hash.h"
+#include "sram_conf.h"
+#include "sx_errors.h"
+#include "sx_dma.h"
 
 #define LOCAL_TRACE 1 //close local trace 1->0
 

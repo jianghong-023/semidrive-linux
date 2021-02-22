@@ -7,7 +7,7 @@
 #ifndef SX_ECC_KEYGEN
 #define SX_ECC_KEYGEN
 
-#include <sx_ecc.h>
+#include "sx_ecc.h"
 /** @brief ECC structure for ECC curve definition */
 
 uint32_t ecc_curve_bytesize(const sx_ecc_curve_t* curve);

@@ -7,8 +7,8 @@
 #ifndef SX_TRNG_H
 #define SX_TRNG_H
 
-#include <ce_reg.h>
-#include <ce.h>
+#include "ce_reg.h"
+#include "ce.h"
 
 typedef enum trng_test {
     TRNG_REP_TEST,      /**< Repetition count test. */

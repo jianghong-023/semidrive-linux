@@ -12,8 +12,8 @@
 
 #include <stdint.h>
 
-#include <sx_hash.h>
-#include <sx_trng.h>
+#include "sx_hash.h"
+#include "sx_trng.h"
 
 /**
 * Generate pub key (by the host/server)

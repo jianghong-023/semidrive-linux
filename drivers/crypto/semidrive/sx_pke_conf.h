@@ -8,9 +8,9 @@
 #define SX_PKE_CONF_H
 
 #if PK_CM_ENABLED
-#include <sx_trng.h>
+#include "sx_trng.h"
 #endif
-#include <ce.h>
+#include "ce.h"
 
 #define AUTO_OUTPUT_BY_CE 0
 

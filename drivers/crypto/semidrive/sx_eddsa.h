@@ -9,7 +9,7 @@
 
 #include <stdint.h>
 
-#include <sx_trng.h>
+#include "sx_trng.h"
 
 /** Curve to be used by the EdDSA algorithms */
 typedef enum eddsa_curve {

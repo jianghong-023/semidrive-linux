@@ -15,9 +15,10 @@
 #include <linux/fs.h>
 #include <linux/miscdevice.h>
 #include <linux/uaccess.h>
-#include <ce.h>
-#include <sx_sm2.h>
 #include <linux/interrupt.h>
+
+#include "ce.h"
+#include "sx_sm2.h"
 
 #define TRNG_CE2_VCE2_NUM 1
 
@@ -85,7 +86,7 @@ uint8_t __attribute__((aligned(CACHE_LINE))) verify_key_buff[128] = {0};
 
 static long crypto_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 {
-	int ret;
+	long ret;
 	struct crypto_sm2_msg sm2_msg;
 	int err;
     int time_stamp;
@@ -95,7 +96,7 @@ static long crypto_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 	block_t key;
 	block_t signature;
 
-	//of_set_sys_cnt_ce(4);
+	ret = -ENOTTY;
 
 	crypto = to_crypto_dev(filp->private_data);
 
@@ -110,15 +111,14 @@ static long crypto_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 						return err;
 					}
 					of_set_sys_cnt_ce(time_stamp);
-					return;
+					return ret;
 				}
 
 				if(cmd == SEMIDRIVE_CRYPTO_SM2_GET_TIME_STAMP){
 					ret = of_get_sys_cnt_ce();
 					copy_to_user((char __user *)arg, &ret, sizeof(int));
-					return;
+					return ret;
 				}
-				//of_set_sys_cnt_ce(5);
 				err = copy_from_user((char *)&sm2_msg, (char __user *)arg, sizeof(struct crypto_sm2_msg));
 				if (err < 0) {
 					//pr_info("%s: copy_from_user (%p) failed (%d)\n", __func__, (char __user *)arg, err);
@@ -141,7 +141,6 @@ static long crypto_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 					}
 				}
 				//curve =	get_curve_value_by_nid(sm2_msg.curve_nid);
-				//of_set_sys_cnt_ce(6);
 				switch (cmd) {
 				case SEMIDRIVE_CRYPTO_SM2_VERIFY_NO_DIGEST:
 
@@ -209,9 +208,7 @@ static long crypto_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 					ret = -EINVAL;
 				}
 				//pr_info("crypto_ioctl out ret=%d", ret);
-				//of_set_sys_cnt_ce(7);
 				copy_to_user((char __user *)(sm2_msg.ret), &ret, sizeof(int));
-				//of_set_sys_cnt_ce(8);
 				return ret;
 			}
 				break;

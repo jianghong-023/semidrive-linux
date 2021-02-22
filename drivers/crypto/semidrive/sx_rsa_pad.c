@@ -4,11 +4,11 @@
 *
 */
 
-#include <sx_hash.h>
-#include <sx_rsa_pad.h>
-#include <sx_errors.h>
-#include <sx_pke_conf.h>
-#include <sx_trng.h>
+#include "sx_hash.h"
+#include "sx_rsa_pad.h"
+#include "sx_errors.h"
+#include "sx_pke_conf.h"
+#include "sx_trng.h"
 
 static const __attribute__((aligned(0x4))) uint8_t zeros[32] = {0};
 
