@@ -4,6 +4,7 @@
 config SEMIDRIVE_BUDGET_COOLING
 	tristate "semidrive budget cooling"
 	depends on ARCH_SEMIDRIVE
+	depends on CPU_FREQ
 	help
 	Adds semidrive cpu budget cooling devices, and these cooling devices can be
 	bound to thermal zone trip points. When a trip point reached, the
@@ -12,6 +13,7 @@ config SEMIDRIVE_BUDGET_COOLING
 config SEMIDRIVE_COOLING_DEVICES
 	tristate "semidrive cooling about CPU"
 	depends on ARCH_SEMIDRIVE
+	depends on CPU_FREQ
 	help
 	Adds CPU ap cooling device.
 
