@@ -6,11 +6,11 @@
 
 #include <linux/kernel.h>
 
-#include <sx_pke_conf.h>
-#include <ce_reg.h>
-#include <sx_errors.h>
-#include <sx_dma.h>
-#include <sx_pke_funcs.h>
+#include "sx_pke_conf.h"
+#include "ce_reg.h"
+#include "sx_errors.h"
+#include "sx_dma.h"
+#include "sx_pke_funcs.h"
 
 uint32_t prime_verify(void * device,
                       block_t* ref_prime,

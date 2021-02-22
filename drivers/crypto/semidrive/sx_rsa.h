@@ -8,7 +8,7 @@
 #define SX_RSA_H
 
 #include <stdint.h>
-#include <sx_hash.h>
+#include "sx_hash.h"
 
 /**
 * @brief Enumeration of possible padding types

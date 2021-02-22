@@ -3,9 +3,9 @@
 * All rights reserved.
 *
 */
-#include <sram_conf.h>
-#include <ce_reg.h>
-#include <ce.h>
+#include "sram_conf.h"
+#include "ce_reg.h"
+#include "ce.h"
 
 void sram_config(void)
 {

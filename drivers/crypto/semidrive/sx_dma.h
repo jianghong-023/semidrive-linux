@@ -7,7 +7,7 @@
 #ifndef SX_DMA_H
 #define SX_DMA_H
 
-#include <ce.h>
+#include "ce.h"
 
 /**
  * @brief Configure fetch and push operations in direct mode on internal DMA

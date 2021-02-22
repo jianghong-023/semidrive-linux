@@ -4,13 +4,13 @@
 *
 */
 #include <linux/kernel.h>
-#include <sx_pke_conf.h>
-#include <sx_hash.h>
-#include <sx_errors.h>
-#include <sx_dma.h>
-#include <sx_sm2.h>
-#include <sx_trng.h>
-#include <sram_conf.h>
+#include "sx_pke_conf.h"
+#include "sx_hash.h"
+#include "sx_errors.h"
+#include "sx_dma.h"
+#include "sx_sm2.h"
+#include "sx_trng.h"
+#include "sram_conf.h"
 
 #define SM2_MAX_ID_LENGTH 16
 #define SM2_ID_DIGEST_MSG_LEN_MAX 210 // id_(16) + id_len(2) + a/b(64) + x/y(64) + pubkey(64)

@@ -7,9 +7,9 @@
 #ifndef SX_SM2_H
 #define SX_SM2_H
 
-#include <sx_ecc_keygen.h>
-#include <sx_hash.h>
-#include <ce_reg.h>
+#include "sx_ecc_keygen.h"
+#include "sx_hash.h"
+#include "ce_reg.h"
 /**
  * @brief Verify an SM2 signature from a \p formatted_digest
  *

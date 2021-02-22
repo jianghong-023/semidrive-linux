@@ -9,13 +9,11 @@
 #include <kernel/thread.h>
 //#include <platform/interrupts.h>
 
-#include <ce_reg.h>
-#include <ce.h>
-#include <sx_cipher.h>
-#include <sram_conf.h>
-#include <sx_errors.h>
-
-#include <trace.h>
+#include "ce_reg.h"
+#include "ce.h"
+#include "sx_cipher.h"
+#include "sram_conf.h"
+#include "sx_errors.h"
 
 #define LOCAL_TRACE 0 //close local trace 1->0
 
