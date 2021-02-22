@@ -8,9 +8,9 @@
 #define SX_ECDSA_H
 
 #include <stdint.h>
-#include <sx_ecc_keygen.h>
-#include <sx_hash.h>
-#include <sx_trng.h>
+#include "sx_ecc_keygen.h"
+#include "sx_hash.h"
+#include "sx_trng.h"
 
 /**
  * @brief Validates curve parameters when given by the host \p curve

@@ -6,10 +6,10 @@
 
 #include <linux/kernel.h>
 #include <linux/delay.h>
-#include <sx_errors.h>
-#include <ce_reg.h>
-#include <sx_dma.h>
-#include <sx_pke_conf.h>
+#include "sx_errors.h"
+#include "ce_reg.h"
+#include "sx_dma.h"
+#include "sx_pke_conf.h"
 
 #define WAIT_PK_WITH_REGISTER_POLLING 1
 #define LOCAL_TRACE 0 //close local trace 1->0

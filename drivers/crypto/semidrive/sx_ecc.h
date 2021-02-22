@@ -7,7 +7,7 @@
 #ifndef SX_ECC
 #define SX_ECC
 
-#include <sx_pke_conf.h>
+#include "sx_pke_conf.h"
 
 typedef struct sx_ecc_curve_t {
     /**< points to predefined curve params

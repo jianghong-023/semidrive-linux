@@ -3,7 +3,7 @@
 * All rights reserved.
 *
 */
-#include <sx_ecc.h>
+#include "sx_ecc.h"
 
 #define SN_X9_62_prime192v1             "prime192v1"
 #define NID_X9_62_prime192v1            409

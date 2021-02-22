@@ -7,13 +7,13 @@
 #include <string.h>
 #include <stdbool.h>
 
-#include <sx_pke_conf.h>
-#include <sx_hash.h>
-#include <sx_trng.h>
-#include <sx_errors.h>
-#include <sx_sm2.h>
-#include <sx_dma.h>
-#include <sx_eddsa.h>
+#include "sx_pke_conf.h"
+#include "sx_hash.h"
+#include "sx_trng.h"
+#include "sx_errors.h"
+#include "sx_sm2.h"
+#include "sx_dma.h"
+#include "sx_eddsa.h"
 
 #define DOM4_ED448_STR "SigEd448"
 

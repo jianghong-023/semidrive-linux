@@ -8,7 +8,7 @@
 #define SX_DSA_H
 
 #include <stdint.h>
-#include <sx_hash.h>
+#include "sx_hash.h"
 
 uint32_t dsa_generate_private_key(uint32_t vce_id,
                                   block_t n,

@@ -3,11 +3,12 @@
 * All rights reserved.
 *
 */
-#include <sram_conf.h>
-#include <ce.h>
-#include <ce_reg.h>
 #include <linux/dma-mapping.h>
 #include <asm/cacheflush.h>
+#include "sram_conf.h"
+#include "ce.h"
+#include "ce_reg.h"
+
 
 #define CE_MEM_NODE_ITEM_NUM_MAX 6
 

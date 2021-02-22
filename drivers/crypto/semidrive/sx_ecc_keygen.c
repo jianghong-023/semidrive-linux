@@ -3,10 +3,10 @@
 * All rights reserved.
 *
 */
-#include <sx_ecc_keygen.h>
-//#include <sx_primitives.h>
-#include <sx_dma.h>
-#include <sx_errors.h>
+#include "sx_ecc_keygen.h"
+//#include "sx_primitives.h"
+#include "sx_dma.h"
+#include "sx_errors.h"
 
 void math_array_incr(uint8_t* a,
                      const size_t length,

@@ -9,7 +9,7 @@
 
 #include <stdint.h>
 #include <stddef.h>
-#include <sx_hash.h>
+#include "sx_hash.h"
 //#include "sx_rng.h"
 
 /**
