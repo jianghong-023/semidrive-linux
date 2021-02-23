@@ -188,6 +188,7 @@ static void backend_disconnect(struct xenipc_backend *be)
 
 		if (chan->back_ring.sring) {
 			xenbus_unmap_ring_vfree(be->dev, chan->back_ring.sring);
+			chan->back_ring.sring = NULL;
 		}
 	}
 }
@@ -201,7 +202,7 @@ static void xenipc_front_changed(struct xenbus_device *dev,
 	struct xenipc_backend *be = dev_get_drvdata(&dev->dev);
 	int err;
 
-	dev_info(&dev->dev, "out %s %p front(%s) back(%s)\n",
+	dev_info(&dev->dev, "in %s %p front(%s) back(%s)\n",
 		 __func__,
 		 dev,
 		xenbus_strstate(frontend_state),
@@ -224,8 +225,6 @@ static void xenipc_front_changed(struct xenbus_device *dev,
 		 */
 		if (dev->state == XenbusStateConnected)
 			break;
-
-		//backend_disconnect(be);
 
 		err = backend_connect(be);
 		if (err) {
@@ -278,7 +277,6 @@ static struct xenipc_be_channel *xenipc_alloc_channel(domid_t domid)
 {
 	struct xenipc_be_channel *bechan;
 
-	//bechan = kmem_cache_zalloc(xenipc_cachep, GFP_KERNEL);
 	bechan = kzalloc(sizeof(struct xenipc_be_channel), GFP_KERNEL);
 	if (!bechan)
 		return ERR_PTR(-ENOMEM);
@@ -334,15 +332,16 @@ static int xenipc_back_remove(struct xenbus_device *dev)
 	struct xenipc_backend *be = dev_get_drvdata(&dev->dev);
 
 	xenbus_switch_state(dev, XenbusStateClosed);
-	if (be)
+	if (be) {
 		backend_disconnect(be);
 
-	if (be->bechan)
-		xenipc_free_channel(be->bechan);
+		if (be->bechan)
+			xenipc_free_channel(be->bechan);
 
-	kfree(be);
-	dev_set_drvdata(&dev->dev, NULL);
-
+		be->bechan = NULL;
+		dev_set_drvdata(&dev->dev, NULL);
+		kfree(be);
+	}
 	return 0;
 }
 
