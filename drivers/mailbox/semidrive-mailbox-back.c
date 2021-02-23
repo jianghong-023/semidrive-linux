@@ -407,7 +407,7 @@ int mbox_back_request_channel(struct mbox_backend *be, const struct mbox_request
 			mchan->used = true;
 			mchan->osid = req->osid;
 			mchan->mba  = req->mba;
-			dev_err(&xbdev->dev, "request chan os=%d a=%x", mchan->osid, mchan->mba);
+			dev_info(&xbdev->dev, "request chan os=%d a=%x", mchan->osid, mchan->mba);
 			return 0;
 		}
 	}
@@ -798,8 +798,6 @@ static int mbox_back_remove(struct xenbus_device *xbdev)
 		mbox_free_channel(be->channel);
 
 	be->inited = false;
-
-	kfree(be);
 	dev_set_drvdata(&xbdev->dev, NULL);
 
 	return 0;
