@@ -26,7 +26,7 @@
      	__CONST_RING_SIZE(xenipc, XEN_PAGE_SIZE * XENBUS_MAX_RING_GRANTS)
 #define IPC_RING_SIZE	\
         __CONST_RING_SIZE(xenipc, XEN_PAGE_SIZE)
-#define IPC_WAIT_RSP_TIMEOUT	MAX_SCHEDULE_TIMEOUT
+#define IPC_WAIT_RSP_TIMEOUT	(20000)
 
 struct xenipc_channel {
 	spinlock_t ring_lock;
@@ -49,17 +49,6 @@ typedef struct xenipc_frontend {
 struct xenipc_frontend gXenIpcInfo={0};
 /* Only one front/back connection supported. */
 static struct xenbus_device *xipc_fe_dev;
-static atomic_t ipc_refcount;
-
-/* first increment refcount, then proceed */
-#define xipc_enter() {               \
-	atomic_inc(&ipc_refcount);      \
-}
-
-/* first complete other operations, then decrement refcount */
-#define xipc_exit() {                \
-	atomic_dec(&ipc_refcount);      \
-}
 
 static int xenipc_rpc_call(struct xenipc_frontend *fe, struct xenipc_request *pReq)
 {
@@ -89,6 +78,71 @@ static int xenipc_rpc_call(struct xenipc_frontend *fe, struct xenipc_request *pR
 	return 0;
 }
 
+static void enqueue_request_list(xenipc_fe_handle_t handle, struct xenipc_call_info *call)
+{
+	struct xenipc_call_info *current_call;
+	unsigned long flags;
+
+	spin_lock_irqsave(&handle->calls_lock, flags);
+	current_call = handle->call_head;
+	if (!current_call) {
+		handle->call_head = call;
+	} else {
+		while (current_call->next){
+			current_call = current_call->next;
+		}
+		current_call->next = call;
+	}
+	spin_unlock_irqrestore(&handle->calls_lock, flags);
+}
+
+static void dequeue_request_list(xenipc_fe_handle_t handle, struct xenipc_call_info *call)
+{
+	struct xenipc_call_info *current_call;
+	unsigned long flags;
+
+	spin_lock_irqsave(&handle->calls_lock, flags);
+	current_call = handle->call_head;
+	if (current_call == NULL) {
+		// do nothing
+	} else if (current_call == call) {
+		handle->call_head = current_call->next;
+	} else {
+		do{
+			if (current_call->next == call) {
+				current_call->next = current_call->next->next;
+				break;
+
+			}
+			current_call = current_call->next;
+		} while (current_call != NULL);
+	}
+
+	spin_unlock_irqrestore(&handle->calls_lock, flags);
+}
+
+static void complete_request(xenipc_fe_handle_t handle, struct xenipc_respond *result)
+{
+	struct xenipc_call_info *current_call;
+	unsigned long flags;
+
+	spin_lock_irqsave(&handle->calls_lock, flags);
+	current_call = handle->call_head;
+	if (current_call == NULL) {
+		// do nothing
+	} else {
+		do {
+			if (current_call->req->id == result->id) {
+				memcpy(current_call->rsp, result, sizeof(struct xenipc_respond));
+				complete(&current_call->call_completed);
+				break;
+			}
+			current_call = current_call->next;
+		} while(current_call);
+	}
+	spin_unlock_irqrestore(&handle->calls_lock, flags);
+}
+
 static irqreturn_t xenipc_interrupt(int irq, void *dev_id)
 {
 	struct xenipc_respond *result;
@@ -96,7 +150,6 @@ static irqreturn_t xenipc_interrupt(int irq, void *dev_id)
 	struct xenbus_device *xbdev = (struct xenbus_device *)dev_id;
 	struct xenipc_frontend *fe = dev_get_drvdata(&xbdev->dev);
 	struct xenipc_channel *chan = fe->channel;
-	struct xenipc_call_info *current_call = NULL;
 	unsigned long flags;
 
 	spin_lock_irqsave(&chan->ring_lock, flags);
@@ -108,21 +161,7 @@ again:
 
 		result = RING_GET_RESPONSE(&chan->front_ring, i);
 
-		//spin_lock(&info->calls_lock);
-		current_call = fe->call_head;
-		do {
-			if (!current_call)
-				break;
-			if (current_call->req->id == result->id)
-				break;
-			current_call = current_call->next;
-		} while(current_call);
-
-		if (current_call && (current_call->req->id == result->id)) {
-			memcpy(current_call->rsp, result, sizeof(struct xenipc_respond));
-			complete(&current_call->call_completed);
-		}
-		//spin_unlock(&info->calls_lock);
+		complete_request(fe, result);
 	}
 
 	chan->front_ring.rsp_cons = i;
@@ -144,8 +183,6 @@ int xenipc_do_request(int dev, struct xenipc_request *pReq, struct xenipc_respon
 {
 	int ret = 0;
 	struct xenipc_call_info *call;
-	struct xenipc_call_info *current_call;
-	unsigned long flags;
 	xenipc_fe_handle_t hRpc = &gXenIpcInfo;
 
 	VMM_DEBUG_PRINT("%s:%d, enter!", __FUNCTION__, __LINE__);
@@ -161,53 +198,42 @@ int xenipc_do_request(int dev, struct xenipc_request *pReq, struct xenipc_respon
 		return -ENOMEM;
 	}
 
-	spin_lock_irqsave(&hRpc->calls_lock, flags);
 	init_completion(&call->call_completed);
-	current_call = hRpc->call_head;
-	if (!current_call) {
-		hRpc->call_head = call;
-	} else {
-		while (current_call->next){
-			current_call = current_call->next;
-		}
-		current_call->next = call;
-	}
 	call->req = pReq;
 	call->rsp = rsp;
+
+	enqueue_request_list(hRpc, call);
 	VMM_DEBUG_PRINT("xenipc calling(cmd=%d)", pReq->cmd);
 
 	ret = xenipc_rpc_call(hRpc, pReq);
-	if (ret) {
-		spin_unlock_irqrestore(&hRpc->calls_lock, flags);
+	if (ret < 0) {
 		pr_err("xenipc failled to call\n");
-		return ret;
+		goto out;
 	}
 	VMM_DEBUG_PRINT("xenipc cmd %d is called, pReq->id = %lld!", pReq->cmd, pReq->id);
-	spin_unlock_irqrestore(&hRpc->calls_lock, flags);
 
+#if IPC_WAIT_RSP_TIMEOUT
 	/* wait for the backend to connect */
-	if (wait_for_completion_interruptible(&call->call_completed) < 0)
-		return -ETIMEDOUT;
-
+	ret = wait_for_completion_timeout(&call->call_completed,
+					msecs_to_jiffies(IPC_WAIT_RSP_TIMEOUT));
+	if (ret > 0)
+		ret = 0;
+	else if (ret == 0) {
+		pr_err("xenipc wait complete timeout\n");
+		ret = -ETIME;
+	}
+#else
+	ret = wait_for_completion_interruptible(&call->call_completed);
+	if (ret < 0) {
+		pr_err("xenipc wait complete interrupted\n");
+		goto out;
+	}
+#endif
 	VMM_DEBUG_PRINT("xenipc cmd %d respond!", pReq->cmd);
 
-	spin_lock_irqsave(&hRpc->calls_lock, flags);
-	current_call = hRpc->call_head;
-	if ( current_call == NULL ) {
-		// do nothing
-	} else if ( current_call == call ){
-		hRpc->call_head = current_call->next;
-	} else {
-		do{
-			if (current_call->next == call) break;
-			current_call = current_call->next;
-		} while (current_call != NULL);
+out:
+	dequeue_request_list(hRpc, call);
 
-		if (current_call->next == call)
-			current_call->next = current_call->next->next;
-	}
-
-	spin_unlock_irqrestore(&hRpc->calls_lock, flags);
 	kfree(call);
 
 	return ret;
@@ -219,17 +245,31 @@ int xenipc_rpc_trace(int dev, struct rpc_req_msg *req, struct rpc_ret_msg *resul
 	int ret;
 	struct xenipc_request xreq;
 	struct xenipc_respond xrsp;
+	ktime_t start, delta = 0;
+	s64 msecs;
 
 	xreq.cmd = req->cmd;
 	xreq.cksum = XENIPC_SANITY_TAG;	//TODO: add real checksum
 	memcpy(xreq.param, req->param, sizeof(req->param));
 
+	start = ktime_get();
 	ret = xenipc_do_request(dev, &xreq, &xrsp);
 
 	if (result) {
 		result->ack = xrsp.ack;
 		result->retcode = xrsp.retcode;
 		memcpy(result->result, xrsp.result, sizeof(xrsp.result));
+	}
+
+	delta = ktime_sub(ktime_get(), start);
+	msecs = ktime_to_ms(delta);
+
+	if (ret < 0) {
+		VMM_ERROR_PRINT("xenipc call=%d fail=%d\n", req->cmd, ret);
+	}
+
+	if (msecs > 1000) {
+		VMM_ERROR_PRINT("xenipc call=%d excessive time=%lld\n", req->cmd, msecs);
 	}
 
 	return ret;

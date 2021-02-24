@@ -14,7 +14,7 @@
  */
 #define VMM_DEBUG 0
 
-#if defined(VMM_DEBUG)
+#if (VMM_DEBUG == 1)
     #define VMM_DEBUG_PRINT(fmt, ...) \
         pr_err(fmt, __VA_ARGS__)
 #else
