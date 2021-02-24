@@ -26,6 +26,22 @@
 			status = "disabled";
 		};
 
+		g2d: g2d@30c90000 {
+			compatible = "semidrive,g2d";
+			reg = <0x00 0x30c90000 0x00 0x10000>;
+			interrupts = <0 147 4>;
+			status = "disabled";
+			sdrv,ip = "g2d-r0p1";
+		};
+
+		g2d_lite: g2d_lite@30ca0000 {
+			compatible = "semidrive,g2d";
+			reg = <0x00 0x30ca0000 0x00 0x10000>;
+			interrupts = <0 148 4>;
+			status = "disabled";
+			sdrv,ip = "g2dlite-r0p0";
+		};
+
 		dp1: dp1@30440000 {
 			compatible = "sdrv,dp";
 			reg = <DP1_BASE DPU_RANGE>;
