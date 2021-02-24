@@ -45,6 +45,9 @@
 
 #define SDRV_SID_PCIE1        0xa0
 
+#define SDRV_SID_G2D1         0x05
+#define SDRV_SID_G2D2         0x06
+
 /* vm dtb */
 #define GUEST_PHANDLE_GIC (65000)
 
