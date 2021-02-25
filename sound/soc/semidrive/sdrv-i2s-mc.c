@@ -1234,7 +1234,7 @@ err_disable:
 static int snd_afe_i2s_mc_remove(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
-	struct sdrv_afe_i2s_mc *afe = platform_get_drvdata(dev);
+	struct sdrv_afe_i2s_mc *afe = platform_get_drvdata(pdev);
 	dev_info(dev, "Removed.\n");
 	regmap_exit(afe->regmap);
 	snd_soc_unregister_platform(&pdev->dev);
