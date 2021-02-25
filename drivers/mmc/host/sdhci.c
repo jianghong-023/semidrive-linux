@@ -1096,6 +1096,10 @@ static void sdhci_prepare_data(struct sdhci_host *host, struct mmc_command *cmd)
 				}
 			}
 		}
+
+		if ((host->quirks2 & SDHCI_QUIRK2_SLOW_USE_PIO) &&
+			host->clock < 25000000)
+			host->flags &= ~SDHCI_REQ_USE_DMA;
 	}
 
 	if (host->flags & SDHCI_REQ_USE_DMA) {

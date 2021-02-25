@@ -482,6 +482,8 @@ struct sdhci_host {
  * block count.
  */
 #define SDHCI_QUIRK2_USE_32BIT_BLK_CNT			(1<<18)
+/* When bus slow, force use pio */
+#define SDHCI_QUIRK2_SLOW_USE_PIO			(1<<30)
 
 	int irq;		/* Device IRQ */
 	void __iomem *ioaddr;	/* Mapped address */
