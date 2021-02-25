@@ -383,13 +383,17 @@ static void afe_i2s_sc_stop_capture(struct sdrv_afe_i2s_sc *afe)
 static void afe_i2s_sc_start_playback(struct sdrv_afe_i2s_sc *afe)
 {
 	u32 ret, val;
+
+	/*FIFO reset*/
 	regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_I2S_CTRL,
-			   BIT_CTRL_I2S_EN,
-			   (0 << I2S_CTRL_I2S_EN_FIELD_OFFSET));
+			   BIT_CTRL_FIFO_RST,
+			   (0 << I2S_CTRL_FIFO_RST_FIELD_OFFSET));
 
-	regcache_sync(afe->regmap);
+	/* Disable interrupt */
+	regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_I2S_CTRL,
+			   BIT_CTRL_INTREQ_MASK,
+			   (0 << I2S_CTRL_INTREQ_MASK_FIELD_OFFSET));
 
-	/* Then enable interrupt */
 	/*Set interrupt request i2s fdx */
 	regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_I2S_CTRL_FDX,
 			   BIT_CTRL_FDX_RI2S_MASK,
@@ -415,22 +419,16 @@ static void afe_i2s_sc_start_playback(struct sdrv_afe_i2s_sc *afe)
 			   BIT_CTRL_FDX_RFIFO_AFULL_MASK,
 			   (0 << I2S_CTRL_FDX_RFIFO_AFULL_MASK_FIELD_OFFSET));
 
-	/*At the last Enable i2s interrupt main switch*/
-	regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_I2S_CTRL,
-			   BIT_CTRL_INTREQ_MASK,
-			   (1 << I2S_CTRL_INTREQ_MASK_FIELD_OFFSET));
 
-
-	/*Firstly,Enable i2s*/
+	/*Firstly,disable i2s*/
 	regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_I2S_CTRL,
 			   BIT_CTRL_I2S_EN,
-			   (1 << I2S_CTRL_I2S_EN_FIELD_OFFSET));
+			   (0 << I2S_CTRL_I2S_EN_FIELD_OFFSET));
 
 	/*Clear I2S UNDERR status*/
 	regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_I2S_STAT,
 			   BIT_STAT_TDATA_UNDERR,
 			   (0 << I2S_STAT_TDATA_UNDERR_FIELD_OFFSET));
-
 
 	if (afe->tdm_initialized == true) {
 		regmap_update_bits(
@@ -440,7 +438,16 @@ static void afe_i2s_sc_start_playback(struct sdrv_afe_i2s_sc *afe)
 	}
 
 	regcache_sync(afe->regmap);
+	/*At the last Enable i2s interrupt main switch*/
+	regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_I2S_CTRL,
+			   BIT_CTRL_INTREQ_MASK,
+			   (1 << I2S_CTRL_INTREQ_MASK_FIELD_OFFSET));
 
+	regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_I2S_CTRL,
+			   BIT_CTRL_I2S_EN,
+			   (1 << I2S_CTRL_I2S_EN_FIELD_OFFSET));
+
+	regcache_sync(afe->regmap);
 	ret = regmap_read(afe->regmap, REG_CDN_I2SSC_REGS_I2S_CTRL, &val);
 	dev_dbg(afe->dev, "DUMP %d REG_CDN_I2SSC_REGS_I2S_CTRL(0x%x)\n",
 		__LINE__, val);
@@ -1324,11 +1331,11 @@ static int snd_afe_set_dai_tdm_slot(struct snd_soc_dai *dai,
 
 	regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_TDM_FD_DIR,
 				   BIT_TDM_FD_DIR_CH_TX_EN,
-				   (tx_mask << TDM_FD_DIR_CH0_TXEN_FIELD_OFFSET));
+				   (0 << TDM_FD_DIR_CH0_TXEN_FIELD_OFFSET));
 
 	regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_TDM_FD_DIR,
 				   BIT_TDM_FD_DIR_CH_RX_EN,
-				   (rx_mask << TDM_FD_DIR_CH0_RXEN_FIELD_OFFSET));
+				   (0 << TDM_FD_DIR_CH0_RXEN_FIELD_OFFSET));
 
 	if (slots <= 4){
 		DEBUG_FUNC_PRT
