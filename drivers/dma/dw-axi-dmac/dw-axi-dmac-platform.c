@@ -1790,8 +1790,15 @@ static bool dw_dma_filter_fn(struct dma_chan *dchan, void *param)
 {
 	struct axi_dma_chan *chan = dchan_to_axi_dma_chan(dchan);
 	struct dw_dma_filter_data *data = param;
-	/*Set dma chan slave id */
+	struct dw_axi_dma *dw = chan->chip->dw;
 
+	if (NULL != dw->dma.dev->of_node) {
+		if (dw->dma.dev->of_node != data->of_node)
+		{
+			return false;
+		}
+	}
+	/*Set dma chan slave id */
 	chan->fix_slave_id = true;
 	chan->dma_sconfig.slave_id = data->slave_id;
 	printk(KERN_DEBUG "DW AXI DMAC"
@@ -1824,8 +1831,8 @@ struct dma_chan *dw_dma_of_xlate(struct of_phandle_args *dma_spec,
 	data.of_node = ofdma->of_node;
 	data.slave_id = dma_spec->args[0];
 	printk(KERN_DEBUG "DW AXI DMAC"
-			  "DMA channel translation args %d \n",
-	       dma_spec->args[0]);
+			  "DMA(%s) channel translation args %d  \n",
+	       data.of_node->full_name, dma_spec->args[0]);
 	return dma_request_channel(info->dma_cap, info->filter_fn, &data);
 }
 
