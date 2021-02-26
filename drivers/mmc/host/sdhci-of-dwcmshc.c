@@ -438,7 +438,7 @@ static const struct sdhci_ops sdhci_dwcmshc_ops = {
 
 static const struct sdhci_pltfm_data sdhci_dwcmshc_pdata = {
 	.ops = &sdhci_dwcmshc_ops,
-	.quirks2 = SDHCI_QUIRK2_PRESET_VALUE_BROKEN,
+	.quirks2 = SDHCI_QUIRK2_PRESET_VALUE_BROKEN | SDHCI_QUIRK2_SLOW_USE_PIO,
 };
 
 static int dwcmshc_probe(struct platform_device *pdev)
@@ -461,6 +461,7 @@ static int dwcmshc_probe(struct platform_device *pdev)
 	if (IS_ERR(pltfm_host->clk)) {
 		err = PTR_ERR(pltfm_host->clk);
 		dev_err(&pdev->dev, "failed to get core clk: %d\n", err);
+		goto free_pltfm;
 	} else {
 		err = clk_prepare_enable(pltfm_host->clk);
 		if (err)
@@ -490,7 +491,8 @@ static int dwcmshc_probe(struct platform_device *pdev)
 
 err_clk:
 	clk_disable_unprepare(pltfm_host->clk);
-	clk_disable_unprepare(priv->bus_clk);
+	if (!IS_ERR(priv->bus_clk))
+		clk_disable_unprepare(priv->bus_clk);
 free_pltfm:
 	sdhci_pltfm_free(pdev);
 	return err;
