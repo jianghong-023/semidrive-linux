@@ -266,23 +266,28 @@ config ARCH_ZYNQMP
 	  This enables support for Xilinx ZynqMP Family
 
 config ARCH_SEMIDRIVE
-	bool "Semidrive SOC Family"
-	select SDRV_TIMER
-	help
-	  This enables support for Semidrive SOC  Family
+	def_bool n
+
+config ARCH_SEMIDRIVE_PROCESSOR9
+        bool "Semidrive Processor9 SOC Family"
+	select ARCH_SEMIDRIVE
+        select SDRV_TIMER
+        help
+          This enables support for Semidrive SOC  Family
+choice
+	prompt "Semidrive Processor9"
+	depends on ARCH_SEMIDRIVE_PROCESSOR9
 config ARCH_SEMIDRIVE_X9
         bool "Semidrive X9 SOC Family"
-        depends on ARCH_SEMIDRIVE
         help
           This enables support for Semidrive x9 SOC  Family
 config ARCH_SEMIDRIVE_G9
         bool "Semidrive G9 SOC Family"
-        depends on ARCH_SEMIDRIVE
         help
           This enables support for Semidrive g9 SOC  Family
 config ARCH_SEMIDRIVE_V9
         bool "Semidrive V9 SOC Family"
-        depends on ARCH_SEMIDRIVE
         help
           This enables support for Semidrive v9 SOC  Family
+endchoice
 endmenu
