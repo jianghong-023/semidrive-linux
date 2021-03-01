@@ -86,14 +86,16 @@ static int deser_s_power(struct v4l2_subdev *sd, int on)
 {
 	deser_dev_t *sensor = to_deser_dev(sd);
 	struct v4l2_subdev *interface_sd = deser_get_interface_subdev(sd);
-	struct sdrv_csi_mipi_csi2 *kcmc = v4l2_get_subdevdata(interface_sd);
+	struct sdrv_csi_mipi_csi2 *kcmc = NULL;
 	deser_para_t *pdeser = sensor->priv;
 
 	//printk("%s on = %d +\n", __FUNCTION__, on);
 
-	kcmc->lanerate = pdeser->mipi_bps/8;
-	kcmc->lane_count = 4;
-
+	if(pdeser->mipi_bps){
+		kcmc = v4l2_get_subdevdata(interface_sd);
+		kcmc->lanerate = pdeser->mipi_bps/8;
+		kcmc->lane_count = 4;
+	}
 #ifndef PROBE_INIT
 	if (on == 1) {
 		if (pdeser->power_deser) {
