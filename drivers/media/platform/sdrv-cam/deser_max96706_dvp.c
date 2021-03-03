@@ -46,7 +46,8 @@ enum MAX96705_READ_WRITE {
 };
 
 enum SUBBOARD_TYPE{
-	BOARD_SD507  = 0x10,
+	BOARD_SD507_A02P  = 0x00,
+	BOARD_SD507_A02  = 0x10,
 	BOARD_DB5071 = 0x20,
 };
 
@@ -463,8 +464,8 @@ static int gpi_power(deser_dev_t *dev, int gpio, bool enable)
 		reg = 0x6;
 	}
 
-	if (board_type == BOARD_SD507) {
-		printk("gpi sd507 board.\n");
+	if (board_type == BOARD_SD507_A02 || board_type == BOARD_SD507_A02P) {
+		printk("gpi sd507 a02/a02+ board.\n");
 		if (dev->gpi_gpio) {
 			dev_err(&dev->i2c_client->dev, "has gpi_gpio\n", __func__);
 			gpiod_direction_output(dev->gpi_gpio, enable ? 1 : 0);
