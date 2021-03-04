@@ -74,7 +74,7 @@ void clear_local_hwid(void)
 static bool init_hwid_from_system(struct sd_hwid_usr *id)
 {
 	struct sd_hwid_usr *usr;
-	int count = 10000;
+	int i = 0, count = 10000;
 	u32 v;
 	struct device_node *np;
 	struct regmap *regmap;
@@ -86,11 +86,14 @@ static bool init_hwid_from_system(struct sd_hwid_usr *id)
 	}
 	regmap = dev_get_regmap((struct device *)np->data, NULL);
 	if (!regmap) {
-		pr_err("no hwid reg mapped\n");
+		pr_err("no reg mapped\n");
 		goto dummy;
 	}
 	do {
-		regmap_read(regmap, SDRV_REG_HWID, &v);
+		if (regmap_read(regmap, SDRV_REG_HWID, &v) != 0) {
+			pr_err("no hwid reg configured in dts\n");
+			break;
+		}
 		usr = (struct sd_hwid_usr *)&v;
 		if (usr->magic == HW_ID_MAGIC)
 			break;
