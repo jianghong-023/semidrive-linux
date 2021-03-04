@@ -42,6 +42,25 @@
 
 #define MAX20086_SLAVE_ID 0x28
 
+//#define V9TS_CSI
+
+#define DES_REG15_CSIOUT_DISABLE 0x03
+#define DES_REG1_FS_DISABLE 0xc3
+#define DES_REG1_FS_EN 0x40
+#define DES_REG1C_HIM_ENABLE 0xf4
+#define DES_REGA_ALLLINK_EN 0xff
+#define DES_REG12_YUV8_DBL 0xf3
+#define DES_REGC_HVEN 0x91
+#define DES_REG69_AUTO_MASK 0x30
+#define DES_REG_PERIOD 0x80
+#define DES_REG0_INPUTLINK_EN 0xef
+#define DES_REG
+
+#define SER_REG4_CFGLINK_EN 0x43
+#define SER_REG4_VIDEOLINK_EN 0x83
+#define SER_REG7_DBL_HV_EN	0x84
+#define SER_REG67_DBLALIGN 0xe7
+
 enum max9286_mode_id {
 	MAX9286_MODE_720P_1280_720 = 0,
 	MAX9286_NUM_MODES,
@@ -344,7 +363,6 @@ static int max20086_read_reg(struct max9286_dev *sensor, u8 reg, u8 * val)
 	return 0;
 }
 
-
 static struct v4l2_subdev *max9286_get_interface_subdev(struct v4l2_subdev *sd)
 {
 	struct media_pad *source_pad, *remote_pad;
@@ -607,7 +625,7 @@ static int max9286_init_controls(struct max9286_dev *sensor)
 	sensor->sd.ctrl_handler = hdl;
 	return 0;
 
- free_ctrls:
+free_ctrls:
 	v4l2_ctrl_handler_free(hdl);
 	return ret;
 }
@@ -615,7 +633,25 @@ static int max9286_init_controls(struct max9286_dev *sensor)
 static void max9286_power(struct max9286_dev *sensor, bool enable)
 {
 	gpiod_direction_output(sensor->pwdn_gpio, enable ? 1 : 0);
-	msleep(1);
+}
+
+static void max20086_power(struct max9286_dev *sensor, bool enable)
+{
+	u8 reg, val;
+
+	reg = 0x1;
+	if (enable) {
+		val = 0x1f;
+		max20086_write_reg(sensor, reg, val);
+	} else {
+		val = 0x10;
+		max20086_write_reg(sensor, reg, val);
+	}
+
+	val = 0;
+	max20086_read_reg(sensor, reg, &val);
+	dev_err(&sensor->i2c_client->dev, "20086: reg=%d, val=0x%x\n", reg,
+		val);
 }
 
 static int max9286_check_chip_id(struct max9286_dev *sensor)
@@ -650,115 +686,135 @@ static int max9286_initialization(struct max9286_dev *sensor)
 {
 	struct i2c_client *client = sensor->i2c_client;
 	int ret = 0;
-	u8 val;
+	u8 reg, val;
 	u8 link_status = 0, link_count = 0;
-	int i = 0;
+	int i = 0, j;
 
 	//csienable=0
-	max9286_write_reg(sensor, 0x15, 0x13);
-	msleep(10);
+	ret = max9286_write_reg(sensor, 0x15, DES_REG15_CSIOUT_DISABLE);
+	if (ret) {
+		dev_err(&client->dev, "max9286 write fail!\n");
+		return 0;
+	}
+	usleep_range(5000, 6000);
 
+	//disable fs
+	max9286_write_reg(sensor, 0x1, DES_REG1_FS_DISABLE);
+
+#ifndef V9TS_CSI
+	dev_err(&client->dev, "set him\n");
 	//him enable
-	max9286_write_reg(sensor, 0x1c, 0xf4);
-	msleep(10);
+	max9286_write_reg(sensor, 0x1c, DES_REG1C_HIM_ENABLE);
+	usleep_range(5000, 6000);
 
-	//yuv10 to yuv8
-	//enable dbl
-	max9286_write_reg(sensor, 0x12, 0xf3);
-	msleep(10);
+	max20086_power(sensor, true);
+	msleep(100);
+#endif
 
-	max9286_write_reg(sensor, 0x0c, 0x91);
-	msleep(10);
-
-	//fs, manual pclk
-	max9286_write_reg(sensor, 0x06, 0x00);
-	max9286_write_reg(sensor, 0x07, 0xf2);
-	max9286_write_reg(sensor, 0x08, 0x2b);
-	msleep(10);
-
-#if 0
-	max9286_read_reg(sensor, 0x49, &val);
-	link_status = val & 0xf;
-	dev_err(&client->dev, "link_status=0x%x\n", link_status);
-#else
-
-	for (i = 0; i < 100; i++) {
+	for (i = 0; i < 20; i++) {
 		val = 0;
 		max9286_read_reg(sensor, 0x49, &val);
 
 		if ((val & 0x0f) == 0x0f)
 			break;
-		else
-			msleep(10);
+		msleep(20);
+	}
+	dev_err(&client->dev, "0x49=0x%x, i=%d\n", val, i);
+	if (val == 0) {
+		dev_err(&client->dev, "max96705 detect fail!\n");
+		return 0;
+	}
+	//config link
+	max96705_write_reg(sensor, 0, 0x04, SER_REG4_CFGLINK_EN);
+	usleep_range(5000, 6000);
+
+	//dbl, hven
+	max96705_write_reg(sensor, 0, 0x07, SER_REG7_DBL_HV_EN);
+	usleep_range(5000, 6000);
+
+	//dbl align
+	max96705_write_reg(sensor, 0, 0x67, SER_REG67_DBLALIGN);
+
+	for (j = 0; j < 20; j++) {
+		reg = 0x49;
+		val = 0;
+		max9286_read_reg(sensor, reg, &val);
+
+		if ((val & 0xf0) == 0xf0)
+			break;
+		msleep(20);
+	}
+	dev_err(&client->dev, "reg=0x%x, val=0x%x, j=%d\n", reg, val, j);
+
+	for (i = 0; i < MAX_SENSOR_NUM; i++) {
+
+		//max9286_write_reg(sensor, 0x0A, 0x11<<i);
+		max9286_write_reg(sensor, 0x0A, 0x01 << i);
+		usleep_range(5000, 6000);
+
+		link_count++;
+
+		for (j = 0; j < 20; j++) {
+			reg = 0x49;
+			val = 0;
+			max9286_read_reg(sensor, reg, &val);
+
+			if ((val & 0x10 << i))
+				break;
+			msleep(20);
+		}
+		dev_err(&client->dev,
+			"reg=0x%x, val=0x%x, [0x%x], i=%d, j=%d\n", reg, val,
+			(MAX96705_SLAVE_ID + MAX96705_DEV_INDEX +
+			 sensor->sec_9286_shift + i), i, j);
+
+		max96705_write_reg(sensor, 0, 0x00,
+				   (MAX96705_SLAVE_ID + MAX96705_DEV_INDEX +
+				    sensor->sec_9286_shift + i) << 1);
+		usleep_range(5000, 6000);
 	}
 
-	link_status = val & 0xf;
-	dev_err(&client->dev, "link_status=0x%x, i=%d\n", link_status, i);
-#endif
-	max9286_write_reg(sensor, 0x0, (0xe0 | link_status));
-	msleep(10);
+	//Enable all Link control channel
+	max9286_write_reg(sensor, 0x0A, DES_REGA_ALLLINK_EN);
+	usleep_range(10000, 11000);
 
-	//internal fs, debug for output
-	max9286_write_reg(sensor, 0x1, 0x40);
-	msleep(10);
+	reg = 0x49;
+	val = 0;
+	max9286_read_reg(sensor, 0x49, &val);
+	dev_err(&client->dev, "all reg=0x%x, val=0x%x\n", reg, val);
+
+	//yuv10 to yuv8
+	//enable dbl
+	max9286_write_reg(sensor, 0x12, DES_REG12_YUV8_DBL);
+
+	//polarity
+	max9286_write_reg(sensor, 0x0c, DES_REGC_HVEN);
 
 	//63, 64 for csi data output
 	max9286_write_reg(sensor, 0x63, 0x0);
-	msleep(10);
 	max9286_write_reg(sensor, 0x64, 0x0);
-	msleep(10);
 
 	//auto mask
-	max9286_write_reg(sensor, 0x69, 0x30);
-	msleep(10);
+	max9286_write_reg(sensor, 0x69, DES_REG69_AUTO_MASK);
 
-	max9286_write_reg(sensor, 0x19, 0x80);
-	msleep(10);
+	//period
+	max9286_write_reg(sensor, 0x19, DES_REG_PERIOD);
+	usleep_range(5000, 6000);
 
 	val = 0;
 
 	for (i = 0; i < MAX_SENSOR_NUM; i++) {
-
-		if (((1 << i) & link_status) == 0)
-			continue;
-
-		link_count++;
-		//Enable Link control channel
-		val |= (0x11 << i);
-		//sensor->i2c_client->addr = sensor->addr_9286;
-		max9286_write_reg(sensor, 0x0A, val);
-		msleep(10);
-
-		dev_err(&client->dev, "reg=0x%x, aid=0x%x\n", val,
-			(sensor->addr_96705 + MAX96705_DEV_INDEX +
-			 sensor->sec_9286_shift + i));
-		//Set MAX9271 new address for link 0
-		//sensor->i2c_client->addr = sensor->addr_96705;
-
-		max96705_write_reg(sensor, 0, 0x00,
-				   (sensor->addr_96705 + MAX96705_DEV_INDEX +
-				    sensor->sec_9286_shift + i) << 1);
-		msleep(10);
-
-		//enable dbl, hven
-		max96705_write_reg(sensor,
-				   MAX96705_DEV_INDEX + sensor->sec_9286_shift +
-				   i, 0x7, 0x84);
-		msleep(10);
-
 		//vs delay
 		max96705_write_reg(sensor,
 				   MAX96705_DEV_INDEX + sensor->sec_9286_shift +
 				   i, 0x43, 0x25);
-		msleep(10);
 		max96705_write_reg(sensor,
 				   MAX96705_DEV_INDEX + sensor->sec_9286_shift +
 				   i, 0x45, 0x01);
-		msleep(10);
 		max96705_write_reg(sensor,
 				   MAX96705_DEV_INDEX + sensor->sec_9286_shift +
 				   i, 0x47, 0x26);
-		msleep(10);
+		usleep_range(5000, 6000);
 
 		//max96705_write_reg(sensor, i, 0x4d, 0xcc);
 
@@ -786,7 +842,7 @@ static int max9286_initialization(struct max9286_dev *sensor)
 		max96705_write_reg(sensor,
 				   MAX96705_DEV_INDEX + sensor->sec_9286_shift +
 				   i, 0x27, 0x00);
-		msleep(10);
+		//msleep(10);
 
 		max96705_write_reg(sensor,
 				   MAX96705_DEV_INDEX + sensor->sec_9286_shift +
@@ -812,18 +868,44 @@ static int max9286_initialization(struct max9286_dev *sensor)
 		max96705_write_reg(sensor,
 				   MAX96705_DEV_INDEX + sensor->sec_9286_shift +
 				   i, 0x37, 0x10);
-		msleep(10);
+		usleep_range(5000, 6000);
 
 		max96705_write_reg(sensor,
 				   MAX96705_DEV_INDEX + sensor->sec_9286_shift +
 				   i, 0x9,
-				   (sensor->addr_0101 + AP0101_DEV_INDEX +
+				   (AP0101_SLAVE_ID + AP0101_DEV_INDEX +
 				    sensor->sec_9286_shift + i) << 1);
 		max96705_write_reg(sensor,
 				   MAX96705_DEV_INDEX + sensor->sec_9286_shift +
-				   i, 0xa, sensor->addr_0101 << 1);
-		msleep(10);
+				   i, 0xa, AP0101_SLAVE_ID << 1);
+		usleep_range(5000, 6000);
 	}
+
+	max9286_write_reg(sensor, 0x0, DES_REG0_INPUTLINK_EN);
+	usleep_range(5000, 6000);
+
+	//fs, manual pclk
+	max9286_write_reg(sensor, 0x06, 0x00);
+	max9286_write_reg(sensor, 0x07, 0xf2);
+	max9286_write_reg(sensor, 0x08, 0x2b);
+	usleep_range(10000, 11000);
+
+	for (i = 0; i < MAX_SENSOR_NUM; i++) {
+		//enable channel
+		max96705_write_reg(sensor,
+				   MAX96705_DEV_INDEX + sensor->sec_9286_shift +
+				   i, 0x04, 0x83);
+		usleep_range(5000, 6000);
+	}
+
+	reg = 0x49;
+	val = 0;
+	max9286_read_reg(sensor, 0x49, &val);
+	dev_err(&client->dev, "end reg=0x%x, val=0x%x\n", reg, val);
+
+	//internal fs, debug for output
+	max9286_write_reg(sensor, 0x1, DES_REG1_FS_EN);
+	usleep_range(10000, 11000);
 
 	sensor->link_count = link_count;
 	return 0;
@@ -850,6 +932,7 @@ static int max9286_probe(struct i2c_client *client,
 	sensor->i2c_client = client;
 	sensor->addr_9286 = client->addr;
 
+	mutex_init(&sensor->lock);
 	/*
 	 * default init sequence initialize sensor to
 	 * YUV422 UYVY VGA@30fps
@@ -875,18 +958,27 @@ static int max9286_probe(struct i2c_client *client,
 
 	sensor->ae_target = 52;
 
-	ret = fwnode_property_read_u16(dev_fwnode(&client->dev), "addr_20086", &sensor->addr_20086);
-	dev_info(&client->dev, "addr_20086: 0x%x, ret=%d\n", sensor->addr_20086, ret);
+	ret =
+	    fwnode_property_read_u16(dev_fwnode(&client->dev), "addr_20086",
+				     &sensor->addr_20086);
+	dev_info(&client->dev, "addr_20086: 0x%x, ret=%d\n", sensor->addr_20086,
+		 ret);
 	if (ret < 0) {
 		sensor->addr_20086 = MAX20086_SLAVE_ID;
 	}
-	ret = fwnode_property_read_u16(dev_fwnode(&client->dev), "addr_96705", &sensor->addr_96705);
-	dev_info(&client->dev, "addr_96705: 0x%x, ret=%d\n", sensor->addr_96705, ret);
+	ret =
+	    fwnode_property_read_u16(dev_fwnode(&client->dev), "addr_96705",
+				     &sensor->addr_96705);
+	dev_info(&client->dev, "addr_96705: 0x%x, ret=%d\n", sensor->addr_96705,
+		 ret);
 	if (ret < 0) {
 		sensor->addr_96705 = MAX96705_SLAVE_ID;
 	}
-	ret = fwnode_property_read_u16(dev_fwnode(&client->dev), "addr_0101", &sensor->addr_0101);
-	dev_info(&client->dev, "addr_0101: 0x%x, ret=%d\n", sensor->addr_0101, ret);
+	ret =
+	    fwnode_property_read_u16(dev_fwnode(&client->dev), "addr_0101",
+				     &sensor->addr_0101);
+	dev_info(&client->dev, "addr_0101: 0x%x, ret=%d\n", sensor->addr_0101,
+		 ret);
 	if (ret < 0) {
 		sensor->addr_0101 = AP0101_SLAVE_ID;
 	}
@@ -1001,14 +1093,18 @@ static int max9286_probe(struct i2c_client *client,
 		sensor->sec_9286_shift = 0;
 	}
 
-	#if 1
-	u8 reg,val;
-	for(reg=0;reg<10;reg++){
-		max20086_read_reg(sensor, reg, &val);
-		dev_info(&client->dev, "20086: reg=%d, val=0x%x\n", reg, val);
-	}
-	#endif
-	max9286_power(sensor, 1);
+	max9286_power(sensor, false);
+#ifndef V9TS_CSI
+	max20086_power(sensor, false);
+#endif
+	usleep_range(10000, 11000);
+
+	max9286_power(sensor, true);
+	usleep_range(10000, 11000);
+#ifdef V9TS_CSI
+	msleep(100);		//for poc
+#endif
+
 	max9286_check_chip_id(sensor);
 
 	max9286_initialization(sensor);
@@ -1020,9 +1116,9 @@ static int max9286_probe(struct i2c_client *client,
 
 	return 0;
 
- free_ctrls:
+free_ctrls:
 //  v4l2_ctrl_handler_free(&sensor->ctrls.handler);
- entity_cleanup:
+entity_cleanup:
 	mutex_destroy(&sensor->lock);
 	media_entity_cleanup(&sensor->sd.entity);
 	return ret;
