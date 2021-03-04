@@ -497,10 +497,6 @@ static struct v4l2_subdev *max96706_get_interface_subdev(struct v4l2_subdev *sd)
 
 static int max96706_s_power(struct v4l2_subdev *sd, int on)
 {
-	struct max96706_dev *sensor = to_max96706_dev(sd);
-
-	if (sensor->device_exist == -1)
-		return -1;
 
 	return 0;
 }
@@ -1066,7 +1062,8 @@ static int max96706_probe(struct i2c_client *client,
 			dev_err(&client->dev, "Failed to get %s GPIO: %d\n",
 				"pwdn", ret);
 
-		return ret;
+		//return ret;
+		gpiod = NULL;
 	}
 
 	sensor->pwdn_gpio = gpiod;
@@ -1094,7 +1091,8 @@ static int max96706_probe(struct i2c_client *client,
 			dev_err(&client->dev, "Failed to get %s GPIO: %d\n",
 				"pwdn", ret);
 
-		return ret;
+		//return ret;
+		gpiod = NULL;
 	}
 
 	sensor->poc_gpio = gpiod;
@@ -1103,9 +1101,10 @@ static int max96706_probe(struct i2c_client *client,
 
 	dev_err(dev, "%s(): call max96706_power()-100-500\n", __func__);
 	max96706_power(sensor, 1);
-	max96706_check_chip_id(sensor);
+	ret = max96706_check_chip_id(sensor);
 
-	max96706_initialization(sensor);
+	if (ret == 0)
+		max96706_initialization(sensor);
 
 	ret = v4l2_async_register_subdev(&sensor->sd);
 

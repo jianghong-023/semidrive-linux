@@ -1069,7 +1069,8 @@ static int max9286_probe(struct i2c_client *client,
 			dev_err(&client->dev, "Failed to get %s GPIO: %d\n",
 				"pwdn", ret);
 
-		return ret;
+		//return ret;
+		gpiod = NULL;
 	}
 
 	sensor->pwdn_gpio = gpiod;
@@ -1115,9 +1116,10 @@ static int max9286_probe(struct i2c_client *client,
 	usleep_range(10000, 11000);
 
 
-	max9286_check_chip_id(sensor);
+	ret = max9286_check_chip_id(sensor);
 
-	max9286_initialization(sensor);
+	if (ret == 0)
+		max9286_initialization(sensor);
 
 	ret = v4l2_async_register_subdev(&sensor->sd);
 
