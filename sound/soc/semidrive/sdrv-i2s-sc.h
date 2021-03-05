@@ -46,7 +46,7 @@ enum { CDN_CHN_WIDTH_8BITS = 0,
 
 const static uint8_t ChnWidthTable[] = {8, 12, 16, 18, 20, 24, 28, 32};
 #define I2S_SC_SAMPLE_RATE_CALC(fclk, fsample, chn_num, chn_width)             \
-	(fclk / (fsample * chn_num * chn_width))
+	DIV_ROUND_CLOSEST(fclk , (fsample * chn_num * chn_width))
 
 /* Register offsets from SDRV_I2S*_BASE */
 #define I2S_SC_FIFO_OFFSET 0x040

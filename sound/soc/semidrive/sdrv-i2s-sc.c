@@ -992,15 +992,13 @@ int snd_afe_dai_hw_params(struct snd_pcm_substream *substream,
 		    afe->regmap, REG_CDN_I2SSC_REGS_I2S_SRATE,
 		    I2S_SC_SAMPLE_RATE_CALC(clk_get_rate(afe->clk_i2s), srate,
 					    max(channels, 2),
-					    ChnWidthTable[AFE_I2S_CHN_WIDTH]) -
-			1);
+					    ChnWidthTable[AFE_I2S_CHN_WIDTH]));
 	}
 	else{
 		regmap_write(afe->regmap, REG_CDN_I2SSC_REGS_I2S_SRATE,
 			     I2S_SC_SAMPLE_RATE_CALC(clk_get_rate(afe->clk_i2s), srate,
 						     afe->slots,
-						     ChnWidthTable[AFE_I2S_CHN_WIDTH]) -
-				 1);
+						     ChnWidthTable[AFE_I2S_CHN_WIDTH]));
 	}
 
 	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
@@ -1647,6 +1645,9 @@ static int snd_afe_i2s_sc_probe(struct platform_device *pdev)
 	afe->clk_i2s = devm_clk_get(&pdev->dev, "i2s-clk");
 	if (IS_ERR(afe->clk_i2s))
 		return PTR_ERR(afe->clk_i2s);
+	ret = clk_set_rate(afe->clk_i2s, 294911997);
+	if (ret)
+		return ret;
 	DEBUG_ITEM_PRT(clk_get_rate(afe->clk_i2s));
 
 	afe->mclk = devm_clk_get(&pdev->dev, "i2s-mclk");
@@ -1655,6 +1656,7 @@ static int snd_afe_i2s_sc_probe(struct platform_device *pdev)
 	DEBUG_ITEM_PRT(clk_get_rate(afe->mclk));
 
 	/* TODO: need clean next debug code later. */
+
 	ret = clk_set_rate(afe->mclk, 12288000);
 	if (ret)
 		return ret;
