@@ -159,13 +159,13 @@ dw_mipi_csi_read(struct sdrv_csi_mipi_csi2 *kcmc, unsigned long address)
 static bool check_version(struct sdrv_csi_mipi_csi2 *kcmc)
 {
 	u32 version;
+
 	version = dw_mipi_csi_read(kcmc, R_CSI2_VERSION);
 
 	if (version != 0x3133302A) {
-		printk("mipi_csi2 version error.\n");
+		pr_err_ratelimited("mipi_csi2 version error.\n");
 		return false;
-	}
-	else
+	} else
 		return true;
 }
 
@@ -180,13 +180,12 @@ static void mipi_csi2_enable(struct sdrv_csi_mipi_csi2 *kcmc,
 
 		//resetn high, not reset
 		dw_mipi_csi_write(kcmc, R_CSI2_CTRL_RESETN, 1);
-		msleep(1);
-	}
-	else {
+		usleep_range(1000, 2000);
+	} else {
 		dw_mipi_csi_write(kcmc, R_CSI2_DPHY_SHUTDOWNZ, 0);
 		dw_mipi_csi_write(kcmc, R_CSI2_DPHY_RSTZ, 0);
 		dw_mipi_csi_write(kcmc, R_CSI2_CTRL_RESETN, 0);
-		msleep(1);
+		usleep_range(1000, 2000);
 	}
 }
 
@@ -194,22 +193,22 @@ static void mipi_csi2_enable(struct sdrv_csi_mipi_csi2 *kcmc,
 static void set_lane_number(struct sdrv_csi_mipi_csi2 *kcmc, int cnt)
 {
 	switch (cnt) {
-		case 1:
-			dw_mipi_csi_write(kcmc, R_CSI2_N_LANES, 0);
-			break;
+	case 1:
+		dw_mipi_csi_write(kcmc, R_CSI2_N_LANES, 0);
+		break;
 
-		case 2:
-			dw_mipi_csi_write(kcmc, R_CSI2_N_LANES, 1);
-			break;
+	case 2:
+		dw_mipi_csi_write(kcmc, R_CSI2_N_LANES, 1);
+		break;
 
-		case 3:
-			dw_mipi_csi_write(kcmc, R_CSI2_N_LANES, 2);
-			break;
+	case 3:
+		dw_mipi_csi_write(kcmc, R_CSI2_N_LANES, 2);
+		break;
 
-		case 4:
-		default:
-			dw_mipi_csi_write(kcmc, R_CSI2_N_LANES, 3);
-			break;
+	case 4:
+	default:
+		dw_mipi_csi_write(kcmc, R_CSI2_N_LANES, 3);
+		break;
 	}
 }
 
@@ -217,48 +216,48 @@ static void set_ipi_mode(struct sdrv_csi_mipi_csi2 *kcmc, int index,
 						 int val)
 {
 	switch (index) {
-		case 1:
-			dw_mipi_csi_write(kcmc, R_CSI2_IPI_MODE, val);
-			break;
+	case 1:
+		dw_mipi_csi_write(kcmc, R_CSI2_IPI_MODE, val);
+		break;
 
-		case 2:
-			dw_mipi_csi_write(kcmc, R_CSI2_IPI2_MODE, val);
-			break;
+	case 2:
+		dw_mipi_csi_write(kcmc, R_CSI2_IPI2_MODE, val);
+		break;
 
-		case 3:
-			dw_mipi_csi_write(kcmc, R_CSI2_IPI3_MODE, val);
-			break;
+	case 3:
+		dw_mipi_csi_write(kcmc, R_CSI2_IPI3_MODE, val);
+		break;
 
-		case 4:
-			dw_mipi_csi_write(kcmc, R_CSI2_IPI4_MODE, val);
-			break;
+	case 4:
+		dw_mipi_csi_write(kcmc, R_CSI2_IPI4_MODE, val);
+		break;
 
-		default:
-			break;
+	default:
+		break;
 	}
 }
 
 static void set_ipi_vcid(struct sdrv_csi_mipi_csi2 *kcmc, int index)
 {
 	switch (index) {
-		case 1:
-			dw_mipi_csi_write(kcmc, R_CSI2_IPI_VCID, 0);
-			break;
+	case 1:
+		dw_mipi_csi_write(kcmc, R_CSI2_IPI_VCID, 0);
+		break;
 
-		case 2:
-			dw_mipi_csi_write(kcmc, R_CSI2_IPI2_VCID, 1);
-			break;
+	case 2:
+		dw_mipi_csi_write(kcmc, R_CSI2_IPI2_VCID, 1);
+		break;
 
-		case 3:
-			dw_mipi_csi_write(kcmc, R_CSI2_IPI3_VCID, 2);
-			break;
+	case 3:
+		dw_mipi_csi_write(kcmc, R_CSI2_IPI3_VCID, 2);
+		break;
 
-		case 4:
-			dw_mipi_csi_write(kcmc, R_CSI2_IPI4_VCID, 3);
-			break;
+	case 4:
+		dw_mipi_csi_write(kcmc, R_CSI2_IPI4_VCID, 3);
+		break;
 
-		default:
-			break;
+	default:
+		break;
 	}
 }
 
@@ -266,23 +265,23 @@ static void set_ipi_data_type(struct sdrv_csi_mipi_csi2 *kcmc, int index,
 							  uint8_t type)
 {
 	switch (index) {
-		case 1:
-			dw_mipi_csi_write(kcmc, R_CSI2_IPI_DATA_TYPE, type);
-			break;
+	case 1:
+		dw_mipi_csi_write(kcmc, R_CSI2_IPI_DATA_TYPE, type);
+		break;
 
-		case 2:
-			dw_mipi_csi_write(kcmc, R_CSI2_IPI2_DATA_TYPE, type);
-			break;
+	case 2:
+		dw_mipi_csi_write(kcmc, R_CSI2_IPI2_DATA_TYPE, type);
+		break;
 
-		case 3:
-			dw_mipi_csi_write(kcmc, R_CSI2_IPI3_DATA_TYPE, type);
-			break;
+	case 3:
+		dw_mipi_csi_write(kcmc, R_CSI2_IPI3_DATA_TYPE, type);
+		break;
 
-		case 4:
-			dw_mipi_csi_write(kcmc, R_CSI2_IPI4_DATA_TYPE, type);
+	case 4:
+		dw_mipi_csi_write(kcmc, R_CSI2_IPI4_DATA_TYPE, type);
 
-		default:
-			break;
+	default:
+		break;
 	}
 }
 
@@ -290,23 +289,23 @@ static void set_ipi_hsa(struct sdrv_csi_mipi_csi2 *kcmc, int index,
 						uint32_t val)
 {
 	switch (index) {
-		case 1:
-			dw_mipi_csi_write(kcmc, R_CSI2_IPI_HSA_TIME, val);
-			break;
+	case 1:
+		dw_mipi_csi_write(kcmc, R_CSI2_IPI_HSA_TIME, val);
+		break;
 
-		case 2:
-			dw_mipi_csi_write(kcmc, R_CSI2_IPI2_HSA_TIME, val);
-			break;
+	case 2:
+		dw_mipi_csi_write(kcmc, R_CSI2_IPI2_HSA_TIME, val);
+		break;
 
-		case 3:
-			dw_mipi_csi_write(kcmc, R_CSI2_IPI3_HSA_TIME, val);
-			break;
+	case 3:
+		dw_mipi_csi_write(kcmc, R_CSI2_IPI3_HSA_TIME, val);
+		break;
 
-		case 4:
-			dw_mipi_csi_write(kcmc, R_CSI2_IPI4_HSA_TIME, val);
+	case 4:
+		dw_mipi_csi_write(kcmc, R_CSI2_IPI4_HSA_TIME, val);
 
-		default:
-			break;
+	default:
+		break;
 	}
 }
 
@@ -382,11 +381,13 @@ static void set_ipi_adv_features(struct sdrv_csi_mipi_csi2 *kcmc,
 }
 
 
-static void mipi_csi2_initialization(struct sdrv_csi_mipi_csi2 *kcmc)
+static int mipi_csi2_initialization(struct sdrv_csi_mipi_csi2 *kcmc)
 {
 	int i;
-	check_version(kcmc);
-	set_lane_number(kcmc, 4);
+
+	if (!check_version(kcmc))
+		return -ENODEV;
+	set_lane_number(kcmc, kcmc->hw.num_lanes);
 
 	for (i = 1; i <= SDRV_MIPI_CSI2_IPI_NUM; i++) {
 		set_ipi_mode(kcmc, i, kcmc->hw.ipi_mode);
@@ -402,6 +403,7 @@ static void mipi_csi2_initialization(struct sdrv_csi_mipi_csi2 *kcmc)
 	}
 	mipi_csi2_set_phy_freq(kcmc, kcmc->lanerate / 1000 / 1000,
 								   kcmc->lane_count);
+	return 0;
 }
 
 static int mipi_csi2_s_power(struct v4l2_subdev *sd, int on)
@@ -419,10 +421,10 @@ static int mipi_csi2_s_power(struct v4l2_subdev *sd, int on)
 	if (!kcmc)
 		return -EINVAL;
 
-	if(kcmc->active_stream_num == 0) {
+	if (kcmc->active_stream_num == 0)
 		ret = v4l2_subdev_call(sensor_sd, core, s_power, on);
-	}
- 	return ret;
+
+	return ret;
 }
 
 static int mipi_csi2_set_phy_freq(struct sdrv_csi_mipi_csi2 *kcmc,
@@ -435,11 +437,11 @@ static int mipi_csi2_set_phy_freq(struct sdrv_csi_mipi_csi2 *kcmc,
 	phyrate = freq * lanes * 2;
 	//phyrate = freq;
 
-	printk("%s(): phyrate %dMHz, lanerate=%dMHz\n", __func__, phyrate, freq);
+	pr_info_ratelimited("%s(): phyrate %dMHz, lanerate=%dMHz\n", __func__, phyrate, freq);
 
 	if ((phyrate < g_phy_freqs[0].range_l)
 			|| (phyrate > g_phy_freqs[62].range_h)) {
-		printk("err phy freq\n");
+		pr_err_ratelimited("err phy freq\n");
 		return -1;
 	}
 
@@ -458,15 +460,12 @@ static int mipi_csi2_set_phy_freq(struct sdrv_csi_mipi_csi2 *kcmc,
 	}
 
 
-	if (kcmc->id == 0) {
+	if (kcmc->id == 0)
 		iowrite32(g_phy_freqs[i].index, kcmc->dispmux_address + 0x60);
-	}
-	else if (kcmc->id == 1) {
+	else if (kcmc->id == 1)
 		iowrite32(g_phy_freqs[i].index, kcmc->dispmux_address + 0x68);
-	}
-	else {
-		printk("wrong host id\n");
-	}
+	else
+		pr_err_ratelimited("wrong host id\n");
 
 	devm_iounmap(&kcmc->pdev->dev, kcmc->dispmux_address);
 	devm_release_mem_region(&kcmc->pdev->dev, kcmc->dispmux_res->start,
@@ -501,7 +500,7 @@ static int mipi_csi2_s_frame_interval(struct v4l2_subdev *sd,
 static int mipi_csi2_s_stream(struct v4l2_subdev *sd, int enable)
 {
 	struct sdrv_csi_mipi_csi2 *kcmc;
-
+	int ret = 0;
 	struct v4l2_subdev *sensor_sd = mipi_csi2_get_sensor_subdev(sd);
 
 	if (!sensor_sd)
@@ -516,7 +515,11 @@ static int mipi_csi2_s_stream(struct v4l2_subdev *sd, int enable)
 	if (enable == 1) {
 		if (kcmc->active_stream_num == 0) {
 			kcmc->active_stream_num++;
-			mipi_csi2_initialization(kcmc);
+			ret = mipi_csi2_initialization(kcmc);
+			if (ret < 0) {
+				mutex_unlock(&kcmc->lock);
+				return -ENODEV;
+			}
 			mipi_csi2_enable(kcmc, enable);
 			usleep_range(10000, 11000);
 			v4l2_subdev_call(sensor_sd, video, s_stream, enable);
@@ -720,6 +723,8 @@ dw_mipi_csi_parse_dt(struct platform_device *pdev,
 		dev_info(&pdev->dev, "Couldn't read data-lanes\n");
 		//return ret;
 	}
+	if (kcmc->hw.num_lanes == 0)
+		kcmc->hw.num_lanes = 4;
 
 	ret = of_property_read_u32(node, "output-type", &kcmc->hw.output_type);
 
@@ -728,7 +733,7 @@ dw_mipi_csi_parse_dt(struct platform_device *pdev,
 		//return ret;
 	}
 
-	printk("kcmc->hw.output_type=0x%x\n", kcmc->hw.output_type);
+	dev_info(&pdev->dev, "kcmc->hw.output_type=0x%x\n", kcmc->hw.output_type);
 
 	ret = of_property_read_u32(node, "ipi-mode", &kcmc->hw.ipi_mode);
 
@@ -741,8 +746,8 @@ dw_mipi_csi_parse_dt(struct platform_device *pdev,
 
 	kcmc->hw.adv_feature = IPI_ADV_SYNC_LEGACCY | IPI_ADV_USE_VIDEO |
 						   IPI_ADV_SEL_LINE_EVENT;
-	printk("kcmc->hw.ipi_mode=0x%x\n", kcmc->hw.ipi_mode);
-	printk("kcmc->hw.adv_feature=0x%x\n", kcmc->hw.adv_feature);
+	dev_info(&pdev->dev, "kcmc->hw.ipi_mode=0x%x\n", kcmc->hw.ipi_mode);
+	dev_info(&pdev->dev, "kcmc->hw.adv_feature=0x%x\n", kcmc->hw.adv_feature);
 
 	ret =
 		of_property_read_u32(node, "ipi-auto-flush",
@@ -777,7 +782,7 @@ dw_mipi_csi_parse_dt(struct platform_device *pdev,
 		//return ret;
 	}
 
-	printk("kcmc->lanerate=%d\n", kcmc->lanerate);
+	dev_info(&pdev->dev, "kcmc->lanerate=%d\n", kcmc->lanerate);
 
 	ret = of_property_read_u32(node, "hsa", &kcmc->hw.hsa);
 
@@ -847,6 +852,7 @@ static int sdrv_mipi_csi2_probe(struct platform_device *pdev)
 	struct v4l2_subdev *sd;
 	int ret;
 	struct resource *res = NULL;
+
 	dev_info(dev, "%s\n", __func__);
 
 	kcmc = devm_kzalloc(dev, sizeof(*kcmc), GFP_KERNEL);
