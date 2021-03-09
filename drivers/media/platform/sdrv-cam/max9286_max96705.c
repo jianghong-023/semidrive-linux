@@ -42,7 +42,6 @@
 
 #define MAX20086_SLAVE_ID 0x28
 
-//#define V9TS_CSI
 
 #define DES_REG15_CSIOUT_DISABLE 0x03
 #define DES_REG1_FS_DISABLE 0xc3
@@ -137,6 +136,7 @@ struct max9286_dev {
 	unsigned short addr_96705;
 	unsigned short addr_0101;
 	unsigned short addr_20086;
+	struct i2c_adapter *adap;
 	struct v4l2_subdev sd;
 #if 1
 	struct media_pad pads[MIPI_CSI2_SENS_VCX_PADS_NUM];
@@ -175,7 +175,7 @@ struct max9286_dev {
 };
 
 static const struct max9286_mode_info
- max9286_mode_data[MAX9286_NUM_FRAMERATES][MAX9286_NUM_MODES] = {
+	max9286_mode_data[MAX9286_NUM_FRAMERATES][MAX9286_NUM_MODES] = {
 	{
 		{
 			MAX9286_MODE_720P_1280_720, SUBSAMPLING,
@@ -216,7 +216,7 @@ static int max9286_write_reg(struct max9286_dev *sensor, u8 reg, u8 val)
 	return 0;
 }
 
-static int max9286_read_reg(struct max9286_dev *sensor, u8 reg, u8 * val)
+static int max9286_read_reg(struct max9286_dev *sensor, u8 reg, u8 *val)
 {
 	struct i2c_client *client = sensor->i2c_client;
 	struct i2c_msg msg[2];
@@ -254,6 +254,7 @@ static int max96705_write_reg(struct max9286_dev *sensor, u8 idx, u8 reg,
 	struct i2c_msg msg;
 	u8 buf[2];
 	int ret;
+
 	client->addr = sensor->addr_96705;
 	buf[0] = reg;
 	buf[1] = val;
@@ -275,12 +276,13 @@ static int max96705_write_reg(struct max9286_dev *sensor, u8 idx, u8 reg,
 }
 
 static int max96705_read_reg(struct max9286_dev *sensor, u8 idx, u8 reg,
-			     u8 * val)
+			     u8 *val)
 {
 	struct i2c_client *client = sensor->i2c_client;
 	struct i2c_msg msg[2];
 	u8 buf[1];
 	int ret;
+
 	client->addr = sensor->addr_96705;
 	buf[0] = reg;
 
@@ -321,7 +323,7 @@ static int max20086_write_reg(struct max9286_dev *sensor, u8 reg, u8 val)
 	msg.buf = buf;
 	msg.len = sizeof(buf);
 
-	ret = i2c_transfer(client->adapter, &msg, 1);
+	ret = i2c_transfer(sensor->adap ? sensor->adap : client->adapter, &msg, 1);
 
 	if (ret < 0) {
 		dev_err(&client->dev, "%s: error: reg=0x%x, val=0x%x\n",
@@ -332,7 +334,7 @@ static int max20086_write_reg(struct max9286_dev *sensor, u8 reg, u8 val)
 	return 0;
 }
 
-static int max20086_read_reg(struct max9286_dev *sensor, u8 reg, u8 * val)
+static int max20086_read_reg(struct max9286_dev *sensor, u8 reg, u8 *val)
 {
 	struct i2c_client *client = sensor->i2c_client;
 	struct i2c_msg msg[2];
@@ -352,7 +354,7 @@ static int max20086_read_reg(struct max9286_dev *sensor, u8 reg, u8 * val)
 	msg[1].buf = buf;
 	msg[1].len = 1;
 
-	ret = i2c_transfer(client->adapter, msg, 2);
+	ret = i2c_transfer(sensor->adap ? sensor->adap : client->adapter, msg, 2);
 
 	if (ret < 0) {
 		dev_err(&client->dev, "%s: error: reg=0x%x\n", __func__, reg);
@@ -701,15 +703,16 @@ static int max9286_initialization(struct max9286_dev *sensor)
 	//disable fs
 	max9286_write_reg(sensor, 0x1, DES_REG1_FS_DISABLE);
 
-#ifndef V9TS_CSI
+
 	dev_err(&client->dev, "set him\n");
 	//him enable
 	max9286_write_reg(sensor, 0x1c, DES_REG1C_HIM_ENABLE);
 	usleep_range(5000, 6000);
 
+
 	max20086_power(sensor, true);
 	msleep(100);
-#endif
+
 
 	for (i = 0; i < 20; i++) {
 		val = 0;
@@ -923,6 +926,7 @@ static int max9286_probe(struct i2c_client *client,
 	u32 sync;
 	int ret;
 	struct gpio_desc *gpiod;
+	struct device_node *poc_np;
 
 	sensor = devm_kzalloc(dev, sizeof(*sensor), GFP_KERNEL);
 
@@ -963,33 +967,42 @@ static int max9286_probe(struct i2c_client *client,
 				     &sensor->addr_20086);
 	dev_info(&client->dev, "addr_20086: 0x%x, ret=%d\n", sensor->addr_20086,
 		 ret);
-	if (ret < 0) {
+	if (ret < 0)
 		sensor->addr_20086 = MAX20086_SLAVE_ID;
-	}
+
 	ret =
 	    fwnode_property_read_u16(dev_fwnode(&client->dev), "addr_96705",
 				     &sensor->addr_96705);
 	dev_info(&client->dev, "addr_96705: 0x%x, ret=%d\n", sensor->addr_96705,
 		 ret);
-	if (ret < 0) {
+	if (ret < 0)
 		sensor->addr_96705 = MAX96705_SLAVE_ID;
-	}
+
 	ret =
 	    fwnode_property_read_u16(dev_fwnode(&client->dev), "addr_0101",
 				     &sensor->addr_0101);
 	dev_info(&client->dev, "addr_0101: 0x%x, ret=%d\n", sensor->addr_0101,
 		 ret);
-	if (ret < 0) {
+	if (ret < 0)
 		sensor->addr_0101 = AP0101_SLAVE_ID;
-	}
+
 	ret = fwnode_property_read_u32(dev_fwnode(&client->dev), "sync", &sync);
 	dev_info(&client->dev, "sync: %d, ret=%d\n", sync, ret);
 
-	if (ret < 0) {
+	if (ret < 0)
 		sync = 0;
-	}
 
 	sensor->sync = sync;
+
+
+	poc_np = of_parse_phandle(client->dev.of_node, "semidrive,poc", 0);
+	if (!poc_np) {
+		dev_err(&client->dev, "no poc device node\n");
+		sensor->adap = NULL;
+	} else
+		sensor->adap = of_find_i2c_adapter_by_node(poc_np);
+	dev_err(&client->dev, "sensor->adap=%p\n", sensor->adap);
+
 
 	/* optional indication of physical rotation of sensor */
 	ret = fwnode_property_read_u32(dev_fwnode(&client->dev), "rotation",
@@ -1073,11 +1086,11 @@ static int max9286_probe(struct i2c_client *client,
 			dev_err(&client->dev, "Failed to get %s GPIO: %d\n",
 				"vin", ret);
 
-		printk("%s: get vin gpio fail\n", __func__);
+		dev_err(&client->dev, "%s: get vin gpio fail\n", __func__);
 		//return ret;
 	} else {
 		gpiod_direction_output(gpiod, 1);
-		msleep(1);
+		usleep_range(1000, 2000);
 	}
 
 	ret = fwnode_property_read_u32(dev_fwnode(&client->dev), "sec_9286",
@@ -1094,16 +1107,13 @@ static int max9286_probe(struct i2c_client *client,
 	}
 
 	max9286_power(sensor, false);
-#ifndef V9TS_CSI
 	max20086_power(sensor, false);
-#endif
+
 	usleep_range(10000, 11000);
 
 	max9286_power(sensor, true);
 	usleep_range(10000, 11000);
-#ifdef V9TS_CSI
-	msleep(100);		//for poc
-#endif
+
 
 	max9286_check_chip_id(sensor);
 
