@@ -447,7 +447,16 @@ static u8 gic_get_cpumask(struct gic_chip_data *gic)
 			break;
 	}
 
+#ifdef CONFIG_SDRV_REMOTE_GIC
+	/*
+	 * For V9Ts, side B gic is used by a uniprocessor system,
+	 * thus ITAGET registers are always read as 0, so cpu mask
+	 * can not be found.
+	 */
+	if (!mask && num_possible_cpus() > 1 && gic == &gic_data[0])
+#else
 	if (!mask && num_possible_cpus() > 1)
+#endif
 		pr_crit("GIC CPU mask not found - kernel will fail to boot.\n");
 
 	return mask;
@@ -1342,7 +1351,10 @@ int gic_of_init_child(struct device *dev, struct gic_chip_data **gic, int irq)
 		return ret;
 	}
 
-	irq_set_chained_handler_and_data(irq, gic_handle_cascade_irq, *gic);
+#ifdef CONFIG_SDRV_REMOTE_GIC
+	if (irq >= 0)
+#endif
+		irq_set_chained_handler_and_data(irq, gic_handle_cascade_irq, *gic);
 
 	return 0;
 }
@@ -1609,4 +1621,27 @@ IRQCHIP_ACPI_DECLARE(gic_v2, ACPI_MADT_TYPE_GENERIC_DISTRIBUTOR,
 IRQCHIP_ACPI_DECLARE(gic_v2_maybe, ACPI_MADT_TYPE_GENERIC_DISTRIBUTOR,
 		     gic_validate_dist, ACPI_MADT_GIC_VERSION_NONE,
 		     gic_v2_acpi_init);
+#endif
+
+#ifdef CONFIG_SDRV_REMOTE_GIC
+int gic_get_base_and_domain(struct gic_chip_data *gic, void **dist_base,
+			    void **cpu_base, struct irq_domain **domain)
+{
+	if (!gic)
+		return -EINVAL;
+
+	if (dist_base) {
+		*dist_base = gic_data_dist_base(gic);
+	}
+
+	if (cpu_base) {
+		*cpu_base = gic_data_cpu_base(gic);
+	}
+
+	if (domain) {
+		*domain = gic->domain;
+	}
+
+	return 0;
+}
 #endif

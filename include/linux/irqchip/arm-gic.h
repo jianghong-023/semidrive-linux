@@ -162,6 +162,10 @@ void gic_send_sgi(unsigned int cpu_id, unsigned int irq);
 int gic_get_cpu_id(unsigned int cpu);
 void gic_migrate_target(unsigned int new_cpu_id);
 unsigned long gic_get_sgir_physaddr(void);
+#ifdef CONFIG_SDRV_REMOTE_GIC
+int gic_get_base_and_domain(struct gic_chip_data *gic, void **dist_base,
+			    void **cpu_base, struct irq_domain **domain);
+#endif
 
 #endif /* __ASSEMBLY */
 #endif
