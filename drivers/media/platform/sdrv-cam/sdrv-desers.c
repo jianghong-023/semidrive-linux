@@ -160,11 +160,7 @@ static int deser_enum_frame_interval(struct v4l2_subdev *sd,
 		return -EINVAL;
 
 	tpf.numerator = 1;
-	//tpf.denominator = deser_framerates[fie->index];
-	//printk("%s index = %d\n", __FUNCTION__, fie->index);
-
-	//tpf.denominator = deser_framerates[fie->index];
-	tpf.denominator = sensor->frame_interval.numerator;
+	tpf.denominator = sensor->frame_interval.denominator;
 
 	fie->interval = tpf;
 
