@@ -42,3 +42,7 @@ config VIDEO_SEMIDRIVE_AR0132_AP0101
 config VIDEO_SEMIDRIVE_DESERS_ADAPTIVE
 	tristate "self-adaptive semidrive deser driver"
 	depends on VIDEO_SEMIDRIVE
+
+config POWER_POC_DRIVER
+	tristate "deser poc driver"
+	depends on VIDEO_SEMIDRIVE

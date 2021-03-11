@@ -12,6 +12,7 @@
 #include <linux/gpio/consumer.h>
 
 #include "sdrv-deser.h"
+#include "poc-max2008x.h"
 
 
 #define MAX_CAMERA_NUM 4
@@ -411,11 +412,36 @@ static int max96722_power(deser_dev_t *dev, bool enable)
 //Power for camera module
 static int max20087_power(deser_dev_t *dev, bool enable)
 {
+	int ret = -EINVAL;
+
+#ifdef CONFIG_POWER_POC_DRIVER
+	struct i2c_client *client = dev->i2c_client;
+	u8 reg;
+
+	reg = 0x1;
+	//pr_debug("sensor->name = %s\n", client->name);
+	if (!strcmp(client->name, SDRV_DESER_NAME_I2C)) {
+		ret = poc_mdeser0_power(0xf, enable, reg,  0);
+	} else if (!strcmp(client->name, SDRV2_DESER_NAME_I2C)) {
+		ret = poc_mdeser1_power(0xf, enable, reg,  0);
+#if defined(CONFIG_ARCH_SEMIDRIVE_V9)
+	} else if (!strcmp(client->name, SDRV_DESER_NAME_I2C_B)) {
+		ret = poc_r_mdeser0_power(0xf, enable, reg,  0);
+	} else if (!strcmp(client->name, SDRV2_DESER_NAME_I2C_B)) {
+		ret = poc_r_mdeser1_power(0xf, enable, reg,  0);
+#endif
+	} else {
+		dev_err(&client->dev, "Can't support POC %s.\n", client->name);
+		return ret;
+	}
+#else
 	if (enable == 1)
-		max20087_write_reg(dev, 0x01, 0x1f);
+		ret = max20087_write_reg(dev, 0x01, 0x1f);
 	else
-		max20087_write_reg(dev, 0x01, 0x10);
-	return 0;
+		ret = max20087_write_reg(dev, 0x01, 0x10);
+#endif
+
+	return ret;
 }
 
 static void max96722_preset(deser_dev_t *dev)

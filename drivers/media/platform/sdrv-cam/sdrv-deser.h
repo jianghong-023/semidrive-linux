@@ -23,6 +23,25 @@
 
 #define MIPI_CSI2_SENS_VCX_PADS_NUM     4
 
+//If you don't want necessary requirement, DON'T CHANGE THESE NAMES.
+#define SDRV_DESER_NAME  "sdrv,mcsi0_deser"
+#define SDRV2_DESER_NAME "sdrv,mcsi1_deser"
+#define SDRV3_DESER_NAME "sdrv,dvp_deser"
+
+#define SDRV_DESER_NAME_I2C  "mcsi0_deser"
+#define SDRV2_DESER_NAME_I2C "mcsi1_deser"
+#define SDRV3_DESER_NAME_I2C "dvp_deser"
+
+#if defined(CONFIG_ARCH_SEMIDRIVE_V9)
+#define SDRV_DESER_NAME_B  "sdrv,mcsi0_deser_sideb"
+#define SDRV2_DESER_NAME_B "sdrv,mcsi1_deser_sideb"
+#define SDRV3_DESER_NAME_B "sdrv,dvp_deser_sideb"
+#define SDRV_DESER_NAME_I2C_B  "mcsi0_deser_sideb"
+#define SDRV2_DESER_NAME_I2C_B "mcsi1_deser_sideb"
+#define SDRV3_DESER_NAME_I2C_B "dvp_deser_sideb"
+#endif
+
+
 typedef struct __deser_param deser_para_t;
 
 
@@ -129,6 +148,7 @@ typedef struct{
 enum DESER_MACHINE {
 	DESER_NOT_USED = 0,		/** don't use this deser at one csi interface when not detected*/
 	DESER_USE_ONCE = 1,		/** use one deser at one csi interface detected*/
+	DESER_USE_TWICE = 2,		/** use one deser at one csi interface detected*/
 };
 
 

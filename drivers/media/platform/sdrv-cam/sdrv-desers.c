@@ -34,18 +34,11 @@
 #include "deser-max9286.h"
 #include "deser-max96706.h"
 
-
-
 #define MIPI_CSI2_SENS_VC0_PAD_SOURCE   0
 #define MIPI_CSI2_SENS_VC1_PAD_SOURCE   1
 #define MIPI_CSI2_SENS_VC2_PAD_SOURCE   2
 #define MIPI_CSI2_SENS_VC3_PAD_SOURCE   3
 #define MIPI_CSI2_SENS_VCX_PADS_NUM	 4
-
-#define SDRV_DESER_NAME  "sdrv,mcsi0_deser"
-#define SDRV2_DESER_NAME "sdrv,mcsi1_deser"
-#define SDRV3_DESER_NAME "sdrv,dvp_deser"
-
 
 #define PROBE_INIT
 
@@ -389,8 +382,10 @@ static int deser_probe(struct i2c_client *client,
 	for (deser_index = 0; desers_array[deser_index] != NULL; deser_index++) {
 		pdeser_param = desers_array[deser_index];
 
+		//printk("detect deser name %s\n", pdeser_param->name);
 		if (pdeser_param->used == DESER_USE_ONCE || NULL == pdeser_param->detect_deser)
 			continue;
+		//printk("detect deser name %s\n", pdeser_param->name);
 
 		sensor->addr_deser = pdeser_param->addr_deser;
 		sensor->addr_poc = pdeser_param->addr_poc;
@@ -544,15 +539,6 @@ static int deser_remove(struct i2c_client *client)
 	return 0;
 }
 
-static const struct i2c_device_id deser_id[] = {
-	{SDRV_DESER_NAME, 0},
-	{SDRV2_DESER_NAME, 0},
-	{SDRV3_DESER_NAME, 0},
-	{},
-};
-
-MODULE_DEVICE_TABLE(i2c, deser_id);
-
 static const struct of_device_id deser_dt_ids[] = {
 	{.compatible = SDRV_DESER_NAME},
 	{.compatible = SDRV2_DESER_NAME},
@@ -573,5 +559,61 @@ static struct i2c_driver deser_i2c_driver = {
 
 module_i2c_driver(deser_i2c_driver);
 
+
+#if defined(CONFIG_ARCH_SEMIDRIVE_V9)
+extern int register_sideb_poc_driver(void);
+
+static const struct i2c_device_id desers_id_sideb[] = {
+	{SDRV_DESER_NAME_I2C_B, 0},
+	{SDRV2_DESER_NAME_I2C_B, 0},
+	{SDRV3_DESER_NAME_I2C_B, 0},
+	{},
+};
+
+
+static const struct of_device_id deser_dt_ids_sideb[] = {
+	{.compatible = SDRV_DESER_NAME_B},
+	{.compatible = SDRV2_DESER_NAME_B},
+	{.compatible = SDRV3_DESER_NAME_B},
+	{ /* sentinel */ }
+};
+
+MODULE_DEVICE_TABLE(of, deser_dt_ids_sideb);
+
+static struct i2c_driver desers_i2c_driver_sideb = {
+	.driver = {
+		   .name = "sdrv-deser-sideb",
+		   .of_match_table = deser_dt_ids_sideb,
+		   },
+	.id_table = desers_id_sideb,
+	.probe = deser_probe,
+	.remove = deser_remove,
+};
+
+static int __init sdrv_desers_sideb_init(void)
+{
+	int ret;
+
+	ret = register_sideb_poc_driver();
+
+	if (ret < 0) {
+		pr_err("fail to register poc driver for sideb ret = %d!\n", ret);
+	} else
+		pr_debug("success to register sideb poc sideb driver ret = %d.\n", ret);
+
+
+	ret = i2c_add_driver(&desers_i2c_driver_sideb);
+	if (ret < 0)
+		pr_err("fail to register desers i2c driver ret = %d.\n", ret);
+	else
+		pr_debug("success to register desers sideb driver ret = %d.\n", ret);
+
+	return ret;
+}
+
+late_initcall(sdrv_desers_sideb_init);
+#endif
+
 MODULE_DESCRIPTION("Deser MIPI Camera Subdev Driver");
+MODULE_AUTHOR("michael chen");
 MODULE_LICENSE("GPL");
