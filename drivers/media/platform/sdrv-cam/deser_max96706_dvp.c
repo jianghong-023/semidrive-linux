@@ -52,10 +52,6 @@ enum SUBBOARD_TYPE{
 };
 
 
-
-static reg_param_t max96706_reg[] = {
-};
-
 static int max96706_write_reg(deser_dev_t *sensor, u8 reg, u8 val)
 {
 	struct i2c_client *client = sensor->i2c_client;
@@ -486,6 +482,7 @@ static int gpi_power(deser_dev_t *dev, int gpio, bool enable)
 	}
 
 	//printk("poc power -\n");
+	return 0;
 
 }
 

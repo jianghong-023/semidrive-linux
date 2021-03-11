@@ -12,6 +12,7 @@
 #include <linux/gpio/consumer.h>
 
 #include "sdrv-deser.h"
+#include "poc-max2008x.h"
 
 #define MAX_CAMERA_NUM 4
 
@@ -24,7 +25,7 @@
 #define MAX96705_DEVICE_ID 0x41
 
 #define MAX20087_SLAVE_ID 0x28
-#define MAX20087_SLAVE_ID_2 0x2B
+#define MAX20087_SLAVE_ID_2 0x29
 
 
 
@@ -288,11 +289,33 @@ static int max9286_power(deser_dev_t *dev, bool enable)
 //Power for camera module
 static int max20087_power(deser_dev_t *dev, bool enable)
 {
+	int ret = -EINVAL;
+
+#ifdef CONFIG_POWER_POC_DRIVER
+	struct i2c_client *client = dev->i2c_client;
+	u8 reg;
+
+	reg = 0x1;
+	if (!strcmp(client->name, SDRV_DESER_NAME_I2C)) {
+		ret = poc_mdeser0_power(0xf, enable, reg,  0);
+	} else if (!strcmp(client->name, SDRV2_DESER_NAME_I2C)) {
+		ret = poc_mdeser1_power(0xf, enable, reg,  0);
+#if defined(CONFIG_ARCH_SEMIDRIVE_V9)
+	} else if (!strcmp(client->name, SDRV_DESER_NAME_I2C_B)) {
+		ret = poc_r_mdeser0_power(0xf, enable, reg,  0);
+	} else if (!strcmp(client->name, SDRV2_DESER_NAME_I2C_B)) {
+		ret = poc_r_mdeser1_power(0xf, enable, reg,  0);
+#endif
+	} else {
+		dev_err(&client->dev, "Can't support POC %s.\n", client->name);
+		return ret;
+	}
+#else
 	//For different camera subboard max9286's 'POC i2c addr.
 	//There is only a POC chip on one i2c bus.
 	u8 poc_addr[4] = {0x28, 0x29, 0x2a, 0x2b};
 	int i;
-	int ret;
+
 
 	if (enable == 1)
 		ret = max20087_write_reg(dev, 0x01, 0x1f);
@@ -308,6 +331,7 @@ static int max20087_power(deser_dev_t *dev, bool enable)
 				break;
 		}
 	}
+#endif
 	return ret;
 }
 
@@ -331,7 +355,6 @@ static int max96705_check_chip_id(deser_dev_t *dev)
 	int ret = 0;
 	u8 chip_id = 0;
 	int i = 0;
-	int error_cha = 0;
 
 	for (i = 0; i < 4; i++) {
 		ret = max96705_read_reg(dev, i, 0x1E, &chip_id);
