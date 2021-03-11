@@ -136,6 +136,7 @@ struct max9286_dev {
 	unsigned short addr_96705;
 	unsigned short addr_0101;
 	unsigned short addr_20086;
+	unsigned short addr_20086_;
 	struct i2c_adapter *adap;
 	struct v4l2_subdev sd;
 #if 1
@@ -328,7 +329,22 @@ static int max20086_write_reg(struct max9286_dev *sensor, u8 reg, u8 val)
 	if (ret < 0) {
 		dev_err(&client->dev, "%s: error: reg=0x%x, val=0x%x\n",
 			__func__, reg, val);
-		return ret;
+		if (sensor->addr_20086_) {
+			client->addr = sensor->addr_20086_;
+			buf[0] = reg;
+			buf[1] = val;
+			msg.addr = client->addr;
+			msg.flags = client->flags;
+			msg.buf = buf;
+			msg.len = sizeof(buf);
+			ret = i2c_transfer(sensor->adap ? sensor->adap : client->adapter, &msg, 1);
+			if (ret < 0) {
+				dev_err(&client->dev, "%s_: error: reg=0x%x, val=0x%x\n", __func__, reg, val);
+				return ret;
+			}
+		} else {
+			return ret;
+		}
 	}
 
 	return 0;
@@ -358,7 +374,25 @@ static int max20086_read_reg(struct max9286_dev *sensor, u8 reg, u8 *val)
 
 	if (ret < 0) {
 		dev_err(&client->dev, "%s: error: reg=0x%x\n", __func__, reg);
-		return ret;
+		if (sensor->addr_20086_) {
+			client->addr = sensor->addr_20086_;
+			buf[0] = reg;
+			msg[0].addr = client->addr;
+			msg[0].flags = client->flags;
+			msg[0].buf = buf;
+			msg[0].len = sizeof(buf);
+			msg[1].addr = client->addr;
+			msg[1].flags = client->flags | I2C_M_RD;
+			msg[1].buf = buf;
+			msg[1].len = 1;
+			ret = i2c_transfer(sensor->adap ? sensor->adap : client->adapter, msg, 2);
+			if (ret < 0) {
+				dev_err(&client->dev, "%s_: error: reg=0x%x\n", __func__, reg);
+				return ret;
+			}
+		} else {
+			return ret;
+		}
 	}
 
 	*val = buf[0];
@@ -969,6 +1003,13 @@ static int max9286_probe(struct i2c_client *client,
 		 ret);
 	if (ret < 0)
 		sensor->addr_20086 = MAX20086_SLAVE_ID;
+	ret =
+	    fwnode_property_read_u16(dev_fwnode(&client->dev), "addr_20086_",
+				     &sensor->addr_20086_);
+	dev_info(&client->dev, "addr_20086_: 0x%x, ret=%d\n", sensor->addr_20086_,
+		 ret);
+	if (ret < 0)
+		sensor->addr_20086_ = 0;
 
 	ret =
 	    fwnode_property_read_u16(dev_fwnode(&client->dev), "addr_96705",
