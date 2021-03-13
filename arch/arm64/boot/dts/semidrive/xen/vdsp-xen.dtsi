@@ -11,7 +11,8 @@
 			device-irq-mode = <1>;    /* level */
 			host-irq-mode = <1>;      /* level */
 
-                        reg = <0x0 VDSP_SHARE_MEMBASE 0x0 VDSP_SHARE_MEMSIZE>, /* DSP shared memory */
+                        reg = <0x0 XEN_RESERVED_VDSP_BASE 0x0 0x1000>, /* DSP memory */
+                        <0x0 (XEN_RESERVED_VDSP_BASE+0x4000) 0x0 (0x4000000-0x4000)>, /* DSP shared memory */
 	                <0x0 0x34040000 0x0 0x1000>, /* vdsp mu base address, pass to vdsp, won't map */
 	                <0x0 0x38316000 0x0 0x1000>, /* scr 0x458 */
 	                <0x0 0x3839e000 0x0 0x1000>, /* scr 0x678 */
@@ -27,7 +28,7 @@
 	                ranges = <0x0 0x00a00000 0x0 0x00a00000 0x0 0x00020000
 		        0x0 0x00a20000 0x0 0x00a20000 0x0 0x00020000
 		        0x0 VDSP_MEMBASE 0x0 VDSP_MEMBASE 0x0 VDSP_MEMSIZE
-		        0x0 VDSP_SHARE_MEMBASE 0x0 VDSP_SHARE_MEMBASE 0x0 VDSP_SHARE_MEMSIZE>;
+		        0x0 XEN_RESERVED_VDSP_BASE 0x0 XEN_RESERVED_VDSP_BASE 0x0 XEN_RESERVED_VDSP_SIZE>;
 
 			status = "disabled";
 
