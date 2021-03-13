@@ -38,10 +38,9 @@ int sd_kick_vdsp(void)
 {
 	int ret = 0;
 
-	if (xen_domain()) {
-		/* TODO: XEN domain IPC call */
-		pr_err("%s: Not implemented\n", __func__);
-//		ret = xenipc_rpc_trace(VDSP_DEV, &request, NULL);
+	if (xen_initial_domain()) {
+		/* mailbox API is not supported in Dom0 */
+		pr_err("%s: Dom0 not implemented\n", __func__);
 	} else {
 		ret = vdsp_send_mbox_msg(VDSP_DEV);
 	}
@@ -52,9 +51,9 @@ EXPORT_SYMBOL(sd_kick_vdsp);
 
 int sd_connect_vdsp(void *hwctx, vdsp_isr_callback isr_cb)
 {
-	if (xen_domain()) {
-		/* in DomU: open vIPC channel with interrupt callback */
-		pr_err("%s: Not implemented\n", __func__);
+	if (xen_initial_domain()) {
+		/* mailbox API is not supported in Dom0 */
+		pr_err("%s: Dom0 not implemented\n", __func__);
 	} else {
 		struct vdsp_ipc_device *vdsp = VDSP_DEV;
 
@@ -108,7 +107,7 @@ static void vdsp_mbox_cb(struct mbox_client *client, void *mssg)
 		return;
 	}
 
-	if (xen_domain()) {
+	if (xen_initial_domain()) {
 		/* We are in dom0, call work to trigger vIPC to frontend */
 		schedule_work(&vdsp->rx_work);
 	} else {

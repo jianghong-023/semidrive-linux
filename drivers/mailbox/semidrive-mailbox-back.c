@@ -267,32 +267,51 @@ void mbox_back_received_data(sd_msghdr_t *data, int remote_proc, int src, int de
 	struct mbox_backend *be;
 	unsigned int osid;
 	struct mbox_data_head *hdr;
+	sd_msghdr_t msg_body;
+	sd_msghdr_t *msg = &msg_body;
 	void *rx_buf;
 	int size;
 
 	if (!xen_domain())
 		return;
 
-	osid = data->osid;
-	pr_debug("mbox-irq: rx p=%d o=%d s=%d d=%d l=%d\n", remote_proc, osid, src, dest, data->dat_len);
-
-	/* otherwise, to find a frontend */
-	if (osid == 0)
-		osid = data->rproc;
-	be = mbox_find_backend(osid, dest);
-	if (!be) {
-		be = mbox_find_backend(0, dest);
+	/* from VDSP, reserved a special mba without data */
+	if (remote_proc == MASTER_VDSP) {
+		be = mbox_find_backend(0, IPCC_ADDR_VDSP_ANN);
 		if (!be) {
-			pr_err("mbox-irq: backend with osid-%d not found\n", osid);
+			pr_err("mbox-irq: backend for mba-%d is not found\n",
+					IPCC_ADDR_VDSP_ANN);
 			return;
 		}
-	}
+		pr_info("mbox-irq: backend for VDSP\n");
+		/* do not copy any data, src, dst is not used */
+		MB_MSG_INIT_VDSP_HEAD(msg, MB_MSG_HDR_SZ);
+		src = IPCC_ADDR_VDSP_ANN;
+		dest = IPCC_ADDR_VDSP_ANN;
+	} else {
+		/* otherwise, to find a frontend */
+		msg = data;
+		osid = msg->osid;
+		pr_debug("mbox-irq: rx p=%d o=%d s=%d d=%d l=%d\n",
+				remote_proc, osid, src, dest, msg->dat_len);
 
+		if (osid == 0)
+			osid = msg->rproc;
+		be = mbox_find_backend(osid, dest);
+		if (!be) {
+			be = mbox_find_backend(0, dest);
+			if (!be) {
+				pr_err("mbox-irq: %d backend with osid-%d mba-%d not found\n",
+						remote_proc, osid, dest);
+				return;
+			}
+		}
+	}
 	chan = be->channel;
 
 	BUG_ON(!chan);
 
-	size = sizeof(struct mbox_data_head) + data->dat_len;
+	size = sizeof(struct mbox_data_head) + msg->dat_len;
 	rx_buf = kmalloc(size, GFP_ATOMIC);
 	if (rx_buf == NULL)
 		return;
@@ -303,7 +322,7 @@ void mbox_back_received_data(sd_msghdr_t *data, int remote_proc, int src, int de
 	hdr->src_addr = src;
 	hdr->dst_addr = dest;
 	hdr->type = MU_TYPE_NEWDATA;
-	memcpy_fromio(hdr->data, data, data->dat_len);
+	memcpy_fromio(hdr->data, msg, msg->dat_len);
 
 	atomic_inc(&chan->read);
 	atomic_inc(&chan->io);
