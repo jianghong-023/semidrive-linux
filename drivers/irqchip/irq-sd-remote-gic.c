@@ -102,9 +102,9 @@ static int sd_remote_gic_remove(struct platform_device *pdev)
     pm_runtime_put_sync(&pdev->dev);
     pm_runtime_disable(&pdev->dev);
 
-    iounmap(r_gic_chip_data->int_id);
-
     r_gic_chip_data = platform_get_drvdata(pdev);
+
+    iounmap(r_gic_chip_data->int_id);
 
     spin_lock_irqsave(&remote_gic_lock, flags);
     list_del(&r_gic_chip_data->node);
