@@ -446,7 +446,7 @@ static int be_hw_params_fixup_tas6424(struct snd_soc_pcm_runtime *rtd,
 static int x9_ref04_ak7738_rtd_init(struct snd_soc_pcm_runtime *rtd) {
 	int ret;
 	dev_dbg(rtd->dev,"[i2s sc] int fixed cpu -----%s -- %p %p %p----------------------- \n",rtd->cpu_dai->name,rtd->cpu_dai,rtd->cpu_dai->driver,rtd->cpu_dai->driver->ops->set_tdm_slot);
-	ret = snd_soc_dai_set_tdm_slot(rtd->cpu_dai, 0xFF, 0x3, 8, 32);
+	ret = snd_soc_dai_set_tdm_slot(rtd->cpu_dai, 0xFF, 0xF, 8, 32);
 	if (ret < 0) {
 		dev_err(rtd->dev, "can't set cpu snd_soc_dai_set_tdm_slot err %d\n", ret);
 		return ret;
@@ -609,7 +609,7 @@ static int x9_ref04_ak7738_probe(struct platform_device *pdev)
 
 	int ret;
 	struct snd_x9_chip *chip;
-	dev_info(&pdev->dev, ": dev name =%s %s\n", pdev->name, __func__);
+	dev_info(&pdev->dev, ": dev name =  %s %s\n", pdev->name, __func__);
 	if ((get_part_id(PART_BOARD_TYPE) != BOARD_TYPE_REF) ||
 		(get_part_id(PART_BOARD_ID_MAJ) != 1) ||
 		(get_part_id(PART_BOARD_ID_MIN) != 4)) {
