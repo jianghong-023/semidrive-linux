@@ -482,7 +482,8 @@ static long init_v1(struct platform_device *pdev, struct xrp_hw_semidrive *hw)
 	long ret;
 	enum xrp_init_flags init_flags = 0;
 
-	ret = init_hw(pdev, hw, 1, &init_flags);
+	/* use 2 reg to seperate 0: cmd queue 1: shared buffer */
+	ret = init_hw(pdev, hw, 2, &init_flags);
 	if (ret < 0)
 		return ret;
 
