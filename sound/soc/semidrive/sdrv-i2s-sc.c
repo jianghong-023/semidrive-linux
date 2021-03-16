@@ -183,6 +183,7 @@ static void afe_i2s_sc_dump_reg(struct sdrv_afe_i2s_sc *afe)
 		 "DUMP %d REG_CDN_I2SSC_REGS_TDM_FD_DIR 0x%x: (0x%x)\n",
 		 __LINE__, REG_CDN_I2SSC_REGS_TDM_FD_DIR, val);
 }
+
 /* misc operation */
 
 static void afe_i2s_sc_config(struct sdrv_afe_i2s_sc *afe)
@@ -247,6 +248,9 @@ static void afe_i2s_sc_config(struct sdrv_afe_i2s_sc *afe)
 		    BIT_CTRL_FDX_RFIFO_AFULL_MASK,
 		    (0 << I2S_CTRL_FDX_RFIFO_AFULL_MASK_FIELD_OFFSET));
 	}
+	regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_I2S_CTRL,
+			   BIT_CTRL_I2S_EN,
+			   (1 << I2S_CTRL_I2S_EN_FIELD_OFFSET));
 
 	/*config direction of transmission:Tx*/
 	regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_I2S_CTRL,
@@ -260,19 +264,23 @@ static void afe_i2s_sc_config(struct sdrv_afe_i2s_sc *afe)
 
 	/*config almost empty fifo level:tx fifo level */
 	regmap_write(afe->regmap, REG_CDN_I2SSC_REGS_FIFO_AEMPTY, 0x30);
-
 	/*config almost full fifo level:defualt value*/
-	regmap_write(afe->regmap, REG_CDN_I2SSC_REGS_FIFO_AFULL, 0x7f);
+	regmap_write(afe->regmap, REG_CDN_I2SSC_REGS_FIFO_AFULL, 0x60);
 
 	/*config resolution,valid number of data bit*/
 	if (true == afe->is_full_duplex) {
 		regmap_write(afe->regmap, REG_CDN_I2SSC_REGS_I2S_SRES_FDR, 0xf);
 		regmap_write(afe->regmap, REG_CDN_I2SSC_REGS_I2S_SRES, 0xf);
+		/*config almost empty fifo level:tx fifo level */
+		regmap_write(afe->regmap, REG_CDN_I2SSC_REGS_FIFO_AEMPTY_FDR,
+			     0x30);
+		/*config almost full fifo level:defualt value*/
+		regmap_write(afe->regmap, REG_CDN_I2SSC_REGS_FIFO_AFULL_FDR,
+			     0x60);
 	} else {
 		regmap_write(afe->regmap, REG_CDN_I2SSC_REGS_I2S_SRES, 0xf);
 	}
 
-	regcache_sync(afe->regmap);
 
 	ret = regmap_read(afe->regmap, REG_CDN_I2SSC_REGS_I2S_CTRL, &val);
 	dev_dbg(afe->dev, "DUMP %d REG_CDN_I2SSC_REGS_I2S_CTRL 0x%x:(0x%x)\n",
@@ -289,19 +297,104 @@ static void afe_i2s_sc_config(struct sdrv_afe_i2s_sc *afe)
 	dev_dbg(afe->dev, "DUMP %d REG_CDN_I2SSC_REGS_I2S_SRES 0x%x: (0x%x)\n",
 		__LINE__, REG_CDN_I2SSC_REGS_I2S_SRES, val);
 	ret = regmap_read(afe->regmap, REG_CDN_I2SSC_REGS_TDM_FD_DIR, &val);
-	dev_dbg(afe->dev, "DUMP %d REG_CDN_I2SSC_REGS_TDM_FD_DIR 0x%x: (0x%x)\n",
+	dev_dbg(afe->dev,
+		"DUMP %d REG_CDN_I2SSC_REGS_TDM_FD_DIR 0x%x: (0x%x)\n",
 		__LINE__, REG_CDN_I2SSC_REGS_TDM_FD_DIR, val);
 }
 
-static void afe_i2s_sc_start_capture(struct sdrv_afe_i2s_sc *afe)
+static void afe_i2s_sc_start_capture_tdm(struct sdrv_afe_i2s_sc *afe)
 {
 	u32 ret, val;
-	/*Firstly,Enable i2s*/
+	/* 	atomic_set(&afe->capturing, 1);
+
+		afe_i2s_sc_start_playback_tdm(afe);
+		return; */
+	/*Firstly,disable i2s*/
+	regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_I2S_CTRL,
+			   BIT_CTRL_I2S_EN,
+			   (0 << I2S_CTRL_I2S_EN_FIELD_OFFSET));
+
+	/*FIFO reset*/
+	regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_I2S_CTRL,
+			   BIT_CTRL_FIFO_RST,
+			   (0 << I2S_CTRL_FIFO_RST_FIELD_OFFSET));
+
+	regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_I2S_CTRL_FDX,
+			   BIT_CTRL_FDX_FIFO_RST,
+			   (0 << I2S_CTRL_FDX_FIFO_RST_FIELD_OFFSET));
+
+	/* Disable interrupt */
+	regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_I2S_CTRL,
+			   BIT_CTRL_INTREQ_MASK,
+			   (0 << I2S_CTRL_INTREQ_MASK_FIELD_OFFSET));
+
+	/*Set interrupt request i2s fdx */
+	regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_I2S_CTRL_FDX,
+			   BIT_CTRL_FDX_RI2S_MASK,
+			   (1 << I2S_CTRL_FDX_RI2S_MASK_FIELD_OFFSET));
+
+	/*Set all interrupt request generation */
+	regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_I2S_CTRL,
+			   BIT_CTRL_I2S_MASK,
+			   (1 << I2S_CTRL_I2S_MASK_FIELD_OFFSET));
+
+	/*Set fifo almost empty mask */
+	regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_I2S_CTRL,
+			   BIT_CTRL_FIFO_AEMPTY_MASK,
+			   (0 << I2S_CTRL_FIFO_AEMPTY_MASK_FIELD_OFFSET));
+
+	/*Clear fifo almost full mask */
+	regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_I2S_CTRL,
+			   BIT_CTRL_FIFO_AFULL_MASK,
+			   (0 << I2S_CTRL_FIFO_AFULL_MASK_FIELD_OFFSET));
+
+	/*Clear fifo afull mask */
+	regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_I2S_CTRL_FDX,
+			   BIT_CTRL_FDX_RFIFO_AFULL_MASK,
+			   (0 << I2S_CTRL_FDX_RFIFO_AFULL_MASK_FIELD_OFFSET));
+
+	/*Clear I2S Overrun status*/
+	regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_I2S_STAT,
+			   BIT_STAT_RDATA_OVERR,
+			   (0 << I2S_STAT_RDATA_OVERR_FIELD_OFFSET));
+
+	/*Clear I2S UNDERR status*/
+	regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_I2S_STAT,
+			   BIT_STAT_TDATA_UNDERR,
+			   (0 << I2S_STAT_TDATA_UNDERR_FIELD_OFFSET));
+
+	if (atomic_read(&afe->playing)) {
+		regmap_update_bits(
+		    afe->regmap, REG_CDN_I2SSC_REGS_TDM_FD_DIR,
+		    BIT_TDM_FD_DIR_CH_TX_EN,
+		    (afe->tx_slot_mask << TDM_FD_DIR_CH0_TXEN_FIELD_OFFSET));
+	}
+
+	regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_I2S_CTRL,
+			   BIT_CTRL_INTREQ_MASK,
+			   (1 << I2S_CTRL_INTREQ_MASK_FIELD_OFFSET));
+
 	regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_I2S_CTRL,
 			   BIT_CTRL_I2S_EN,
 			   (1 << I2S_CTRL_I2S_EN_FIELD_OFFSET));
 
+	regmap_update_bits(
+	    afe->regmap, REG_CDN_I2SSC_REGS_TDM_FD_DIR, BIT_TDM_FD_DIR_CH_RX_EN,
+	    (afe->rx_slot_mask << TDM_FD_DIR_CH0_RXEN_FIELD_OFFSET));
 
+	ret = regmap_read(afe->regmap, REG_CDN_I2SSC_REGS_I2S_CTRL, &val);
+	dev_dbg(afe->dev, "DUMP %d REG_CDN_I2SSC_REGS_I2S_CTRL(0x%x)\n",
+		__LINE__, val);
+	return;
+}
+
+static void afe_i2s_sc_start_capture_normal(struct sdrv_afe_i2s_sc *afe)
+{
+	u32 ret, val;
+
+	regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_I2S_CTRL,
+			   BIT_CTRL_I2S_EN,
+			   (0 << I2S_CTRL_I2S_EN_FIELD_OFFSET));
 	/* Then enable interrupt */
 	regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_I2S_CTRL_FDX,
 			   BIT_CTRL_FDX_RI2S_MASK,
@@ -337,22 +430,30 @@ static void afe_i2s_sc_start_capture(struct sdrv_afe_i2s_sc *afe)
 			   BIT_STAT_RDATA_OVERR,
 			   (0 << I2S_STAT_RDATA_OVERR_FIELD_OFFSET));
 
-	if(afe->tdm_initialized == true){
-		regmap_update_bits(
-		    afe->regmap, REG_CDN_I2SSC_REGS_TDM_FD_DIR,
-		    BIT_TDM_FD_DIR_CH_RX_EN,
-		    (afe->rx_slot_mask << TDM_FD_DIR_CH0_RXEN_FIELD_OFFSET));
-	}
-	regcache_sync(afe->regmap);
+	/*At last,Enable i2s*/
+	regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_I2S_CTRL,
+			   BIT_CTRL_I2S_EN,
+			   (1 << I2S_CTRL_I2S_EN_FIELD_OFFSET));
+
 
 	ret = regmap_read(afe->regmap, REG_CDN_I2SSC_REGS_I2S_CTRL, &val);
 	dev_dbg(afe->dev, "DUMP %d REG_CDN_I2SSC_REGS_I2S_CTRL(0x%x)\n",
 		__LINE__, val);
 }
 
+static void afe_i2s_sc_start_capture(struct sdrv_afe_i2s_sc *afe)
+{
+	if (afe->tdm_initialized == true) {
+		afe_i2s_sc_start_capture_tdm(afe);
+	} else if (!atomic_read(&afe->playing)) {
+		afe_i2s_sc_start_capture_normal(afe);
+	} else {
+		DEBUG_FUNC_PRT
+	}
+}
+
 static void afe_i2s_sc_stop_capture(struct sdrv_afe_i2s_sc *afe)
 {
-
 
 	if (true == afe->is_full_duplex) {
 
@@ -360,35 +461,44 @@ static void afe_i2s_sc_stop_capture(struct sdrv_afe_i2s_sc *afe)
 		regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_I2S_CTRL_FDX,
 				   BIT_CTRL_FDX_FIFO_RST,
 				   (0 << I2S_CTRL_FDX_FIFO_RST_FIELD_OFFSET));
-	}else{
+	} else {
 		/*FIFO reset*/
 		regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_I2S_CTRL,
 				   BIT_CTRL_FIFO_RST,
 				   (0 << I2S_CTRL_FIFO_RST_FIELD_OFFSET));
 	}
-
 	/* Disable interrupt */
 	regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_I2S_CTRL_FDX,
 			   BIT_CTRL_FDX_RI2S_MASK,
 			   (0 << I2S_CTRL_I2S_EN_FIELD_OFFSET));
-	/*TDM slot setting clear i2s setting but keep afe->rx_slot_mask*/
 	if (afe->tdm_initialized == true) {
 		regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_TDM_FD_DIR,
 				   BIT_TDM_FD_DIR_CH_RX_EN,
 				   (0 << TDM_FD_DIR_CH0_RXEN_FIELD_OFFSET));
 	}
-	regcache_sync(afe->regmap);
+	return;
 }
 
-static void afe_i2s_sc_start_playback(struct sdrv_afe_i2s_sc *afe)
+static void afe_i2s_sc_start_playback_tdm(struct sdrv_afe_i2s_sc *afe)
 {
 	u32 ret, val;
+
+	/*Firstly,disable i2s*/
+	regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_I2S_CTRL,
+			   BIT_CTRL_I2S_EN,
+			   (0 << I2S_CTRL_I2S_EN_FIELD_OFFSET));
 
 	/*FIFO reset*/
 	regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_I2S_CTRL,
 			   BIT_CTRL_FIFO_RST,
 			   (0 << I2S_CTRL_FIFO_RST_FIELD_OFFSET));
 
+	if (true == afe->is_full_duplex) {
+		/*Reset full duplex FIFO reset*/
+		regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_I2S_CTRL_FDX,
+				   BIT_CTRL_FDX_FIFO_RST,
+				   (0 << I2S_CTRL_FDX_FIFO_RST_FIELD_OFFSET));
+	}
 	/* Disable interrupt */
 	regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_I2S_CTRL,
 			   BIT_CTRL_INTREQ_MASK,
@@ -419,6 +529,84 @@ static void afe_i2s_sc_start_playback(struct sdrv_afe_i2s_sc *afe)
 			   BIT_CTRL_FDX_RFIFO_AFULL_MASK,
 			   (0 << I2S_CTRL_FDX_RFIFO_AFULL_MASK_FIELD_OFFSET));
 
+	/*Clear I2S UNDERR status*/
+	regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_I2S_STAT,
+			   BIT_STAT_TDATA_UNDERR,
+			   (0 << I2S_STAT_TDATA_UNDERR_FIELD_OFFSET));
+
+	regmap_update_bits(
+	    afe->regmap, REG_CDN_I2SSC_REGS_TDM_FD_DIR, BIT_TDM_FD_DIR_CH_TX_EN,
+	    (afe->tx_slot_mask << TDM_FD_DIR_CH0_TXEN_FIELD_OFFSET));
+
+	/*At the last Enable i2s interrupt main switch*/
+	regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_I2S_CTRL,
+			   BIT_CTRL_INTREQ_MASK,
+			   (1 << I2S_CTRL_INTREQ_MASK_FIELD_OFFSET));
+
+	regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_I2S_CTRL,
+			   BIT_CTRL_I2S_EN,
+			   (1 << I2S_CTRL_I2S_EN_FIELD_OFFSET));
+
+	if (atomic_read(&afe->capturing)) {
+		regmap_update_bits(
+		    afe->regmap, REG_CDN_I2SSC_REGS_TDM_FD_DIR,
+		    BIT_TDM_FD_DIR_CH_RX_EN,
+		    (afe->rx_slot_mask << TDM_FD_DIR_CH0_RXEN_FIELD_OFFSET));
+	}
+
+	ret = regmap_read(afe->regmap, REG_CDN_I2SSC_REGS_I2S_CTRL, &val);
+	dev_dbg(afe->dev, "DUMP %d REG_CDN_I2SSC_REGS_I2S_CTRL(0x%x)\n",
+		__LINE__, val);
+	ret = regmap_read(afe->regmap, REG_CDN_I2SSC_REGS_I2S_CTRL_FDX, &val);
+	dev_dbg(afe->dev, "DUMP REG_CDN_I2SSC_REGS_I2S_CTRL_FDX(0x%x)\n", val);
+	ret = regmap_read(afe->regmap, REG_CDN_I2SSC_REGS_I2S_SRES, &val);
+	dev_dbg(afe->dev, "DUMP REG_CDN_I2SSC_REGS_I2S_SRES(0x%x)\n", val);
+}
+
+static void afe_i2s_sc_start_playback_normal(struct sdrv_afe_i2s_sc *afe)
+{
+	u32 ret, val;
+
+	/*FIFO reset*/
+	regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_I2S_CTRL,
+			   BIT_CTRL_FIFO_RST,
+			   (0 << I2S_CTRL_FIFO_RST_FIELD_OFFSET));
+
+	if (true == afe->is_full_duplex) {
+		/*Reset full duplex FIFO reset*/
+		regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_I2S_CTRL_FDX,
+				   BIT_CTRL_FDX_FIFO_RST,
+				   (0 << I2S_CTRL_FDX_FIFO_RST_FIELD_OFFSET));
+	}
+	/* Disable interrupt */
+	regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_I2S_CTRL,
+			   BIT_CTRL_INTREQ_MASK,
+			   (0 << I2S_CTRL_INTREQ_MASK_FIELD_OFFSET));
+
+	/*Set interrupt request i2s fdx */
+	regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_I2S_CTRL_FDX,
+			   BIT_CTRL_FDX_RI2S_MASK,
+			   (1 << I2S_CTRL_FDX_RI2S_MASK_FIELD_OFFSET));
+
+	/*Set all interrupt request generation */
+	regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_I2S_CTRL,
+			   BIT_CTRL_I2S_MASK,
+			   (1 << I2S_CTRL_I2S_MASK_FIELD_OFFSET));
+
+	/*Set fifo almost empty mask */
+	regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_I2S_CTRL,
+			   BIT_CTRL_FIFO_AEMPTY_MASK,
+			   (0 << I2S_CTRL_FIFO_AEMPTY_MASK_FIELD_OFFSET));
+
+	/*Clear fifo almost full mask */
+	regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_I2S_CTRL,
+			   BIT_CTRL_FIFO_AFULL_MASK,
+			   (0 << I2S_CTRL_FIFO_AFULL_MASK_FIELD_OFFSET));
+
+	/*Clear fifo afull mask */
+	regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_I2S_CTRL_FDX,
+			   BIT_CTRL_FDX_RFIFO_AFULL_MASK,
+			   (0 << I2S_CTRL_FDX_RFIFO_AFULL_MASK_FIELD_OFFSET));
 
 	/*Firstly,disable i2s*/
 	regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_I2S_CTRL,
@@ -430,14 +618,6 @@ static void afe_i2s_sc_start_playback(struct sdrv_afe_i2s_sc *afe)
 			   BIT_STAT_TDATA_UNDERR,
 			   (0 << I2S_STAT_TDATA_UNDERR_FIELD_OFFSET));
 
-	if (afe->tdm_initialized == true) {
-		regmap_update_bits(
-		    afe->regmap, REG_CDN_I2SSC_REGS_TDM_FD_DIR,
-		    BIT_TDM_FD_DIR_CH_TX_EN,
-		    (afe->tx_slot_mask << TDM_FD_DIR_CH0_TXEN_FIELD_OFFSET));
-	}
-
-	regcache_sync(afe->regmap);
 	/*At the last Enable i2s interrupt main switch*/
 	regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_I2S_CTRL,
 			   BIT_CTRL_INTREQ_MASK,
@@ -446,8 +626,6 @@ static void afe_i2s_sc_start_playback(struct sdrv_afe_i2s_sc *afe)
 	regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_I2S_CTRL,
 			   BIT_CTRL_I2S_EN,
 			   (1 << I2S_CTRL_I2S_EN_FIELD_OFFSET));
-
-	regcache_sync(afe->regmap);
 	ret = regmap_read(afe->regmap, REG_CDN_I2SSC_REGS_I2S_CTRL, &val);
 	dev_dbg(afe->dev, "DUMP %d REG_CDN_I2SSC_REGS_I2S_CTRL(0x%x)\n",
 		__LINE__, val);
@@ -457,25 +635,25 @@ static void afe_i2s_sc_start_playback(struct sdrv_afe_i2s_sc *afe)
 	dev_dbg(afe->dev, "DUMP REG_CDN_I2SSC_REGS_I2S_SRES(0x%x)\n", val);
 }
 
+static void afe_i2s_sc_start_playback(struct sdrv_afe_i2s_sc *afe)
+{
+	if (afe->tdm_initialized == true) {
+		afe_i2s_sc_start_playback_tdm(afe);
+	} else if (!atomic_read(&afe->capturing)) {
+		afe_i2s_sc_start_playback_normal(afe);
+	} else {
+		DEBUG_FUNC_PRT
+	}
+}
+
 static void afe_i2s_sc_stop_playback(struct sdrv_afe_i2s_sc *afe)
 {
 
-	/*FIFO reset*/
-	regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_I2S_CTRL,
-			   BIT_CTRL_FIFO_RST,
-			   (0 << I2S_CTRL_FIFO_RST_FIELD_OFFSET));
-
-	/* Disable interrupt */
-	regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_I2S_CTRL,
-			   BIT_CTRL_INTREQ_MASK,
-			   (0 << I2S_CTRL_INTREQ_MASK_FIELD_OFFSET));
-	/*TDM slot setting clear i2s setting but keep afe->tx_slot_mask*/
 	if (afe->tdm_initialized == true) {
 		regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_TDM_FD_DIR,
 				   BIT_TDM_FD_DIR_CH_TX_EN,
 				   (0 << TDM_FD_DIR_CH0_TXEN_FIELD_OFFSET));
 	}
-	regcache_sync(afe->regmap);
 }
 
 static void afe_i2s_sc_stop(struct sdrv_afe_i2s_sc *afe)
@@ -483,13 +661,19 @@ static void afe_i2s_sc_stop(struct sdrv_afe_i2s_sc *afe)
 	u32 ret, val;
 	/*Clear I2S status*/
 	regmap_write(afe->regmap, REG_CDN_I2SSC_REGS_I2S_STAT, 0);
-
+	if (afe->tdm_initialized == true) {
+		regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_TDM_FD_DIR,
+				   BIT_TDM_FD_DIR_CH_TX_EN,
+				   (0 << TDM_FD_DIR_CH0_TXEN_FIELD_OFFSET));
+		regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_TDM_FD_DIR,
+				   BIT_TDM_FD_DIR_CH_RX_EN,
+				   (0 << TDM_FD_DIR_CH0_RXEN_FIELD_OFFSET));
+	}
 	/*Disable i2s*/
 	regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_I2S_CTRL,
 			   BIT_CTRL_I2S_EN,
 			   (0 << I2S_CTRL_I2S_EN_FIELD_OFFSET));
 
-	regcache_sync(afe->regmap);
 	DEBUG_FUNC_PRT
 	ret = regmap_read(afe->regmap, REG_CDN_I2SSC_REGS_I2S_CTRL, &val);
 	dev_dbg(afe->dev, "DUMP %d REG_CDN_I2SSC_REGS_I2S_CTRL(0x%x)\n",
@@ -623,7 +807,6 @@ static int sdrv_snd_pcm_trigger(struct snd_pcm_substream *substream, int cmd)
 			afe_i2s_sc_start_capture(afe);
 			atomic_set(&afe->capturing, 1);
 		}
-		regcache_sync(afe->regmap);
 		return 0;
 
 	case SNDRV_PCM_TRIGGER_STOP:
@@ -638,9 +821,8 @@ static int sdrv_snd_pcm_trigger(struct snd_pcm_substream *substream, int cmd)
 		}
 		if (!atomic_read(&afe->playing) &&
 		    !atomic_read(&afe->capturing)) {
-			afe_i2s_sc_stop(afe);
+			 afe_i2s_sc_stop(afe);
 		}
-		regcache_sync(afe->regmap);
 		return 0;
 	}
 	return -EINVAL;
@@ -761,7 +943,7 @@ static irqreturn_t sdrv_i2s_sc_irq_handler(int irq, void *dev_id)
 	}
 
 	return IRQ_HANDLED;
-	}
+}
 
 /* -Set up dai regmap
  * here----------------------------------------------------------- */
@@ -807,7 +989,7 @@ static const struct regmap_config sdrv_i2s_sc_regmap_config = {
     .writeable_reg = sdrv_i2s_wr_rd_reg,
     .readable_reg = sdrv_i2s_wr_rd_reg,
     .volatile_reg = sdrv_i2s_wr_rd_reg,
-    .cache_type = REGCACHE_FLAT,
+    .cache_type = REGCACHE_NONE,
 };
 
 int snd_afe_dai_startup(struct snd_pcm_substream *substream,
@@ -869,7 +1051,7 @@ static void snd_afe_dai_ch_cfg(struct sdrv_afe_i2s_sc *afe, int stream, unsigned
 	regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_TDM_CTRL,
 				   BIT_TDM_CTRL_TDM_EN,
 				   (1 << TDM_CTRL_TDM_EN_FIELD_OFFSET));
-
+	//regcache_sync(afe->regmap);
 	//ret = regmap_read(afe->regmap, REG_CDN_I2SSC_REGS_TDM_CTRL, &val);
 	//dev_dbg(afe->dev, "DUMP REG_CDN_I2SSC_REGS_TDM_CTRL(0x%x)\n", val);
 }
@@ -893,7 +1075,13 @@ int snd_afe_dai_hw_params(struct snd_pcm_substream *substream,
 	/* 	unsigned freq, ratio, level;
 		int err; */
 
-
+	if ((params_channels(hwparam) != 1) &&
+	    (params_channels(hwparam) != 2) &&
+	    (params_channels(hwparam) != 4) &&
+	    (params_channels(hwparam) != 8)) {
+		/*Filter TDM setting*/
+		return -EINVAL;
+	}
 	if(afe->tdm_initialized == false){
 		if (params_channels(hwparam) == 2) {
 			/*config data channel stereo*/
@@ -1010,7 +1198,7 @@ int snd_afe_dai_hw_params(struct snd_pcm_substream *substream,
 		if (true == afe->is_full_duplex) {
 
 			/*Reset full duplex FIFO reset*/
-			regmap_update_bits(
+ 			regmap_update_bits(
 			    afe->regmap, REG_CDN_I2SSC_REGS_I2S_CTRL_FDX,
 			    BIT_CTRL_FDX_FIFO_RST,
 			    (0 << I2S_CTRL_FDX_FIFO_RST_FIELD_OFFSET));
@@ -1022,7 +1210,8 @@ int snd_afe_dai_hw_params(struct snd_pcm_substream *substream,
 			    (0 << I2S_CTRL_FIFO_RST_FIELD_OFFSET));
 		}
 	}
-	regcache_sync(afe->regmap);
+
+	//regcache_sync(afe->regmap);
 	/* 	ret = regmap_read(afe->regmap, REG_CDN_I2SSC_REGS_I2S_CTRL,
 	   &val); dev_dbg(afe->dev, "DUMP %d
 	   REG_CDN_I2SSC_REGS_I2S_CTRL(0x%x)\n",
@@ -1052,6 +1241,7 @@ int snd_afe_dai_prepare(struct snd_pcm_substream *substream,
 {
 
 	DEBUG_FUNC_PRT
+	struct sdrv_afe_i2s_sc *afe = snd_soc_dai_get_drvdata(dai);
 	return 0;
 }
 
@@ -1061,7 +1251,7 @@ int snd_afe_dai_trigger(struct snd_pcm_substream *substream, int cmd,
 {
 
 	struct sdrv_afe_i2s_sc *afe = snd_soc_dai_get_drvdata(dai);
-	printk(KERN_INFO "%s:%i ------cmd(%d)stream(%d)--------------\n", __func__,
+	printk(KERN_INFO "%s:%i ---- cmd(%d)stream(%d)--------------\n", __func__,
 	       __LINE__, cmd,substream->stream );
 	switch (cmd) {
 	case SNDRV_PCM_TRIGGER_START:
@@ -1093,13 +1283,14 @@ int snd_afe_dai_trigger(struct snd_pcm_substream *substream, int cmd,
 			printk(KERN_INFO "%s:%i -----i2s stop----------\n", __func__,
 	       __LINE__, cmd,substream->stream );
 			afe_i2s_sc_stop(afe);
+			//afe_i2s_sc_dump_reg(afe);
 		}
 		break;
 
 	default:
 		return -EINVAL;
 	}
-	/* afe_i2s_sc_dump_reg(afe); */
+
 	return 0;
 }
 int snd_afe_dai_hw_free(struct snd_pcm_substream *substream,
@@ -1306,7 +1497,7 @@ static int snd_afe_dai_set_fmt(struct snd_soc_dai *dai, unsigned int fmt)
 	default:
 		return -EINVAL;
 	}
-	// regcache_sync(afe->regmap);
+	// //regcache_sync(afe->regmap);
 
 	ret = regmap_read(afe->regmap, REG_CDN_I2SSC_REGS_I2S_CTRL, &val);
 	dev_dbg(afe->dev, "DUMP %d REG_CDN_I2SSC_REGS_I2S_CTRL(0x%x)\n",
@@ -1328,12 +1519,12 @@ static int snd_afe_set_dai_tdm_slot(struct snd_soc_dai *dai,
 				   (1 << TDM_CTRL_TDM_EN_FIELD_OFFSET));
 
 	regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_TDM_FD_DIR,
-				   BIT_TDM_FD_DIR_CH_TX_EN,
-				   (0 << TDM_FD_DIR_CH0_TXEN_FIELD_OFFSET));
+			   BIT_TDM_FD_DIR_CH_TX_EN,
+			   (tx_mask << TDM_FD_DIR_CH0_TXEN_FIELD_OFFSET));
 
 	regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_TDM_FD_DIR,
-				   BIT_TDM_FD_DIR_CH_RX_EN,
-				   (0 << TDM_FD_DIR_CH0_RXEN_FIELD_OFFSET));
+			   BIT_TDM_FD_DIR_CH_RX_EN,
+			   (rx_mask << TDM_FD_DIR_CH0_RXEN_FIELD_OFFSET));
 
 	if (slots <= 4){
 		DEBUG_FUNC_PRT
@@ -1373,7 +1564,6 @@ static int snd_afe_set_dai_tdm_slot(struct snd_soc_dai *dai,
 	else{
 		return -EINVAL;
 	}
-
 /*  	if (true == afe->is_full_duplex) {
 		regmap_write(afe->regmap, REG_CDN_I2SSC_REGS_I2S_SRES_FDR, slot_width -1);
 		regmap_write(afe->regmap, REG_CDN_I2SSC_REGS_I2S_SRES, slot_width -1);
@@ -1533,8 +1723,8 @@ static int sdrv_pcm_prepare_slave_config(struct snd_pcm_substream *substream,
 	if (ret)
 		return ret;
 
-	slave_config->dst_maxburst = max(channels, 8);
-	slave_config->src_maxburst = max(channels, 8);
+	slave_config->dst_maxburst = max(channels, 4);
+	slave_config->src_maxburst = max(channels, 4);
 
 	/*Change width by audio format */
 

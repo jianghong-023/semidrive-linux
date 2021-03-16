@@ -438,7 +438,7 @@ const static uint8_t ChnWidthTable[] = {8, 12, 16, 18, 20, 24, 28, 32};
 #define BIT_TDM_CTRL_CH2_EN (BIT_(18))
 #define BIT_TDM_CTRL_CH1_EN (BIT_(17))
 #define BIT_TDM_CTRL_CH0_EN (BIT_(16))
-#define BIT_TDM_CTRL_CH_EN (0xFF00)
+#define BIT_TDM_CTRL_CH_EN (0xFFFF0000)
 #define BIT_TDM_CTRL_CHN_NO_3 (BIT_(4))
 #define BIT_TDM_CTRL_CHN_NO_2 (BIT_(3))
 #define BIT_TDM_CTRL_CHN_NO_1 (BIT_(2))
