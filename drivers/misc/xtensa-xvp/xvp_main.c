@@ -1968,26 +1968,29 @@ static int xrp_init_regs_v0(struct platform_device *pdev, struct xvp *xvp)
 
 static int xrp_init_regs_v1(struct platform_device *pdev, struct xvp *xvp)
 {
-	struct resource *mem;
+	struct resource *comm, *mem;
 	struct resource r;
 
-	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+	comm = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+	if (!comm)
+		return -ENODEV;
+
+	mem = platform_get_resource(pdev, IORESOURCE_MEM, 1);
 	if (!mem)
 		return -ENODEV;
 
-	if (resource_size(mem) < 5 * PAGE_SIZE) {
+	if (resource_size(mem) < PAGE_SIZE || resource_size(comm) < PAGE_SIZE) {
 		dev_err(xvp->dev,
 			"%s: shared memory size is too small\n",
 			__func__);
 		return -ENOMEM;
 	}
 
-	xvp->comm_phys = mem->start;
-	/* start from 4 pages aligned */
-	xvp->pmem = mem->start + 0x4000;
-	xvp->shared_size = resource_size(mem) - 0x4000;
+	xvp->comm_phys = comm->start;
+	xvp->pmem = mem->start;
+	xvp->shared_size = resource_size(mem);
 
-	r = *mem;
+	r = *comm;
 	r.end = r.start + PAGE_SIZE;
 	xvp->comm = devm_ioremap_resource(&pdev->dev, &r);
 	return xrp_init_private_pool(&xvp->pool, xvp->pmem,
