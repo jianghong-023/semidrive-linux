@@ -523,35 +523,15 @@ int max96722_check_chip_id(deser_dev_t *dev)
 	u8 chip_id = 0;
 	int i = 0;
 
-	//max96722_power(dev, 0);
-	//usleep_range(5000, 6000);
-	//max96722_power(dev, 1);
-	//msleep(30);
-
 	ret = max96722_read_reg(dev, 0x000d, &chip_id);
-
-	if (ret < 0) {
-		//dev_err(&client->dev, "%s: failed to read max96722 chipid.\n",
-		//	__func__);
-		for (i = 0; i < 2; i++) {
-			ret = max96722_read_reg(dev, 0x000d, &chip_id);
-			if (ret == 0)
-				break;
-			//dev_err(&client->dev,"failed to read max96722 chipid.\n");
-			usleep_range(10000, 11000);
-		}
-		//if(ret < 0)
-		//	return ret;
-	}
 
 	if (chip_id == MAX96722_DEVICE_ID || chip_id == MAX96712_DEVICE_ID) {
 		dev_err(&client->dev, "max96722/12 chipid = 0x%02x\n", chip_id);
-		ret = max96722_read_reg(dev, 0x004c, &chip_id);
-		dev_err(&client->dev, "max96722/12 dev version = 0x%02x\n", chip_id);
 	} else {
 		dev_err(&client->dev,
 			"%s: wrong chip identifier, expected 0x%x(max96722), 0x%x(max96712) got 0x%x\n",
 			__func__, MAX96722_DEVICE_ID, MAX96712_DEVICE_ID, chip_id);
+		return -EIO;
 	}
 
 	return ret;
