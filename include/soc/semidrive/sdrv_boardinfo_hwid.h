@@ -43,6 +43,7 @@ enum sd_board_type_e {//2 bit
 enum sd_boardid_major_e {//3 bit
 	BOARDID_MAJOR_UNKNOWN,
 	BOARDID_MAJOR_A,
+	BOARDID_MAJOR_G9A
 };
 enum sd_boardid_ms_major_e {//3 bit
 	BOARDID_MAJOR_MPS = 1,

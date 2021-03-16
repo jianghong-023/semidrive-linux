@@ -211,6 +211,7 @@ char *get_hwid_friendly_name(char *hwid, int len)
 		case BOARDID_MAJOR_UNKNOWN:
 			strcat(hwid, "UNKNOWN");
 			break;
+		case BOARDID_MAJOR_G9A:
 		case BOARDID_MAJOR_A:
 			sprintf(hwid, "%sA%02d", hwid, get_part_id(PART_BOARD_ID_MIN));
 			break;
