@@ -380,35 +380,13 @@ int max9286_check_chip_id(deser_dev_t *dev)
 	u8 chip_id = 0;
 	int i = 0;
 
-	//max9286_power(dev, 0);
-	//usleep_range(5000, 5100);
-	//max9286_power(dev, 1);
-	//msleep(30);
-
 	ret = max9286_read_reg(dev, 0x1e, &chip_id);
 
-	if (ret < 0) {
-		//dev_err(&client->dev, "%s: failed to read max9286 chipid.\n",
-		//	__func__);
-		for (i = 0; i < 2; i++) {
-			ret = max9286_read_reg(dev, 0x1e, &chip_id);
-			if (ret == 0)
-				break;
-			//dev_err(&client->dev,"failed to read max9286 chipid.\n");
-			usleep_range(10000, 11000);
-		}
-		//if(ret < 0)
-		//	return ret;
-	}
-
-	if (chip_id == MAX9286_DEVICE_ID) {
-		dev_err(&client->dev, "%s chipid = 0x%02x\n", dev->priv->name, chip_id);
-		ret = max9286_read_reg(dev, 0x1f, &chip_id);
-		dev_err(&client->dev, "%s dev version = 0x%02x\n", dev->priv->name, chip_id);
-	} else {
+	if (chip_id != MAX9286_DEVICE_ID) {
 		dev_err(&client->dev,
 			"%s: wrong chip identifier, expected 0x%x(max9286) got 0x%x\n",
 			__func__, MAX9286_DEVICE_ID, chip_id);
+		return -EIO;
 	}
 
 	return ret;

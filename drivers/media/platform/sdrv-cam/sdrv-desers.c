@@ -45,8 +45,8 @@
 deser_para_t *desers_array[] = {
 	&max9286_para,
 	&max96722_para,
-	&max9286_para_2,
 	&max96706_para,
+	&max9286_para_2,
 	NULL,
 };
 
