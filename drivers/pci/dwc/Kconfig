@@ -178,4 +178,10 @@ config PCIE_SEMIDRIVE
 	help
 	  Say Y here if you want PCIe controller support
 	  on Semidrive Kunlun series SoCs.
+
+config PCIE_SD_DEV
+	bool "Semidrive PCIe device driver"
+	depends on PCI && PCIE_DW_HOST
+	select SDRV_REMOTE_GIC
+	default n
 endmenu

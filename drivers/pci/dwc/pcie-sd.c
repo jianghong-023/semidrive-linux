@@ -44,6 +44,9 @@
 #define PCIE_PHY_NCR_CTRL25 (0x64)
 #define PCIE_PHY_NCR_STS0 (0x80)
 
+#define PCIE1_DBI (0x31000000)
+#define PCIE2_DBI (0x31100000)
+
 /* info in PCIe PHY NCR registers */
 #define CR_ADDR_MODE_BIT (0x1 << 29)
 #define BIF_EN_BIT (0x1 << 1)
@@ -123,6 +126,7 @@ struct sd_pcie {
 	void __iomem *ctrl_ncr_base;
 	enum sd_pcie_lane_cfg lane_config;
 	u32 phy_refclk_sel;
+	u32 index;
 };
 
 static inline void sd_apb_phy_writel(struct sd_pcie *sd_pcie,
@@ -232,6 +236,11 @@ static int sd_pcie_get_resource(struct sd_pcie *sd_pcie,
 	sd_pcie->pcie->dbi_base = devm_ioremap_resource(dev, dbi);
 	if (IS_ERR(sd_pcie->pcie->dbi_base))
 		return PTR_ERR(sd_pcie->pcie->dbi_base);
+
+	if (dbi->start == PCIE1_DBI)
+		sd_pcie->index = PCIE1_INDEX;
+	else if (dbi->start == PCIE2_DBI)
+		sd_pcie->index = PCIE2_INDEX;
 
 	sd_pcie->pcie->atu_base =
 	    sd_pcie->pcie->dbi_base + SD_PCIE_ATU_OFFSET;
@@ -524,6 +533,14 @@ static int sd_pcie_host_init(struct pcie_port *pp)
 		dw_pcie_msi_init(pp);
 
 	return 0;
+}
+
+u32 sd_pcie_get_index(struct pcie_port *pp)
+{
+	struct dw_pcie *pcie = to_dw_pcie_from_pp(pp);
+	struct sd_pcie *sd_pcie = to_sd_pcie(pcie);
+
+	return sd_pcie->index;
 }
 
 static struct dw_pcie_ops sd_dw_pcie_ops = {

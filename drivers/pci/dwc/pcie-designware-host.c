@@ -77,6 +77,9 @@ static struct msi_domain_info dw_pcie_msi_domain_info = {
 	.chip	= &dw_pcie_msi_irq_chip,
 };
 
+extern bool sd_remote_int_completed(unsigned short pci_dev);
+extern u32 sd_pcie_get_index(struct pcie_port *pp);
+
 /* MSI int handler */
 irqreturn_t dw_handle_msi_irq(struct pcie_port *pp)
 {
@@ -105,6 +108,13 @@ irqreturn_t dw_handle_msi_irq(struct pcie_port *pp)
 			dw_pcie_wr_own_conf(pp, PCIE_MSI_INTR0_STATUS +
 						(i * MSI_REG_CTRL_BLOCK_SIZE),
 					    4, 1 << pos);
+
+		#ifdef CONFIG_SDRV_REMOTE_GIC
+			if (sd_pcie_get_index(pp) == 1)
+				sd_remote_int_completed(1);
+			else if (sd_pcie_get_index(pp) == 2)
+				sd_remote_int_completed(2);
+		#endif
 			pos++;
 		}
 	}
@@ -309,6 +319,9 @@ void dw_pcie_msi_init(struct pcie_port *pp)
 	struct page *page;
 	u64 msi_target;
 
+#ifdef CONFIG_SDRV_REMOTE_GIC
+	pp->msi_data = 0x8000000000;
+#else
 	page = alloc_page(GFP_KERNEL);
 	pp->msi_data = dma_map_page(dev, page, 0, PAGE_SIZE, DMA_FROM_DEVICE);
 	if (dma_mapping_error(dev, pp->msi_data)) {
@@ -316,6 +329,7 @@ void dw_pcie_msi_init(struct pcie_port *pp)
 		__free_page(page);
 		return;
 	}
+#endif
 	msi_target = (u64)pp->msi_data;
 
 	/* Program the msi_data */
