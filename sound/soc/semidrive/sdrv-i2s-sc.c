@@ -58,7 +58,7 @@ static void sdrv_pcm_refill_fifo(struct sdrv_afe_i2s_sc *afe)
 	tx_substream = rcu_dereference(afe->tx_substream);
 	const u16(*p)[2] = (void *)tx_substream->runtime->dma_area;
 	tx_active = tx_substream && snd_pcm_running(tx_substream);
-	// if(tx_active)
+
 	{
 		u32 ret, val, val1;
 		if (p) {
@@ -859,7 +859,6 @@ static irqreturn_t sdrv_i2s_sc_irq_handler(int irq, void *dev_id)
 	unsigned int i2s_sc_status;
 	struct snd_pcm_runtime *runtime;
 	int ret;
-	int err = 0;
 
 	runtime = afe->tx_substream->runtime;
 	ret = regmap_read(afe->regmap, REG_CDN_I2SSC_REGS_I2S_STAT,
@@ -1017,7 +1016,7 @@ static int ch_mask[]={0x0,0x1,0x3,0x7,0xf,0x1f,0x3f,0x7f,0xff};
 
 static void snd_afe_dai_ch_cfg(struct sdrv_afe_i2s_sc *afe, int stream, unsigned ch_numb)
 {
-	int ret, val;
+
 
 	afe->slots = max(ch_numb,afe->slots);
 	afe->slot_width = AFE_I2S_CHN_WIDTH;
@@ -1060,7 +1059,7 @@ int snd_afe_dai_hw_params(struct snd_pcm_substream *substream,
 			  struct snd_pcm_hw_params *hwparam,
 			  struct snd_soc_dai *dai)
 {
-	u32 ret, val;
+
 
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
 	/* 	struct device *dev = dai->dev;
@@ -1179,7 +1178,7 @@ int snd_afe_dai_hw_params(struct snd_pcm_substream *substream,
 		regmap_write(
 		    afe->regmap, REG_CDN_I2SSC_REGS_I2S_SRATE,
 		    I2S_SC_SAMPLE_RATE_CALC(clk_get_rate(afe->clk_i2s), srate,
-					    max(channels, 2),
+					    max((int)channels, 2),
 					    ChnWidthTable[AFE_I2S_CHN_WIDTH]));
 	}
 	else{
@@ -1241,7 +1240,8 @@ int snd_afe_dai_prepare(struct snd_pcm_substream *substream,
 {
 
 	DEBUG_FUNC_PRT
-	struct sdrv_afe_i2s_sc *afe = snd_soc_dai_get_drvdata(dai);
+/* 	struct sdrv_afe_i2s_sc *afe;
+	afe = snd_soc_dai_get_drvdata(dai); */
 	return 0;
 }
 
@@ -1352,7 +1352,7 @@ static int snd_afe_dai_set_fmt(struct snd_soc_dai *dai, unsigned int fmt)
 		/*config sck polar*/
 		regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_I2S_CTRL,
 				   BIT_CTRL_SCK_POLAR,
-				   (1 << I2S_CTRL_SCK_POLAR_FIELD_OFFSET));
+				   (0 << I2S_CTRL_SCK_POLAR_FIELD_OFFSET));
 		/*config ws polar*/
 		regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_I2S_CTRL,
 				   BIT_CTRL_WS_POLAR,
@@ -1380,7 +1380,7 @@ static int snd_afe_dai_set_fmt(struct snd_soc_dai *dai, unsigned int fmt)
 		/*config sck polar*/
 		regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_I2S_CTRL,
 				   BIT_CTRL_SCK_POLAR,
-				   (1 << I2S_CTRL_SCK_POLAR_FIELD_OFFSET));
+				   (0 << I2S_CTRL_SCK_POLAR_FIELD_OFFSET));
 		/*config ws polar*/
 		regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_I2S_CTRL,
 				   BIT_CTRL_WS_POLAR,
@@ -1408,7 +1408,7 @@ static int snd_afe_dai_set_fmt(struct snd_soc_dai *dai, unsigned int fmt)
 		/*config sck polar*/
 		regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_I2S_CTRL,
 				   BIT_CTRL_SCK_POLAR,
-				   (1 << I2S_CTRL_SCK_POLAR_FIELD_OFFSET));
+				   (0 << I2S_CTRL_SCK_POLAR_FIELD_OFFSET));
 		/*config ws polar*/
 		regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_I2S_CTRL,
 				   BIT_CTRL_WS_POLAR,
@@ -1434,7 +1434,7 @@ static int snd_afe_dai_set_fmt(struct snd_soc_dai *dai, unsigned int fmt)
 		/*config sck polar*/
 		regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_I2S_CTRL,
 				   BIT_CTRL_SCK_POLAR,
-				   (1 << I2S_CTRL_SCK_POLAR_FIELD_OFFSET));
+				   (0 << I2S_CTRL_SCK_POLAR_FIELD_OFFSET));
 
 		/*config ws polar*/
 		regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_I2S_CTRL,
@@ -1466,7 +1466,7 @@ static int snd_afe_dai_set_fmt(struct snd_soc_dai *dai, unsigned int fmt)
 		/*config sck polar*/
 		regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_I2S_CTRL,
 				   BIT_CTRL_SCK_POLAR,
-				   (1 << I2S_CTRL_SCK_POLAR_FIELD_OFFSET));
+				   (0 << I2S_CTRL_SCK_POLAR_FIELD_OFFSET));
 
 		/*config ws polar*/
 		regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_I2S_CTRL,
@@ -1509,7 +1509,8 @@ static int snd_afe_set_dai_tdm_slot(struct snd_soc_dai *dai,
 	unsigned int tx_mask, unsigned int rx_mask, int slots, int slot_width)
 {
 	struct sdrv_afe_i2s_sc *afe = snd_soc_dai_get_drvdata(dai);
-	int channel_numb ;
+	int ret, val;
+
 	dev_info(afe->dev, "%s:%i : tx_mask(0x%x) rx_mask(0x%x) slots(%d) slot_width(%d) \n", __func__,
 	       __LINE__,tx_mask,rx_mask,slots,slot_width);
 
@@ -1576,7 +1577,7 @@ static int snd_afe_set_dai_tdm_slot(struct snd_soc_dai *dai,
 	afe->rx_slot_mask = rx_mask;
 	/*Audio will use tdm */
 	afe->tdm_initialized = true;
-	int ret, val;
+
 	ret = regmap_read(afe->regmap, REG_CDN_I2SSC_REGS_TDM_CTRL, &val);
 	dev_info(afe->dev, "DUMP REG_CDN_I2SSC_REGS_TDM_CTRL(0x%x)\n", val);
 	ret = regmap_read(afe->regmap, REG_CDN_I2SSC_REGS_TDM_FD_DIR, &val);
@@ -1723,8 +1724,8 @@ static int sdrv_pcm_prepare_slave_config(struct snd_pcm_substream *substream,
 	if (ret)
 		return ret;
 
-	slave_config->dst_maxburst = max(channels, 4);
-	slave_config->src_maxburst = max(channels, 4);
+	slave_config->dst_maxburst = max((int)channels, 4);
+	slave_config->src_maxburst = max((int)channels, 4);
 
 	/*Change width by audio format */
 
@@ -1816,7 +1817,6 @@ static int snd_afe_i2s_sc_probe(struct platform_device *pdev)
 	struct sdrv_afe_i2s_sc *afe;
 	int ret;
 	struct resource *res;
-	struct resource *scr_res;
 	unsigned int irq_id, value;
 
 	dev_info(dev, "Probed.\n");
@@ -1835,7 +1835,8 @@ static int snd_afe_i2s_sc_probe(struct platform_device *pdev)
 	afe->clk_i2s = devm_clk_get(&pdev->dev, "i2s-clk");
 	if (IS_ERR(afe->clk_i2s))
 		return PTR_ERR(afe->clk_i2s);
-	ret = clk_set_rate(afe->clk_i2s, 294911997);
+	//Only this freq could also set MCLK to 12.288M.
+	ret = clk_set_rate(afe->clk_i2s, 98304000);
 	if (ret)
 		return ret;
 	DEBUG_ITEM_PRT(clk_get_rate(afe->clk_i2s));
