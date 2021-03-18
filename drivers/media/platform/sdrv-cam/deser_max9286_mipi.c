@@ -339,7 +339,7 @@ static int max20087_power(deser_dev_t *dev, bool enable)
 static int start_deser(deser_dev_t *dev, bool en)
 {
 	if (en == true) {
-		msleep(100);
+		msleep(20);
 		max9286_write_reg(dev, 0x15, 0x9b);
 	} else if (en == false) {
 		max9286_write_reg(dev, 0x15, 0x13);
@@ -499,7 +499,7 @@ int max9286_initialization(deser_dev_t *dev)
 	reg = 0x49;
 	val = 0;
 	max9286_read_reg(sensor, 0x49, &val);
-	dev_err(&client->dev, "all reg=0x%x, val=0x%x\n", reg, val);
+	//dev_err(&client->dev, "all reg=0x%x, val=0x%x\n", reg, val);
 
 
 	//yuv10 to yuv8
@@ -624,13 +624,17 @@ int max9286_initialization(deser_dev_t *dev)
 	reg = 0x49;
 	val = 0;
 	max9286_read_reg(sensor, 0x49, &val);
-	dev_err(&client->dev, "end reg=0x%x, val=0x%x\n", reg, val);
+	//dev_err(&client->dev, "end reg=0x%x, val=0x%x\n", reg, val);
 
 	//internal fs, debug for output
 	max9286_write_reg(sensor, 0x1, DES_REG1_FS_EN);
 	usleep_range(10000, 11000);
 
-	printk("%s  -\n", __FUNCTION__);
+	max9286_write_reg(dev, 0x15, 0x9b);
+	usleep_range(2000, 3000);
+	max9286_write_reg(dev, 0x15, 0x13);
+
+	//printk("%s  -\n", __FUNCTION__);
 
 	return 0;
 }

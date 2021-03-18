@@ -521,7 +521,6 @@ static int mipi_csi2_s_stream(struct v4l2_subdev *sd, int enable)
 				return -ENODEV;
 			}
 			mipi_csi2_enable(kcmc, enable);
-			usleep_range(10000, 11000);
 			v4l2_subdev_call(sensor_sd, video, s_stream, enable);
 		} else
 			kcmc->active_stream_num++;

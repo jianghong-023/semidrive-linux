@@ -475,11 +475,13 @@ static void max96722_link_enable(deser_dev_t *dev, int en)
 static int start_deser(deser_dev_t *dev, bool en)
 {
 	if (en == true) {
-		msleep(100);
+		msleep(20);
 		max96722_link_enable(dev, 1);
+		usleep_range(2000, 3000);
 		max96722_mipi_enable(dev, 1);
 	} else if (en == false) {
 		max96722_link_enable(dev, 0);
+		usleep_range(2000, 3000);
 		max96722_mipi_enable(dev, 0);
 	}
 
@@ -539,48 +541,6 @@ int max96722_check_chip_id(deser_dev_t *dev)
 
 void max96722_reg_dump(deser_dev_t *sensor)
 {
-#ifdef DEBUG_MAX96722
-	u8 tmp[32];
-	u8 val1;
-
-	msleep(1000);
-	max96722_read_reg(sensor, 0x08D0, &tmp[0]);
-	max96722_read_reg(sensor, 0x08D2, &tmp[31]);
-	max96722_read_reg(sensor, 0x04B6, &tmp[1]);
-	max96722_read_reg(sensor, 0x040A, &tmp[2]);
-	max96722_read_reg(sensor, 0x11F2, &tmp[3]);
-
-	max96722_read_reg(sensor, 0x0bcb, &tmp[4]);
-	max96722_read_reg(sensor, 0x0ccb, &tmp[5]);
-	max96722_read_reg(sensor, 0x0dcb, &tmp[6]);
-	max96722_read_reg(sensor, 0x0ecb, &tmp[7]);
-
-	max96722_read_reg(sensor, 0x11F0, &tmp[9]);
-	max96722_read_reg(sensor, 0x11F1, &tmp[10]);
-	max96722_read_reg(sensor, 0x0010, &tmp[11]);
-	max96722_read_reg(sensor, 0x040B, &tmp[12]);
-	max96722_read_reg(sensor, 0x040C, &tmp[13]);
-	max96722_read_reg(sensor, 0x08A3, &val1);
-	max96722_read_reg(sensor, 0x0006, &tmp[30]);
-
-	printk("mipi out: 0x08D0=0x%02x\n", tmp[0]);
-	printk("mipi out: 0x08D2=0x%02x\n", tmp[31]);
-	printk("frameLoc: 0x04B6=0x%02x\n", tmp[1]);
-	printk("ErrorHas: 0x040A=0x%02x\n", tmp[2]);
-	printk("VsDetect: 0x11F0=0x%02x\n\n", tmp[9]);
-	printk("VsDetect: 0x11F1=0x%02x\n\n", tmp[10]);
-	printk("VsDetect: 0x11F2=0x%02x\n\n", tmp[3]);
-	printk("VsDetect: 0x0010=0x%02x\n\n", tmp[11]);
-	printk("VsDetect: 0x040b=0x%02x\n\n", tmp[12]);
-	printk("VsDetect: 0x040c=0x%02x\n\n", tmp[13]);
-	printk("VsDetect: 0x08A3=0x%02x\n\n", val1);
-
-	printk("LinkA ST: 0x0bcb=0x%02x\n", tmp[4]);
-	printk("LinkB ST: 0x0ccb=0x%02x\n", tmp[5]);
-	printk("LinkC ST: 0x0dcb=0x%02x\n", tmp[6]);
-	printk("LinkD ST: 0x0ecb=0x%02x\n", tmp[7]);
-	printk("Link  EN: 0x0006=0x%02x\n", tmp[30]);
-#endif
 	return;
 }
 
@@ -593,8 +553,6 @@ int max96722_initialization(deser_dev_t *dev)
 	int ret;
 	int reglen = sizeof(max96722_reg)/sizeof(max96722_reg[0]);
 	int i = 0;
-
-	printk("%s reglen = %d +\n", __FUNCTION__, reglen);
 
 	//Check if deser exists.
 	ret = max96722_read_reg(dev, 0x000d, &value);
@@ -616,12 +574,13 @@ int max96722_initialization(deser_dev_t *dev)
 	max20087_power(dev, 0);
 	usleep_range(10000, 11000);
 	max20087_power(dev, 1);
-	msleep(100);
+	msleep(120);
 
 	for (i = 0; i < MAX_CAMERA_NUM; i++) {
 		//Modify serializer i2c address
 		max96722_write_reg(dev, 0x0006, 1<<i);
-		usleep_range(10000, 11000);
+		usleep_range(20000, 21000);
+
 		max96705_write_reg(dev, (MAX96705_DEF-MAX96705_CH_A)>>1, 0x00, MAX96705_CH_A + i * 2);
 		usleep_range(10000, 11000);
 		max96705_access_sync(dev, i, MAX96705_WRITE, 0x07, NULL, 0x84);
@@ -637,11 +596,12 @@ int max96722_initialization(deser_dev_t *dev)
 	}
 
 	//For enable data
+	usleep_range(2000, 3000);
 	max96722_mipi_enable(dev, 1);
+	usleep_range(2000, 3000);
 	max96722_link_enable(dev, 1);
-	msleep(20);
-	max96722_link_enable(dev, 0);
-	printk("%s  -\n", __FUNCTION__);
+	msleep(30);
+	max96722_mipi_enable(dev, 0);
 
 	return 0;
 }

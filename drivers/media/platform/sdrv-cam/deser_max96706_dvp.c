@@ -417,7 +417,7 @@ int check_camera_subboard(deser_dev_t *sensor)
 	} else
 		board_type = val[1]&0x30;
 
-	printk("TCA9539: 0x1=0x%x, board_type = 0x%x\n", val[1], board_type);
+	//printk("TCA9539: 0x1=0x%x, board_type = 0x%x\n", val[1], board_type);
 
 	return board_type;
 }
@@ -440,7 +440,7 @@ static int gpi_power(deser_dev_t *dev, int gpio, bool enable)
 	u8 reg;
 	int shift;
 
-	//printk("poc power +\n");
+	//printk("gpi power +\n");
 
 	if (gpio > 15 || gpio < 0)
 		return -EINVAL;
@@ -461,15 +461,13 @@ static int gpi_power(deser_dev_t *dev, int gpio, bool enable)
 	}
 
 	if (board_type == BOARD_SD507_A02 || board_type == BOARD_SD507_A02P) {
-		printk("gpi sd507 a02/a02+ board.\n");
+		pr_debug("gpi sd507 a02/a02+ board.\n");
 		if (dev->gpi_gpio) {
-			dev_err(&dev->i2c_client->dev, "has gpi_gpio\n", __func__);
+			//dev_err(&dev->i2c_client->dev, "has gpi_gpio\n", __func__);
 			gpiod_direction_output(dev->gpi_gpio, enable ? 1 : 0);
-		} else {
-			dev_err(&dev->i2c_client->dev, "no gpi_gpio\n", __func__);
 		}
 	} else {  //For BOARD_DB5071 PIN9
-		printk("gpi db5071 board.\n");
+		pr_debug("gpi db5071 board.\n");
 		if (enable == true) {
 			tca9539_read_reg(dev, reg, &val);
 			val &= ~(1 << shift);
@@ -481,7 +479,7 @@ static int gpi_power(deser_dev_t *dev, int gpio, bool enable)
 		}
 	}
 
-	//printk("poc power -\n");
+	//printk("gpi power -\n");
 	return 0;
 
 }
@@ -533,7 +531,6 @@ static int start_deser(deser_dev_t *sensor, bool en)
 		max96706_write_reg(sensor, 0x04, val);
 		usleep_range(1000, 1100);
 	}
-	printk("max96706 start data  -\n");
 
 	return 0;
 }
@@ -585,12 +582,15 @@ static int max96706_initialization(deser_dev_t *sensor)
 	u16 reg;
 	u16 val16;
 
-	dev_err(&client->dev, "%s()\n", __func__);
-	//printk("max96706 init +\n");
-
+	//printk("max96706 init %s pid %d +\n", current->comm, current->pid);
 	//set him
 	val = 0;
-	max96706_read_reg(sensor, 0x06, &val);
+	ret = max96706_read_reg(sensor, 0x06, &val);
+	if (ret < 0) {
+		dev_err(&client->dev, "max96706 fail to read 0x06=%d\n", ret);
+		return ret;
+	}
+
 	val |= 0x80;
 	max96706_write_reg(sensor, 0x06, val);
 	usleep_range(1000, 1100);
@@ -600,12 +600,13 @@ static int max96706_initialization(deser_dev_t *sensor)
 	max96706_read_reg(sensor, 0x02, &val);
 	val |= 0x80;
 	max96706_write_reg(sensor, 0x02, val);
-	usleep_range(1000, 1100);
+	usleep_range(3000, 3100);
 
 	//disable output
 	val = 0;
-	max96706_read_reg(sensor, 0x04, &val);
-	val |= 0x40;
+	//max96706_read_reg(sensor, 0x04, &val);
+	//printk("max96706 read 0x4 = 0x%x\n",  val);
+	val = 0x47;
 	max96706_write_reg(sensor, 0x04, val);
 	msleep(20);
 
@@ -619,15 +620,16 @@ static int max96706_initialization(deser_dev_t *sensor)
 		ret = max96705_check_chip_id(sensor);
 
 		if (ret != 0) {
-			dev_err(&client->dev, "%s: times %d not found 96705, ret=%d\n", __func__, i, ret);
+			//dev_err(&client->dev, "%s: times %d not found 96705, ret=%d\n", __func__, i, ret);
 			msleep(20);
 		} else {
-			dev_err(&client->dev, "%s: found 96705, ret=%d\n", __func__, ret);
+			//dev_err(&client->dev, "%s: found 96705, ret=%d\n", __func__, ret);
 			break;
 		}
 	}
 
 	//Change I2C
+	usleep_range(1000, 2000);
 	max96705_write_reg(sensor,  (MAX96705_DEF-MAX96705_CH_A)>>1, 0x00, sensor->addr_serer << 1);
 	usleep_range(5000, 6000);
 	max96705_write_reg(sensor, 0, 0x01, (sensor->addr_deser) << 1);
@@ -647,11 +649,12 @@ static int max96706_initialization(deser_dev_t *sensor)
 		gpi_power(sensor, 9, 0);
 		usleep_range(100, 200);
 		gpi_power(sensor, 9, 1);
+		;
 	} else {
-		dev_err(&sensor->i2c_client->dev, "%s: no gpi_gpio\n", __func__);
+		//dev_err(&sensor->i2c_client->dev, "%s: no gpi_gpio\n", __func__);
 		val = 0;
 		max96705_read_reg(sensor, 0, 0x0f, &val);
-		dev_info(&sensor->i2c_client->dev, "%s: val=0x%x\n", __func__, val);
+		//dev_info(&sensor->i2c_client->dev, "%s: val=0x%x\n", __func__, val);
 		val |= 0x81;
 		max96705_write_reg(sensor, 0, 0x0f, val);
 		usleep_range(100, 200);
@@ -672,13 +675,13 @@ static int max96706_initialization(deser_dev_t *sensor)
 	reg = 0x0;	//chip version, 0x0160
 	val16 = 0;
 	ap0101_read_reg16(sensor, 0, reg, &val16);
-	dev_err(&client->dev, "0101, reg=0x%x, val=0x%x\n", reg, val16);
+	//dev_err(&client->dev, "0101, reg=0x%x, val=0x%x\n", reg, val16);
 
 
 	reg = 0xca9c;	//
 	val16 = 0;
 	ap0101_read_reg16(sensor, 0, reg, &val16);
-	dev_err(&client->dev, "0101, reg=0x%x, val=0x%x\n", reg, val16);
+	//dev_err(&client->dev, "0101, reg=0x%x, val=0x%x\n", reg, val16);
 	if ((val16 & (0x1<<10)) == 0) {
 		val16 = 0x405;
 		ap0101_write_reg16(sensor, 0, reg, val16);
@@ -693,7 +696,7 @@ static int max96706_initialization(deser_dev_t *sensor)
 	}
 	val16 = 0;
 	ap0101_read_reg16(sensor, 0, reg, &val16);
-	dev_err(&client->dev, "0101, reg=0x%x, val=0x%x\n", reg, val16);
+	//dev_err(&client->dev, "0101, reg=0x%x, val=0x%x\n", reg, val16);
 	if ((val16 & (0x1<<9)) == 0) {
 		val16 = 0x605;
 		ap0101_write_reg16(sensor, 0, reg, val16);
@@ -708,16 +711,16 @@ static int max96706_initialization(deser_dev_t *sensor)
 	}
 
 
-	dev_err(&client->dev, "0101, end msb. i=%d\n", i);
+	//dev_err(&client->dev, "0101, end msb. i=%d\n", i);
 
 	val = 0;
 	max96706_read_reg(sensor, 0x5, &val);
-	dev_err(&client->dev, "96706, reg=0x5, val=0x%x\n", val);
+	//dev_err(&client->dev, "96706, reg=0x5, val=0x%x\n", val);
 	val |= 0x40;
 	max96706_write_reg(sensor, 0x5, val);
 	val = 0;
 	max96706_read_reg(sensor, 0x5, &val);
-	dev_err(&client->dev, "96706, reg=0x5, val=0x%x\n", val);
+	//dev_err(&client->dev, "96706, reg=0x5, val=0x%x\n", val);
 	//printk("max96706 init -\n");
 
 	return 0;

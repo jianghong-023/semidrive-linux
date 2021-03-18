@@ -40,8 +40,6 @@
 #define MIPI_CSI2_SENS_VC3_PAD_SOURCE   3
 #define MIPI_CSI2_SENS_VCX_PADS_NUM	 4
 
-#define PROBE_INIT
-
 deser_para_t *desers_array[] = {
 	&max9286_para,
 	&max96722_para,
@@ -93,19 +91,12 @@ static int deser_s_power(struct v4l2_subdev *sd, int on)
 	if (on == 1) {
 		if (pdeser->power_deser) {
 			pdeser->power_deser(sensor, 1);
-			msleep(50);
+			msleep(30);
 		}
-
-		/* if (pdeser->power_module) {
-			pdeser->power_module(sensor, 0);
-			usleep_range(10000, 15000);
-			pdeser->power_module(sensor, 1);
-			msleep(50);
-		}*/
 
 		if (pdeser->init_deser) {
 			pdeser->init_deser(sensor);
-			msleep(100);
+			msleep(30);
 		}
 	} else if (on == 0) {
 		if (pdeser->power_deser)
@@ -211,7 +202,6 @@ static int deser_s_stream(struct v4l2_subdev *sd, int enable)
 	//printk("%s enable =%d +\n", __FUNCTION__, enable);
 
 	if (enable == 1) {
-		msleep(100);
 		if (pdeser->start_deser)
 			pdeser->start_deser(sensor, 1);
 
@@ -303,6 +293,7 @@ static int deser_probe(struct i2c_client *client,
 	int deser_index;
 	deser_para_t *pdeser_param;
 	int deser_detect = false;
+
 	//printk("%s %s +\n", __FUNCTION__, client->name);
 	sensor = devm_kzalloc(dev, sizeof(*sensor), GFP_KERNEL);
 
@@ -310,6 +301,7 @@ static int deser_probe(struct i2c_client *client,
 		dev_err(&client->dev, "No memory!");
 		return -ENOMEM;
 	}
+
 
 	sensor->i2c_client = client;
 
@@ -374,14 +366,12 @@ static int deser_probe(struct i2c_client *client,
 	}
 
 	mutex_init(&sensor->serer_lock);
-
+	pr_crit("Scan desers ....\n");
 	for (deser_index = 0; desers_array[deser_index] != NULL; deser_index++) {
 		pdeser_param = desers_array[deser_index];
 
-		//printk("detect deser name %s\n", pdeser_param->name);
 		if (pdeser_param->used == DESER_USE_ONCE || NULL == pdeser_param->detect_deser)
 			continue;
-		//printk("detect deser name %s\n", pdeser_param->name);
 
 		sensor->addr_deser = pdeser_param->addr_deser;
 		sensor->addr_poc = pdeser_param->addr_poc;
@@ -391,9 +381,9 @@ static int deser_probe(struct i2c_client *client,
 
 		if (pdeser_param->power_deser) {
 			pdeser_param->power_deser(sensor, 0);
-			usleep_range(5000, 5000);
+			usleep_range(30, 31);
 			pdeser_param->power_deser(sensor, 1);
-			msleep(50);
+			msleep(20);
 		}
 
 		//Please make sure that each deser has different i2c address.
@@ -413,6 +403,7 @@ static int deser_probe(struct i2c_client *client,
 		client->addr = pdeser_param->addr_deser;
 		if (pdeser_param->used == DESER_NOT_USED)
 			pdeser_param->used = DESER_USE_ONCE;
+		pr_crit("Done, %s\n", pdeser_param->name);
 		/* for (deser_index = 0; desers_array[deser_index] != NULL; deser_index++) {
 			if (pdeser_param->used == DESER_USE_ONCE)
 				pr_info("deser name = %s\n"	, desers_array[deser_index]->name);
@@ -492,17 +483,20 @@ static int deser_probe(struct i2c_client *client,
 		return ret;
 
 #ifdef PROBE_INIT
-		//Power deser
-		if (pdeser_param->power_deser) {
-			pdeser_param->power_deser(sensor, 0);
-			usleep_range(5000, 5000);
-			pdeser_param->power_deser(sensor, 1);
-			msleep(50);
-		}
+	//Power deser
+	if (pdeser_param->power_deser) {
+		pdeser_param->power_deser(sensor, 0);
+		usleep_range(5000, 5000);
+		pdeser_param->power_deser(sensor, 1);
+		msleep(50);
+	}
 
-		//Init deser
-		if (pdeser_param->init_deser)
-			pdeser_param->init_deser(sensor);
+	//Init deser
+	if (pdeser_param->init_deser) {
+		ret = pdeser_param->init_deser(sensor);
+		if (ret < 0)
+			return ret;
+	}
 #endif
 
 	ret = v4l2_async_register_subdev(&sensor->sd);
