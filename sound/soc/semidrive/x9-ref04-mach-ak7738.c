@@ -254,7 +254,7 @@ static const struct snd_soc_dapm_route sd_x9_ref04_dapm_map[] = {
     {"PCM0 IN", NULL, "AIF4 Capture"},
 
     {"DIG_AMP Playback", NULL, "AIF5 Playback"},
-    {"AIF5 Capture", NULL, "AIF4 Capture"},
+    {"AIF5 Capture", NULL, "AIF2 Capture"},
 };
 
 static const struct snd_soc_ops x9_ref04_ak7738_ops = {
