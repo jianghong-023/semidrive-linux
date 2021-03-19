@@ -86,6 +86,7 @@
 #define INTR_RDLH_LINK_UP (0x1 << 27)
 #define RESET_MASK (0x3f << 6)
 #define RESET_OFF (0x3f << 6)
+#define RESET_ON (0x1f << 6)
 
 /* Time for delay */
 #define TIME_PHY_RST_MIN (5)
@@ -452,7 +453,10 @@ static void sd_pcie_core_init(struct sd_pcie *sd_pcie)
 	u32 reg_val;
 
 	sd_ctrl_ncr_writel(sd_pcie, 0, PCIE_CTRL_NCR_INTEN0);
-	sd_ctrl_ncr_writel(sd_pcie, 0, PCIE_CTRL_NCR_INTEN1);
+	if (IS_ENABLED(CONFIG_PCI_MSI) && pci_msi_enabled())
+		sd_ctrl_ncr_writel(sd_pcie, 0, PCIE_CTRL_NCR_INTEN1);
+	else
+		sd_ctrl_ncr_writel(sd_pcie, 0x3c000000, PCIE_CTRL_NCR_INTEN1);
 	sd_ctrl_ncr_writel(sd_pcie, 0, PCIE_CTRL_NCR_INTEN2);
 	sd_ctrl_ncr_writel(sd_pcie, 0, PCIE_CTRL_NCR_INTEN3);
 	sd_ctrl_ncr_writel(sd_pcie, 0, PCIE_CTRL_NCR_INTEN4);
@@ -474,6 +478,12 @@ static void sd_pcie_core_init(struct sd_pcie *sd_pcie)
 	sd_ctrl_ncr_writel(sd_pcie, reg_val, PCIE_CTRL_NCR_CTRL0);
 
 	reg_val = sd_ctrl_ncr_readl(sd_pcie, PCIE_CTRL_NCR_CTRL2);
+	reg_val &= ~RESET_MASK;
+	reg_val |= RESET_ON;
+	sd_ctrl_ncr_writel(sd_pcie, reg_val, PCIE_CTRL_NCR_CTRL2);
+
+	usleep_range(1000, 1100);
+
 	reg_val &= ~RESET_MASK;
 	reg_val |= RESET_OFF;
 	sd_ctrl_ncr_writel(sd_pcie, reg_val, PCIE_CTRL_NCR_CTRL2);
@@ -529,7 +539,7 @@ static int sd_pcie_host_init(struct pcie_port *pp)
 	if (ret)
 		return ret;
 
-	if (IS_ENABLED(CONFIG_PCI_MSI))
+	if (IS_ENABLED(CONFIG_PCI_MSI) && pci_msi_enabled())
 		dw_pcie_msi_init(pp);
 
 	return 0;
@@ -559,7 +569,7 @@ static int __init sd_add_pcie_port(struct dw_pcie *pcie,
 	struct pcie_port *pp = &(pcie->pp);
 	struct sd_pcie *sd_pcie = to_sd_pcie(pcie);
 
-	if (IS_ENABLED(CONFIG_PCI_MSI)) {
+	if (IS_ENABLED(CONFIG_PCI_MSI) && pci_msi_enabled()) {
 		pp->msi_irq = platform_get_irq_byname(pdev, "msi");
 		if (pp->msi_irq <= 0) {
 			dev_err(dev, "failed to get MSI irq\n");
