@@ -257,7 +257,7 @@ static int dw_i2c_plat_probe(struct platform_device *pdev)
 	struct dw_i2c_platform_data *pdata = dev_get_platdata(&pdev->dev);
 	struct i2c_adapter *adap;
 	struct dw_i2c_dev *dev;
-	u32 acpi_speed, ht = 0;
+	u32 acpi_speed, ht = 0, timeout = 0;
 	struct resource *mem;
 	int i, irq, ret;
 	const int supported_speeds[] = { 0, 100000, 400000, 1000000, 3400000 };
@@ -319,6 +319,8 @@ static int dw_i2c_plat_probe(struct platform_device *pdev)
 					 &dev->scl_falling_time);
 		device_property_read_u32(&pdev->dev, "clock-frequency",
 					 &dev->clk_freq);
+		device_property_read_u32(&pdev->dev, "timeout",
+					 &timeout);
 	}
 
 	acpi_speed = i2c_acpi_find_bus_speed(&pdev->dev);
@@ -382,6 +384,8 @@ static int dw_i2c_plat_probe(struct platform_device *pdev)
 
 	adap = &dev->adapter;
 	adap->owner = THIS_MODULE;
+	if (timeout != 0)
+		adap->timeout = msecs_to_jiffies(timeout);
 	adap->class = I2C_CLASS_DEPRECATED;
 	ACPI_COMPANION_SET(&adap->dev, ACPI_COMPANION(&pdev->dev));
 	adap->dev.of_node = pdev->dev.of_node;
