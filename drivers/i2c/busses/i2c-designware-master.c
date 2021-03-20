@@ -406,7 +406,14 @@ i2c_dw_read(struct dw_i2c_dev *dev)
 			dev->status &= ~STATUS_READ_IN_PROGRESS;
 	}
 }
+static int calc_bytes(struct i2c_msg msgs[], int num)
+{
+	int i, count = 0;
 
+	for (i = 0; i < num; i++)
+		count += (msgs[i].len + 2);
+	return count;
+}
 /*
  * Prepare controller for a transaction and call i2c_dw_xfer_msg.
  */
@@ -414,7 +421,7 @@ static int
 i2c_dw_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num)
 {
 	struct dw_i2c_dev *dev = i2c_get_adapdata(adap);
-	int ret;
+	int ret, count, timeout;
 
 	dev_dbg(dev->dev, "%s: msgs: %d\n", __func__, num);
 
@@ -441,9 +448,13 @@ i2c_dw_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num)
 
 	/* Start the transfers */
 	i2c_dw_xfer_init(dev);
+	count = calc_bytes(msgs, num);
+	timeout = count * adap->timeout;
+	if (timeout > HZ)
+		timeout = HZ;
 
 	/* Wait for tx to complete */
-	if (!wait_for_completion_timeout(&dev->cmd_complete, adap->timeout)) {
+	if (!wait_for_completion_timeout(&dev->cmd_complete, timeout)) {
 		dev_err(dev->dev, "controller timed out\n");
 		/* i2c_dw_init implicitly disables the adapter */
 		i2c_dw_init_master(dev);
