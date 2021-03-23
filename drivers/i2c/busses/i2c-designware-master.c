@@ -53,7 +53,7 @@ static void i2c_dw_configure_fifo_master(struct dw_i2c_dev *dev)
  */
 static int i2c_dw_init_master(struct dw_i2c_dev *dev)
 {
-	u32 hcnt, lcnt;
+	u32 hcnt, lcnt, tmp;
 	u32 reg, comp_param1;
 	u32 sda_falling_time, scl_falling_time;
 	int ret;
@@ -149,7 +149,10 @@ static int i2c_dw_init_master(struct dw_i2c_dev *dev)
 	if (reg >= DW_IC_SDA_HOLD_MIN_VERS) {
 		if (!dev->sda_hold_time) {
 			/* Keep previous hold time setting if no one set it */
-			dev->sda_hold_time = dw_readl(dev, DW_IC_SDA_HOLD);
+			//dev->sda_hold_time = dw_readl(dev, DW_IC_SDA_HOLD);
+			//add sda hold check, sda hold to lcnt/2 and should small than lcnt -2
+			tmp = min(lcnt/2, (lcnt - 2));
+			dev->sda_hold_time = (tmp << DW_IC_SDA_HOLD_RX_SHIFT) + tmp;
 		}
 		/*
 		 * Workaround for avoiding TX arbitration lost in case I2C
