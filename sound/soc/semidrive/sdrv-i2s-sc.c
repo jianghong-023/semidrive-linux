@@ -374,13 +374,13 @@ static void afe_i2s_sc_start_capture_tdm(struct sdrv_afe_i2s_sc *afe)
 			   BIT_CTRL_INTREQ_MASK,
 			   (1 << I2S_CTRL_INTREQ_MASK_FIELD_OFFSET));
 
-	regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_I2S_CTRL,
-			   BIT_CTRL_I2S_EN,
-			   (1 << I2S_CTRL_I2S_EN_FIELD_OFFSET));
-
 	regmap_update_bits(
 	    afe->regmap, REG_CDN_I2SSC_REGS_TDM_FD_DIR, BIT_TDM_FD_DIR_CH_RX_EN,
 	    (afe->rx_slot_mask << TDM_FD_DIR_CH0_RXEN_FIELD_OFFSET));
+
+	regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_I2S_CTRL,
+			   BIT_CTRL_I2S_EN,
+			   (1 << I2S_CTRL_I2S_EN_FIELD_OFFSET));
 
 	ret = regmap_read(afe->regmap, REG_CDN_I2SSC_REGS_I2S_CTRL, &val);
 	dev_dbg(afe->dev, "DUMP %d REG_CDN_I2SSC_REGS_I2S_CTRL(0x%x)\n",
@@ -492,13 +492,11 @@ static void afe_i2s_sc_start_playback_tdm(struct sdrv_afe_i2s_sc *afe)
 	regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_I2S_CTRL,
 			   BIT_CTRL_FIFO_RST,
 			   (0 << I2S_CTRL_FIFO_RST_FIELD_OFFSET));
+	/*Reset full duplex FIFO reset*/
+	regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_I2S_CTRL_FDX,
+			   BIT_CTRL_FDX_FIFO_RST,
+			   (0 << I2S_CTRL_FDX_FIFO_RST_FIELD_OFFSET));
 
-	if (true == afe->is_full_duplex) {
-		/*Reset full duplex FIFO reset*/
-		regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_I2S_CTRL_FDX,
-				   BIT_CTRL_FDX_FIFO_RST,
-				   (0 << I2S_CTRL_FDX_FIFO_RST_FIELD_OFFSET));
-	}
 	/* Disable interrupt */
 	regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_I2S_CTRL,
 			   BIT_CTRL_INTREQ_MASK,
@@ -543,16 +541,18 @@ static void afe_i2s_sc_start_playback_tdm(struct sdrv_afe_i2s_sc *afe)
 			   BIT_CTRL_INTREQ_MASK,
 			   (1 << I2S_CTRL_INTREQ_MASK_FIELD_OFFSET));
 
-	regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_I2S_CTRL,
-			   BIT_CTRL_I2S_EN,
-			   (1 << I2S_CTRL_I2S_EN_FIELD_OFFSET));
-
 	if (atomic_read(&afe->capturing)) {
 		regmap_update_bits(
 		    afe->regmap, REG_CDN_I2SSC_REGS_TDM_FD_DIR,
 		    BIT_TDM_FD_DIR_CH_RX_EN,
 		    (afe->rx_slot_mask << TDM_FD_DIR_CH0_RXEN_FIELD_OFFSET));
+
+
 	}
+
+	regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_I2S_CTRL,
+			   BIT_CTRL_I2S_EN,
+			   (1 << I2S_CTRL_I2S_EN_FIELD_OFFSET));
 
 	ret = regmap_read(afe->regmap, REG_CDN_I2SSC_REGS_I2S_CTRL, &val);
 	dev_dbg(afe->dev, "DUMP %d REG_CDN_I2SSC_REGS_I2S_CTRL(0x%x)\n",
