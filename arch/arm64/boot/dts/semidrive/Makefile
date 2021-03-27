@@ -56,6 +56,20 @@ dtb-$(CONFIG_ARCH_SEMIDRIVE_X9) += x9_mid_ref_native_ivi_serdes.dtb
 dtb-$(CONFIG_ARCH_SEMIDRIVE_X9) += x9_mid_ref_native_ivi_serdes_avm.dtb
 dtb-$(CONFIG_ARCH_SEMIDRIVE_X9) += x9_mid_ref_native_cluster.dtb
 dtb-$(CONFIG_ARCH_SEMIDRIVE_X9) += x9_mid_ref_native_controlpanel.dtb
+
+dtb-$(CONFIG_ARCH_SEMIDRIVE_X9) += x9_ultra_ref_native_cluster_8g_a.dts
+dtb-$(CONFIG_ARCH_SEMIDRIVE_X9) += x9_ultra_ref_native_cluster_8g_b.dts
+dtb-$(CONFIG_ARCH_SEMIDRIVE_X9) += x9_ultra_ref_native_cluster_8g_bt_a.dts
+dtb-$(CONFIG_ARCH_SEMIDRIVE_X9) += x9_ultra_ref_native_cluster_8g_bt_b.dts
+dtb-$(CONFIG_ARCH_SEMIDRIVE_X9) += x9_ultra_ref_native_cluster_a.dts
+dtb-$(CONFIG_ARCH_SEMIDRIVE_X9) += x9_ultra_ref_native_cluster_b.dts
+dtb-$(CONFIG_ARCH_SEMIDRIVE_X9) += x9_ultra_ref_native_cluster_bt_a.dts
+dtb-$(CONFIG_ARCH_SEMIDRIVE_X9) += x9_ultra_ref_native_cluster_bt_b.dts
+dtb-$(CONFIG_ARCH_SEMIDRIVE_X9) += x9_ultra_ref_native_ivi_8g_a.dts
+dtb-$(CONFIG_ARCH_SEMIDRIVE_X9) += x9_ultra_ref_native_ivi_8g_b.dts
+dtb-$(CONFIG_ARCH_SEMIDRIVE_X9) += x9_ultra_ref_native_ivi_a.dts
+dtb-$(CONFIG_ARCH_SEMIDRIVE_X9) += x9_ultra_ref_native_ivi_b.dts
+
 always		:= $(dtb-y)
 subdir-y	+= overlays
 clean-files	:= *.dtb
