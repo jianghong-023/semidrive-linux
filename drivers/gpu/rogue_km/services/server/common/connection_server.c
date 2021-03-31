@@ -134,7 +134,18 @@ static PVRSRV_ERROR ConnectionDataDestroy(CONNECTION_DATA *psConnection)
 	if (psConnection->psHandleBase != NULL)
 	{
 		eError = PVRSRVFreeHandleBase(psConnection->psHandleBase, ui64MaxBridgeTime);
-		PVR_LOG_RETURN_IF_ERROR(eError, "PVRSRVFreeHandleBase:2");
+
+		if (eError != PVRSRV_OK)
+		{
+			if (eError != PVRSRV_ERROR_RETRY)
+			{
+				PVR_DPF((PVR_DBG_ERROR,
+					"%s: Couldn't free handle base for connection (%s)",
+					__func__, PVRSRVGetErrorString(eError)));
+			}
+
+			return eError;
+		}
 
 		psConnection->psHandleBase = NULL;
 	}
