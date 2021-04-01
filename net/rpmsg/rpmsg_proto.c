@@ -699,6 +699,7 @@ out:
 
 static struct rpmsg_device_id rpmsg_proto_id_table[] = {
 	{ .name	= "safety,vcan" },
+	{ .name = "rpmsg-vircan" },
 	{ .name = "safety,vi2c" },
 	{ },
 };

@@ -156,6 +156,7 @@ typedef enum {
 #define SD_SSYSTEM_EPT		(72)
 #define SD_EARLYAPP_EPT	(80)
 #define SD_VIRCAN_EPT		(90)
+#define SD_VIRCAN_EPT_C	(91)
 
 #define SYS_RPC_REQ_BASE			(0x2000)
 #define SYS_RPC_REQ_SET_PROPERTY	(SYS_RPC_REQ_BASE + 0)

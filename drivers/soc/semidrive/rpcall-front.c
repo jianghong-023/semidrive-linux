@@ -477,6 +477,23 @@ int rpmsg_front_connect(struct socket *sock, struct sockaddr *addr,
 	return ret;
 }
 
+static bool __write_complete(struct sock_mapping *map)
+{
+	struct pvcalls_data_intf *intf = map->active.ring;
+	RING_IDX cons, prod, size = XEN_FLEX_RING_SIZE(RPCALLS_RING_ORDER);
+	int32_t error;
+
+	error = intf->out_error;
+	if (error == -ENOTCONN)
+		return false;
+	if (error != 0)
+		return true;
+
+	cons = intf->out_cons;
+	prod = intf->out_prod;
+	return pvcalls_queued(prod, cons, size) == 0;
+}
+
 static int __write_ring(struct pvcalls_data_intf *intf,
 			struct pvcalls_data *data,
 			struct iov_iter *msg_iter,
@@ -563,6 +580,12 @@ again:
 	if (sent < 0)
 		tot_sent = sent;
 
+	/* blocking sendmsg, wait for reply */
+	if (!(msg->msg_flags & MSG_DONTWAIT)) {
+		wait_event_interruptible(map->active.inflight_conn_req,
+					 __write_complete(map));
+	}
+
 	mutex_unlock(&map->active.out_mutex);
 	rpcalls_exit();
 	return tot_sent;
@@ -635,8 +658,12 @@ int rpmsg_front_recvmsg(struct socket *sock, struct msghdr *msg, size_t len,
 		len = XEN_FLEX_RING_SIZE(RPCALLS_RING_ORDER);
 
 	while (!(flags & MSG_DONTWAIT) && !rpmsg_front_read_todo(map)) {
-		wait_event_interruptible(map->active.inflight_conn_req,
-					 rpmsg_front_read_todo(map));
+		/* Wait until we get data or the endpoint goes away */
+		if (wait_event_interruptible(map->active.inflight_conn_req,
+						 rpmsg_front_read_todo(map))) {
+			ret = -ERESTARTSYS;
+			goto read_ring_done;
+		}
 	}
 	ret = __read_ring(map->active.ring, &map->active.data,
 			  &msg->msg_iter, len, flags);
@@ -648,6 +675,7 @@ int rpmsg_front_recvmsg(struct socket *sock, struct msghdr *msg, size_t len,
 	if (ret == -ENOTCONN)
 		ret = 0;
 
+read_ring_done:
 	mutex_unlock(&map->active.in_mutex);
 	rpcalls_exit();
 	return ret;
