@@ -69,6 +69,12 @@ dtb-$(CONFIG_ARCH_SEMIDRIVE_X9) += x9_ultra_ref_native_ivi_8g_a.dtb
 dtb-$(CONFIG_ARCH_SEMIDRIVE_X9) += x9_ultra_ref_native_ivi_8g_b.dtb
 dtb-$(CONFIG_ARCH_SEMIDRIVE_X9) += x9_ultra_ref_native_ivi_a.dtb
 dtb-$(CONFIG_ARCH_SEMIDRIVE_X9) += x9_ultra_ref_native_ivi_b.dtb
+dtb-$(CONFIG_ARCH_SEMIDRIVE_X9) += x9_high-plus_ms_native_cluster_8g.dtb
+dtb-$(CONFIG_ARCH_SEMIDRIVE_X9) += x9_high-plus_ms_native_ivi_serdes_8g_avm.dtb
+dtb-$(CONFIG_ARCH_SEMIDRIVE_X9) += x9_high_ms_native_cluster_serdes.dtb
+dtb-$(CONFIG_ARCH_SEMIDRIVE_X9) += x9_high_ms_native_ivi_serdes_avm.dtb
+dtb-$(CONFIG_ARCH_SEMIDRIVE_X9) += x9_mid_ms_native_cluster.dtb
+dtb-$(CONFIG_ARCH_SEMIDRIVE_X9) += x9_mid_ms_native_ivi_serdes_avm.dtb
 
 always		:= $(dtb-y)
 subdir-y	+= overlays
