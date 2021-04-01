@@ -161,6 +161,20 @@
 		hsync-len = <512>;
 		vsync-len = <4>;
 	};
+
+	fhd2608x720: fhd_2608x720@60 {
+		clock-frequency = <125491200>;
+		hactive = <2608>;
+		vactive = <720>;
+		hback-porch = <50>;
+		hfront-porch = <70>;
+		vback-porch = <13>;
+		vfront-porch = <17>;
+		hsync-len = <24>;
+		vsync-len = <10>;
+		vrefresh = <45>;
+	};
+
 };
 
 &dtimings1 {
@@ -242,6 +256,19 @@
 		width-mm = <292>;
 		height-mm = <109>;
 		vrefresh = <51>;
+	};
+
+	hsd_jpw1920x720_1: hsd_jpw1920x720@60 {
+		clock-frequency = <94285714>;
+		hactive = <1920>;
+		hfront-porch = <52>;
+		hback-porch = <32>;
+		hsync-len = <24>;
+		vactive = <720>;
+		vfront-porch = <8>;
+		vback-porch = <21>;
+		vsync-len = <3>;
+		vrefresh = <60>;
 	};
 
 	fhd1920x1080_1: z1_1920x1080@60 {
