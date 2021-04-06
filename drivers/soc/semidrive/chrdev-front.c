@@ -24,8 +24,10 @@
 #include <linux/skbuff.h>
 #include <linux/slab.h>
 #include <linux/uaccess.h>
+#include <linux/of_device.h>
 #include <linux/platform_device.h>
 #include <linux/soc/semidrive/ipcc.h>
+#include <uapi/linux/rpmsg_socket.h>
 #include "uapi/dcf-ioctl.h"
 #define CONFIG_DCF_ENDPOINT (0)
 
@@ -39,6 +41,7 @@ struct dcf_front_device {
 	umode_t mode;
 	const struct file_operations *fops;
 	fmode_t fmode;
+	int myaddr;
 
 	int minor;
 	struct device *dev;
@@ -46,6 +49,7 @@ struct dcf_front_device {
 	struct mutex ept_lock;
 	struct list_head users;
 	atomic_t user_count;
+	struct socket *sock;
 };
 
 struct dcf_user {
@@ -58,6 +62,149 @@ struct dcf_user {
 	wait_queue_head_t readq;
 	int pid;
 };
+
+static long vircan_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
+{
+	pr_warn_once("%s: not supported\n", __func__);
+	return -ENOTSUPP;
+}
+static ssize_t vircan_read(struct file *filp, char __user *buf,
+				 size_t len, loff_t *f_pos)
+{
+	struct dcf_front_device *fdev = filp->private_data;
+	struct socket *sock = fdev->sock;
+	unsigned int msg_flags = 0;
+	struct msghdr msg;
+	struct kvec vec[2];
+	void *kbuf;
+	int ret;
+
+	kbuf = kmalloc(len, GFP_KERNEL);
+	if (!kbuf)
+		return -ENOMEM;
+
+	memset(&msg, 0, sizeof(msg));
+	msg.msg_iter.type = ITER_KVEC|READ;
+	msg.msg_iter.count = len;
+	vec[0].iov_base = kbuf;
+	vec[0].iov_len = len;
+	msg.msg_iter.kvec = vec;
+	msg.msg_iter.nr_segs = 1;
+
+	if (filp->f_flags & O_NONBLOCK)
+		msg_flags = MSG_DONTWAIT;
+
+	ret = sock_recvmsg(sock, &msg, msg_flags);
+	if (ret > 0)
+		ret = copy_to_user(buf, kbuf, min_t(size_t, len, ret));
+
+	kfree(kbuf);
+
+	dev_err(fdev->dev, "%s recv %d bytes\n", __func__, ret);
+
+	return ret < 0 ? ret : len;
+}
+
+static ssize_t vircan_write(struct file *filp, const char __user *buf,
+				  size_t len, loff_t *f_pos)
+{
+	struct dcf_front_device *fdev = filp->private_data;
+	struct socket *sock = fdev->sock;
+	struct msghdr msg;
+	struct kvec vec[2];
+	void *kbuf;
+	int ret;
+
+	kbuf = memdup_user(buf, len);
+	if (IS_ERR(kbuf))
+		return PTR_ERR(kbuf);
+
+	if (mutex_lock_interruptible(&fdev->ept_lock)) {
+		ret = -ERESTARTSYS;
+		goto free_kbuf;
+	}
+
+	memset(&msg, 0, sizeof(msg));
+	if (filp->f_flags & O_NONBLOCK)
+		msg.msg_flags |= MSG_DONTWAIT;
+
+	msg.msg_iter.type = ITER_KVEC|WRITE;
+	msg.msg_iter.count = len;
+	vec[0].iov_base = kbuf;
+	vec[0].iov_len = len;
+	msg.msg_iter.kvec = vec;
+	msg.msg_iter.nr_segs = 1;
+
+	ret = sock_sendmsg(sock, &msg);
+
+	mutex_unlock(&fdev->ept_lock);
+	dev_err(fdev->dev, "%s sent %d bytes\n", __func__, ret);
+
+free_kbuf:
+	kfree(kbuf);
+	return ret < 0 ? ret : len;
+}
+
+/* This device support single user */
+static int vircan_open(struct inode *inode, struct file *filp)
+{
+	struct dcf_front_device *fdev = filp->private_data;
+	struct device *dev = fdev->dev;
+	struct socket *sock;
+	struct sockaddr_rpmsg sa;
+	int ret;
+
+	if (atomic_read(&fdev->user_count)) {
+		dev_err(dev, "already open ept:%d\n", fdev->myaddr);
+		return -EBUSY;
+	}
+
+	atomic_inc(&fdev->user_count);
+	mutex_init(&fdev->ept_lock);
+	INIT_LIST_HEAD(&fdev->users);
+
+	get_device(dev);
+
+	sa.family = AF_RPMSG;
+	sa.vproc_id = 0;	/* default safety core */
+	sa.addr = fdev->myaddr;
+	ret = sock_create(sa.family, SOCK_SEQPACKET, 0, &sock);
+	if (ret < 0)
+		goto out;
+
+	ret = kernel_connect(sock, (struct sockaddr *)&sa, sizeof(sa), 0);
+	if (ret < 0) {
+		sock_release(sock);
+		goto out;
+	}
+	fdev->sock = sock;
+	dev_info(dev, "device open ept:%d\n", fdev->myaddr);
+
+out:
+
+	return ret;
+}
+
+static int vircan_release(struct inode *inode, struct file *filp)
+{
+	struct dcf_front_device *fdev = filp->private_data;
+	struct socket *sock = fdev->sock;
+	struct device *dev = fdev->dev;
+
+	sock_release(sock);
+	atomic_dec(&fdev->user_count);
+	dev_info(dev, "device close\n");
+
+	put_device(dev);
+
+	return 0;
+}
+
+static unsigned int vircan_poll(struct file *filp, poll_table *wait)
+{
+	pr_warn_once("%s: not supported\n", __func__);
+	return -ENOTSUPP;
+}
 
 static int validate_ioctl_arg(unsigned int cmd, union dcf_ioctl_arg *arg)
 {
@@ -150,60 +297,6 @@ long dcf_file_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 	return ret;
 }
 
-static ssize_t dcf_file_read(struct file *filp, char __user *buf,
-				 size_t len, loff_t *f_pos)
-{
-	return 0;
-}
-
-static ssize_t dcf_file_write(struct file *filp, const char __user *buf,
-				  size_t len, loff_t *f_pos)
-{
-	struct dcf_user *user = filp->private_data;
-	struct dcf_front_device *fdev = user->fdev;
-	struct platform_device *pdev = fdev->pdev;
-	void *kbuf;
-	int ret;
-
-	kbuf = memdup_user(buf, len);
-	if (IS_ERR(kbuf))
-		return PTR_ERR(kbuf);
-
-	if (mutex_lock_interruptible(&fdev->ept_lock)) {
-		ret = -ERESTARTSYS;
-		goto free_kbuf;
-	}
-
-	/* TODO: fulfil write function below */
-	if (filp->f_flags & O_NONBLOCK)
-		ret = semidrive_trysend(pdev, kbuf, len);
-	else
-		ret = semidrive_send(pdev, kbuf, len);
-
-	mutex_unlock(&fdev->ept_lock);
-
-free_kbuf:
-	kfree(kbuf);
-	return ret < 0 ? ret : len;
-}
-
-static unsigned int dcf_file_poll(struct file *filp, poll_table *wait)
-{
-	struct dcf_user *user = filp->private_data;
-	struct dcf_front_device *fdev = user->fdev;
-	struct platform_device *pdev = fdev->pdev;
-	unsigned int mask = 0;
-
-	poll_wait(filp, &user->readq, wait);
-
-	if (!skb_queue_empty(&user->queue))
-		mask |= POLLIN | POLLRDNORM;
-
-	mask |= semidrive_poll(pdev, filp, wait);
-
-	return mask;
-}
-
 static int dcf_file_open_detail(struct inode *inode, struct file *filp)
 {
 	struct dcf_front_device *fdev = filp->private_data;
@@ -258,7 +351,6 @@ static int dcf_file_release(struct inode *inode, struct file *filp)
 	}
 	spin_unlock(&user->queue_lock);
 	dev_info(dev, "user=%d pid=%d released!\n", user->user_id, user->pid);
-	kfree(user);
 
 	if (atomic_dec_and_test(&fdev->user_count)) {
 		/* Close the endpoint, if it's not already destroyed by the parent */
@@ -270,6 +362,7 @@ static int dcf_file_release(struct inode *inode, struct file *filp)
 		dev_info(dev, "last user=%d pid=%d released!\n", user->user_id, user->pid);
 	}
 
+	kfree(user);
 	put_device(dev);
 
 	return 0;
@@ -277,12 +370,12 @@ static int dcf_file_release(struct inode *inode, struct file *filp)
 
 static const struct file_operations __maybe_unused vircan_fops = {
 	.llseek		= no_llseek,
-	.read		= dcf_file_read,
-	.write		= dcf_file_write,
-	.unlocked_ioctl = dcf_file_ioctl,
-	.poll		= dcf_file_poll,
-	.open		= dcf_file_open_detail,
-	.release	= dcf_file_release,
+	.read		= vircan_read,
+	.write		= vircan_write,
+	.unlocked_ioctl = vircan_ioctl,
+	.poll		= vircan_poll,
+	.open		= vircan_open,
+	.release	= vircan_release,
 };
 
 static const struct file_operations property_fops = {
@@ -295,10 +388,14 @@ static const struct file_operations property_fops = {
 
 static struct dcf_front_device devlist[] = {
 	[1] = { "property", 0600, &property_fops,FMODE_UNSIGNED_OFFSET, SD_PROPERTY_EPT},
+	[2] = { "vircan",   0600, &vircan_fops,  FMODE_UNSIGNED_OFFSET, SD_VIRCAN_EPT},
+	[3] = { "vircan",   0600, &vircan_fops,  FMODE_UNSIGNED_OFFSET, SD_VIRCAN_EPT_C},
 };
 
 static const struct of_device_id dcf_front_of_ids[] = {
-	{ .compatible = "dcf,property"},
+	{ .compatible = "dcf,property", .data = (void *)SD_PROPERTY_EPT},
+	{ .compatible = "dcf,vircan0",  .data = (void *)SD_VIRCAN_EPT},
+	{ .compatible = "dcf,vircan1",  .data = (void *)SD_VIRCAN_EPT_C},
 	{ }
 };
 
@@ -344,11 +441,9 @@ static int dcf_front_probe(struct platform_device *pdev)
 {
 	struct dcf_front_device *dev = NULL;
 	int minor;
-	char *pstr;
 
 	for (minor = 1; minor < ARRAY_SIZE(devlist); minor++) {
-		pstr = strnstr(pdev->name, devlist[minor].name, RPMSG_NAME_SIZE);
-		if (pstr) {
+		if (devlist[minor].myaddr == (long)of_device_get_match_data(&pdev->dev)) {
 			dev = &devlist[minor];
 			if (dev->dev) {
 				pr_err("Error already open device %s\n", dev->name);
@@ -364,7 +459,7 @@ static int dcf_front_probe(struct platform_device *pdev)
 				return PTR_ERR(dev->dev);
 			}
 			dev_set_drvdata(&pdev->dev, dev);
-			dev_info(&pdev->dev, "device %s created!\n", dev->name);
+			dev_info(&pdev->dev, "device created minor:%d\n", dev->minor);
 			return 0;
 		}
 	}

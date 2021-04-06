@@ -47,7 +47,7 @@ typedef struct {
 	u16 priority: 1;
 	u16 addr    : 8;		/* receiver client address */
 	u16 dat_len : 12;
-	u16 osid    : 4;
+	u16 osid    : 4;		/* reserved for future */
 	u8 data[0];
 } __attribute__((packed)) sd_msghdr_t;
 
@@ -67,6 +67,7 @@ inline static void mb_msg_init_head(sd_msghdr_t *msg, int rproc,
 	msg->priority = priority;
 	msg->dat_len = size;	/* this size has included msghead */
 	msg->addr = dest;
+	msg->osid = 0;			/* not used */
 }
 
 inline static u32 mb_msg_parse_packet_len(void *data)
