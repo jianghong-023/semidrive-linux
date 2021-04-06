@@ -43,6 +43,7 @@ dtb-$(CONFIG_ARCH_SEMIDRIVE_X9) += x9_high_ref_native_ivi_serdes.dtb
 dtb-$(CONFIG_ARCH_SEMIDRIVE_X9) += x9_high_ref_native_ivi_serdes_nobt.dtb
 dtb-$(CONFIG_ARCH_SEMIDRIVE_X9) += x9_high_icl02_native_ivi.dtb
 dtb-$(CONFIG_ARCH_SEMIDRIVE_X9) += x9_high_icl02_native_ivi_nobt.dtb
+dtb-$(CONFIG_ARCH_SEMIDRIVE_X9) += x9_high_icl02_native_cluster.dtb
 dtb-$(CONFIG_ARCH_SEMIDRIVE_X9) += x9_high_ref_native_ivi_serdes_cockpit.dtb
 dtb-$(CONFIG_ARCH_SEMIDRIVE_X9) += x9_high_evb_native_ivi_avm.dtb
 dtb-$(CONFIG_ARCH_SEMIDRIVE_X9) += x9_high_ref_native_ivi_avm.dtb
