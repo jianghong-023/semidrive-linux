@@ -1094,7 +1094,7 @@ static int vpu_mmap(struct file *fp, struct vm_area_struct *vm)
 
 #endif
 
-    pr_err("[VPUDRV-ERR] never come here while using ion  vm_pgoff %lx, s_common_memory.phys_addr %p, s_common_memory.phys_addr >> PAGE_SHIFT %llx \n  ",
+    pr_info("[VPUDRV] not using ion, vm_pgoff %lx, s_common_memory.phys_addr %p, s_common_memory.phys_addr >> PAGE_SHIFT %llx \n  ",
             vm->vm_pgoff,
             (void *)s_common_memory.phys_addr,
             s_common_memory.phys_addr >> PAGE_SHIFT);
