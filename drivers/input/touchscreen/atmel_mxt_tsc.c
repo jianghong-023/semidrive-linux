@@ -496,8 +496,8 @@ struct mxt_data {
 	/* Debugfs variables */
 	struct dentry *debug_dir;
 
-	u8 addr_ds941;
-	u8 addr_ds948;
+	u32 addr_ds941;
+	u32 addr_ds948;
 	int reset_channel;
 };
 #ifdef CONFIG_TOUCHSCREEN_ATMEL_MXT_T37
