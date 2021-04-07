@@ -423,6 +423,9 @@ static const struct nla_policy nl80211_policy[NUM_NL80211_ATTR] = {
 	[NL80211_ATTR_SCHED_SCAN_MULTI] = { .type = NLA_FLAG },
 	[NL80211_ATTR_SAE_PASSWORD] = { .type = NLA_BINARY,
 					.len = SAE_PASSWORD_MAX_LEN },
+	#ifdef CONFIG_NF3205PQ_WLAN
+	[NL80211_ATTR_EXTERNAL_AUTH_SUPPORT] = { .type = NLA_FLAG },
+	#endif
 };
 
 /* policy for the key attributes */
@@ -3482,7 +3485,12 @@ static bool ht_rateset_to_mask(struct ieee80211_supported_band *sband,
 			return false;
 
 		/* check availability */
+#ifndef CONFIG_NF3205PQ_WLAN
 		if (sband->ht_cap.mcs.rx_mask[ridx] & rbit)
+#else
+		ridx = array_index_nospec(ridx, IEEE80211_HT_MCS_MASK_LEN);
+		if (sband->ht_cap.mcs.rx_mask[ridx] & rbit)
+#endif
 			mcs[ridx] |= rbit;
 		else
 			return false;
@@ -3865,12 +3873,15 @@ static bool nl80211_valid_auth_type(struct cfg80211_registered_device *rdev,
 			return false;
 		return true;
 	case NL80211_CMD_CONNECT:
+		#ifndef CONFIG_NF3205PQ_WLAN
+		if (auth_type == NL80211_AUTHTYPE_SAE)
+		#else
 		if (!(rdev->wiphy.features & NL80211_FEATURE_SAE) &&
-		    !wiphy_ext_feature_isset(&rdev->wiphy,
-					     NL80211_EXT_FEATURE_SAE_OFFLOAD) &&
-		    auth_type == NL80211_AUTHTYPE_SAE)
+			!wiphy_ext_feature_isset(&rdev->wiphy,
+						NL80211_EXT_FEATURE_SAE_OFFLOAD) &&
+			auth_type == NL80211_AUTHTYPE_SAE)
+			#endif
 			return false;
-
 		/* FILS with SK PFS or PK not supported yet */
 		if (auth_type == NL80211_AUTHTYPE_FILS_SK_PFS ||
 		    auth_type == NL80211_AUTHTYPE_FILS_PK)
@@ -4192,6 +4203,9 @@ static int parse_station_flags(struct genl_info *info,
 		params->sta_flags_mask = BIT(NL80211_STA_FLAG_AUTHENTICATED) |
 					 BIT(NL80211_STA_FLAG_MFP) |
 					 BIT(NL80211_STA_FLAG_AUTHORIZED);
+#ifdef CONFIG_NF3205PQ_WLAN
+		break;
+#endif
 	default:
 		return -EINVAL;
 	}
@@ -4199,7 +4213,6 @@ static int parse_station_flags(struct genl_info *info,
 	for (flag = 1; flag <= NL80211_STA_FLAG_MAX; flag++) {
 		if (flags[flag]) {
 			params->sta_flags_set |= (1<<flag);
-
 			/* no longer support new API additions in old API */
 			if (flag > NL80211_STA_FLAG_MAX_OLD_API)
 				return -EINVAL;
@@ -6006,22 +6019,26 @@ do {									    \
 				  IEEE80211_HT_OP_MODE_NON_HT_STA_PRSNT))
 			return -EINVAL;
 
+#ifndef CONFIG_NF3205PQ_WLAN
 		if ((ht_opmode & IEEE80211_HT_OP_MODE_NON_GF_STA_PRSNT) &&
-		    (ht_opmode & IEEE80211_HT_OP_MODE_NON_HT_STA_PRSNT))
+			(ht_opmode & IEEE80211_HT_OP_MODE_NON_HT_STA_PRSNT))
 			return -EINVAL;
-
-		switch (ht_opmode & IEEE80211_HT_OP_MODE_PROTECTION) {
-		case IEEE80211_HT_OP_MODE_PROTECTION_NONE:
-		case IEEE80211_HT_OP_MODE_PROTECTION_20MHZ:
+			switch (ht_opmode & IEEE80211_HT_OP_MODE_PROTECTION) {
+			case IEEE80211_HT_OP_MODE_PROTECTION_NONE:
+			case IEEE80211_HT_OP_MODE_PROTECTION_20MHZ:
 			if (ht_opmode & IEEE80211_HT_OP_MODE_NON_HT_STA_PRSNT)
 				return -EINVAL;
 			break;
-		case IEEE80211_HT_OP_MODE_PROTECTION_NONMEMBER:
-		case IEEE80211_HT_OP_MODE_PROTECTION_NONHT_MIXED:
+			case IEEE80211_HT_OP_MODE_PROTECTION_NONMEMBER:
+			case IEEE80211_HT_OP_MODE_PROTECTION_NONHT_MIXED:
 			if (!(ht_opmode & IEEE80211_HT_OP_MODE_NON_HT_STA_PRSNT))
 				return -EINVAL;
 			break;
 		}
+#else
+		/* NON_HT_STA bit is reserved, but some programs set it */
+		ht_opmode &= ~IEEE80211_HT_OP_MODE_NON_HT_STA_PRSNT;
+#endif
 		cfg->ht_opmode = ht_opmode;
 		mask |= (1 << (NL80211_MESHCONF_HT_OPMODE - 1));
 	}
@@ -9081,11 +9098,20 @@ static int nl80211_connect(struct sk_buff *skb, struct genl_info *info)
 		kzfree(connkeys);
 		return -EINVAL;
 	}
+#ifdef CONFIG_NF3205PQ_WLAN
+		if (nla_get_flag(info->attrs[NL80211_ATTR_EXTERNAL_AUTH_SUPPORT])) {
+			if (!info->attrs[NL80211_ATTR_SOCKET_OWNER]) {
+				kzfree(connkeys);
+				return -EINVAL;
+			}
+			connect.flags |= CONNECT_REQ_EXTERNAL_AUTH_SUPPORT;
+		}
+#endif
 
 	wdev_lock(dev->ieee80211_ptr);
 
 	err = cfg80211_connect(rdev, dev, &connect, connkeys,
-			       connect.prev_bssid);
+					connect.prev_bssid);
 	if (err)
 		kzfree(connkeys);
 
@@ -9750,7 +9776,11 @@ static int cfg80211_cqm_rssi_update(struct cfg80211_registered_device *rdev,
 	struct wireless_dev *wdev = dev->ieee80211_ptr;
 	s32 last, low, high;
 	u32 hyst;
+#ifndef CONFIG_NF3205PQ_WLAN
 	int i, n;
+#else
+	int i, n, low_index;
+#endif
 	int err;
 
 	/* RSSI reporting disabled? */
@@ -9786,12 +9816,26 @@ static int cfg80211_cqm_rssi_update(struct cfg80211_registered_device *rdev,
 	for (i = 0; i < n; i++)
 		if (last < wdev->cqm_config->rssi_thresholds[i])
 			break;
-
+#ifndef CONFIG_NF3205PQ_WLAN
 	low = i > 0 ?
 		(wdev->cqm_config->rssi_thresholds[i - 1] - hyst) : S32_MIN;
 	high = i < n ?
 		(wdev->cqm_config->rssi_thresholds[i] + hyst - 1) : S32_MAX;
-
+#else
+	low_index = i - 1;
+	if (low_index >= 0) {
+		low_index = array_index_nospec(low_index, n);
+		low = wdev->cqm_config->rssi_thresholds[low_index] - hyst;
+	} else {
+		low = S32_MIN;
+	}
+	if (i < n) {
+		i = array_index_nospec(i, n);
+		high = wdev->cqm_config->rssi_thresholds[i] + hyst - 1;
+	} else {
+		high = S32_MAX;
+	}
+#endif
 	return rdev_set_cqm_rssi_range_config(rdev, dev, low, high);
 }
 
@@ -10560,20 +10604,27 @@ static int nl80211_set_wowlan(struct sk_buff *skb, struct genl_info *info)
 		nla_for_each_nested(pat, tb[NL80211_WOWLAN_TRIG_PKT_PATTERN],
 				    rem) {
 			u8 *mask_pat;
-
+#ifndef CONFIG_NF3205PQ_WLAN
 			nla_parse_nested(pat_tb, MAX_NL80211_PKTPAT, pat,
 					 nl80211_packet_pattern_policy,
-					 info->extack);
+				info->extack);
+#else
+			err = nla_parse_nested(pat_tb, MAX_NL80211_PKTPAT, pat,
+					 nl80211_packet_pattern_policy,
+				info->extack);
+			if (err)
+				goto error;
+#endif
 			err = -EINVAL;
 			if (!pat_tb[NL80211_PKTPAT_MASK] ||
-			    !pat_tb[NL80211_PKTPAT_PATTERN])
+				!pat_tb[NL80211_PKTPAT_PATTERN])
 				goto error;
 			pat_len = nla_len(pat_tb[NL80211_PKTPAT_PATTERN]);
 			mask_len = DIV_ROUND_UP(pat_len, 8);
 			if (nla_len(pat_tb[NL80211_PKTPAT_MASK]) != mask_len)
 				goto error;
 			if (pat_len > wowlan->pattern_max_len ||
-			    pat_len < wowlan->pattern_min_len)
+				pat_len < wowlan->pattern_min_len)
 				goto error;
 
 			if (!pat_tb[NL80211_PKTPAT_OFFSET])
@@ -10811,9 +10862,16 @@ static int nl80211_parse_coalesce_rule(struct cfg80211_registered_device *rdev,
 	nla_for_each_nested(pat, tb[NL80211_ATTR_COALESCE_RULE_PKT_PATTERN],
 			    rem) {
 		u8 *mask_pat;
-
-		nla_parse_nested(pat_tb, MAX_NL80211_PKTPAT, pat,
+#ifndef CONFIG_NF3205PQ_WLAN
+		 nla_parse_nested(pat_tb, MAX_NL80211_PKTPAT, pat,
 				 nl80211_packet_pattern_policy, NULL);
+#else
+		err = nla_parse_nested(pat_tb, MAX_NL80211_PKTPAT, pat,
+				 nl80211_packet_pattern_policy, NULL);
+		if (err)
+			return err;
+#endif
+
 		if (!pat_tb[NL80211_PKTPAT_MASK] ||
 		    !pat_tb[NL80211_PKTPAT_PATTERN])
 			return -EINVAL;
@@ -11702,21 +11760,24 @@ static int nl80211_update_ft_ies(struct sk_buff *skb, struct genl_info *info)
 
 	if (!rdev->ops->update_ft_ies)
 		return -EOPNOTSUPP;
-
+#ifndef CONFIG_NF3205PQ_WLAN
 	if (!info->attrs[NL80211_ATTR_MDID] ||
-	    !is_valid_ie_attr(info->attrs[NL80211_ATTR_IE]))
+		!is_valid_ie_attr(info->attrs[NL80211_ATTR_IE]))
+#else
+	if (!info->attrs[NL80211_ATTR_MDID] ||
+		!info->attrs[NL80211_ATTR_IE] ||
+		!is_valid_ie_attr(info->attrs[NL80211_ATTR_IE]))
+#endif
 		return -EINVAL;
-
 	memset(&ft_params, 0, sizeof(ft_params));
 	ft_params.md = nla_get_u16(info->attrs[NL80211_ATTR_MDID]);
 	ft_params.ie = nla_data(info->attrs[NL80211_ATTR_IE]);
 	ft_params.ie_len = nla_len(info->attrs[NL80211_ATTR_IE]);
-
 	return rdev_update_ft_ies(rdev, dev, &ft_params);
 }
 
 static int nl80211_crit_protocol_start(struct sk_buff *skb,
-				       struct genl_info *info)
+						struct genl_info *info)
 {
 	struct cfg80211_registered_device *rdev = info->user_ptr[0];
 	struct wireless_dev *wdev = info->user_ptr[1];
@@ -12390,6 +12451,36 @@ static int nl80211_del_pmk(struct sk_buff *skb, struct genl_info *info)
 	return ret;
 }
 
+#ifdef CONFIG_NF3205PQ_WLAN
+static int nl80211_external_auth(struct sk_buff *skb, struct genl_info *info)
+{
+	struct cfg80211_registered_device *rdev = info->user_ptr[0];
+	struct net_device *dev = info->user_ptr[1];
+	struct cfg80211_external_auth_params params;
+
+	if (!rdev->ops->external_auth)
+		return -EOPNOTSUPP;
+	if (!info->attrs[NL80211_ATTR_SSID])
+		return -EINVAL;
+	if (!info->attrs[NL80211_ATTR_BSSID])
+		return -EINVAL;
+	if (!info->attrs[NL80211_ATTR_STATUS_CODE])
+		return -EINVAL;
+	memset(&params, 0, sizeof(params));
+	params.ssid.ssid_len = nla_len(info->attrs[NL80211_ATTR_SSID]);
+	if (params.ssid.ssid_len == 0 ||
+		params.ssid.ssid_len > IEEE80211_MAX_SSID_LEN)
+		return -EINVAL;
+	memcpy(params.ssid.ssid, nla_data(info->attrs[NL80211_ATTR_SSID]),
+		params.ssid.ssid_len);
+
+	memcpy(params.bssid, nla_data(info->attrs[NL80211_ATTR_BSSID]),
+		ETH_ALEN);
+	params.status = nla_get_u16(info->attrs[NL80211_ATTR_STATUS_CODE]);
+	return rdev_external_auth(rdev, dev, &params);
+}
+#endif
+
 #define NL80211_FLAG_NEED_WIPHY		0x01
 #define NL80211_FLAG_NEED_NETDEV	0x02
 #define NL80211_FLAG_NEED_RTNL		0x04
@@ -12504,6 +12595,7 @@ static const struct genl_ops nl80211_ops[] = {
 		.internal_flags = NL80211_FLAG_NEED_WIPHY |
 				  NL80211_FLAG_NEED_RTNL,
 	},
+#ifdef CONFIG_NF3205PQ_WLAN
 	{
 		.cmd = NL80211_CMD_SET_WIPHY,
 		.doit = nl80211_set_wiphy,
@@ -12511,6 +12603,7 @@ static const struct genl_ops nl80211_ops[] = {
 		.flags = GENL_UNS_ADMIN_PERM,
 		.internal_flags = NL80211_FLAG_NEED_RTNL,
 	},
+#endif
 	{
 		.cmd = NL80211_CMD_GET_INTERFACE,
 		.doit = nl80211_get_interface,
@@ -13279,6 +13372,16 @@ static const struct genl_ops nl80211_ops[] = {
 		.internal_flags = NL80211_FLAG_NEED_NETDEV_UP |
 				  NL80211_FLAG_NEED_RTNL,
 	},
+#ifdef CONFIG_NF3205PQ_WLAN
+	{
+		.cmd = NL80211_CMD_EXTERNAL_AUTH,
+		.doit = nl80211_external_auth,
+		.policy = nl80211_policy,
+		.flags = GENL_ADMIN_PERM,
+		.internal_flags = NL80211_FLAG_NEED_NETDEV_UP |
+			NL80211_FLAG_NEED_RTNL,
+		},
+#endif
 
 };
 
@@ -15294,6 +15397,44 @@ void nl80211_send_ap_stopped(struct wireless_dev *wdev)
  out:
 	nlmsg_free(msg);
 }
+
+#ifdef CONFIG_NF3205PQ_WLAN
+int cfg80211_external_auth_request(struct net_device *dev,
+					struct cfg80211_external_auth_params *params,
+				gfp_t gfp)
+{
+	struct wireless_dev *wdev = dev->ieee80211_ptr;
+	struct cfg80211_registered_device *rdev = wiphy_to_rdev(wdev->wiphy);
+	struct sk_buff *msg;
+	void *hdr;
+
+	if (!wdev->conn_owner_nlportid)
+		return -EINVAL;
+	msg = nlmsg_new(NLMSG_DEFAULT_SIZE, gfp);
+	if (!msg)
+		return -ENOMEM;
+	hdr = nl80211hdr_put(msg, 0, 0, 0, NL80211_CMD_EXTERNAL_AUTH);
+	if (!hdr)
+		goto nla_put_failure;
+	if (nla_put_u32(msg, NL80211_ATTR_WIPHY, rdev->wiphy_idx) ||
+		nla_put_u32(msg, NL80211_ATTR_IFINDEX, dev->ifindex) ||
+		nla_put_u32(msg, NL80211_ATTR_AKM_SUITES, params->key_mgmt_suite) ||
+		nla_put_u32(msg, NL80211_ATTR_EXTERNAL_AUTH_ACTION,
+			params->action) ||
+		nla_put(msg, NL80211_ATTR_BSSID, ETH_ALEN, params->bssid) ||
+		nla_put(msg, NL80211_ATTR_SSID, params->ssid.ssid_len,
+			params->ssid.ssid))
+		goto nla_put_failure;
+	genlmsg_end(msg, hdr);
+	genlmsg_unicast(wiphy_net(&rdev->wiphy), msg,
+		wdev->conn_owner_nlportid);
+	return 0;
+ nla_put_failure:
+	nlmsg_free(msg);
+	return -ENOBUFS;
+}
+EXPORT_SYMBOL(cfg80211_external_auth_request);
+#endif
 
 /* initialisation/exit functions */
 

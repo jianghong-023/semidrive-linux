@@ -1345,6 +1345,11 @@ void pci_disable_msix(struct pci_dev *dev);
 void pci_restore_msi_state(struct pci_dev *dev);
 int pci_msi_enabled(void);
 int pci_enable_msi(struct pci_dev *dev);
+
+#ifdef CONFIG_NF3205PQ_WLAN
+int pci_enable_msi_range(struct pci_dev *dev, int minvec, int maxvec);
+#endif
+
 int pci_enable_msix_range(struct pci_dev *dev, struct msix_entry *entries,
 			  int minvec, int maxvec);
 static inline int pci_enable_msix_exact(struct pci_dev *dev,

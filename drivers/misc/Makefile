@@ -63,7 +63,7 @@ obj-$(CONFIG_MEMORY_STATE_TIME)	+= memory_state_time.o
 obj-$(CONFIG_SD_DISPLAY_MISC) += sd_display/
 obj-$(CONFIG_KAPROBE) += kaprobe.o
 obj-$(CONFIG_VDSP)    += xtensa-xvp/
-
+obj-$(CONFIG_ARCH_SEMIDRIVE_PROCESSOR9)	+= sd_rf/
 lkdtm-$(CONFIG_LKDTM)		+= lkdtm_core.o
 lkdtm-$(CONFIG_LKDTM)		+= lkdtm_bugs.o
 lkdtm-$(CONFIG_LKDTM)		+= lkdtm_heap.o

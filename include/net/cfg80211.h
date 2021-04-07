@@ -24,6 +24,9 @@
 #include <linux/net.h>
 #include <net/regulatory.h>
 
+#ifdef CONFIG_NF3205PQ_WLAN
+#define CFG80211_EXTERNAL_AUTH_SUPPORT 1
+#endif
 /**
  * DOC: Introduction
  *
@@ -1907,6 +1910,9 @@ enum cfg80211_assoc_req_flags {
 	ASSOC_REQ_DISABLE_HT		= BIT(0),
 	ASSOC_REQ_DISABLE_VHT		= BIT(1),
 	ASSOC_REQ_USE_RRM		= BIT(2),
+#ifdef CONFIG_NF3205PQ_WLAN
+	CONNECT_REQ_EXTERNAL_AUTH_SUPPORT   = BIT(3),
+#endif
 };
 
 /**
@@ -2592,6 +2598,17 @@ struct cfg80211_pmk_conf {
 	const u8 *pmk_r0_name;
 };
 
+#ifdef CONFIG_NF3205PQ_WLAN
+struct cfg80211_external_auth_params {
+	enum nl80211_external_auth_action action;
+	u8 bssid[ETH_ALEN] __aligned(2);
+	struct cfg80211_ssid ssid;
+	unsigned int key_mgmt_suite;
+	u16 status;
+};
+#endif
+
+
 /**
  * struct cfg80211_ops - backend description for wireless configuration
  *
@@ -3204,6 +3221,12 @@ struct cfg80211_ops {
 					    struct net_device *dev,
 					    const bool enabled);
 
+#ifdef CONFIG_NF3205PQ_WLAN
+	int		(*external_auth)(struct wiphy *wiphy, struct net_device *dev,
+				struct cfg80211_external_auth_params *params);
+#endif
+
+
 	int	(*set_pmk)(struct wiphy *wiphy, struct net_device *dev,
 			   const struct cfg80211_pmk_conf *conf);
 	int	(*del_pmk)(struct wiphy *wiphy, struct net_device *dev,
@@ -3282,6 +3305,9 @@ enum wiphy_flags {
 	WIPHY_FLAG_SUPPORTS_5_10_MHZ		= BIT(22),
 	WIPHY_FLAG_HAS_CHANNEL_SWITCH		= BIT(23),
 	WIPHY_FLAG_HAS_STATIC_WEP		= BIT(24),
+#ifdef CONFIG_NF3205PQ_WLAN
+	WIPHY_FLAG_DFS_OFFLOAD			= BIT(25),
+#endif
 };
 
 /**
@@ -4528,8 +4554,12 @@ int regulatory_hint(struct wiphy *wiphy, const char *alpha2);
  *
  * Return: 0 on success. -EINVAL, -EPERM
  */
+#ifdef CONFIG_NF3205PQ_WLAN
+int regulatory_hint_user(const char *alpha2,
+			enum nl80211_user_reg_hint_type user_reg_hint_type);
+#endif
 int regulatory_set_wiphy_regd(struct wiphy *wiphy,
-			      struct ieee80211_regdomain *rd);
+					struct ieee80211_regdomain *rd);
 
 /**
  * regulatory_set_wiphy_regd_sync_rtnl - set regdom for self-managed drivers
@@ -6212,6 +6242,12 @@ void cfg80211_nan_func_terminated(struct wireless_dev *wdev,
 
 /* ethtool helper */
 void cfg80211_get_drvinfo(struct net_device *dev, struct ethtool_drvinfo *info);
+
+#ifdef CONFIG_NF3205PQ_WLAN
+extern bool cfg80211_is_gratuitous_arp_unsolicited_na(struct sk_buff *skb);
+extern int cfg80211_external_auth_request(struct net_device *netdev,
+		struct cfg80211_external_auth_params *params, gfp_t gfp);
+#endif
 
 /* Logging, debugging and troubleshooting/diagnostic helpers. */
 
