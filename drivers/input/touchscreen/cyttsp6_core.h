@@ -113,8 +113,8 @@ struct cyttsp6_core_platform_data {
 	int irq_gpio;
 	int rst_gpio;
 	int err_gpio;
-	u8 addr_ds941;
-	u8 addr_ds948;
+	u32 addr_ds941;
+	u32 addr_ds948;
 	int reset_channel;
 
 	int level_irq_udelay;
