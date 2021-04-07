@@ -124,4 +124,9 @@ config DRM_PANEL_KUNLUN_SIMPLE
 config DRM_PANEL_SDRV_MIPI_SIMPLE
 	tristate "Semidrive mipi simple panel"
 	depends on OF
+	select DRM_MIPI_DSI
+	help
+	  Say Y here if you want to enable support for Semidrive mipi simple
+	  panel
+
 endmenu
