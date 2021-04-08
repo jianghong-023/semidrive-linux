@@ -365,8 +365,12 @@ static int semidrive_register_input_dev(struct semidrive_sts_data *ts)
 	ts->input_dev->name = "Semidrive Safe TouchScreen";
 	if (ts->instance == TS_SUPPORT_ANRDOID_MAIN)
 		ts->input_dev->phys = "input/ts_main";
-	else
+	else if(ts->instance == TS_SUPPORT_ANRDOID_AUX1)
 		ts->input_dev->phys = "input/ts_aux";
+	else if(ts->instance == TS_SUPPORT_ANRDOID_AUX2)
+		ts->input_dev->phys = "input/ts_aux1";
+	else if(ts->instance == TS_SUPPORT_ANRDOID_AUX3)
+		ts->input_dev->phys = "input/ts_aux2";
 
 	ts->input_dev->id.bustype = BUS_I2C;
 	ts->input_dev->id.vendor = ts->vendor;
