@@ -33,6 +33,7 @@
 #include "deser-max96722.h"
 #include "deser-max9286.h"
 #include "deser-max96706.h"
+#include "deser-max9296.h"
 
 #define MIPI_CSI2_SENS_VC0_PAD_SOURCE   0
 #define MIPI_CSI2_SENS_VC1_PAD_SOURCE   1
@@ -45,6 +46,7 @@ deser_para_t *desers_array[] = {
 	&max96722_para,
 	&max96706_para,
 	&max9286_para_2,
+	&max9296_para,
 	NULL,
 };
 
@@ -288,6 +290,7 @@ static int deser_probe(struct i2c_client *client,
 	u32 rotation;
 	u32 sec_9286;
 	u32 sync;
+	u32 device_type;
 	int ret;
 	struct gpio_desc *gpiod;
 	int deser_index;
@@ -343,6 +346,18 @@ static int deser_probe(struct i2c_client *client,
 		sensor->gpi_gpio = gpiod;
 	}
 
+	gpiod = devm_gpiod_get_optional(&client->dev, "pmu", GPIOD_IN);
+
+	if (IS_ERR(gpiod)) {
+		ret = PTR_ERR(gpiod);
+
+		if (ret != -EPROBE_DEFER)
+			dev_err(&client->dev, "Failed to get %s GPIO: %d\n",
+					"poc", ret);
+	} else {
+		sensor->pmu_gpio = gpiod;
+	}
+
 	ret = fwnode_property_read_u32(dev_fwnode(&client->dev), "sync", &sync);
 	dev_err(&client->dev, "sync: %d, ret=%d\n", sync, ret);
 
@@ -351,6 +366,15 @@ static int deser_probe(struct i2c_client *client,
 	}
 
 	sensor->sync = sync;
+
+	ret = fwnode_property_read_u32(dev_fwnode(&client->dev), "device", &device_type);
+	dev_err(&client->dev, "device_type: 0x%x, ret=%d\n", device_type, ret);
+
+	if (device_type < 0) {
+		device_type = 0;
+	}
+
+	sensor->device_type = device_type;
 
 	ret = fwnode_property_read_u32(dev_fwnode(&client->dev), "sec_9286",
 					   &sec_9286);
@@ -378,6 +402,14 @@ static int deser_probe(struct i2c_client *client,
 		sensor->addr_serer = pdeser_param->addr_serer;
 		sensor->addr_gpioext = pdeser_param->addr_gpioext;
 		sensor->priv = pdeser_param;
+
+		switch (sensor->device_type) {
+		case SDRV3_ICL02:
+			//sensor->addr_deser = pdeser_param->addr_deser = 0x7e;
+			break;
+		default:
+			;
+		}
 
 		if (pdeser_param->power_deser) {
 			pdeser_param->power_deser(sensor, 0);
@@ -431,6 +463,18 @@ static int deser_probe(struct i2c_client *client,
 
 	sensor->ae_target = 52;
 	sensor->priv = pdeser_param;
+
+	switch (sensor->device_type) {
+	case SDRV1_ICL02:
+		pdeser_param->mipi_bps = 792*1000*1000;
+		break;
+	case SDRV3_ICL02:
+		fmt->code = pdeser_param->mbus_code = MEDIA_BUS_FMT_SBGGR8_1X8;
+		fmt->height = pdeser_param->height = 800;
+		break;
+	default:
+		;
+	}
 
 	/* optional indication of physical rotation of sensor */
 	ret = fwnode_property_read_u32(dev_fwnode(&client->dev), "rotation",

@@ -164,6 +164,12 @@ static const struct kstream_mbus_format mbus_fmts[] = {
 		.pix_even = 0x00,
 		.fc_dual = false,
 	},
+	{
+		.code = MEDIA_BUS_FMT_SBGGR8_1X8, /* RAW8 */
+		.pix_odd = 0x03,
+		.pix_even = 0x03,
+		.fc_dual = false,
+	},
 };
 
 const struct kstream_pix_format pix_fmts[] = {
@@ -173,6 +179,18 @@ const struct kstream_pix_format pix_fmts[] = {
 		.mbus_code = MEDIA_BUS_FMT_YUYV8_2X8,
 		.planes = 1,
 		.bpp = {16},
+		.pack_uv_odd = 0x03,
+		.pack_uv_even = 0x03,
+		.pack_pix_odd = 0x03,
+		.pack_pix_even = 0x03,
+		.split = {0x53, 0x3F},
+		.pack = {0x42108, 0},
+	},
+	{
+		.pixfmt = V4L2_PIX_FMT_SBGGR8, /* RAW8 */
+		.mbus_code = MEDIA_BUS_FMT_SBGGR8_1X8,
+		.planes = 1,
+		.bpp = {8},
 		.pack_uv_odd = 0x03,
 		.pack_uv_even = 0x03,
 		.pack_pix_odd = 0x03,

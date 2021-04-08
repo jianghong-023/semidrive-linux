@@ -281,6 +281,7 @@ static int max20087_read_reg(deser_dev_t *dev, u8 reg,
 //Power on/off deser
 static int max9286_power(deser_dev_t *dev, bool enable)
 {
+	dev_err(&dev->i2c_client->dev, "%s: enable=%d\n", __func__, enable);
 	if (dev->pwdn_gpio)
 		gpiod_direction_output(dev->pwdn_gpio, enable ? 1 : 0);
 	return 0;
@@ -290,6 +291,16 @@ static int max9286_power(deser_dev_t *dev, bool enable)
 static int max20087_power(deser_dev_t *dev, bool enable)
 {
 	int ret = -EINVAL;
+
+	dev_err(&dev->i2c_client->dev, "%s: enable=%d\n", __func__, enable);
+
+
+	if (dev->poc_gpio){
+		dev_err(&dev->i2c_client->dev, "%s: dev->poc_gpio=%p.\n", __func__, dev->poc_gpio);
+		gpiod_direction_output(dev->poc_gpio, 1);
+		msleep(20);
+	}
+
 
 #ifdef CONFIG_POWER_POC_DRIVER
 	struct i2c_client *client = dev->i2c_client;
@@ -381,7 +392,7 @@ int max9286_check_chip_id(deser_dev_t *dev)
 	int i = 0;
 
 	ret = max9286_read_reg(dev, 0x1e, &chip_id);
-
+	dev_err(&client->dev, "%s: chip_id=0x%x\n", __func__, chip_id);
 	if (chip_id != MAX9286_DEVICE_ID) {
 		dev_err(&client->dev,
 			"%s: wrong chip identifier, expected 0x%x(max9286) got 0x%x\n",
@@ -401,6 +412,14 @@ int max9286_initialization(deser_dev_t *dev)
 	u8 reg, val;
 	u8 link_status = 0, link_count = 0;
 	int i = 0, j;
+
+	dev_err(&client->dev, "%s: sensor->addr_deser=0x%x\n", __func__, sensor->addr_deser);
+
+	if (sensor->pmu_gpio){
+		dev_err(&sensor->i2c_client->dev, "%s: sensor->pmu_gpio=%p.\n", __func__, sensor->pmu_gpio);
+		gpiod_direction_output(sensor->pmu_gpio, 1);
+		msleep(20);
+	}
 
 	//csienable=0
 	ret = max9286_write_reg(sensor, 0x15, DES_REG15_CSIOUT_DISABLE);
@@ -528,15 +547,28 @@ int max9286_initialization(deser_dev_t *dev)
 
 	for (i = 0; i < MAX_CAMERA_NUM; i++) {
 		//vs delay
-		max96705_write_reg(sensor,
-				   MAX96705_DEV_INDEX + sensor->sec_9286_shift +
-				   i, 0x43, 0x25);
-		max96705_write_reg(sensor,
-				   MAX96705_DEV_INDEX + sensor->sec_9286_shift +
-				   i, 0x45, 0x01);
-		max96705_write_reg(sensor,
-				   MAX96705_DEV_INDEX + sensor->sec_9286_shift +
-				   i, 0x47, 0x26);
+		if (sensor->device_type == SDRV1_ICL02) {
+			max96705_write_reg(sensor,
+					   MAX96705_DEV_INDEX + sensor->sec_9286_shift +
+					   i, 0x43, 0x25);
+			max96705_write_reg(sensor,
+					   MAX96705_DEV_INDEX + sensor->sec_9286_shift +
+					   i, 0x45, 0x01);
+			max96705_write_reg(sensor,
+					   MAX96705_DEV_INDEX + sensor->sec_9286_shift +
+					   i, 0x47, 0x29);
+		} else {
+			max96705_write_reg(sensor,
+					   MAX96705_DEV_INDEX + sensor->sec_9286_shift +
+					   i, 0x43, 0x25);
+			max96705_write_reg(sensor,
+					   MAX96705_DEV_INDEX + sensor->sec_9286_shift +
+					   i, 0x45, 0x01);
+			max96705_write_reg(sensor,
+					   MAX96705_DEV_INDEX + sensor->sec_9286_shift +
+					   i, 0x47, 0x26);
+		}
+
 		usleep_range(5000, 5100);
 
 		//max96705_write_reg(sensor, i, 0x4d, 0xcc);
@@ -608,9 +640,15 @@ int max9286_initialization(deser_dev_t *dev)
 	usleep_range(5000, 5100);
 
 	//fs, manual pclk
-	max9286_write_reg(sensor, 0x06, 0x00);
-	max9286_write_reg(sensor, 0x07, 0xf2);
-	max9286_write_reg(sensor, 0x08, 0x2b);
+	if (sensor->device_type == SDRV1_ICL02) {
+		max9286_write_reg(sensor, 0x06, 0xa0);
+		max9286_write_reg(sensor, 0x07, 0x5b);
+		max9286_write_reg(sensor, 0x08, 0x32);
+	} else {
+		max9286_write_reg(sensor, 0x06, 0x00);
+		max9286_write_reg(sensor, 0x07, 0xf2);
+		max9286_write_reg(sensor, 0x08, 0x2b);
+	}
 	usleep_range(10000, 11000);
 
 	for (i = 0; i < MAX_CAMERA_NUM; i++) {

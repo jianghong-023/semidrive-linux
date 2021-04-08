@@ -61,6 +61,7 @@ typedef struct __sdrv_deser_dev {
 	struct gpio_desc *pwdn_gpio;
 	struct gpio_desc *poc_gpio;
 	struct gpio_desc *gpi_gpio;
+	struct gpio_desc *pmu_gpio;
 
 	bool upside_down;
 	uint32_t link_count;
@@ -82,6 +83,7 @@ typedef struct __sdrv_deser_dev {
 	bool streaming;
 	int sec_9286_shift;
 	u32 sync;
+	u32 device_type;
 	deser_para_t *priv;
 } deser_dev_t;
 
@@ -149,6 +151,14 @@ enum DESER_MACHINE {
 	DESER_NOT_USED = 0,		/** don't use this deser at one csi interface when not detected*/
 	DESER_USE_ONCE = 1,		/** use one deser at one csi interface detected*/
 	DESER_USE_TWICE = 2,		/** use one deser at one csi interface detected*/
+};
+
+
+enum support_device {
+	SDRV_SD = 0x0,	//default cameras
+	SDRV1_ICL02 = 0x0101,	//csi1 cameras
+	SDRV3_ICL02 = 0x0301,	//csi3 cameras
+	SDRV3_MINIEYE,
 };
 
 
