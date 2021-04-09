@@ -10,7 +10,7 @@
 
 struct sd_bt_data {
 	int gpio_bt_en;
-	int gps_rest;
+	int gps_reset;
 	int power_state;
 	struct rfkill *rfkill;
 	struct platform_device *pdev;
