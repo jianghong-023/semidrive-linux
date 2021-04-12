@@ -21,7 +21,6 @@ static int sd_bt_on(struct sd_bt_data *data, bool on_off)
 {
 	if (!on_off && gpio_is_valid(data->gpio_bt_en))
 		gpio_set_value(data->gpio_bt_en, 0);
-
 	if (on_off && gpio_is_valid(data->gpio_bt_en)) {
 		mdelay(10);
 		gpio_set_value(data->gpio_bt_en, 1);
@@ -72,20 +71,20 @@ static int sd_bt_probe(struct platform_device *pdev)
 		ret = gpio_request(data->gpio_bt_en, "bt_en");
 		gpio_direction_output(data->gpio_bt_en, 1);
 	}
-	data->gps_rest = of_get_named_gpio(np, "gps_rest", 0);
-	if (data->gps_rest < 0) {
-		data->gps_rest = -1;
-		return -1;
+	data->gps_reset = of_get_named_gpio(np, "gps_reset", 0);
+	if (data->gps_reset < 0) {
+		data->gps_reset = -1;
 	}
-	if (data->gps_rest != -1)
-		ret = gpio_request(data->gps_rest, "gps_rest");
-	gpio_direction_output(data->gps_rest, 1);
-	msleep(20);
-	gpio_direction_output(data->gps_rest, 0);
-	msleep(20);
-	gpio_direction_output(data->gps_rest, 1);
+	if (data->gps_reset != -1) {
+		ret = gpio_request(data->gps_reset, "gps_reset");
+		gpio_set_value_cansleep(data->gps_reset, 1);
+		msleep(20);
+		gpio_set_value_cansleep(data->gps_reset, 0);
+		msleep(20);
+		gpio_set_value_cansleep(data->gps_reset, 1);
+	}
 	data->rfkill = rfkill_alloc("sd-rfkill", dev, RFKILL_TYPE_BLUETOOTH,
-			   &sd_bt_rfkill_ops, data);
+				&sd_bt_rfkill_ops, data);
 	if (!data->rfkill) {
 		rc = -ENOMEM;
 		goto err_rfkill;
@@ -99,8 +98,8 @@ static int sd_bt_probe(struct platform_device *pdev)
 	return 0;
 err_rfkill:
 	rfkill_destroy(data->rfkill);
-err_pwr_dir:
 	gpio_free(data->gpio_bt_en);
+	gpio_free(data->gps_reset);
 	return rc;
 }
 
@@ -108,7 +107,6 @@ static int sd_bt_remove(struct platform_device *dev)
 {
 	struct sd_bt_data *data = dev->dev.platform_data;
 	struct rfkill *rfk = platform_get_drvdata(dev);
-
 	platform_set_drvdata(dev, NULL);
 	if (rfk) {
 		rfkill_unregister(rfk);
