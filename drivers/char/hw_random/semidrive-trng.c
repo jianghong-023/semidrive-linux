@@ -15,13 +15,14 @@
 #include <linux/platform_device.h>
 #include <linux/random.h>
 
+#define RNG_CE_TRNG_VALUE_OFFSET       (0x114<<0)
 #define REG_CE_TRNG_CONTROL_OFFSET     (0x8100<<0)
 #define TRNG_CONTROL_TRNG_SOFTRESET_FIELD_OFFSET 8
 
 #define TRNG_SOFTRESET_SHIFT                TRNG_CONTROL_TRNG_SOFTRESET_FIELD_OFFSET
 #define TRNG_SOFTRESET_MASK                 1UL << TRNG_SOFTRESET_SHIFT
 
-#define to_semidrive_rng(p)	container_of(p, struct semidrive_rng_data, rng)
+#define to_semidrive_rng(p)    container_of(p, struct semidrive_rng_data, rng)
 
 struct semidrive_rng_data {
 	void __iomem *base;
@@ -65,23 +66,20 @@ uint32_t rng_get_trng(void __iomem *ce_base, uint8_t* dst, uint32_t size)
 	uint32_t index = 0;
 	uint32_t index_max = 0;
 	uint32_t cp_left = 0;
-	unsigned long baddr;
-
-	baddr = ce_base + (0x114<<0);
 
 	index = 0;
 	index_max = size>>2; //4 byte one cp
 	cp_left = size&0x3;
 
 	for (i = 0; i < index_max; i++) {
-			rng_value = readl(baddr);
+			rng_value = readl(ce_base + RNG_CE_TRNG_VALUE_OFFSET);
 			memcpy(dst+index, (void *)(&rng_value), sizeof(rng_value));
 			index = index+4;
 			ret = index;
 	}
 
 	if(cp_left > 0){
-		rng_value = readl(baddr);
+		rng_value = readl(ce_base + RNG_CE_TRNG_VALUE_OFFSET);
 		memcpy(dst+index, (void *)(&rng_value), cp_left);
 		ret = index+cp_left;
 	}
@@ -91,8 +89,6 @@ uint32_t rng_get_trng(void __iomem *ce_base, uint8_t* dst, uint32_t size)
 
 static int semidrive_rng_init(struct hwrng *rng)
 {
-	struct semidrive_rng_data *priv = to_semidrive_rng(rng);
-
 	pr_info("semidrive_rng_init enter ");
 	return 0;
 }
@@ -118,11 +114,11 @@ static int semidrive_rng_read(struct hwrng *rng, void *buf, size_t max, bool wai
 static int semidrive_rng_probe(struct platform_device *pdev)
 {
 	struct semidrive_rng_data *rng;
-	struct resource *res;
 	int ret;
 	u32 val;
 	struct device_node *np;
 	struct semidrive_vce_device *rng_device;
+
 	val = 0;
 	np = pdev->dev.of_node;
 	rng_device = (struct semidrive_vce_device *)platform_get_drvdata(pdev);
