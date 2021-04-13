@@ -1,6 +1,7 @@
 config PINCTRL_SEMIDRIVE
 	bool
-	select PINCTRL
+	depends on OF
+	depends on ARCH_SEMIDRIVE
 	select GENERIC_PINCTRL_GROUPS
 	select GENERIC_PINMUX_FUNCTIONS
 	select GENERIC_PINCONF

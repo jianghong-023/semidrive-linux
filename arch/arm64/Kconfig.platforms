@@ -267,6 +267,7 @@ config ARCH_ZYNQMP
 
 config ARCH_SEMIDRIVE
 	def_bool n
+	select PINCTRL
 
 config ARCH_SEMIDRIVE_PROCESSOR9
         bool "Semidrive Processor9 SOC Family"

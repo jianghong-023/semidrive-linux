@@ -6,6 +6,7 @@ config PINCTRL
 	bool
 
 menu "Pin controllers"
+	depends on PINCTRL
 
 config GENERIC_PINCTRL_GROUPS
 	bool
