@@ -61,6 +61,17 @@ config SND_X9_REF04_MACH
 	  Select Y if you have such device.
 	  If unsure select "N".
 
+config SND_X9_ICL02_MACH
+	tristate "ASoC Audio driver for icl platform x9 with ak7738"
+	depends on ARCH_SEMIDRIVE_X9
+	select SND_SDRV_AFE_I2S_SC
+	select SND_SOC_GENERIC_DMAENGINE_PCM
+	help
+	  This adds support for ASoC machine driver for SEMI_DRIVE X9
+	  platforms with internal audio codec and speaker amplifier.
+	  Select Y if you have such device.
+	  If unsure select "N".
+
 config SND_X9_CORE01_MACH
 	tristate "ASoC Audio driver for core platform x9 with ak7738"
 	depends on ARCH_SEMIDRIVE_X9
