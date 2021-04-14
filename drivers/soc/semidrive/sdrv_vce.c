@@ -69,7 +69,7 @@ static int sdrv_vce_probe(struct platform_device *pdev)
 		irq = platform_get_irq(pdev, 0);
 
 		//bit 0 define rng function open
-		if(val&0x1 == 0x1){
+		if((val&0x1) == 0x1){
 			rng_pdev = platform_device_alloc(rng_drive_name, -1);
 			if (!rng_pdev){
 				return -ENOMEM;
@@ -91,7 +91,7 @@ static int sdrv_vce_probe(struct platform_device *pdev)
 			}
 		}
 		//bit 1 define ce function open
-		if(val&0x2 == 0x2){
+		if((val&0x2) == 0x2){
 			ce_pdev = platform_device_alloc(ce_drive_name, -1);
 			if (!ce_pdev){
 				return -ENOMEM;
