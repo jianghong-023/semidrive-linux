@@ -437,11 +437,8 @@ static struct snd_soc_dai_link snd_x9_core01_soc_dai_links[] = {
 	.cpu_dai_name = "ak7738-aif5",
 	.codec_name = "snd-soc-dummy",
 	.codec_dai_name = "snd-soc-dummy-dai",
-	.dai_fmt = SND_SOC_DAIFMT_DSP_A | SND_SOC_DAIFMT_CBM_CFM,
+	.dai_fmt = SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_CBS_CFS,
 	.ignore_suspend = 1,
-	.dynamic = 1,
-	.dpcm_playback = 1,
-	.dpcm_capture = 1,
     },
     /* Back End DAI links */
     {
