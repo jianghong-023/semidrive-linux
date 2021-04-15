@@ -448,7 +448,7 @@ static void max96722_preset(deser_dev_t *dev)
 {
 	//0x00,0x13,0x75,
 	max96722_write_reg(dev, 0x0013, 0x75);
-	msleep(50);
+	msleep(20);
 	return;
 }
 

@@ -411,14 +411,14 @@ static int sdrv_of_parse_core(struct platform_device *pdev,
 		return PTR_ERR(csi->base);
 	}
 
-	res = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
+	csi->irq = platform_get_irq(pdev, 0);
 
-	if (!res) {
+	if (csi->irq <= 0) {
 		dev_err(dev, "Missing IRQ\n");
 		return -EINVAL;
 	}
 
-	csi->irq = res->start;
+	//dev_info(dev, "csi->irq = %d\n", csi->irq);
 
 	ret = of_property_read_string(dev->of_node, "mbus-type", &mbus);
 
@@ -718,6 +718,37 @@ static struct platform_driver sdrv_csi_driver = {
 };
 
 module_platform_driver(sdrv_csi_driver);
+
+#ifdef CONFIG_ARCH_SEMIDRIVE_V9
+static const struct of_device_id sdrv_csi_dt_match_sideb[] = {
+	{.compatible = "semidrive,sdrv-csi-sideb"},
+	{},
+};
+
+static struct platform_driver sdrv_csi_driver_sideb = {
+	.probe = sdrv_csi_probe,
+	.remove = sdrv_csi_remove,
+	.driver = {
+		   .name = "sdrv-csi-sideb",
+		   .of_match_table = sdrv_csi_dt_match_sideb,
+		   },
+};
+
+static int __init sdrv_csi2_sideb_init(void)
+{
+	int ret;
+
+	ret = platform_driver_register(&sdrv_csi_driver_sideb);
+	if (ret < 0) {
+		printk("fail to register sideb csi2 driver ret = %d.\n", ret);
+	}
+	return ret;
+}
+
+late_initcall(sdrv_csi2_sideb_init);
+#endif
+
+
 
 MODULE_ALIAS("platform:sdrv-csi");
 MODULE_DESCRIPTION("Semidrive Camera driver");

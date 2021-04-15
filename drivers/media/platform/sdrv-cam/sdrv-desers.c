@@ -628,14 +628,6 @@ static int __init sdrv_desers_sideb_init(void)
 {
 	int ret;
 
-	ret = register_sideb_poc_driver();
-
-	if (ret < 0) {
-		pr_err("fail to register poc driver for sideb ret = %d!\n", ret);
-	} else
-		pr_debug("success to register sideb poc sideb driver ret = %d.\n", ret);
-
-
 	ret = i2c_add_driver(&desers_i2c_driver_sideb);
 	if (ret < 0)
 		pr_err("fail to register desers i2c driver ret = %d.\n", ret);

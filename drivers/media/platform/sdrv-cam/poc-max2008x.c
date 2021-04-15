@@ -51,6 +51,7 @@ struct max2008x_chip {
 	char *names;
 	struct mutex i2c_lock;
 	struct i2c_client *client;
+	struct gpio_desc *poc_gpiod;
 	unsigned long driver_data;
 };
 
@@ -124,8 +125,12 @@ int poc_mdeser0_power(int chan, int enable, u8 reg, u8 val)
 	struct max2008x_chip *ppoc = poc_max2008x[POC_CHIP_INDEX_MDESER0];
 
 	if (NULL == ppoc) {
-		pr_err("There is no poc for this deser %s. Don't change deser's name.\n");
+		pr_err("There is no poc for this deser. Don't change deser's name.\n");
 		return -EINVAL;
+	}
+
+	if (ppoc->poc_gpiod) {
+		gpiod_direction_output(ppoc->poc_gpiod, enable);
 	}
 
 	addr = ppoc->client->addr;
@@ -186,9 +191,14 @@ int poc_mdeser1_power(int chan, int enable, int reg, u32 val)
 	struct max2008x_chip *ppoc = poc_max2008x[POC_CHIP_INDEX_MDESER1];
 
 	if (NULL == ppoc) {
-		pr_err("There is no poc for this deser %s. Don't change deser's name.\n");
+		pr_err("There is no poc for this deser. Don't change deser's name.\n");
 		return -EINVAL;
 	}
+
+	if (ppoc->poc_gpiod) {
+		gpiod_direction_output(ppoc->poc_gpiod, enable);
+	}
+
 
 	addr = ppoc->client->addr;
 
@@ -245,8 +255,12 @@ int poc_r_mdeser0_power(int chan, int enable,  u8 reg, u8 val)
 	struct max2008x_chip *ppoc = poc_max2008x[POC_CHIP_INDEX_R_MDESER0];
 
 	if (NULL == ppoc) {
-		pr_err("There is no poc for this deser %s. Don't change deser's name.\n");
+		pr_err("There is no poc for this deser. Don't change deser's name.\n");
 		return -EINVAL;
+	}
+
+	if (ppoc->poc_gpiod) {
+		gpiod_direction_output(ppoc->poc_gpiod, enable);
 	}
 
 	max2008x_read_8b(ppoc, MAX2008X_CMD_CONFIG, &value);
@@ -291,8 +305,12 @@ int poc_r_mdeser1_power(int chan, int enable, int reg, u32 val)
 	struct max2008x_chip *ppoc = poc_max2008x[POC_CHIP_INDEX_R_MDESER1];
 
 	if (NULL == ppoc) {
-		pr_err("There is no poc for this deser %s. Don't change deser's name.\n");
+		pr_err("There is no poc for this deser. Don't change deser's name.\n");
 		return -EINVAL;
+	}
+
+	if (ppoc->poc_gpiod) {
+		gpiod_direction_output(ppoc->poc_gpiod, enable);
 	}
 
 	max2008x_read_8b(ppoc, MAX2008X_CMD_CONFIG, &value);
@@ -335,6 +353,8 @@ static int max2008x_device_init(struct max2008x_chip *chip)
 {
 	//Disable camera module power in default.
 	max2008x_write_8b(chip, MAX2008X_CMD_CONFIG, DISABLE_ALL_LINK_POWER);
+	//if (chip->poc_gpiod)
+	//	gpiod_direction_output(chip->poc_gpiod, 0);
 	return 0;
 }
 
@@ -343,9 +363,9 @@ static int max2008x_probe(struct i2c_client *client,
 {
 	struct device *dev = &client->dev;
 	struct max2008x_chip *dev_max2008x;
+	struct gpio_desc *gpiod;
 	u8 val;
 	int ret;
-	int i;
 
 	pr_debug("%s name = %s +\n", __FUNCTION__, client->name);
 	dev_max2008x = devm_kzalloc(dev, sizeof(*dev_max2008x), GFP_KERNEL);
@@ -360,8 +380,6 @@ static int max2008x_probe(struct i2c_client *client,
 	if (ret < 0) {
 		dev_err(&client->dev, "Can't detect poc device!");
 		return -ENODEV;
-	} else {
-		dev_dbg(&client->dev, "max2008x id %d\n", val);
 	}
 
 	if (!strcmp(client->name, "deser0_poc"))
@@ -376,12 +394,18 @@ static int max2008x_probe(struct i2c_client *client,
 		poc_max2008x[POC_CHIP_INDEX_MDESER_RESER] = dev_max2008x;
 
 	dev_max2008x->index++;
+	gpiod = devm_gpiod_get_optional(&client->dev, "en", GPIOD_OUT_LOW);
+
+	if (IS_ERR(gpiod)) {
+		ret = PTR_ERR(gpiod);
+		if (ret != -EPROBE_DEFER)
+			dev_err(&client->dev, "Failed to get %s GPIO: %d\n",
+				"en", ret);
+	} else {
+		dev_max2008x->poc_gpiod = gpiod;
+	}
 
 	max2008x_device_init(dev_max2008x);
-
-	max2008x_read_8b(dev_max2008x, MAX2008X_CMD_CONFIG, &val);
-	pr_debug("max2008x config 0x%x\n", val);
-	pr_debug("%s name = %s -\n", __FUNCTION__, client->name);
 
 	return 0;
 }
@@ -416,7 +440,7 @@ subsys_initcall(max2008x_i2c_init);
 
 static void __exit max2008x_exit(void)
 {
-	i2c_del_driver(&max2008x_driver);
+	return i2c_del_driver(&max2008x_driver);
 }
 module_exit(max2008x_exit);
 

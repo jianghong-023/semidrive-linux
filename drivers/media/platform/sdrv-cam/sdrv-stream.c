@@ -359,7 +359,8 @@ static int kstream_set_stride(struct kstream_device *kstream)
 	if (pos_i >= ARRAY_SIZE(mbus_fmts))
 		return -EINVAL;
 
-	if ((kstream->core->host_id == 0) || (kstream->core->host_id == 1))
+	if ((kstream->core->host_id == 0) || (kstream->core->host_id == 1)
+			|| (kstream->core->host_id == 3) || (kstream->core->host_id == 4))
 		width = in_fmt->width - 1;
 	else
 		width = in_fmt->width - (1 + mbus_fmts[pos_i].pix_odd);
@@ -556,7 +557,9 @@ static int kstream_set_channel(struct kstream_device *kstream)
 		dev_err(kstream->dev, "%s: pix_fmts[pos=%d]\n", __func__, pos);
 
 		if ((kstream->core->host_id == 0)
-		    || (kstream->core->host_id == 1)) {
+		    || (kstream->core->host_id == 1)
+		    || (kstream->core->host_id == 3)
+		    || (kstream->core->host_id == 4)) {
 			if (kstream->core->sync == 0) {
 				kcsi_writel(kstream->base, IMG_CHN_SPLIT_(n),
 					    0x13);
@@ -701,7 +704,7 @@ static int kstream_set_pixel_ctrl(struct kstream_device *kstream)
 
 	val |= (0x01 << IMG_VSYNC_MASK_SHIFT);
 
-	if (kstream->core->host_id == 2) {
+	if (kstream->core->host_id == 2 || kstream->core->host_id == 5) {
 		val |= (mbus_fmts[i].pix_even << IMG_PIXEL_VLD_EVEN_SHIFT);
 		val |= (mbus_fmts[i].pix_odd << IMG_PIXEL_VLD_ODD_SHIFT);
 	}

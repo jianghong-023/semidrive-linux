@@ -33,6 +33,8 @@
 #include <linux/interrupt.h>
 #include "sdrv-csi.h"
 #define SDRV_MIPI_CSI2_NAME           "sdrv-mipi-csi2"
+#define SDRV_MIPI_CSI2_NAME_SIDEB           "sdrv-mipi-csi2-sideb"
+
 
 #define SDRV_MIPI_CSI2_VC0_PAD_SINK       0
 #define SDRV_MIPI_CSI2_VC1_PAD_SINK       1

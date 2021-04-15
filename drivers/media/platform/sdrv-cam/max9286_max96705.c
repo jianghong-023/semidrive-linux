@@ -28,6 +28,7 @@
 
 #include "sdrv-csi.h"
 #include "sdrv-mipi-csi2.h"
+#include "poc-max2008x.h"
 
 #define MAX_SENSOR_NUM 4
 
@@ -39,9 +40,18 @@
 
 #define AP0101_SLAVE_ID 0x5d
 #define AP0101_DEV_INDEX -4
-
 #define MAX20086_SLAVE_ID 0x28
 
+
+#define MAX9286_MCSI0_NAME "max,max9286"
+#define MAX9286_MCSI1_NAME "max,max9286s"
+#define MAX9286_RMCSI0_NAME "max,max9286_sideb"
+#define MAX9286_RMCSI1_NAME "max,max9286s_sideb"
+
+#define MAX9286_MCSI0_NAME_I2C "max9286"
+#define MAX9286_MCSI1_NAME_I2C "max9286s"
+#define MAX9286_RMCSI0_NAME_I2C "max9286_sideb"
+#define MAX9286_RMCSI1_NAME_I2C "max9286s_sideb"
 
 #define DES_REG15_CSIOUT_DISABLE 0x03
 #define DES_REG1_FS_DISABLE 0xc3
@@ -675,6 +685,24 @@ static void max20086_power(struct max9286_dev *sensor, bool enable)
 {
 	u8 reg, val;
 
+#ifdef CONFIG_POWER_POC_DRIVER
+		struct i2c_client *client = sensor->i2c_client;
+
+		reg = 0x1;
+		if (!strcmp(client->name, MAX9286_MCSI0_NAME_I2C)) {
+			poc_mdeser0_power(0xf, enable, reg,  0);
+		} else if (!strcmp(client->name, MAX9286_MCSI1_NAME_I2C)) {
+			poc_mdeser1_power(0xf, enable, reg,  0);
+#if defined(CONFIG_ARCH_SEMIDRIVE_V9)
+		} else if (!strcmp(client->name, MAX9286_RMCSI0_NAME_I2C)) {
+			poc_r_mdeser0_power(0xf, enable, reg,  0);
+		} else if (!strcmp(client->name, MAX9286_RMCSI1_NAME_I2C)) {
+			poc_r_mdeser1_power(0xf, enable, reg,  0);
+#endif
+		} else {
+			dev_err(&client->dev, "Can't support POC %s.\n", client->name);
+		}
+#else
 	reg = 0x1;
 	if (enable) {
 		val = 0x1f;
@@ -688,6 +716,8 @@ static void max20086_power(struct max9286_dev *sensor, bool enable)
 	max20086_read_reg(sensor, reg, &val);
 	dev_err(&sensor->i2c_client->dev, "20086: reg=%d, val=0x%x\n", reg,
 		val);
+#endif
+
 }
 
 static int max9286_check_chip_id(struct max9286_dev *sensor)
@@ -754,7 +784,7 @@ static int max9286_initialization(struct max9286_dev *sensor)
 
 		if ((val & 0x0f) == 0x0f)
 			break;
-		msleep(20);
+		msleep(10);
 	}
 	dev_err(&client->dev, "0x49=0x%x, i=%d\n", val, i);
 	if (val == 0) {
@@ -982,8 +1012,8 @@ static int max9286_probe(struct i2c_client *client,
 	fmt->ycbcr_enc = V4L2_MAP_YCBCR_ENC_DEFAULT(fmt->colorspace);
 	fmt->quantization = V4L2_QUANTIZATION_FULL_RANGE;
 	fmt->xfer_func = V4L2_MAP_XFER_FUNC_DEFAULT(fmt->colorspace);
-	fmt->width = 640;
-	fmt->height = 480;
+	fmt->width = 1280;
+	fmt->height = 720;
 	fmt->field = V4L2_FIELD_NONE;
 	sensor->frame_interval.numerator = 1;
 
@@ -1198,7 +1228,8 @@ static const struct i2c_device_id max9286_id[] = {
 MODULE_DEVICE_TABLE(i2c, max9286_id);
 
 static const struct of_device_id max9286_dt_ids[] = {
-	{.compatible = "max,max9286"},
+	{.compatible = MAX9286_MCSI0_NAME},
+	{.compatible = MAX9286_MCSI1_NAME},
 	{ /* sentinel */ }
 };
 
@@ -1215,6 +1246,44 @@ static struct i2c_driver max9286_i2c_driver = {
 };
 
 module_i2c_driver(max9286_i2c_driver);
+
+#ifdef CONFIG_ARCH_SEMIDRIVE_V9
+static const struct i2c_device_id max9286_id_sideb[] = {
+	{"max9286", 0},
+	{},
+};
+
+static const struct of_device_id max9286_dt_ids_sideb[] = {
+	{.compatible = MAX9286_RMCSI0_NAME},
+	{.compatible = MAX9286_RMCSI1_NAME},
+	{ /* sentinel */ }
+};
+
+MODULE_DEVICE_TABLE(of, max9286_dt_ids_sideb);
+
+static struct i2c_driver max9286_i2c_driver_sideb = {
+	.driver = {
+		   .name = "max9286_sideb",
+		   .of_match_table = max9286_dt_ids_sideb,
+		   },
+	.id_table = max9286_id_sideb,
+	.probe = max9286_probe,
+	.remove = max9286_remove,
+};
+
+static int __init sdrv_max9286_sideb_init(void)
+{
+	int ret;
+
+	ret = i2c_add_driver(&max9286_i2c_driver_sideb);
+	if (ret < 0)
+		printk("fail to register max9286 i2c driver.\n");
+
+	return ret;
+}
+
+late_initcall(sdrv_max9286_sideb_init);
+#endif
 
 MODULE_DESCRIPTION("MAX9286 MIPI Camera Subdev Driver");
 MODULE_LICENSE("GPL");

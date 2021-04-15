@@ -3,7 +3,8 @@
 * All rights reserved.
 *
 */
-
+#include <linux/genalloc.h>
+#include <asm/cacheflush.h>
 #include "sdrv_ion.h"
 
 #define SEMIDRIVE_COMPAT_STR	"semidrive,sdrv-ion"
@@ -19,6 +20,83 @@ static struct heap_types_info {
 	//MAKE_HEAP_TYPE_MAPPING(SECURE_DMA),
 	//MAKE_HEAP_TYPE_MAPPING(HYP_CMA),
 };
+
+//#define CONFIG_USE_PCIE
+#ifdef CONFIG_USE_PCIE
+#define RAM_POOL_BASE	0x540000000
+#define RAM_POOL_SIZE 0x8000000
+static struct gen_pool *ram_pool;
+struct gen_pool *ram_pool_get(void)
+{
+	return ram_pool;
+}
+EXPORT_SYMBOL(ram_pool_get);
+
+void *ram_alloc(struct device *dev, size_t len, dma_addr_t *dma)
+{
+	unsigned long offset;
+	dma_addr_t *dst;
+
+	if (dma)
+		*dma = 0;
+	if (!ram_pool) {
+		pr_err("drm: ram_pool %p\n", ram_pool);
+		return NULL;
+	}
+
+	return gen_pool_dma_alloc(ram_pool, len, dma);
+}
+EXPORT_SYMBOL(ram_alloc);
+
+void ram_free(void *vaddr, void *paddr, size_t len)
+{
+	gen_pool_free(ram_pool, (unsigned long) vaddr, len);
+}
+EXPORT_SYMBOL(ram_free);
+
+int ram_init(struct	device *pdev, phys_addr_t phys, size_t len)
+{
+	int status = 0;
+	void __iomem *addr;
+
+	if (!phys && !len) {
+		phys = RAM_POOL_BASE;
+		len = RAM_POOL_SIZE;
+	}
+
+	if (len) {
+		ram_pool = gen_pool_create(PAGE_SHIFT, -1);
+		if (!ram_pool)
+			status = -ENOMEM;
+	}
+
+	if (ram_pool) {
+		addr = __ioremap(phys, len, __pgprot(PROT_NORMAL));
+		status = gen_pool_add_virt(ram_pool, addr, phys, len, -1);
+	}
+
+	WARN_ON(status < 0);
+	return status;
+}
+EXPORT_SYMBOL(ram_init);
+#else
+void *ram_alloc(struct device *dev, size_t len, dma_addr_t *dma)
+{
+	return NULL;
+}
+EXPORT_SYMBOL(ram_alloc);
+void ram_free(void *vaddr, void *paddr, size_t len)
+{
+	return;
+}
+EXPORT_SYMBOL(ram_free);
+
+int ram_init(struct	device *pdev, phys_addr_t phys, size_t len)
+{
+	return 0;
+}
+EXPORT_SYMBOL(ram_init);
+#endif
 
 static struct ion_heap *sdrv_ion_heap_create(struct ion_platform_heap *heap_data)
 {
@@ -161,6 +239,14 @@ static int sdrv_ion_probe(struct platform_device *pdev)
 	int ret = 0;
 	int i;
 
+#ifdef CONFIG_USE_PCIE
+	ret = ram_init(NULL, RAM_POOL_BASE, RAM_POOL_SIZE);
+	if (ret < 0)
+		pr_err("pcie ram_init fail.\n");
+	else
+		pr_notice("pcie ram_init success.\n");
+#endif
+
 	pdatas = sdrv_ion_parse_dt(pdev, &num_valid, &num_child);
 	if (IS_ERR(pdatas)) {
 		ret = PTR_ERR(pdatas);
@@ -198,7 +284,6 @@ static int sdrv_ion_probe(struct platform_device *pdev)
 
 freepdatas:
 	kfree(pdatas);
-
 out:
 	return ret;
 }

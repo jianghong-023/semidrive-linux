@@ -115,6 +115,9 @@ static void vb2_dc_finish(void *buf_priv)
 	dma_sync_sg_for_cpu(buf->dev, sgt->sgl, sgt->orig_nents, buf->dma_dir);
 }
 
+extern void *ram_alloc(struct device *dev, size_t len, dma_addr_t *dma);
+extern void ram_free(void *vaddr, void *paddr, size_t len);
+
 /*********************************************/
 /*        callbacks for MMAP buffers         */
 /*********************************************/
@@ -130,8 +133,13 @@ static void vb2_dc_put(void *buf_priv)
 		sg_free_table(buf->sgt_base);
 		kfree(buf->sgt_base);
 	}
-	dma_free_attrs(buf->dev, buf->size, buf->cookie, buf->dma_addr,
-		       buf->attrs);
+	if (!strcmp(dev_name(buf->dev), "580cc0000.r_csi0") ||
+		!strcmp(dev_name(buf->dev), "580cd0000.r_csi1")) {
+		ram_free(buf->cookie, &buf->dma_addr, buf->size);
+	} else {
+		dma_free_attrs(buf->dev, buf->size, buf->cookie, buf->dma_addr,
+			   buf->attrs);
+	}
 	put_device(buf->dev);
 	kfree(buf);
 }
@@ -151,8 +159,13 @@ static void *vb2_dc_alloc(struct device *dev, unsigned long attrs,
 
 	if (attrs)
 		buf->attrs = attrs;
-	buf->cookie = dma_alloc_attrs(dev, size, &buf->dma_addr,
+	if (!strcmp(dev_name(dev), "580cc0000.r_csi0") ||
+		!strcmp(dev_name(dev), "580cd0000.r_csi1")) {
+		buf->cookie = ram_alloc(dev, size, &buf->dma_addr);
+	} else {
+		buf->cookie = dma_alloc_attrs(dev, size, &buf->dma_addr,
 					GFP_KERNEL | gfp_flags, buf->attrs);
+	}
 	if (!buf->cookie) {
 		dev_err(dev, "dma_alloc_coherent of size %ld failed\n", size);
 		kfree(buf);
@@ -203,6 +216,8 @@ static int vb2_dc_mmap(void *buf_priv, struct vm_area_struct *vma)
 	vma->vm_flags		|= VM_DONTEXPAND | VM_DONTDUMP;
 	vma->vm_private_data	= &buf->handler;
 	vma->vm_ops		= &vb2_common_vm_ops;
+	vma->vm_page_prot = pgprot_device(vm_get_page_prot(vma->vm_flags));
+	vma->vm_page_prot = pgprot_noncached(vm_get_page_prot(vma->vm_flags));
 
 	vma->vm_ops->open(vma);
 
@@ -272,9 +287,10 @@ static void vb2_dc_dmabuf_ops_detach(struct dma_buf *dbuf,
 	sgt = &attach->sgt;
 
 	/* release the scatterlist cache */
-	if (attach->dma_dir != DMA_NONE)
-		dma_unmap_sg(db_attach->dev, sgt->sgl, sgt->orig_nents,
-			attach->dma_dir);
+	if (attach->dma_dir != DMA_NONE) {
+		dma_unmap_sg_attrs(db_attach->dev, sgt->sgl, sgt->orig_nents,
+				attach->dma_dir, DMA_ATTR_SKIP_CPU_SYNC);
+	}
 	sg_free_table(sgt);
 	kfree(attach);
 	db_attach->priv = NULL;
@@ -305,8 +321,8 @@ static struct sg_table *vb2_dc_dmabuf_ops_map(
 	}
 
 	/* mapping to the client with new direction */
-	sgt->nents = dma_map_sg(db_attach->dev, sgt->sgl, sgt->orig_nents,
-				dma_dir);
+	sgt->nents = dma_map_sg_attrs(db_attach->dev, sgt->sgl, sgt->orig_nents, dma_dir,
+				  DMA_ATTR_SKIP_CPU_SYNC);
 	if (!sgt->nents) {
 		pr_err("failed to map scatterlist\n");
 		mutex_unlock(lock);

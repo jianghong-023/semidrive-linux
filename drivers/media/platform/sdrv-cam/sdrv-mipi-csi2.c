@@ -460,11 +460,11 @@ static int mipi_csi2_set_phy_freq(struct sdrv_csi_mipi_csi2 *kcmc,
 	}
 
 
-	if (kcmc->id == 0)
+	if (kcmc->id == 0 || kcmc->id == 2) {
 		iowrite32(g_phy_freqs[i].index, kcmc->dispmux_address + 0x60);
-	else if (kcmc->id == 1)
+	} else if (kcmc->id == 1 || kcmc->id == 3) {
 		iowrite32(g_phy_freqs[i].index, kcmc->dispmux_address + 0x68);
-	else
+	} else
 		pr_err_ratelimited("wrong host id\n");
 
 	devm_iounmap(&kcmc->pdev->dev, kcmc->dispmux_address);
@@ -866,10 +866,10 @@ static int sdrv_mipi_csi2_probe(struct platform_device *pdev)
 	kcmc->pdev = pdev;
 	kcmc->active_stream_num = 0;
 
-	of_id = of_match_node(sdrv_mipi_csi2_dt_match, dev->of_node);
+    //of_id = of_match_node(sdrv_mipi_csi2_dt_match, dev->of_node);
 
-	if (WARN_ON(of_id == NULL))
-		return -EINVAL;
+    //if (WARN_ON(of_id == NULL))
+    //    return -EINVAL;
 
 	ret = dw_mipi_csi_parse_dt(pdev, kcmc);
 //  if (ret < 0)
@@ -990,6 +990,45 @@ static struct platform_driver sdrv_mipi_csi2_driver = {
 };
 
 module_platform_driver(sdrv_mipi_csi2_driver);
+
+#ifdef CONFIG_ARCH_SEMIDRIVE_V9
+extern int register_sideb_poc_driver(void);
+
+static const struct of_device_id sdrv_mipi_csi2_sideb_dt_match[] = {
+    {.compatible = "semidrive,sdrv-csi-mipi-sideb"},
+    {},
+};
+
+MODULE_DEVICE_TABLE(of, sdrv_mipi_csi2_sideb_dt_match);
+
+static struct platform_driver sdrv_mipi_csi2_sideb_driver = {
+    .probe = sdrv_mipi_csi2_probe,
+    .remove = sdrv_mipi_csi2_remove,
+    .driver = {
+		.name = SDRV_MIPI_CSI2_NAME_SIDEB,
+		.of_match_table = sdrv_mipi_csi2_sideb_dt_match,
+    },
+};
+
+static int __init sdrv_mipi_csi2_sideb_init(void)
+{
+	int ret;
+
+	ret = register_sideb_poc_driver();
+
+	if (ret < 0) {
+		printk("fail to register poc driver for sideb!\n");
+	}
+
+	ret = platform_driver_register(&sdrv_mipi_csi2_sideb_driver);
+	if (ret < 0) {
+		printk("fail to register sideb mipi csi2 driver ret = %d.\n", ret);
+	}
+	return ret;
+}
+
+late_initcall(sdrv_mipi_csi2_sideb_init);
+#endif
 
 MODULE_AUTHOR("Semidrive Semiconductor");
 MODULE_DESCRIPTION("Semidrive mipi-csi2 driver");
