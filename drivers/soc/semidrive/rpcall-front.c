@@ -918,7 +918,7 @@ int rpmsg_front_release(struct socket *sock)
 }
 
 static const struct xenbus_device_id rpmsg_front_ids[] = {
-	{ "rpcalls" },
+	{ "rpcall" },
 	{ "" }
 };
 
