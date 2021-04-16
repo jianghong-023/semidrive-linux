@@ -1118,7 +1118,7 @@ static int rpcalls_back_uevent(struct xenbus_device *xdev,
 }
 
 static const struct xenbus_device_id rpcalls_back_ids[] = {
-	{ "rpcalls" },
+	{ "rpcall" },
 	{ "" }
 };
 
