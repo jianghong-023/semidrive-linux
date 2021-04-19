@@ -77,7 +77,7 @@ static ssize_t vircan_read(struct file *filp, char __user *buf,
 	struct msghdr msg;
 	struct kvec vec[2];
 	void *kbuf;
-	int ret;
+	int ret, rev_len = 0;
 
 	kbuf = kmalloc(len, GFP_KERNEL);
 	if (!kbuf)
@@ -95,14 +95,17 @@ static ssize_t vircan_read(struct file *filp, char __user *buf,
 		msg_flags = MSG_DONTWAIT;
 
 	ret = sock_recvmsg(sock, &msg, msg_flags);
-	if (ret > 0)
-		ret = copy_to_user(buf, kbuf, min_t(size_t, len, ret));
+	if (ret > 0) {
+		rev_len = min_t(size_t, len, ret);
+		ret = copy_to_user(buf, kbuf, rev_len);
+//		print_hex_dump_bytes("vircan_rx: ", DUMP_PREFIX_ADDRESS, kbuf, rev_len);
+	}
 
 	kfree(kbuf);
 
-	dev_err(fdev->dev, "%s recv %d bytes\n", __func__, ret);
+	dev_err(fdev->dev, "%s recv %d bytes\n", __func__, rev_len);
 
-	return ret < 0 ? ret : len;
+	return ret < 0 ? ret : rev_len;
 }
 
 static ssize_t vircan_write(struct file *filp, const char __user *buf,
