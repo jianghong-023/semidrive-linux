@@ -52,7 +52,7 @@
 #define GUEST_PHANDLE_GIC (65000)
 
 /* xen vm reserved memory */
-#define XEN_RESERVED_BASE              0xe0000000
+#define XEN_RESERVED_BASE              0x90000000
 
 #define XEN_RESERVED_VM_BASE           (XEN_RESERVED_BASE+0x00)
 #define XEN_RESERVED_VM_SIZE           0x02000000
