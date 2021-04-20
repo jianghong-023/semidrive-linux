@@ -29,14 +29,26 @@
 
 #include "sdrv-csi.h"
 #include "sdrv-mipi-csi2.h"
+#include "poc-max2008x.h"
 
 #define MAX_CAMERA_NUM 4
 
+#define MAX96712_DEVICE_ID 0xa0
 #define MAX96722_DEVICE_ID 0xa1
 #define MAX96705_DEVICE_ID 0x41
 
 #define AP0101_SLAVE_ID (0x5d)
 #define MAX20087_SLAVE_ID (0x29)
+
+#define MAX96722_MCSI0_NAME "max,max96722"
+#define MAX96722_MCSI1_NAME "max,max96722s"
+#define MAX96722_RMCSI0_NAME "max,max96722_sideb"
+#define MAX96722_RMCSI1_NAME "max,max96722s_sideb"
+
+#define MAX96722_MCSI0_NAME_I2C "max96722"
+#define MAX96722_MCSI1_NAME_I2C "max96722s"
+#define MAX96722_RMCSI0_NAME_I2C "max96722_sideb"
+#define MAX96722_RMCSI1_NAME_I2C "max96722s_sideb"
 
 
 enum max96722_mode_id {
@@ -347,7 +359,7 @@ static void max96722_link_enable(struct max96722_dev *sensor, int en);
 static void max96722_mipi_enable(struct max96722_dev *sensor, int en);
 static int max96722_initialization(struct max96722_dev *sensor);
 static void max96722_power(struct max96722_dev *sensor, bool enable);
-static void max20087_power(struct max96722_dev *sensor, bool enable);
+static int max20087_power(struct max96722_dev *sensor, bool enable);
 
 
 static inline struct max96722_dev *to_max96722_dev(struct v4l2_subdev *sd)
@@ -581,12 +593,12 @@ static int max96722_s_power(struct v4l2_subdev *sd, int on)
 	struct v4l2_subdev *interface_sd = max96722_get_interface_subdev(sd);
 	struct sdrv_csi_mipi_csi2 *kcmc = v4l2_get_subdevdata(interface_sd);
 
-
+	printk("%s on = %d +\n", __FUNCTION__, on);
 	kcmc->lane_count = 4;
 #ifndef PROBE_INIT_MAX96722
 	if(on == 1) {
 		max96722_power(sensor, 1);
-		msleep(50);
+		msleep(30);
 		max96722_initialization(sensor);
 		msleep(10);
 	} else if(on == 0) {
@@ -594,6 +606,7 @@ static int max96722_s_power(struct v4l2_subdev *sd, int on)
 		max20087_power(sensor, 0);
 	}
 #endif
+	printk("%s -\n", __FUNCTION__);
 
 	return 0;
 }
@@ -679,16 +692,16 @@ static int max96722_enum_mbus_code(struct v4l2_subdev *sd,
 static int max96722_s_stream(struct v4l2_subdev *sd, int enable)
 {
 	struct max96722_dev *sensor = to_max96722_dev(sd);
+	printk("%s +\n", __FUNCTION__);
 
 	if (enable == 1) {
-		msleep(100);
 		max96722_link_enable(sensor, 1);
 		max96722_mipi_enable(sensor, 1);
-
 	} else if (enable == 0) {
 		max96722_link_enable(sensor, 0);
 		max96722_mipi_enable(sensor, 0);
 	}
+	printk("%s -\n", __FUNCTION__);
 
 	return 0;
 }
@@ -760,13 +773,37 @@ static void max96722_power(struct max96722_dev *sensor, bool enable)
 	gpiod_direction_output(sensor->pwdn_gpio, enable ? 1 : 0);
 }
 
+
 //Power for camera module
-static void max20087_power(struct max96722_dev *sensor, bool enable)
+static int max20087_power(struct max96722_dev *sensor, bool enable)
 {
+	int ret;
+
+#ifdef CONFIG_POWER_POC_DRIVER
+	struct i2c_client *client = sensor->i2c_client;
+	u8 reg = 0x1;
+
+	if (!strcmp(client->name, MAX96722_MCSI0_NAME_I2C)) {
+		ret = poc_mdeser0_power(0xf, enable, reg,  0);
+	} else if (!strcmp(client->name, MAX96722_MCSI1_NAME_I2C)) {
+		ret = poc_mdeser1_power(0xf, enable, reg,  0);
+#if defined(CONFIG_ARCH_SEMIDRIVE_V9)
+	} else if (!strcmp(client->name, MAX96722_RMCSI0_NAME_I2C)) {
+		ret = poc_r_mdeser0_power(0xf, enable, reg,  0);
+	} else if (!strcmp(client->name, MAX96722_RMCSI1_NAME_I2C)) {
+		ret = poc_r_mdeser1_power(0xf, enable, reg,  0);
+#endif
+	} else {
+		dev_err(&client->dev, "Can't support POC %s.\n", client->name);
+		ret = -EINVAL;
+	}
+#else
 	if(enable == 1)
-		max20087_write_reg(sensor, 0x01, 0x1f);
+		ret = max20087_write_reg(sensor, 0x01, 0x1f);
 	else
-		max20087_write_reg(sensor, 0x01, 0x00);
+		ret = max20087_write_reg(sensor, 0x01, 0x00);
+#endif
+	return ret;
 }
 
 
@@ -782,27 +819,17 @@ static int max96722_check_chip_id(struct max96722_dev *sensor)
 	if (ret < 0) {
 		dev_err(&client->dev, "%s: failed to read max96722 chipid.\n",
 			__func__);
-		for(i = 0; i < 10; i++) {
-			ret = max96722_read_reg(sensor, 0x000d, &chip_id);
-			if(ret == 0)
-				break;
-			dev_err(&client->dev,"failed to read max96722 chipid.\n");
-			msleep(10);
-		}
-		if(ret < 0)
-			return ret;
+		return ret;
 	}
 
-	printk("\n max96722/12 chipid = 0x%02x\n", chip_id);
-
-	if (chip_id != MAX96722_DEVICE_ID) {
+	if (chip_id == MAX96722_DEVICE_ID || chip_id == MAX96712_DEVICE_ID) {
+		dev_err(&client->dev, "max96722/12 chipid = 0x%02x\n", chip_id);
+	} else {
 		dev_err(&client->dev,
-			"%s: wrong chip identifier, expected 0x%x(max96722), got 0x%x\n",
-			__func__, MAX96722_DEVICE_ID, chip_id);
+			"%s: wrong chip identifier, expected 0x%x(max96722), 0x%x(max96712) got 0x%x\n",
+			__func__, MAX96722_DEVICE_ID, MAX96712_DEVICE_ID, chip_id);
+		return -EIO;
 	}
-
-	ret = max96722_read_reg(sensor, 0x004c, &chip_id);
-	printk("max96722/12 dev version = 0x%02x\n", chip_id);
 
 	return ret;
 }
@@ -835,7 +862,7 @@ static void max96722_preset(struct max96722_dev *sensor)
 {
 	//0x00,0x13,0x75,
 	max96722_write_reg(sensor, 0x0013, 0x75);
-	msleep(50);
+	msleep(10);
 	return;
 }
 
@@ -924,10 +951,10 @@ static int max96722_probe(struct i2c_client *client,
 	struct max96722_dev *sensor;
 	struct v4l2_mbus_framefmt *fmt;
 	u32 rotation;
-	u32 sec_9286;
 	u32 sync;
 	int ret;
 	struct gpio_desc *gpiod;
+	//printk("%s %s\n", __FUNCTION__, client->name);
 
 	sensor = devm_kzalloc(dev, sizeof(*sensor), GFP_KERNEL);
 
@@ -935,7 +962,6 @@ static int max96722_probe(struct i2c_client *client,
 		return -ENOMEM;
 
 	sensor->i2c_client = client;
-
 	sensor->addr_96722 = client->addr;
 	sensor->addr_96705 = MAX96705_CH_A>>1;
 	sensor->addr_max20087 = MAX20087_SLAVE_ID;
@@ -960,8 +986,6 @@ static int max96722_probe(struct i2c_client *client,
 	sensor->current_fr = MAX96722_25_FPS;
 	sensor->current_mode =
 	    &max96722_mode_data[MAX96722_25_FPS][MAX96722_MODE_720P_1280_720];
-
-//  sensor->last_mode = sensor->current_mode;
 
 	sensor->ae_target = 52;
 
@@ -996,7 +1020,6 @@ static int max96722_probe(struct i2c_client *client,
 
 	endpoint = fwnode_graph_get_next_endpoint(dev_fwnode(&client->dev),
 						  NULL);
-
 	if (!endpoint) {
 		dev_err(dev, "endpoint node not found\n");
 		return -EINVAL;
@@ -1014,22 +1037,15 @@ static int max96722_probe(struct i2c_client *client,
 
 	sensor->sd.flags |= V4L2_SUBDEV_FL_HAS_DEVNODE;
 	sensor->sd.entity.function = MEDIA_ENT_F_CAM_SENSOR;
-#if 1
 	sensor->pads[MIPI_CSI2_SENS_VC0_PAD_SOURCE].flags = MEDIA_PAD_FL_SOURCE;
 	sensor->pads[MIPI_CSI2_SENS_VC1_PAD_SOURCE].flags = MEDIA_PAD_FL_SOURCE;
 	sensor->pads[MIPI_CSI2_SENS_VC2_PAD_SOURCE].flags = MEDIA_PAD_FL_SOURCE;
 	sensor->pads[MIPI_CSI2_SENS_VC3_PAD_SOURCE].flags = MEDIA_PAD_FL_SOURCE;
 	ret = media_entity_pads_init(&sensor->sd.entity,
 				     MIPI_CSI2_SENS_VCX_PADS_NUM, sensor->pads);
-#else
-	sensor->pad.flags = MEDIA_PAD_FL_SOURCE;
-	ret = media_entity_pads_init(&sensor->sd.entity, 1, &sensor->pad);
-#endif
-
 	if (ret)
 		return ret;
 
-	//struct gpio_desc *gpiod;
 	gpiod = devm_gpiod_get_optional(&client->dev, "pwdn", GPIOD_IN);
 
 	if (IS_ERR(gpiod)) {
@@ -1043,32 +1059,11 @@ static int max96722_probe(struct i2c_client *client,
 	}
 
 	sensor->pwdn_gpio = gpiod;
-	//gpiod_direction_output(gpiod, 1);
-	//msleep(1);
-
-	//struct gpio_desc *gpiod;
-	gpiod = devm_gpiod_get_optional(&client->dev, "vin", GPIOD_IN);
-
-	if (IS_ERR(gpiod)) {
-		ret = PTR_ERR(gpiod);
-
-		if (ret != -EPROBE_DEFER)
-			dev_err(&client->dev, "Failed to get %s GPIO: %d\n",
-				"vin", ret);
-
-		printk("%s: get vin gpio fail\n", __func__);
-		//return ret;
-	}
-
-	ret = fwnode_property_read_u32(dev_fwnode(&client->dev), "sec_9286",
-				       &sec_9286);
-	dev_err(&client->dev, "sec_9286: %d, ret=%d\n", sec_9286, ret);
-
 
 	max96722_power(sensor, 0);
 	msleep(1);
 	max96722_power(sensor, 1);
-	msleep(50);
+	msleep(30);
 
 	ret = max96722_check_chip_id(sensor);
 	if (ret < 0) {
@@ -1088,6 +1083,7 @@ static int max96722_probe(struct i2c_client *client,
 		goto free_ctrls;
 
 	mutex_init(&sensor->max96705_lock);
+	mutex_init(&sensor->lock);
 
 	return 0;
 
@@ -1120,6 +1116,7 @@ MODULE_DEVICE_TABLE(i2c, max96722_id);
 
 static const struct of_device_id max96722_dt_ids[] = {
 	{.compatible = "max,max96722"},
+	{.compatible = "max,max96722s"},
 	{ /* sentinel */ }
 };
 
@@ -1136,6 +1133,45 @@ static struct i2c_driver max96722_i2c_driver = {
 };
 
 module_i2c_driver(max96722_i2c_driver);
+
+#ifdef CONFIG_ARCH_SEMIDRIVE_V9
+static const struct i2c_device_id max96722_id_sideb[] = {
+	{"max96722", 0},
+	{},
+};
+
+static const struct of_device_id max96722_dt_ids_sideb[] = {
+	{.compatible = MAX96722_RMCSI0_NAME},
+	{.compatible = MAX96722_RMCSI1_NAME},
+	{ /* sentinel */ }
+};
+
+MODULE_DEVICE_TABLE(of, max96722_dt_ids_sideb);
+
+static struct i2c_driver max96722_i2c_driver_sideb = {
+	.driver = {
+		   .name = "max96722_sideb",
+		   .of_match_table = max96722_dt_ids_sideb,
+		   },
+	.id_table = max96722_id_sideb,
+	.probe = max96722_probe,
+	.remove = max96722_remove,
+};
+
+static int __init sdrv_max96722_sideb_init(void)
+{
+	int ret;
+
+	ret = i2c_add_driver(&max96722_i2c_driver_sideb);
+	if (ret < 0)
+		printk("fail to register max96722 i2c driver.\n");
+
+	return ret;
+}
+
+late_initcall(sdrv_max96722_sideb_init);
+#endif
+
 
 MODULE_DESCRIPTION("MAX96722 MIPI Camera Subdev Driver");
 MODULE_LICENSE("GPL");

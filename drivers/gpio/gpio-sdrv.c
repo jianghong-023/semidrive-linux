@@ -890,7 +890,55 @@ static struct platform_driver sdrv_gpio_driver = {
 	.remove		= sdrv_gpio_remove,
 };
 
-module_platform_driver(sdrv_gpio_driver);
+static int __init sdrv_gpio_init(void)
+{
+	return platform_driver_register(&sdrv_gpio_driver);
+}
+
+//module_platform_driver(sdrv_gpio_driver);
+static void __exit sdrv_gpio_exit(void)
+{
+	return platform_driver_unregister(&sdrv_gpio_driver);
+}
+
+subsys_initcall(sdrv_gpio_init);
+module_exit(sdrv_gpio_exit);
+
+#ifdef CONFIG_ARCH_SEMIDRIVE_V9
+static const struct of_device_id sdrv_of_match_sideb[] = {
+	{.compatible = "semidrive,sdrv-gpio-sideb"},
+	{},
+};
+
+static struct platform_driver sdrv_gpio_driver_sideb = {
+	.probe = sdrv_gpio_probe,
+	.remove = sdrv_gpio_remove,
+	.driver = {
+		   .name = "semidrive,sdrv-gpio-sideb",
+		   .of_match_table = sdrv_of_match_sideb,
+		   },
+};
+
+static int __init sdrv_gpio_sideb_init(void)
+{
+	int ret;
+
+	ret = platform_driver_register(&sdrv_gpio_driver_sideb);
+	if (ret < 0) {
+		printk("fail to register sideb gpio driver ret = %d.\n", ret);
+	}
+	return ret;
+}
+
+static void __exit sdrv_gpio_sideb_exit(void)
+{
+	return platform_driver_unregister(&sdrv_gpio_driver_sideb);
+}
+
+late_initcall(sdrv_gpio_sideb_init);
+module_exit(sdrv_gpio_sideb_exit);
+#endif
+
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Semidrive");

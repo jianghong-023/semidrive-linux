@@ -529,9 +529,39 @@ subsys_initcall(dw_i2c_init_driver);
 
 static void __exit dw_i2c_exit_driver(void)
 {
-	platform_driver_unregister(&dw_i2c_driver);
+	return platform_driver_unregister(&dw_i2c_driver);
 }
 module_exit(dw_i2c_exit_driver);
+
+
+#ifdef CONFIG_ARCH_SEMIDRIVE_V9
+static const struct of_device_id dw_i2c_of_match_sideb[] = {
+	{ .compatible = "snps,designware-i2c-sideb", },
+	{},
+};
+
+static struct platform_driver dw_i2c_driver_sideb = {
+	.probe = dw_i2c_plat_probe,
+	.remove = dw_i2c_plat_remove,
+	.driver		= {
+		.name	= "i2c_designware-sideb",
+		.of_match_table = of_match_ptr(dw_i2c_of_match_sideb),
+		.pm	= DW_I2C_DEV_PMOPS,
+	},
+};
+
+static int __init dw_i2c_init_driver_sideb(void)
+{
+	return platform_driver_register(&dw_i2c_driver_sideb);
+}
+late_initcall(dw_i2c_init_driver_sideb);
+
+static void __exit dw_i2c_exit_driver_sideb(void)
+{
+	return platform_driver_unregister(&dw_i2c_driver_sideb);
+}
+module_exit(dw_i2c_exit_driver_sideb);
+#endif
 
 MODULE_AUTHOR("Baruch Siach <baruch@tkos.co.il>");
 MODULE_DESCRIPTION("Synopsys DesignWare I2C bus adapter");
