@@ -1216,6 +1216,7 @@ enum nl80211_commands {
 	NL80211_CMD_RELOAD_REGDB,
 
 	NL80211_CMD_EXTERNAL_AUTH,
+	NL80211_CMD_UPDATE_OWE_INFO,
 #endif
 	/* add new commands above here */
 
@@ -5353,6 +5354,9 @@ enum nl80211_crit_proto_id {
  */
 enum nl80211_rxmgmt_flags {
 	NL80211_RXMGMT_FLAG_ANSWERED = 1 << 0,
+#ifdef CONFIG_NF3205PQ_WLAN
+	NL80211_RXMGMT_FLAG_EXTERNAL_AUTH = 1 << 1,
+#endif
 };
 
 /*
