@@ -1205,6 +1205,8 @@ static int device_icl02_init(deser_dev_t *sensor)
 
 	for (i =0; i < (sizeof(AR0144_RegTable)/sizeof(struct reg_value_ar)); i++) {
 		ar0144_write_reg(sensor, AR0144_RegTable[i].reg_addr, AR0144_RegTable[i].val);
+		if(AR0144_RegTable[i].reg_addr==0x301a)
+			usleep_range(10000, 11000);
 	}
 
 	//trun on led
