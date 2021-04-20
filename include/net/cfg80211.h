@@ -2600,11 +2600,38 @@ struct cfg80211_pmk_conf {
 
 #ifdef CONFIG_NF3205PQ_WLAN
 struct cfg80211_external_auth_params {
-	enum nl80211_external_auth_action action;
-	u8 bssid[ETH_ALEN] __aligned(2);
-	struct cfg80211_ssid ssid;
-	unsigned int key_mgmt_suite;
+    enum nl80211_external_auth_action action;
+    u8 bssid[ETH_ALEN] __aligned(2);
+    struct cfg80211_ssid ssid;
+    unsigned int key_mgmt_suite;
+    u16 status;
+	const u8* pmkid;
+};
+
+/**
+ * struct cfg80211_update_owe_info - OWE Information
+ *
+ * This structure provides information needed for the drivers to offload OWE
+ * (Opportunistic Wireless Encryption) processing to the user space.
+ *
+ * Commonly used across update_owe_info request and event interfaces.
+ *
+ * @peer: MAC address of the peer device for which the OWE processing
+ *	has to be done.
+ * @status: status code, %WLAN_STATUS_SUCCESS for successful OWE info
+ *	processing, use %WLAN_STATUS_UNSPECIFIED_FAILURE if user space
+ *	cannot give you the real status code for failures. Used only for
+ *	OWE update request command interface (user space to driver).
+ * @ie: IEs obtained from the peer or constructed by the user space. These are
+ *	the IEs of the remote peer in the event from the host driver and
+ *	the constructed IEs by the user space in the request interface.
+ * @ie_len: Length of IEs in octets.
+ */
+struct cfg80211_update_owe_info {
+	u8 peer[ETH_ALEN] __aligned(2);
 	u16 status;
+	const u8 *ie;
+	size_t ie_len;
 };
 #endif
 
@@ -3221,9 +3248,12 @@ struct cfg80211_ops {
 					    struct net_device *dev,
 					    const bool enabled);
 
-#ifdef CONFIG_NF3205PQ_WLAN
-	int		(*external_auth)(struct wiphy *wiphy, struct net_device *dev,
-				struct cfg80211_external_auth_params *params);
+#ifdef CONFIG_NF3205PQ_WLAN 
+    int     (*external_auth)(struct wiphy *wiphy, struct net_device *dev,
+                         struct cfg80211_external_auth_params *params);
+
+	int	(*update_owe_info)(struct wiphy *wiphy, struct net_device *dev,
+				   struct cfg80211_update_owe_info *owe_info);
 #endif
 
 
@@ -6294,5 +6324,17 @@ extern int cfg80211_external_auth_request(struct net_device *netdev,
  */
 #define wiphy_WARN(wiphy, format, args...)			\
 	WARN(1, "wiphy: %s\n" format, wiphy_name(wiphy), ##args);
+
+#ifdef CONFIG_NF3205PQ_WLAN
+/**
+ * cfg80211_update_owe_info_event - Notify the peer's OWE info to user space
+ * @netdev: network device
+ * @owe_info: peer's owe info
+ * @gfp: allocation flags
+ */
+void cfg80211_update_owe_info_event(struct net_device *netdev,
+				    struct cfg80211_update_owe_info *owe_info,
+				    gfp_t gfp);
+#endif
 
 #endif /* __NET_CFG80211_H */
