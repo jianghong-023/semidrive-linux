@@ -1,3 +1,3 @@
 
-obj-y += sd_rf.o
+obj-y += sd-bt.o
 
