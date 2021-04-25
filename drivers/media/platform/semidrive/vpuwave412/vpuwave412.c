@@ -774,10 +774,20 @@ static long vpu_ioctl(struct file *filp, u_int cmd, u_long arg)
                 return -1;
             }
 
+            if (IS_ERR(temp)) {
+                pr_err("[VPUDRV-ERR] get dma buf error 0x%x\n", PTR_ERR(temp));
+                return PTR_ERR(temp);
+            }
+
             if (NULL == (void *)(buf.attachment = (uint64_t)dma_buf_attach(temp,
                                                   vpuwave_device))) {
                 pr_err("[VPUDRV-ERR] get dma buf attach error \n");
                 return -1;
+            }
+
+            if (IS_ERR(buf.attachment)) {
+                pr_err("[VPUDRV-ERR] get dma buf attach error 0x%x\n", PTR_ERR(buf.attachment));
+                return PTR_ERR(buf.attachment);
             }
 
             if (NULL ==  (void *)(buf.sgt = (uint64_t) dma_buf_map_attachment((
@@ -786,10 +796,20 @@ static long vpu_ioctl(struct file *filp, u_int cmd, u_long arg)
                 return -1;
             }
 
+            if (IS_ERR(buf.sgt)) {
+                pr_err("[VPUDRV-ERR] dma_buf_map_attachment error 0x%x\n", PTR_ERR(buf.sgt));
+                return PTR_ERR(buf.sgt);
+            }
+
             if (NULL == (void *)( buf.dma_addr  = sg_dma_address(((
                     struct sg_table *)(buf.sgt))->sgl))) {
                 pr_err("[VPUDRV-ERR] sg_dma_address error \n");
                 return -1;
+            }
+
+            if (IS_ERR(buf.dma_addr)) {
+                pr_err("[VPUDRV-ERR] sg_dma_address error 0x%x\n", PTR_ERR(buf.dma_addr));
+                return PTR_ERR(buf.dma_addr);
             }
 
             if (copy_to_user((void __user *)arg, &buf, sizeof(vpudrv_buffer_t)))
@@ -814,10 +834,25 @@ static long vpu_ioctl(struct file *filp, u_int cmd, u_long arg)
                 return -1;
             }
 
+            if (IS_ERR(temp)) {
+                pr_err("[VPUDRV-ERR] unmap get dma buf error 0x%x\n", PTR_ERR(temp));
+                return PTR_ERR(temp);
+            }
+
             if ((NULL == (struct dma_buf_attachment *)(buf.attachment))
                     || ((NULL == (struct sg_table *)buf.sgt))) {
                 pr_err("[VPUDRV-ERR] dma_buf_unmap_attachment param null  \n");
                 return -1;
+            }
+
+            if (IS_ERR(buf.attachment)) {
+                pr_err("[VPUDRV-ERR] dma_buf_unmap_attachment error 0x%x\n", PTR_ERR(buf.attachment));
+                return PTR_ERR(buf.attachment);
+            }
+
+            if (IS_ERR(buf.sgt)) {
+                pr_err("[VPUDRV-ERR] sg_dma_address error 0x%x\n", PTR_ERR(buf.sgt));
+                return PTR_ERR(buf.sgt);
             }
 
             dma_buf_unmap_attachment((struct dma_buf_attachment *)(
