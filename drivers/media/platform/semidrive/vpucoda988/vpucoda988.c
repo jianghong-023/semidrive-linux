@@ -1079,30 +1079,23 @@ static void vpu_get_sram_info(struct platform_device *pdev, struct sram_info  *i
     struct resource *res = NULL;
     struct device_node *ram_node = NULL;
     struct resource res_temp = {0};
-    int32_t index = 0;	 /*sram2 index in soc_sram */
+    uint32_t index = 0;
 
-    if(pdev) {
+    if (pdev) {
         res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "inter_sram");
-        if(res) {
+        if (res) {
             info[0].phy = res->start;
             info[0].size = res->end - res->start + 1;
-            info[0].id = 1;  /*for inter sram */
+            info[0].id = 1;  /* 1 for inter sram */
         }
 
-        if(NULL != (ram_node = of_parse_phandle(pdev->dev.of_node, "vpu2,sram2", 0))) {
-            if(!of_address_to_resource(ram_node, index, &res_temp)) {
-                info[1].phy = res_temp.start;
-                info[1].size = res_temp.end - res_temp.start + 1;
-                info[1].id = 2;   /* for soc sram */
-            }
-        }
-
-        index = 1; /*sram3 index in soc_sram */
-        if(NULL != (ram_node = of_parse_phandle(pdev->dev.of_node, "vpu2,sram3", 0))) {
-            if(!of_address_to_resource(ram_node, index, &res_temp)) {
-                info[1].phy = res_temp.start;
-                info[1].size = res_temp.end - res_temp.start + 1;
-                info[1].id = 2;   /* for soc sram */
+        if (NULL != (ram_node = of_parse_phandle(pdev->dev.of_node, "vpu2,sram", 0))) {
+            if (!of_property_read_u32(pdev->dev.of_node, "sram-index", &index)) {
+                if (!of_address_to_resource(ram_node, index, &res_temp)) {
+                    info[1].phy = res_temp.start;
+                    info[1].size = res_temp.end - res_temp.start + 1;
+                    info[1].id = 2;   /* 2 for soc sram */
+                }
             }
         }
     }
