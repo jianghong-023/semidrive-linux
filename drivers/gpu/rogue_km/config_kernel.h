@@ -1,5 +1,5 @@
 /* modified by lili semidrive begin */
-#if defined(RGX_NUM_OS_SUPPORTED) && (RGX_NUM_OS_SUPPORTED + 1U > 1U)
+#if defined(RGX_NUM_OS_SUPPORTED) && (RGX_NUM_OS_SUPPORTED > 1U)
 #define RGX_FW_HEAP_SHIFT 23
 #else
 #define RGX_FW_HEAP_SHIFT 25
