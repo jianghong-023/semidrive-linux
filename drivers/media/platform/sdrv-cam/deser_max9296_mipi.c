@@ -200,7 +200,7 @@ static int max9295_write_reg(deser_dev_t *dev, int channel, u16 reg,
 	msg.flags = client->flags;
 	msg.buf = buf;
 	msg.len = sizeof(buf);
-	dev_err(&client->dev, "%s: msg.addr = 0x%x\n", __func__, msg.addr);
+	dev_info(&client->dev, "%s: msg.addr = 0x%x\n", __func__, msg.addr);
 	ret = i2c_transfer(client->adapter, &msg, 1);
 
 	if (ret < 0) {
@@ -233,7 +233,7 @@ static int max9295_read_reg(deser_dev_t *dev, int channel, u16 reg,
 	msg[1].flags = client->flags | I2C_M_RD;
 	msg[1].buf = buf;
 	msg[1].len = 1;
-	dev_err(&client->dev, "%s: msg[0].addr = 0x%x\n", __func__, msg[0].addr);
+	dev_info(&client->dev, "%s: msg[0].addr = 0x%x\n", __func__, msg[0].addr);
 
 	ret = i2c_transfer(client->adapter, msg, 2);
 
@@ -310,7 +310,7 @@ static int max20087_read_reg(deser_dev_t *dev, u8 reg,
 //Power on/off deser
 static int max9296_power(deser_dev_t *dev, bool enable)
 {
-	dev_err(&dev->i2c_client->dev, "%s: enable=%d, dev->pwdn_gpio=%p\n", __func__, enable, dev->pwdn_gpio);
+	dev_info(&dev->i2c_client->dev, "%s: enable=%d, dev->pwdn_gpio=%p\n", __func__, enable, dev->pwdn_gpio);
 	if (dev->pwdn_gpio)
 		gpiod_direction_output(dev->pwdn_gpio, enable ? 1 : 0);
 
@@ -322,7 +322,7 @@ static int max20087_power(deser_dev_t *dev, bool enable)
 {
 	int ret = -EINVAL;
 
-	dev_err(&dev->i2c_client->dev, "%s: enable=%d\n", __func__, enable);
+	dev_info(&dev->i2c_client->dev, "%s: enable=%d\n", __func__, enable);
 
 #ifdef CONFIG_POWER_POC_DRIVER
 	struct i2c_client *client = dev->i2c_client;
@@ -371,7 +371,7 @@ static int max20087_power(deser_dev_t *dev, bool enable)
 //Should implement this interface
 static int start_deser(deser_dev_t *dev, bool en)
 {
-	dev_err(&dev->i2c_client->dev, "%s: en=%d\n", __func__, en);
+	dev_info(&dev->i2c_client->dev, "%s: en=%d\n", __func__, en);
 	if (en == true) {
 		msleep(20);
 		max9296_write_reg(dev, 0x15, 0x9b);
@@ -390,7 +390,7 @@ static int max96705_check_chip_id(deser_dev_t *dev)
 	u8 chip_id = 0;
 	int i = 0;
 
-	dev_err(&dev->i2c_client->dev, "%s\n", __func__);
+	dev_info(&dev->i2c_client->dev, "%s\n", __func__);
 	for (i = 0; i < 4; i++) {
 		//ret = max96705_read_reg(dev, i, 0x1E, &chip_id);
 		if (ret < 0) {
@@ -401,7 +401,6 @@ static int max96705_check_chip_id(deser_dev_t *dev)
 			continue;
 		} else
 			break;
-		dev_err(&client->dev, "\n max96705 dev chipid = 0x%02x\n", chip_id);
 	}
 
 	return ret;
@@ -415,7 +414,7 @@ int max9296_check_chip_id(deser_dev_t *dev)
 	u8 chip_id = 0;
 	int i = 0;
 
-	dev_err(&dev->i2c_client->dev, "%s\n", __func__);
+	dev_info(&dev->i2c_client->dev, "%s\n", __func__);
 	ret = max9296_read_reg(dev, 0x0d, &chip_id);
 
 	if (chip_id != MAX9296_DEVICE_ID) {
@@ -436,15 +435,15 @@ int max9296_initialization(deser_dev_t *dev)
 	u16 reg;
 	u8 val;
 
-	dev_err(&dev->i2c_client->dev, "%s()\n", __func__);
+	dev_info(&dev->i2c_client->dev, "%s()\n", __func__);
 	if (dev->pmu_gpio) {
-		dev_err(&dev->i2c_client->dev, "%s: dev->pmu_gpio=%p.\n", __func__, dev->pmu_gpio);
+		dev_info(&dev->i2c_client->dev, "%s: dev->pmu_gpio=%p.\n", __func__, dev->pmu_gpio);
 		gpiod_direction_output(dev->pmu_gpio, 1);
 	}
 	msleep(20);
 
 	if (dev->poc_gpio) {
-		dev_err(&dev->i2c_client->dev, "%s: dev->poc_gpio=%p.\n", __func__, dev->poc_gpio);
+		dev_info(&dev->i2c_client->dev, "%s: dev->poc_gpio=%p.\n", __func__, dev->poc_gpio);
 		gpiod_direction_output(dev->poc_gpio, 1);
 	}
 	msleep(100);
@@ -453,28 +452,28 @@ int max9296_initialization(deser_dev_t *dev)
 	reg = 0x02be;
 	val = 0;
 	max9295_read_reg(dev, 0, reg, &val);
-	dev_err(&dev->i2c_client->dev, "%s: reg=0x%x, val=0x%x.\n", __func__, reg, val);
+	dev_info(&dev->i2c_client->dev, "%s: reg=0x%x, val=0x%x.\n", __func__, reg, val);
 	val = 0x10;
 	max9295_write_reg(dev, 0, reg, val);	//camera reset
 
 	reg = 0x0057;
 	val = 0;
 	max9295_read_reg(dev, 0, reg, &val);
-	dev_err(&dev->i2c_client->dev, "%s: reg=0x%x, val=0x%x.\n", __func__, reg, val);
+	dev_info(&dev->i2c_client->dev, "%s: reg=0x%x, val=0x%x.\n", __func__, reg, val);
 	val = 0x12;
 	max9295_write_reg(dev, 0, reg, val);
 
 	reg = 0x005b;
 	val = 0;
 	max9295_read_reg(dev, 0, reg, &val);
-	dev_err(&dev->i2c_client->dev, "%s: reg=0x%x, val=0x%x.\n", __func__, reg, val);
+	dev_info(&dev->i2c_client->dev, "%s: reg=0x%x, val=0x%x.\n", __func__, reg, val);
 	val = 0x11;
 	max9295_write_reg(dev, 0, reg, val);
 
 	reg = 0x0318;
 	val = 0;
 	max9295_read_reg(dev, 0, reg, &val);
-	dev_err(&dev->i2c_client->dev, "%s: reg=0x%x, val=0x%x.\n", __func__, reg, val);
+	dev_info(&dev->i2c_client->dev, "%s: reg=0x%x, val=0x%x.\n", __func__, reg, val);
 	val = 0x5e;
 	max9295_write_reg(dev, 0, reg, val);
 
@@ -482,14 +481,14 @@ int max9296_initialization(deser_dev_t *dev)
 	reg = 0x0320;
 	val = 0;
 	max9296_read_reg(dev, reg, &val);
-	dev_err(&dev->i2c_client->dev, "%s: reg=0x%x, val=0x%x.\n", __func__, reg, val);
+	dev_info(&dev->i2c_client->dev, "%s: reg=0x%x, val=0x%x.\n", __func__, reg, val);
 	val = 0x28;
 	max9296_write_reg(dev, reg, val);
 
 	reg = 0x0313;
 	val = 0;
 	max9296_read_reg(dev, reg, &val);
-	dev_err(&dev->i2c_client->dev, "%s: reg=0x%x, val=0x%x.\n", __func__, reg, val);
+	dev_info(&dev->i2c_client->dev, "%s: reg=0x%x, val=0x%x.\n", __func__, reg, val);
 	val = 0x02;
 	max9296_write_reg(dev, reg, val);
 

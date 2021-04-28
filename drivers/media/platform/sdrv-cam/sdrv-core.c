@@ -455,7 +455,7 @@ static int sdrv_of_parse_core(struct platform_device *pdev,
 		sync = 0;
 	}
 
-	dev_err(dev, "sync=%d\n", sync);
+	dev_info(dev, "sync=%d\n", sync);
 	csi->sync = sync;
 	fwnode = dev_fwnode(dev);
 	ret = v4l2_fwnode_endpoint_parse(fwnode, &csi->vep);

@@ -359,7 +359,7 @@ static int deser_probe(struct i2c_client *client,
 	}
 
 	ret = fwnode_property_read_u32(dev_fwnode(&client->dev), "sync", &sync);
-	dev_err(&client->dev, "sync: %d, ret=%d\n", sync, ret);
+	dev_info(&client->dev, "sync: %d, ret=%d\n", sync, ret);
 
 	if (ret < 0) {
 		sync = 0;
@@ -368,7 +368,7 @@ static int deser_probe(struct i2c_client *client,
 	sensor->sync = sync;
 
 	ret = fwnode_property_read_u32(dev_fwnode(&client->dev), "device", &device_type);
-	dev_err(&client->dev, "device_type: 0x%x, ret=%d\n", device_type, ret);
+	dev_info(&client->dev, "device_type: 0x%x, ret=%d\n", device_type, ret);
 
 	if (device_type < 0) {
 		device_type = 0;

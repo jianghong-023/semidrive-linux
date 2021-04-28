@@ -823,7 +823,7 @@ static int max96722_check_chip_id(struct max96722_dev *sensor)
 	}
 
 	if (chip_id == MAX96722_DEVICE_ID || chip_id == MAX96712_DEVICE_ID) {
-		dev_err(&client->dev, "max96722/12 chipid = 0x%02x\n", chip_id);
+		dev_info(&client->dev, "max96722/12 chipid = 0x%02x\n", chip_id);
 	} else {
 		dev_err(&client->dev,
 			"%s: wrong chip identifier, expected 0x%x(max96722), 0x%x(max96712) got 0x%x\n",
@@ -990,7 +990,7 @@ static int max96722_probe(struct i2c_client *client,
 	sensor->ae_target = 52;
 
 	ret = fwnode_property_read_u32(dev_fwnode(&client->dev), "sync", &sync);
-	dev_err(&client->dev, "sync: %d, ret=%d\n", sync, ret);
+	dev_info(&client->dev, "sync: %d, ret=%d\n", sync, ret);
 
 	if (ret < 0) {
 		sync = 0;

@@ -281,7 +281,7 @@ static int max20087_read_reg(deser_dev_t *dev, u8 reg,
 //Power on/off deser
 static int max9286_power(deser_dev_t *dev, bool enable)
 {
-	dev_err(&dev->i2c_client->dev, "%s: enable=%d\n", __func__, enable);
+	dev_info(&dev->i2c_client->dev, "%s: enable=%d\n", __func__, enable);
 	if (dev->pwdn_gpio)
 		gpiod_direction_output(dev->pwdn_gpio, enable ? 1 : 0);
 	return 0;
@@ -292,15 +292,13 @@ static int max20087_power(deser_dev_t *dev, bool enable)
 {
 	int ret = -EINVAL;
 
-	dev_err(&dev->i2c_client->dev, "%s: enable=%d\n", __func__, enable);
-
+	dev_info(&dev->i2c_client->dev, "%s: enable=%d\n", __func__, enable);
 
 	if (dev->poc_gpio){
 		dev_err(&dev->i2c_client->dev, "%s: dev->poc_gpio=%p.\n", __func__, dev->poc_gpio);
 		gpiod_direction_output(dev->poc_gpio, 1);
 		msleep(20);
 	}
-
 
 #ifdef CONFIG_POWER_POC_DRIVER
 	struct i2c_client *client = dev->i2c_client;
@@ -375,9 +373,10 @@ static int max96705_check_chip_id(deser_dev_t *dev)
 						__func__, i, MAX96705_DEVICE_ID, chip_id);
 			usleep_range(10000, 11000);
 			continue;
-		} else
+		} else{
+			dev_info(&client->dev, "max96705 dev chipid = 0x%02x\n", chip_id);
 			break;
-		printk("\n max96705 dev chipid = 0x%02x\n", chip_id);
+		}
 	}
 
 	return ret;
@@ -392,7 +391,7 @@ int max9286_check_chip_id(deser_dev_t *dev)
 	int i = 0;
 
 	ret = max9286_read_reg(dev, 0x1e, &chip_id);
-	dev_err(&client->dev, "%s: chip_id=0x%x\n", __func__, chip_id);
+	dev_info(&client->dev, "%s: chip_id=0x%x\n", __func__, chip_id);
 	if (chip_id != MAX9286_DEVICE_ID) {
 		dev_err(&client->dev,
 			"%s: wrong chip identifier, expected 0x%x(max9286) got 0x%x\n",
@@ -413,7 +412,7 @@ int max9286_initialization(deser_dev_t *dev)
 	u8 link_status = 0, link_count = 0;
 	int i = 0, j;
 
-	dev_err(&client->dev, "%s: sensor->addr_deser=0x%x\n", __func__, sensor->addr_deser);
+	dev_info(&client->dev, "%s: sensor->addr_deser=0x%x\n", __func__, sensor->addr_deser);
 
 	if (sensor->pmu_gpio){
 		dev_err(&sensor->i2c_client->dev, "%s: sensor->pmu_gpio=%p.\n", __func__, sensor->pmu_gpio);
@@ -433,7 +432,7 @@ int max9286_initialization(deser_dev_t *dev)
 	max9286_write_reg(sensor, 0x1, DES_REG1_FS_DISABLE);
 
 #ifndef V9TS_CSI
-	dev_err(&client->dev, "set him\n");
+	dev_info(&client->dev, "set him\n");
 	//him enable
 	max9286_write_reg(sensor, 0x1c, DES_REG1C_HIM_ENABLE);
 	usleep_range(5000, 5100);
@@ -453,7 +452,7 @@ int max9286_initialization(deser_dev_t *dev)
 		else
 			usleep_range(10000, 11000);
 	}
-	dev_err(&client->dev, "0x49=0x%x, i=%d\n", val, i);
+	dev_info(&client->dev, "0x49=0x%x, i=%d\n", val, i);
 	if (val == 0) {
 		dev_err(&client->dev, "max96705 detect fail!\n");
 		return 0;
@@ -483,7 +482,7 @@ int max9286_initialization(deser_dev_t *dev)
 		}
 	}
 
-	dev_err(&client->dev, "reg=0x%x, val=0x%x, j=%d\n", reg, val, j);
+	dev_info(&client->dev, "reg=0x%x, val=0x%x, j=%d\n", reg, val, j);
 
 	for (i = 0; i < MAX_CAMERA_NUM; i++) {
 
@@ -502,7 +501,7 @@ int max9286_initialization(deser_dev_t *dev)
 				usleep_range(10000, 11000);
 		}
 
-		dev_err(&client->dev, "reg=0x%x, val=0x%x, [0x%x], i=%d, j=%d\n", reg, val,
+		dev_info(&client->dev, "reg=0x%x, val=0x%x, [0x%x], i=%d, j=%d\n", reg, val,
 			(MAX96705_SLAVE_ID + MAX96705_DEV_INDEX + sensor->sec_9286_shift + i), i, j);
 
 		max96705_write_reg(sensor, 0, 0x00,

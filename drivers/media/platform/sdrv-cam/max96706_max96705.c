@@ -906,12 +906,12 @@ static int max96706_initialization(struct max96706_dev *sensor)
 	reg = 0x0;		//chip version, 0x0160
 	val16 = 0;
 	ap0101_read_reg16(sensor, AP0101_DEV_INDEX, reg, &val16);
-	dev_err(&client->dev, "0101, reg=0x%x, val=0x%x\n", reg, val16);
+	dev_info(&client->dev, "0101, reg=0x%x, val=0x%x\n", reg, val16);
 
 	reg = 0xca9c;		//
 	val16 = 0;
 	ap0101_read_reg16(sensor, AP0101_DEV_INDEX, reg, &val16);
-	dev_err(&client->dev, "0101, reg=0x%x, val=0x%x\n", reg, val16);
+	dev_info(&client->dev, "0101, reg=0x%x, val=0x%x\n", reg, val16);
 	if ((val16 & (0x1 << 10)) == 0) {
 		val16 = 0x405;
 		ap0101_write_reg16(sensor, AP0101_DEV_INDEX, reg, val16);
@@ -928,7 +928,7 @@ static int max96706_initialization(struct max96706_dev *sensor)
 	}
 	val16 = 0;
 	ap0101_read_reg16(sensor, 0, reg, &val16);
-	dev_err(&client->dev, "0101, reg=0x%x, val=0x%x\n", reg, val16);
+	dev_info(&client->dev, "0101, reg=0x%x, val=0x%x\n", reg, val16);
 	if ((val16 & (0x1 << 9)) == 0) {
 		val16 = 0x605;
 		ap0101_write_reg16(sensor, AP0101_DEV_INDEX, reg, val16);
@@ -943,16 +943,16 @@ static int max96706_initialization(struct max96706_dev *sensor)
 			msleep(100);
 		}
 	}
-	dev_err(&client->dev, "0101, end msb. i=%d\n", i);
+	dev_info(&client->dev, "0101, end msb. i=%d\n", i);
 
 	val = 0;
 	max96706_read_reg(sensor, 0x5, &val);
-	dev_err(&client->dev, "96706, reg=0x5, val=0x%x\n", val);
+	dev_info(&client->dev, "96706, reg=0x5, val=0x%x\n", val);
 	val |= 0x40;
 	max96706_write_reg(sensor, 0x5, val);
 	val = 0;
 	max96706_read_reg(sensor, 0x5, &val);
-	dev_err(&client->dev, "96706, reg=0x5, val=0x%x\n", val);
+	dev_info(&client->dev, "96706, reg=0x5, val=0x%x\n", val);
 
 	sensor->link_count = link_count;
 	return 0;
@@ -1099,7 +1099,7 @@ static int max96706_probe(struct i2c_client *client,
 
 	mutex_init(&sensor->lock);
 
-	dev_err(dev, "%s(): call max96706_power()-100-500\n", __func__);
+	dev_info(dev, "%s(): call max96706_power()-100-500\n", __func__);
 	max96706_power(sensor, 1);
 	ret = max96706_check_chip_id(sensor);
 

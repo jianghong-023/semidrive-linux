@@ -357,12 +357,12 @@ static void sd_pwm_set_polarity(struct pwm_chip *chip, struct pwm_device *pwm,
 	if (polarity == PWM_POLARITY_INVERSED) {
 		play_cfg->cmp_cfg[pwm->hwpwm].phase =
 		    DRV_PWM_PHASE_POLARITY_NEG;
-		dev_err(pc->dev, "pwm->hwpwm: %d, PWM_POLARITY_INVERSED",
+		dev_info(pc->dev, "pwm->hwpwm: %d, PWM_POLARITY_INVERSED",
 			pwm->hwpwm);
 	} else {
 		play_cfg->cmp_cfg[pwm->hwpwm].phase =
 		    DRV_PWM_PHASE_POLARITY_POS;
-		dev_err(pc->dev, "pwm->hwpwm: %d, PWM_POLARITY_NORMAL",
+		dev_info(pc->dev, "pwm->hwpwm: %d, PWM_POLARITY_NORMAL",
 			pwm->hwpwm);
 	}
 }
@@ -775,7 +775,7 @@ static int sd_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
 	new_frep = NSEC_PER_SEC;
 	do_div(new_frep, period_ns);
 
-	dev_err(pc->dev,
+	dev_info(pc->dev,
 		"%s %d: map_base: %#x, pwm->hwpwm: %d, new_duty: %d, new_frep: "
 		"%d\n",
 		__func__, __LINE__, pc->map_base, pwm->hwpwm, new_duty,
@@ -1247,7 +1247,7 @@ static int sd_pwm_probe_capture(struct platform_device *pdev) //timer ip
 		dev_err(dev, "pwmchip_add error!\n");
 		return ret;
 	}
-	dev_err(dev, "cdata->cpt_num_devs: %d", cdata->cpt_num_devs);
+	dev_info(dev, "cdata->cpt_num_devs: %d", cdata->cpt_num_devs);
 	for (i = 0; i < cdata->cpt_num_devs; i++) {
 		struct sd_cpt_channel *ddata;
 

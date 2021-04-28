@@ -967,7 +967,7 @@ static int tca9539_read_reg(deser_dev_t *sensor, u8 reg, u8 *val)
 static int max96706_power(deser_dev_t *dev, bool enable)
 {
 	//printk("max96706 power +\n");
-	dev_err(&dev->i2c_client->dev, "%s: enable=%d.\n", __func__, enable);
+	dev_info(&dev->i2c_client->dev, "%s: enable=%d.\n", __func__, enable);
 
 	if (dev->pwdn_gpio)
 		gpiod_direction_output(dev->pwdn_gpio, enable ? 1 : 0);
@@ -1007,9 +1007,9 @@ int check_camera_subboard(deser_dev_t *sensor)
 //Power for camera module
 static int poc_power(deser_dev_t *dev, bool enable)
 {
-	dev_err(&dev->i2c_client->dev, "%s: enable=%d.\n", __func__, enable);
+	dev_info(&dev->i2c_client->dev, "%s: enable=%d.\n", __func__, enable);
 	if (dev->poc_gpio) {
-		dev_err(&dev->i2c_client->dev, "%s: dev->poc_gpio=%p.\n", __func__, dev->poc_gpio);
+		dev_info(&dev->i2c_client->dev, "%s: dev->poc_gpio=%p.\n", __func__, dev->poc_gpio);
 		gpiod_direction_output(dev->poc_gpio, enable ? 1 : 0);
 	}
 	return 0;
@@ -1024,7 +1024,7 @@ static int gpi_power(deser_dev_t *dev, int gpio, bool enable)
 	u8 reg;
 	int shift;
 
-	dev_err(&dev->i2c_client->dev, "%s: enable=%d.\n", __func__, enable);
+	dev_info(&dev->i2c_client->dev, "%s: enable=%d.\n", __func__, enable);
 	//printk("gpi power +\n");
 
 	if (gpio > 15 || gpio < 0)
@@ -1103,7 +1103,7 @@ static int ap0101_change_config(deser_dev_t *sensor, u8 idx)
 static int start_deser(deser_dev_t *sensor, bool en)
 {
 	u8 val;
-	dev_err(&sensor->i2c_client->dev, "%s: %d\n", __func__, en);
+	dev_info(&sensor->i2c_client->dev, "%s: %d\n", __func__, en);
 
 	if (en == true) {
 		msleep(100);
@@ -1163,7 +1163,7 @@ static int device_icl02_init(deser_dev_t *sensor)
 	u16 reg;
 	u8 val;
 
-	dev_err(&sensor->i2c_client->dev, "%s(): \n", __func__);
+	dev_info(&sensor->i2c_client->dev, "%s(): \n", __func__);
 	//dbl
 	max96705_write_reg(sensor,	(MAX96705_DEF-MAX96705_CH_A)>>1, 0x7, 0x84);
 	usleep_range(5000, 6000);
@@ -1215,7 +1215,7 @@ static int device_icl02_init(deser_dev_t *sensor)
 	//start stream
 	u16 ttt=0;
 	ar0144_read_reg(sensor, 0x301a, &ttt);
-	dev_err(&sensor->i2c_client->dev, "%s: ar0144: reg 0x301a=0x%x\n", __func__, ttt);
+	dev_info(&sensor->i2c_client->dev, "%s: ar0144: reg 0x301a=0x%x\n", __func__, ttt);
 	ttt |= 0x4;
 	ar0144_write_reg(sensor, 0x301a, ttt);
 
@@ -1236,7 +1236,7 @@ static int device_minieye_init(deser_dev_t *sensor)
 {
 	int i;
 
-	dev_err(&sensor->i2c_client->dev, "%s: sizeof(OV9284_PLLRegTable)=%d, sizeof(OV9284_RegTable)=%d\n", __func__, sizeof(OV9284_PLLRegTable)/sizeof(struct reg_value_ov), sizeof(OV9284_RegTable)/sizeof(struct reg_value_ov));
+	dev_info(&sensor->i2c_client->dev, "%s: sizeof(OV9284_PLLRegTable)=%d, sizeof(OV9284_RegTable)=%d\n", __func__, sizeof(OV9284_PLLRegTable)/sizeof(struct reg_value_ov), sizeof(OV9284_RegTable)/sizeof(struct reg_value_ov));
 
 	for (i =0; i < (sizeof(OV9284_PLLRegTable)/sizeof(struct reg_value_ov)); i++) {
 		ov9284_write_reg(sensor, OV9284_PLLRegTable[i].reg_addr, OV9284_PLLRegTable[i].val);
@@ -1255,7 +1255,7 @@ static int max96706_initialization(deser_dev_t *sensor)
 	u16 reg;
 	u16 val16;
 
-	dev_err(&client->dev, "%s()\n", __func__);
+	dev_info(&client->dev, "%s()\n", __func__);
 	//printk("max96706 init %s pid %d +\n", current->comm, current->pid);
 	//set him
 	val = 0;
@@ -1272,7 +1272,7 @@ static int max96706_initialization(deser_dev_t *sensor)
 	//[7]dbl, [2]hven, [1]cxtp
 	val = 0;
 	max96706_read_reg(sensor, 0x07, &val);
-	dev_err(&client->dev, "96706 0x7=0x%x\n", val);
+	dev_info(&client->dev, "96706 0x7=0x%x\n", val);
 	if (val != 0x86) {
 		max96706_write_reg(sensor, 0x07, 0x86);
 		usleep_range(10000, 10000);
@@ -1288,13 +1288,13 @@ static int max96706_initialization(deser_dev_t *sensor)
 	//disable output
 	val = 0;
 	max96706_read_reg(sensor, 0x04, &val);
-	dev_err(&client->dev, "max96706 read 0x4 = 0x%x\n",  val);
+	dev_info(&client->dev, "max96706 read 0x4 = 0x%x\n",  val);
 	val = 0x47;
 	max96706_write_reg(sensor, 0x04, val);
 	msleep(20);
 
 	if (sensor->pmu_gpio) {
-		dev_err(&sensor->i2c_client->dev, "%s: sensor->pmu_gpio=%p.\n", __func__, sensor->pmu_gpio);
+		dev_info(&sensor->i2c_client->dev, "%s: sensor->pmu_gpio=%p.\n", __func__, sensor->pmu_gpio);
 		gpiod_direction_output(sensor->pmu_gpio, 1);
 	}
 	msleep(20);
@@ -1308,7 +1308,7 @@ static int max96706_initialization(deser_dev_t *sensor)
 	//dcs
 	val = 0;
 	max96706_read_reg(sensor, 0x5, &val);
-	dev_err(&client->dev, "96706, reg=0x5, val=0x%x\n", val);
+	dev_info(&client->dev, "96706, reg=0x5, val=0x%x\n", val);
 	val |= 0x40;
 	max96706_write_reg(sensor, 0x5, val);
 	val = 0;

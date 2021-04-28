@@ -714,7 +714,7 @@ static void max20086_power(struct max9286_dev *sensor, bool enable)
 
 	val = 0;
 	max20086_read_reg(sensor, reg, &val);
-	dev_err(&sensor->i2c_client->dev, "20086: reg=%d, val=0x%x\n", reg,
+	dev_info(&sensor->i2c_client->dev, "20086: reg=%d, val=0x%x\n", reg,
 		val);
 #endif
 
@@ -768,7 +768,7 @@ static int max9286_initialization(struct max9286_dev *sensor)
 	max9286_write_reg(sensor, 0x1, DES_REG1_FS_DISABLE);
 
 
-	dev_err(&client->dev, "set him\n");
+	dev_info(&client->dev, "set him\n");
 	//him enable
 	max9286_write_reg(sensor, 0x1c, DES_REG1C_HIM_ENABLE);
 	usleep_range(5000, 6000);
@@ -786,7 +786,7 @@ static int max9286_initialization(struct max9286_dev *sensor)
 			break;
 		msleep(10);
 	}
-	dev_err(&client->dev, "0x49=0x%x, i=%d\n", val, i);
+	dev_info(&client->dev, "0x49=0x%x, i=%d\n", val, i);
 	if (val == 0) {
 		dev_err(&client->dev, "max96705 detect fail!\n");
 		return 0;
@@ -811,7 +811,7 @@ static int max9286_initialization(struct max9286_dev *sensor)
 			break;
 		msleep(20);
 	}
-	dev_err(&client->dev, "reg=0x%x, val=0x%x, j=%d\n", reg, val, j);
+	dev_info(&client->dev, "reg=0x%x, val=0x%x, j=%d\n", reg, val, j);
 
 	for (i = 0; i < MAX_SENSOR_NUM; i++) {
 
@@ -830,7 +830,7 @@ static int max9286_initialization(struct max9286_dev *sensor)
 				break;
 			msleep(20);
 		}
-		dev_err(&client->dev,
+		dev_info(&client->dev,
 			"reg=0x%x, val=0x%x, [0x%x], i=%d, j=%d\n", reg, val,
 			(MAX96705_SLAVE_ID + MAX96705_DEV_INDEX +
 			 sensor->sec_9286_shift + i), i, j);
@@ -848,7 +848,7 @@ static int max9286_initialization(struct max9286_dev *sensor)
 	reg = 0x49;
 	val = 0;
 	max9286_read_reg(sensor, 0x49, &val);
-	dev_err(&client->dev, "all reg=0x%x, val=0x%x\n", reg, val);
+	dev_info(&client->dev, "all reg=0x%x, val=0x%x\n", reg, val);
 
 	//yuv10 to yuv8
 	//enable dbl
@@ -968,7 +968,7 @@ static int max9286_initialization(struct max9286_dev *sensor)
 	reg = 0x49;
 	val = 0;
 	max9286_read_reg(sensor, 0x49, &val);
-	dev_err(&client->dev, "end reg=0x%x, val=0x%x\n", reg, val);
+	dev_info(&client->dev, "end reg=0x%x, val=0x%x\n", reg, val);
 
 	//internal fs, debug for output
 	max9286_write_reg(sensor, 0x1, DES_REG1_FS_EN);
@@ -1068,11 +1068,11 @@ static int max9286_probe(struct i2c_client *client,
 
 	poc_np = of_parse_phandle(client->dev.of_node, "semidrive,poc", 0);
 	if (!poc_np) {
-		dev_err(&client->dev, "no poc device node\n");
+		dev_info(&client->dev, "no poc device node\n");
 		sensor->adap = NULL;
 	} else
 		sensor->adap = of_find_i2c_adapter_by_node(poc_np);
-	dev_err(&client->dev, "sensor->adap=%p\n", sensor->adap);
+	dev_info(&client->dev, "sensor->adap=%p\n", sensor->adap);
 
 
 	/* optional indication of physical rotation of sensor */

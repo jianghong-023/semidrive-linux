@@ -491,7 +491,7 @@ static void sdrv_configure_irqs(struct sdrv_gpio *gpio,
 					     IRQ_NOREQUEST, 0,
 					     IRQ_GC_INIT_NESTED_LOCK);
 	if (err) {
-		dev_info(gpio->dev, "irq_alloc_domain_generic_chips failed\n");
+		dev_err(gpio->dev, "irq_alloc_domain_generic_chips failed\n");
 		irq_domain_remove(port->domain);
 		port->domain = NULL;
 		return;
@@ -703,7 +703,7 @@ sdrv_gpio_get_pdata(struct device *dev, struct sdrv_gpio *gpio)
 			pp->irq = irq_of_parse_and_map(to_of_node(fwnode), 0);
 			if (!pp->irq)
 				dev_warn(dev, "no irq for port%d\n", pp->idx);
-			dev_err(dev, "sdrv_gpio: irq [%d]\n", pp->irq);
+			dev_info(dev, "sdrv_gpio: irq [%d]\n", pp->irq);
 		}
 
 		pp->irq_shared	= false;

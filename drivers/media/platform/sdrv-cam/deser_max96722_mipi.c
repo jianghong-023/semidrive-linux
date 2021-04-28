@@ -362,7 +362,7 @@ static int max20087_write_reg(deser_dev_t *dev, u8 reg,
 	ret = i2c_transfer(client->adapter, &msg, 1);
 
 	if (ret < 0) {
-		dev_err(&client->dev, "%s: chip %x02x error: reg=0x%02x, val=0x%02x\n",
+		dev_info(&client->dev, "%s: chip %x02x error: reg=0x%02x, val=0x%02x\n",
 			__func__, client->addr, reg, val);
 		return ret;
 	}
@@ -507,7 +507,7 @@ static int max96705_check_chip_id(deser_dev_t *dev)
 			usleep_range(10000, 11000);
 			continue;
 		} else {
-			printk("\n max96705 dev chipid = 0x%02x\n", chip_id);
+			dev_info(&client->dev,"max96705 dev chipid = 0x%02x\n", chip_id);
 			break;
 		}
 	}
@@ -528,7 +528,7 @@ int max96722_check_chip_id(deser_dev_t *dev)
 	ret = max96722_read_reg(dev, 0x000d, &chip_id);
 
 	if (chip_id == MAX96722_DEVICE_ID || chip_id == MAX96712_DEVICE_ID) {
-		dev_err(&client->dev, "max96722/12 chipid = 0x%02x\n", chip_id);
+		dev_info(&client->dev, "max96722/12 chipid = 0x%02x\n", chip_id);
 	} else {
 		dev_err(&client->dev,
 			"%s: wrong chip identifier, expected 0x%x(max96722), 0x%x(max96712) got 0x%x\n",
