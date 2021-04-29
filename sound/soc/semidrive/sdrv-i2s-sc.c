@@ -1630,9 +1630,9 @@ static int snd_afe_i2s_sc_probe(struct platform_device *pdev)
 	if (IS_ERR(afe->clk_i2s))
 		return PTR_ERR(afe->clk_i2s);
 	//Only this freq could also set MCLK to 12.288M.
-	ret = clk_set_rate(afe->clk_i2s, 98304000);
+/* 	ret = clk_set_rate(afe->clk_i2s, 98304000);
 	if (ret)
-		return ret;
+		return ret; */
 	DEBUG_ITEM_PRT(clk_get_rate(afe->clk_i2s));
 
 	afe->mclk = devm_clk_get(&pdev->dev, "i2s-mclk");
@@ -1642,9 +1642,9 @@ static int snd_afe_i2s_sc_probe(struct platform_device *pdev)
 
 	/* TODO: need clean next debug code later. */
 
-	ret = clk_set_rate(afe->mclk, 12288000);
+/* 	ret = clk_set_rate(afe->mclk, 12288000);
 	if (ret)
-		return ret;
+		return ret; */
 	DEBUG_ITEM_PRT(clk_get_rate(afe->mclk));
 
 	/*  ret = devm_request_threaded_irq(&pdev->dev, irq_id, NULL,
