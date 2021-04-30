@@ -1770,6 +1770,7 @@ static struct platform_driver snd_afe_i2s_sc_driver = {
 	{
 	    .name = DRV_NAME "-i2s",
 	    .of_match_table = sdrv_i2s_sc_of_match,
+	    .probe_type = PROBE_PREFER_ASYNCHRONOUS,
 	},
     .probe = snd_afe_i2s_sc_probe,
     .remove = snd_afe_i2s_sc_remove,

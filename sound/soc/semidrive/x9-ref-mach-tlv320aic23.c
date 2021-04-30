@@ -292,6 +292,7 @@ static struct platform_driver x9_ref_tlv320aic23_mach_driver = {
 #ifdef CONFIG_PM
 	    .pm = &snd_soc_pm_ops,
 #endif
+	    .probe_type = PROBE_PREFER_ASYNCHRONOUS,
 	},
 
     .probe = x9_ref_tlv320aic23_probe,
