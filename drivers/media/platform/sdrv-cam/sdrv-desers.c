@@ -586,6 +586,7 @@ static struct i2c_driver deser_i2c_driver = {
 	.driver = {
 		   .name = "sdrv-deser",
 		   .of_match_table = deser_dt_ids,
+		   .probe_type = PROBE_PREFER_ASYNCHRONOUS,
 		   },
 	.probe = deser_probe,
 	.remove = deser_remove,

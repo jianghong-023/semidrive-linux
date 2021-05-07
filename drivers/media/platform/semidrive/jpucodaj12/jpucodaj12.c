@@ -1180,6 +1180,7 @@ static struct platform_driver jpu_driver = {
 	.driver = {
 		.name = JPU_PLATFORM_DEVICE_NAME,
 		.of_match_table = jpucoda_of_table,
+	        .probe_type = PROBE_PREFER_ASYNCHRONOUS,
 	},
 	.probe      = jpu_probe,
 	.remove     = jpu_remove,

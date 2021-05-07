@@ -1464,6 +1464,7 @@ static struct platform_driver vpu_driver = {
     .driver = {
         .name = VPU_PLATFORM_DEVICE_NAME,
         .of_match_table = vpucoda_of_table,
+	.probe_type = PROBE_PREFER_ASYNCHRONOUS,
     },
     .probe = vpu_probe,
     .remove = vpu_remove,
