@@ -264,7 +264,7 @@ static int vpu_alloc_dma_buffer(vpudrv_buffer_t *vb)
 
     vb->base = (unsigned long)dma_alloc_coherent(vpuwave_device,
                PAGE_ALIGN(vb->size),
-               (dma_addr_t *) (&vb->phys_addr), GFP_DMA | GFP_KERNEL);
+               (dma_addr_t *) (&vb->dma_addr), GFP_DMA | GFP_KERNEL);
 
     if ((void *)(vb->base) == NULL) {
         pr_err( "[VPUDRV-ERR] Physical memory allocation error size=%d\n",
@@ -272,6 +272,7 @@ static int vpu_alloc_dma_buffer(vpudrv_buffer_t *vb)
         return -1;
     }
 
+    vb->phys_addr = vb->dma_addr;
     return 0;
 }
 
