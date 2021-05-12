@@ -108,6 +108,8 @@
 #define GET_LANE0_CFG(val) (val & 0xffff)
 #define GET_LANE1_CFG(val) (val >> 16)
 
+static DEFINE_MUTEX(phy_lock);
+
 enum sd_pcie_lane_cfg {
 	PCIE1_WITH_LANE0 = LANE_CFG(NO_PCIE, PCIE1_INDEX),
 	PCIE1_WITH_LANE1 = LANE_CFG(PCIE1_INDEX, NO_PCIE),
@@ -229,7 +231,7 @@ static int sd_pcie_get_resource(struct sd_pcie *sd_pcie,
 		return PTR_ERR(sd_pcie->ctrl_ncr_base);
 
 	phy = platform_get_resource_byname(pdev, IORESOURCE_MEM, "phy");
-	sd_pcie->phy_base = devm_ioremap_resource(dev, phy);
+	sd_pcie->phy_base = devm_ioremap(dev, phy->start, resource_size(phy));
 	if (IS_ERR(sd_pcie->phy_base))
 		return PTR_ERR(sd_pcie->phy_base);
 
@@ -247,7 +249,8 @@ static int sd_pcie_get_resource(struct sd_pcie *sd_pcie,
 	    sd_pcie->pcie->dbi_base + SD_PCIE_ATU_OFFSET;
 
 	phy_ncr = platform_get_resource_byname(pdev, IORESOURCE_MEM, "phy_ncr");
-	sd_pcie->phy_ncr_base = devm_ioremap_resource(dev, phy_ncr);
+	sd_pcie->phy_ncr_base = devm_ioremap(dev, phy_ncr->start,
+						resource_size(phy_ncr));
 	if (IS_ERR(sd_pcie->phy_ncr_base))
 		return PTR_ERR(sd_pcie->phy_ncr_base);
 
@@ -358,6 +361,11 @@ static void sd_pcie_lane_config(struct sd_pcie *sd_pcie)
 static int sd_pcie_phy_init(struct sd_pcie *sd_pcie)
 {
 	u32 reg_val;
+	static int init_flag = 0;
+
+	mutex_lock(&phy_lock);
+	if (init_flag == 1)
+		goto init_end;
 
 	sd_pcie_phy_refclk_sel(sd_pcie);
 
@@ -376,7 +384,10 @@ static int sd_pcie_phy_init(struct sd_pcie *sd_pcie)
 	sd_phy_ncr_writel(sd_pcie, reg_val, PCIE_PHY_NCR_CTRL0);
 
 	usleep_range(TIME_PHY_RST_MIN, TIME_PHY_RST_MAX);
+	init_flag = 1;
 
+init_end:
+	mutex_unlock(&phy_lock);
 	return 0;
 }
 
@@ -567,7 +578,6 @@ static int __init sd_add_pcie_port(struct dw_pcie *pcie,
 	int ret;
 	struct device *dev = &pdev->dev;
 	struct pcie_port *pp = &(pcie->pp);
-	struct sd_pcie *sd_pcie = to_sd_pcie(pcie);
 
 	if (IS_ENABLED(CONFIG_PCI_MSI) && pci_msi_enabled()) {
 		pp->msi_irq = platform_get_irq_byname(pdev, "msi");
