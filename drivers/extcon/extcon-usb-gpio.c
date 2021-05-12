@@ -38,6 +38,7 @@ struct usb_extcon_info {
 	struct gpio_desc *vbus_gpiod;
 	int id_irq;
 	int vbus_irq;
+	bool no_id_gpio_quirk;
 
 	unsigned long debounce_jiffies;
 	struct delayed_work wq_detcable;
@@ -121,8 +122,9 @@ static int usb_extcon_probe(struct platform_device *pdev)
 	info->id_gpiod = devm_gpiod_get_optional(&pdev->dev, "id", GPIOD_IN);
 	info->vbus_gpiod = devm_gpiod_get_optional(&pdev->dev, "vbus",
 						   GPIOD_IN);
+	info->no_id_gpio_quirk = of_property_read_bool(np, "no_id_gpio_quirk");
 
-	if (!info->id_gpiod && !info->vbus_gpiod) {
+	if (!info->id_gpiod && !info->vbus_gpiod && !info->no_id_gpio_quirk) {
 		dev_err(dev, "failed to get gpios\n");
 		return -ENODEV;
 	}
