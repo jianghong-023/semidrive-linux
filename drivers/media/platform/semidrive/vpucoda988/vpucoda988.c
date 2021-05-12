@@ -209,7 +209,7 @@ static int vpu_alloc_dma_buffer(vpudrv_buffer_t *vb)
         return -1;
 
     vb->base = (unsigned long) dma_alloc_coherent(vpucoda_device,
-               PAGE_ALIGN(vb->size), (dma_addr_t *)(&vb->phys_addr),
+               PAGE_ALIGN(vb->size), (dma_addr_t *)(&vb->dma_addr),
                GFP_DMA | GFP_KERNEL | GFP_USER);
 
     if ((void *)(vb->base) == NULL)  {
@@ -217,6 +217,8 @@ static int vpu_alloc_dma_buffer(vpudrv_buffer_t *vb)
                 vb->size);
         return -1;
     }
+
+    vb->phys_addr = vb->dma_addr;
     return 0;
 }
 
@@ -1046,7 +1048,7 @@ static int vpu_mmap(struct file *fp, struct vm_area_struct *vm)
 
 #endif
 
-    pr_info("[VPUDRV-ERR] never come here while using ion  vm_pgoff %lx, s_common_memory.phys_addr %p, s_common_memory.phys_addr >> PAGE_SHIFT %llx \n  ",
+    pr_info("[VPUDRV] not using ion vm_pgoff %lx, s_common_memory.phys_addr %p, s_common_memory.phys_addr >> PAGE_SHIFT %llx \n  ",
             vm->vm_pgoff,
             (void *)s_common_memory.phys_addr,
             s_common_memory.phys_addr >> PAGE_SHIFT);
