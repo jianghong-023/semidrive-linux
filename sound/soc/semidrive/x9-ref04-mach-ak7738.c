@@ -72,7 +72,7 @@ enum snd_x9_ctrl {
 };
 
 static int snd_x9_ref04_ak7738_controls_get(struct snd_kcontrol *kcontrol,
-					  struct snd_ctl_elem_value *ucontrol)
+					    struct snd_ctl_elem_value *ucontrol)
 {
 	/* struct snd_soc_card *card = snd_kcontrol_chip(kcontrol); */
 	/*Set value here*/
@@ -81,7 +81,7 @@ static int snd_x9_ref04_ak7738_controls_get(struct snd_kcontrol *kcontrol,
 }
 
 static int snd_x9_ref04_ak7738_controls_put(struct snd_kcontrol *kcontrol,
-					  struct snd_ctl_elem_value *ucontrol)
+					    struct snd_ctl_elem_value *ucontrol)
 {
 	/*  Add control here.
 	struct snd_soc_card *card = snd_kcontrol_chip(kcontrol); */
@@ -126,11 +126,7 @@ static int snd_x9_ctl_put(struct snd_kcontrol *kcontrol,
 	return changed;
 }
 
-
-static int x9_ref04_late_probe(struct snd_soc_card *card) {
-
-	return 0;
-}
+static int x9_ref04_late_probe(struct snd_soc_card *card) { return 0; }
 
 /* head set jack GPIO Controller  */
 static struct snd_soc_jack hs_jack;
@@ -273,9 +269,8 @@ static const struct snd_soc_ops x9_ref04_hs_ops = {
     // .hw_params = x9_ref04_hs_soc_hw_params,
 };
 
-
 static int be_hw_params_fixup_sd2(struct snd_soc_pcm_runtime *rtd,
-			      struct snd_pcm_hw_params *params)
+				  struct snd_pcm_hw_params *params)
 {
 	struct snd_mask *mask;
 
@@ -375,7 +370,7 @@ static int be_hw_params_fixup_sd4(struct snd_soc_pcm_runtime *rtd,
 	return 0;
 }
 static int be_hw_params_fixup_sd5(struct snd_soc_pcm_runtime *rtd,
-			      struct snd_pcm_hw_params *params)
+				  struct snd_pcm_hw_params *params)
 {
 
 	struct snd_mask *mask;
@@ -408,34 +403,37 @@ static int be_hw_params_fixup_sd5(struct snd_soc_pcm_runtime *rtd,
 }
 
 static int be_hw_params_fixup_tas6424(struct snd_soc_pcm_runtime *rtd,
-			      struct snd_pcm_hw_params *params)
+				      struct snd_pcm_hw_params *params)
 {
 
 	struct snd_mask *mask;
 
 	int ret;
 
-	struct snd_interval *rate = hw_param_interval(params,
-			SNDRV_PCM_HW_PARAM_RATE);
-	struct snd_interval *channels = hw_param_interval(params,
-						SNDRV_PCM_HW_PARAM_CHANNELS);
+	struct snd_interval *rate =
+	    hw_param_interval(params, SNDRV_PCM_HW_PARAM_RATE);
+	struct snd_interval *channels =
+	    hw_param_interval(params, SNDRV_PCM_HW_PARAM_CHANNELS);
 
 	/*  48k, stereo */
 	rate->min = rate->max = 48000;
 	channels->min = channels->max = 4;
-	dev_dbg(rtd->dev,"[tas6424] -------------------------------rate: %d chan: %d  \n",rate->max,channels->max);
+	dev_dbg(
+	    rtd->dev,
+	    "[tas6424] -------------------------------rate: %d chan: %d  \n",
+	    rate->max, channels->max);
 
 	/* set 32 bit */
 	mask = hw_param_mask(params, SNDRV_PCM_HW_PARAM_FORMAT);
 	snd_mask_none(mask);
 	snd_mask_set(mask, SNDRV_PCM_FORMAT_S24_LE);
-	ret = snd_soc_dai_set_fmt(rtd->codec_dai,
-				  SND_SOC_DAIFMT_DSP_A | SND_SOC_DAIFMT_CBS_CFS);
+	ret = snd_soc_dai_set_fmt(rtd->codec_dai, SND_SOC_DAIFMT_DSP_A |
+						      SND_SOC_DAIFMT_CBS_CFS);
 	if (ret < 0) {
 		dev_err(rtd->dev, "can't set format to DSP_A, err %d\n", ret);
 		return ret;
 	}
- 	ret = snd_soc_dai_set_tdm_slot(rtd->codec_dai, 0xF, 0x10, 4, 24);
+	ret = snd_soc_dai_set_tdm_slot(rtd->codec_dai, 0xF, 0x10, 4, 24);
 	if (ret < 0) {
 		dev_err(rtd->dev, "can't set tdm slot, err %d\n", ret);
 		return ret;
@@ -443,12 +441,18 @@ static int be_hw_params_fixup_tas6424(struct snd_soc_pcm_runtime *rtd,
 	return 0;
 }
 
-static int x9_ref04_ak7738_rtd_init(struct snd_soc_pcm_runtime *rtd) {
+static int x9_ref04_ak7738_rtd_init(struct snd_soc_pcm_runtime *rtd)
+{
 	int ret;
-	dev_dbg(rtd->dev,"[i2s sc] int fixed cpu -----%s -- %p %p %p----------------------- \n",rtd->cpu_dai->name,rtd->cpu_dai,rtd->cpu_dai->driver,rtd->cpu_dai->driver->ops->set_tdm_slot);
+	dev_dbg(rtd->dev,
+		"[i2s sc] int fixed cpu -----%s -- %p %p "
+		"%p----------------------- \n",
+		rtd->cpu_dai->name, rtd->cpu_dai, rtd->cpu_dai->driver,
+		rtd->cpu_dai->driver->ops->set_tdm_slot);
 	ret = snd_soc_dai_set_tdm_slot(rtd->cpu_dai, 0xFF, 0xF, 8, 32);
 	if (ret < 0) {
-		dev_err(rtd->dev, "can't set cpu snd_soc_dai_set_tdm_slot err %d\n", ret);
+		dev_err(rtd->dev,
+			"can't set cpu snd_soc_dai_set_tdm_slot err %d\n", ret);
 		return ret;
 	}
 	return 0;
@@ -594,12 +598,7 @@ static struct snd_soc_card x9_ref04_ak7738_card = {
 };
 
 /*GPIO probe use this function to set gpio. */
-static int x9_gpio_probe(struct snd_soc_card *card)
-{
-	return 0;
-}
-
-
+static int x9_gpio_probe(struct snd_soc_card *card) { return 0; }
 
 /*ALSA machine driver probe functions.*/
 static int x9_ref04_ak7738_probe(struct platform_device *pdev)
@@ -611,8 +610,8 @@ static int x9_ref04_ak7738_probe(struct platform_device *pdev)
 	struct snd_x9_chip *chip;
 	dev_info(&pdev->dev, ": dev name =  %s %s\n", pdev->name, __func__);
 	if ((get_part_id(PART_BOARD_TYPE) != BOARD_TYPE_REF) ||
-		(get_part_id(PART_BOARD_ID_MAJ) != 1) ||
-		(get_part_id(PART_BOARD_ID_MIN) != 4)) {
+	    (get_part_id(PART_BOARD_ID_MAJ) != 1) ||
+	    (get_part_id(PART_BOARD_ID_MIN) != 4)) {
 		/*If it is not ref A04 board, exit. dump_all_part_id();*/
 		return -ENXIO;
 	}
@@ -646,7 +645,7 @@ static int x9_ref04_ak7738_remove(struct platform_device *pdev)
 #ifdef CONFIG_PM
 /*pm suspend operation */
 static int snd_x9_ref04_ak7738_suspend(struct platform_device *pdev,
-				     pm_message_t state)
+				       pm_message_t state)
 {
 	dev_info(&pdev->dev, "%s snd_x9_suspend\n", __func__);
 	return 0;

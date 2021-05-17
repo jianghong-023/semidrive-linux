@@ -62,6 +62,7 @@ struct snd_x9_chip_hs {
 	unsigned int spdif_status;
 	struct mutex audio_mutex;
 };
+static int delay_probe_cnt = 1;
 /*Controls
  * ------------------------------------------------------------------------------*/
 /* head set jack GPIO Controller  */
@@ -202,7 +203,6 @@ static int x9_gpio_probe(struct snd_soc_card *card)
 }
 
 
-
 /*ALSA machine driver probe functions.*/
 static int x9_ref_tlv320aic23_probe(struct platform_device *pdev)
 {
@@ -228,6 +228,10 @@ static int x9_ref_tlv320aic23_probe(struct platform_device *pdev)
 		}
 	}
 	/*FIXME-END:  -------------------------      */
+	if (delay_probe_cnt > 0) {
+		delay_probe_cnt--;
+		return -EPROBE_DEFER;
+	}
 
 	DEBUG_FUNC_PRT;
 	card->dev = dev;
@@ -260,6 +264,7 @@ static int x9_ref_tlv320aic23_remove(struct platform_device *pdev)
 {
 	snd_card_free(platform_get_drvdata(pdev));
 	dev_info(&pdev->dev, "%s x9_ref_tlv320aic23_removed\n", __func__);
+	delay_probe_cnt = 1;
 	return 0;
 }
 #ifdef CONFIG_PM
