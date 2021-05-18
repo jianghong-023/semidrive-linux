@@ -3867,6 +3867,11 @@ static int handle_pte_fault(struct vm_fault *vmf)
 {
 	pte_t entry;
 
+#if defined(CONFIG_GK20A_PCI)
+	pteval_t prot_vm_none = pgprot_val(vm_get_page_prot(VM_NONE));
+	bool fix_prot = false;
+#endif
+
 	if (unlikely(pmd_none(*vmf->pmd))) {
 		/*
 		 * Leave __pte_alloc() until later: because vm_ops->fault may
@@ -3916,11 +3921,32 @@ static int handle_pte_fault(struct vm_fault *vmf)
 	if (pte_protnone(vmf->orig_pte) && vma_is_accessible(vmf->vma))
 		return do_numa_page(vmf);
 
+#if defined(CONFIG_GK20A_PCI)
+	if (vmf->vma->vm_ops && vmf->vma->vm_ops->fixup_prot &&
+			vmf->vma->vm_ops->fault &&
+			((prot_vm_none & pte_val(entry)) == prot_vm_none)) {
+		pgoff_t pgoff = (((vmf->address & PAGE_MASK)
+					- vmf->vma->vm_start) >> PAGE_SHIFT) +
+			vmf->vma->vm_pgoff;
+		if (!vmf->vma->vm_ops->fixup_prot(vmf->vma,
+					vmf->address & PAGE_MASK, pgoff))
+			return VM_FAULT_SIGSEGV; /* access not granted */
+		fix_prot = true;
+	}
+#endif
+
 	vmf->ptl = pte_lockptr(vmf->vma->vm_mm, vmf->pmd);
 	spin_lock(vmf->ptl);
 	entry = vmf->orig_pte;
 	if (unlikely(!pte_same(*vmf->pte, entry)))
 		goto unlock;
+#if defined(CONFIG_GK20A_PCI)
+	if (fix_prot) {
+		entry = pte_modify(entry, vmf->vma->vm_page_prot);
+		vm_stat_account(vmf->vma->vm_mm, VM_NONE, -1);
+		vm_stat_account(vmf->vma->vm_mm, vmf->vma->vm_flags, 1);
+	}
+#endif
 	if (vmf->flags & FAULT_FLAG_WRITE) {
 		if (!pte_write(entry))
 			return do_wp_page(vmf);

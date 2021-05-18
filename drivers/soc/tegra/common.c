@@ -17,9 +17,17 @@ static const struct of_device_id tegra_machine_match[] = {
 	{ .compatible = "nvidia,tegra124", },
 	{ .compatible = "nvidia,tegra132", },
 	{ .compatible = "nvidia,tegra210", },
+	{ .compatible = "nvidia,tegra186", },
+	{ .compatible = "nvidia,tegra194", },
 	{ }
 };
 
+#if defined(CONFIG_GK20A_PCI)
+bool soc_is_tegra(void)
+{
+	return true;
+}
+#else
 bool soc_is_tegra(void)
 {
 	struct device_node *root;
@@ -30,3 +38,4 @@ bool soc_is_tegra(void)
 
 	return of_match_node(tegra_machine_match, root) != NULL;
 }
+#endif

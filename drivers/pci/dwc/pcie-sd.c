@@ -493,7 +493,12 @@ static void sd_pcie_core_init(struct sd_pcie *sd_pcie)
 	reg_val |= RESET_ON;
 	sd_ctrl_ncr_writel(sd_pcie, reg_val, PCIE_CTRL_NCR_CTRL2);
 
+#if defined(CONFIG_GK20A_PCI)
+	/* for GP106 */
+	usleep_range(10000, 11000);
+#else
 	usleep_range(1000, 1100);
+#endif
 
 	reg_val &= ~RESET_MASK;
 	reg_val |= RESET_OFF;

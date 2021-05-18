@@ -1060,6 +1060,12 @@ SYSCALL_DEFINE5(ppoll, struct pollfd __user *, ufds, unsigned int, nfds,
 		if (copy_from_user(&ts, tsp, sizeof(ts)))
 			return -EFAULT;
 
+#if defined(CONFIG_GK20A_PCI)
+		/* cannot modify cuda lib, so hack it here, for cudaMemcpy from device */
+		if (!strncmp(current->comm, "cuda-EvtHandlr", 14))
+			ts.tv_nsec = 20000000;
+#endif
+
 		to = &end_time;
 		if (poll_select_set_timeout(to, ts.tv_sec, ts.tv_nsec))
 			return -EINVAL;

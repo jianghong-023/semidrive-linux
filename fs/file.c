@@ -538,6 +538,9 @@ out:
 	spin_unlock(&files->file_lock);
 	return error;
 }
+#if defined(CONFIG_GK20A_PCI)
+EXPORT_SYMBOL(__alloc_fd);
+#endif
 
 static int alloc_fd(unsigned start, unsigned flags)
 {

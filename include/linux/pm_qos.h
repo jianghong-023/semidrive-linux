@@ -21,6 +21,21 @@ enum {
 	PM_QOS_NUM_CLASSES,
 };
 
+/**
+ * enum pm_qos_bounded_classes - Class ID's for bounded constraints
+ *
+ * Each class wraps around a corresponding min and max pm qos node
+ * and binds the two constraints in one.
+ */
+enum pm_qos_bounded_classes {
+        PM_QOS_RESERVED_BOUNDS = 0,
+        PM_QOS_CPU_FREQ_BOUNDS, /* requests should be in KHz to not exceed s32*/
+        PM_QOS_GPU_FREQ_BOUNDS, /* requests should be in KHz to not exceed s32*/
+        PM_QOS_ONLINE_CPUS_BOUNDS,
+        /* insert new bounded class ids here */
+        PM_QOS_NUM_BOUNDED_CLASSES,
+};
+
 enum pm_qos_flags_status {
 	PM_QOS_FLAGS_UNDEFINED = -1,
 	PM_QOS_FLAGS_NONE,

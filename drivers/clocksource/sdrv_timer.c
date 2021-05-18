@@ -255,6 +255,9 @@ u64 sdrv_timer_get_cnt(void)
 	else
 		return read_sched_clock();
 }
+#if defined(CONFIG_GK20A_PCI)
+EXPORT_SYMBOL(sdrv_timer_get_cnt);
+#endif
 static int sd_timer_set_next_event(unsigned long evt,
 					struct clock_event_device *clk)
 {

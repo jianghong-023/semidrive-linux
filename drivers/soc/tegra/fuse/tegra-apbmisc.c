@@ -39,16 +39,17 @@ static bool long_ram_code;
 
 u32 tegra_read_chipid(void)
 {
-	return readl_relaxed(apbmisc_base + 4);
+	return 0x21817; //readl_relaxed(apbmisc_base + 4);
 }
 
 u8 tegra_get_chip_id(void)
 {
+#if 0
 	if (!apbmisc_base) {
 		WARN(1, "Tegra Chip ID not yet available\n");
 		return 0;
 	}
-
+#endif
 	return (tegra_read_chipid() >> 8) & 0xff;
 }
 
@@ -109,7 +110,7 @@ void __init tegra_init_revision(void)
 
 	tegra_sku_info.revision = rev;
 
-	tegra_sku_info.sku_id = tegra_fuse_read_early(FUSE_SKU_INFO);
+	tegra_sku_info.sku_id = 0xdc;//tegra_fuse_read_early(FUSE_SKU_INFO);
 }
 
 void __init tegra_init_apbmisc(void)
@@ -127,7 +128,7 @@ void __init tegra_init_apbmisc(void)
 		 * This is for backwards-compatibility with old device trees
 		 * that didn't contain an APBMISC node.
 		 */
-		if (IS_ENABLED(CONFIG_ARM) && soc_is_tegra()) {
+		if (IS_ENABLED(CONFIG_ARM) && true/*soc_is_tegra()*/) {
 			/* APBMISC registers (chip revision, ...) */
 			apbmisc.start = 0x70000800;
 			apbmisc.end = 0x70000863;

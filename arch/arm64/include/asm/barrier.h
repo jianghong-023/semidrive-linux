@@ -140,6 +140,12 @@ do {									\
 	VAL;								\
 })
 
+#if defined(CONFIG_GK20A_PCI)
+#define speculation_barrier()						\
+	asm volatile(   "dsb sy\n"					\
+			"isb\n" : : : "memory")
+#endif
+
 #include <asm-generic/barrier.h>
 
 #endif	/* __ASSEMBLY__ */

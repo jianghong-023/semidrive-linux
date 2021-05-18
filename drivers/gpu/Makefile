@@ -5,3 +5,4 @@ obj-$(CONFIG_TEGRA_HOST1X)	+= host1x/
 obj-y				+= drm/ vga/
 obj-$(CONFIG_ROGUE_KM)		+= rogue_km/
 obj-$(CONFIG_IMX_IPUV3_CORE)	+= ipu-v3/
+obj-$(CONFIG_GK20A)		+= nvgpu/

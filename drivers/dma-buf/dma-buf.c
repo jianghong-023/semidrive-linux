@@ -1053,6 +1053,36 @@ void dma_buf_vunmap(struct dma_buf *dmabuf, void *vaddr)
 }
 EXPORT_SYMBOL_GPL(dma_buf_vunmap);
 
+#if defined(CONFIG_GK20A_PCI)
+int dma_buf_set_drvdata(struct dma_buf * dmabuf, struct device *device,
+		void *priv, void (*destroy)(void *))
+{
+	if (!(dmabuf && dmabuf->ops && dmabuf->ops->set_drvdata))
+		return -ENOSYS;
+
+	return dmabuf->ops->set_drvdata(dmabuf, device, priv, destroy);
+}
+EXPORT_SYMBOL(dma_buf_set_drvdata);
+
+/**
+ * dma_buf_get_drvdata - Get driver specific data to dmabuf.
+ *
+ * @dmabuf      [in]    Buffer object
+ * @device      [in]    Device to which the data is related to.
+ *
+ * The function returns the user data structure on success. Otherwise NULL
+ * is returned.
+ */
+void *dma_buf_get_drvdata(struct dma_buf *dmabuf, struct device *device)
+{
+	if (!(dmabuf && dmabuf->ops && dmabuf->ops->get_drvdata))
+		return ERR_PTR(-ENOSYS);
+
+	return dmabuf->ops->get_drvdata(dmabuf, device);
+}
+EXPORT_SYMBOL(dma_buf_get_drvdata);
+#endif
+
 #ifdef CONFIG_DEBUG_FS
 static int dma_buf_debug_show(struct seq_file *s, void *unused)
 {
