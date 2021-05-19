@@ -1588,6 +1588,9 @@ out:
 	destroy_hrtimer_on_stack(&t.timer);
 	return ret;
 }
+#if defined(CONFIG_GK20A_PCI)
+EXPORT_SYMBOL_GPL(hrtimer_nanosleep);
+#endif
 
 SYSCALL_DEFINE2(nanosleep, struct timespec __user *, rqtp,
 		struct timespec __user *, rmtp)

@@ -82,6 +82,7 @@ dtb-$(CONFIG_ARCH_SEMIDRIVE_X9) += x9_mid_ms_native_cluster.dtb
 dtb-$(CONFIG_ARCH_SEMIDRIVE_X9) += x9_mid_ms_native_ivi_serdes_avm.dtb
 dtb-$(CONFIG_ARCH_SEMIDRIVE_X9) += x9_mid_ms_native_linux_serdes_avm.dtb
 dtb-$(CONFIG_ARCH_SEMIDRIVE_V9) += v9t_a_ref.dtb
+dtb-$(CONFIG_ARCH_SEMIDRIVE_V9) += v9t_a_ref_gp106.dtb
 dtb-$(CONFIG_ARCH_SEMIDRIVE_V9) += v9t_b_ref.dtb
 dtb-$(CONFIG_ARCH_SEMIDRIVE_X9) += x9e_ref_native_ivi_avm.dtb
 dtb-$(CONFIG_ARCH_SEMIDRIVE_X9) += x9e_ms_native_ivi_avm.dtb

@@ -552,6 +552,8 @@ static inline int dma_mapping_error(struct device *dev, dma_addr_t dma_addr)
 	debug_dma_mapping_error(dev, dma_addr);
 	if (ops->mapping_error)
 		return ops->mapping_error(dev, dma_addr);
+	else
+		dev_err(dev, "no dma_mapping_error found\n");
 	return 0;
 }
 
@@ -708,6 +710,31 @@ int dma_declare_coherent_memory(struct device *dev, phys_addr_t phys_addr,
 void dma_release_declared_memory(struct device *dev);
 void *dma_mark_declared_memory_occupied(struct device *dev,
 					dma_addr_t device_addr, size_t size);
+
+struct dma_resize_notifier_ops {
+        int (*resize)(phys_addr_t, size_t);
+};
+
+struct dma_resize_notifier {
+        struct dma_resize_notifier_ops *ops;
+};
+
+struct dma_declare_info {
+        const char *name;
+        bool resize;
+        phys_addr_t base;
+        size_t size;
+        struct device *cma_dev;
+        struct dma_resize_notifier notifier;
+};
+
+struct dma_coherent_stats {
+        phys_addr_t base;
+        size_t size;
+        size_t used;
+        size_t max;
+};
+
 #else
 static inline int
 dma_declare_coherent_memory(struct device *dev, phys_addr_t phys_addr,

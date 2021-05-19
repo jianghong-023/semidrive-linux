@@ -58,6 +58,14 @@ void copy_to_user_page(struct vm_area_struct *vma, struct page *page,
 	flush_ptrace_access(vma, page, uaddr, dst, len);
 }
 
+#if defined(CONFIG_GK20A_PCI)
+extern void __clean_dcache_area_poc(void *addr, size_t len);
+void __clean_dcache_page(struct page *page)
+{
+	__clean_dcache_area_poc(page_address(page), PAGE_SIZE);
+}
+#endif
+
 void __sync_icache_dcache(pte_t pte, unsigned long addr)
 {
 	struct page *page = pte_page(pte);
@@ -98,4 +106,16 @@ void arch_invalidate_pmem(void *addr, size_t size)
 	__inval_dcache_area(addr, size);
 }
 EXPORT_SYMBOL_GPL(arch_invalidate_pmem);
+#endif
+
+#if defined(CONFIG_GK20A_PCI)
+EXPORT_SYMBOL(__flush_dcache_area);
+
+extern void __clean_dcache_louis(void *);
+extern void __flush_dcache_all(void *arg);
+extern void __clean_dcache_all(void *arg);
+
+#define flush_cache_louis() flush_dcache_louis()
+EXPORT_SYMBOL(__flush_dcache_all);
+EXPORT_SYMBOL(__clean_dcache_all);
 #endif

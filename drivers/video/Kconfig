@@ -36,6 +36,10 @@ config VIDEOMODE_HELPERS
 config HDMI
 	bool
 
+config NVMAP
+	bool "nvmap for gk20a"
+	default n
+
 if VT
 	source "drivers/video/console/Kconfig"
 endif
@@ -44,6 +48,5 @@ if FB || SGI_NEWPORT_CONSOLE
 	source "drivers/video/logo/Kconfig"
 
 endif
-
 
 endmenu

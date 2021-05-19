@@ -908,28 +908,44 @@ mutex_lock_nested(struct mutex *lock, unsigned int subclass)
 	__mutex_lock(lock, TASK_UNINTERRUPTIBLE, subclass, NULL, _RET_IP_);
 }
 
+#if defined(CONFIG_GK20A_PCI)
+EXPORT_SYMBOL(mutex_lock_nested);
+#else
 EXPORT_SYMBOL_GPL(mutex_lock_nested);
+#endif
 
 void __sched
 _mutex_lock_nest_lock(struct mutex *lock, struct lockdep_map *nest)
 {
 	__mutex_lock(lock, TASK_UNINTERRUPTIBLE, 0, nest, _RET_IP_);
 }
+#if defined(CONFIG_GK20A_PCI)
+EXPORT_SYMBOL(_mutex_lock_nest_lock);
+#else
 EXPORT_SYMBOL_GPL(_mutex_lock_nest_lock);
+#endif
 
 int __sched
 mutex_lock_killable_nested(struct mutex *lock, unsigned int subclass)
 {
 	return __mutex_lock(lock, TASK_KILLABLE, subclass, NULL, _RET_IP_);
 }
+#if defined(CONFIG_GK20A_PCI)
+EXPORT_SYMBOL(mutex_lock_killable_nested);
+#else
 EXPORT_SYMBOL_GPL(mutex_lock_killable_nested);
+#endif
 
 int __sched
 mutex_lock_interruptible_nested(struct mutex *lock, unsigned int subclass)
 {
 	return __mutex_lock(lock, TASK_INTERRUPTIBLE, subclass, NULL, _RET_IP_);
 }
+#if defined(CONFIG_GK20A_PCI)
+EXPORT_SYMBOL(mutex_lock_interruptible_nested);
+#else
 EXPORT_SYMBOL_GPL(mutex_lock_interruptible_nested);
+#endif
 
 void __sched
 mutex_lock_io_nested(struct mutex *lock, unsigned int subclass)
@@ -943,7 +959,11 @@ mutex_lock_io_nested(struct mutex *lock, unsigned int subclass)
 			    subclass, NULL, _RET_IP_, NULL, 0);
 	io_schedule_finish(token);
 }
+#if defined(CONFIG_GK20A_PCI)
+EXPORT_SYMBOL(mutex_lock_io_nested);
+#else
 EXPORT_SYMBOL_GPL(mutex_lock_io_nested);
+#endif
 
 static inline int
 ww_mutex_deadlock_injection(struct ww_mutex *lock, struct ww_acquire_ctx *ctx)
@@ -985,7 +1005,11 @@ ww_mutex_lock(struct ww_mutex *lock, struct ww_acquire_ctx *ctx)
 
 	return ret;
 }
+#if defined(CONFIG_GK20A_PCI)
+EXPORT_SYMBOL(ww_mutex_lock);
+#else
 EXPORT_SYMBOL_GPL(ww_mutex_lock);
+#endif
 
 int __sched
 ww_mutex_lock_interruptible(struct ww_mutex *lock, struct ww_acquire_ctx *ctx)
@@ -1002,7 +1026,11 @@ ww_mutex_lock_interruptible(struct ww_mutex *lock, struct ww_acquire_ctx *ctx)
 
 	return ret;
 }
+#if defined(CONFIG_GK20A_PCI)
+EXPORT_SYMBOL(ww_mutex_lock_interruptible);
+#else
 EXPORT_SYMBOL_GPL(ww_mutex_lock_interruptible);
+#endif
 
 #endif
 

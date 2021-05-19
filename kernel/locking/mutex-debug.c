@@ -104,4 +104,8 @@ void mutex_destroy(struct mutex *lock)
 	lock->magic = NULL;
 }
 
+#if defined(CONFIG_GK20A_PCI)
+EXPORT_SYMBOL(mutex_destroy);
+#else
 EXPORT_SYMBOL_GPL(mutex_destroy);
+#endif

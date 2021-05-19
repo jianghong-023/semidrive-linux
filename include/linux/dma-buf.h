@@ -250,6 +250,11 @@ struct dma_buf_ops {
 
 	void *(*vmap)(struct dma_buf *);
 	void (*vunmap)(struct dma_buf *, void *vaddr);
+
+	/*add for nvgpu */
+        void *(*get_drvdata)(struct dma_buf *, struct device *);
+        int (*set_drvdata)(struct dma_buf *, struct device *, void *priv,
+                           void (*)(void *));
 };
 
 /**
@@ -404,4 +409,9 @@ int dma_buf_mmap(struct dma_buf *, struct vm_area_struct *,
 		 unsigned long);
 void *dma_buf_vmap(struct dma_buf *);
 void dma_buf_vunmap(struct dma_buf *, void *vaddr);
+
+int dma_buf_set_drvdata(struct dma_buf * dmabuf, struct device *device,
+                        void *priv, void (*destroy)(void *));
+void *dma_buf_get_drvdata(struct dma_buf *dmabuf, struct device *device);
+
 #endif /* __DMA_BUF_H__ */

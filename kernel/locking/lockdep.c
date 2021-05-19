@@ -3282,7 +3282,11 @@ void lockdep_init_map(struct lockdep_map *lock, const char *name,
 	cross_init(lock, 0);
 	__lockdep_init_map(lock, name, key, subclass);
 }
+#if defined(CONFIG_GK20A_PCI)
+EXPORT_SYMBOL(lockdep_init_map);
+#else
 EXPORT_SYMBOL_GPL(lockdep_init_map);
+#endif
 
 #ifdef CONFIG_LOCKDEP_CROSSRELEASE
 void lockdep_init_map_crosslock(struct lockdep_map *lock, const char *name,
