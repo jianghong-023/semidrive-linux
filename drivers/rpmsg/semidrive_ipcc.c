@@ -28,6 +28,7 @@
 #include <linux/mailbox_client.h>
 #include <linux/mailbox/semidrive-mailbox.h>
 #include <linux/soc/semidrive/mb_msg.h>
+#include <linux/soc/semidrive/ipcc.h>
 #include "rpmsg_internal.h"
 
 /* The feature bitmap for virtio rpmsg */
@@ -801,8 +802,7 @@ static int rpmsg_ipcc_echo_cb(struct rpmsg_device *rpdev, void *data, int len,
 {
 	struct rpmsg_ipcc_device *vrp = priv;
 	struct device *dev = vrp->dev;
-	struct rpmsg_ipcc_hdr *msg;
-	void *msg_ptr;
+	struct dcf_message *dcfmsg;
 	int err = 0;
 
 	dev_dbg(dev, "%s in\n", __func__);
@@ -816,21 +816,21 @@ static int rpmsg_ipcc_echo_cb(struct rpmsg_device *rpdev, void *data, int len,
 		return -EINVAL;
 	}
 
-	msg_ptr = kzalloc(sizeof(*msg) + len, GFP_ATOMIC);
-	if (!msg_ptr)
-		return -ENOMEM;
+	dcfmsg = (struct dcf_message *) data;
+	switch (dcfmsg->msg_type) {
+	case COMM_MSG_CCM_ECHO:
 
-	msg = msg_ptr;
-	MB_MSG_INIT_RPMSG_HEAD(&msg->mboxhdr, vrp->rproc, sizeof(*msg) + len, 0);
-	msg->src = RPMSG_ECHO_ADDR;
-	msg->dst = src;
-	msg->len = len;
+		err = __send_offchannel_raw(vrp, RPMSG_ECHO_ADDR, src, data, len, true);
+		if (err)
+			dev_err(dev, "failed to echo service %d\n", err);
 
-	err = __send_offchannel_raw(vrp, RPMSG_ECHO_ADDR, src, data, len, true);
-	if (err)
-		dev_err(dev, "failed to echo service %d\n", err);
+		break;
+	case COMM_MSG_CCM_ACK:
+	default:
+		/* No more action, just drop the packet */
+		break;
+	}
 
-	kfree(msg_ptr);
 	return 0;
 }
 
