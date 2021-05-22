@@ -52,7 +52,7 @@ typedef struct __sd_vi2c_t {
 	uint16_t htime_flag;
 	uint16_t dtime_flag;
 	uint16_t etime_flag;
-	uint16_t trans_stat;
+	int8_t trans_stat;
 } sd_vi2c_t;
 
 static sd_vi2c_t *sd_vi2c_arr[MAX_I2C_NUM];
@@ -76,6 +76,7 @@ typedef struct __data_info_t {
 
 typedef struct __end_info_t {
 	common_head_t common_head;
+	int8_t status;
 } end_info_t    __packed;
 
 typedef struct __payload_t {
@@ -90,7 +91,7 @@ static uint8_t I2C_END = 2;
 /*
  * unpack data receiced from remote and populate to client i2c msg buf
  */
-void unpack_data(sd_vi2c_t *sd_vi2c_p)
+void unpack_data(sd_vi2c_t *sd_vi2c_p, int8_t status)
 {
 	int i;
 	if (sd_vi2c_p->r_msg_len) {
@@ -104,11 +105,11 @@ void unpack_data(sd_vi2c_t *sd_vi2c_p)
 					sd_vi2c_p->r_msg_p += sd_vi2c_p->msgs[i].len;
 				}
 			}
-			sd_vi2c_p->trans_stat = 1;
+			sd_vi2c_p->trans_stat = status;
 		}
 	} else {
 		// only write
-		sd_vi2c_p->trans_stat = 1;
+		sd_vi2c_p->trans_stat = status;
 	}
 }
 
@@ -269,12 +270,10 @@ static int sd_vi2c_xfer(struct i2c_adapter *adap,
 		goto done;
 	}
 
-	if (!sd_vi2c_p->trans_stat) {
-		pr_err("adapter[%u], completed with error %u\n",
-			sd_vi2c_p->adap_num, sd_vi2c_p->trans_stat);
-		ret = -EINVAL;
-		goto done;
-	}
+	ret = sd_vi2c_p->trans_stat;
+	if (ret < 0)
+		pr_err("adapter[%u], completed with error %d\n", sd_vi2c_p->adap_num,
+				sd_vi2c_p->trans_stat);
 
 done:
 	if (print_i2c_msg == sd_vi2c_p->adap_num) {
@@ -295,7 +294,7 @@ done:
 
 	kfree(t_msg_data);
 	kfree(t_payload_data);
-	sd_vi2c_p->trans_stat = 0;
+	sd_vi2c_p->trans_stat = -1;
 	return ret;
 }
 
@@ -368,7 +367,7 @@ static int sd_vi2c_plat_probe(struct platform_device *pdev)
 	sd_vi2c_p->adap.dev.of_node = sd_vi2c_p->pdev->dev.of_node;
 	sd_vi2c_p->adap.dev.parent = &sd_vi2c_p->pdev->dev;
 	sd_vi2c_p->adap.retries = 3;
-	sd_vi2c_p->adap.nr = -1;
+	sd_vi2c_p->adap.nr = adap_num + 16;
 	sd_vi2c_p->adap.algo = &sd_vi2c_algo;
 
 	init_completion(&sd_vi2c_p->done);
@@ -453,7 +452,7 @@ static int rpmsg_vi2c_cb(struct rpmsg_device *rpdev,
 		if (sd_vi2c_arr[adap_num]->r_msg
 				&& (len == sd_vi2c_arr[adap_num]->r_msg_len)
 				&& (sd_vi2c_arr[adap_num]->htime_flag == sd_vi2c_arr[adap_num]->etime_flag)) {
-			unpack_data(sd_vi2c_arr[adap_num]);
+			unpack_data(sd_vi2c_arr[adap_num], r_end->status);
 
 		} else {
 			pr_err("%s, adapter[%u] err: r_msg=%p, len=%u, "
