@@ -472,6 +472,10 @@ static int deser_probe(struct i2c_client *client,
 		fmt->code = pdeser_param->mbus_code = MEDIA_BUS_FMT_SBGGR8_1X8;
 		fmt->height = pdeser_param->height = 800;
 		break;
+	case SDRV3_MINIEYE:
+		fmt->code = pdeser_param->mbus_code = MEDIA_BUS_FMT_SBGGR8_1X8;
+		//fmt->height = pdeser_param->height = 800;
+		break;
 	default:
 		;
 	}
