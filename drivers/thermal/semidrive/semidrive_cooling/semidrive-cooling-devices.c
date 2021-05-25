@@ -209,4 +209,3 @@ void semidrive_cpufreq_cooling_unregister(struct semidrive_budget_cooling_device
 	return;
 }
 EXPORT_SYMBOL(semidrive_cpufreq_cooling_unregister);
-

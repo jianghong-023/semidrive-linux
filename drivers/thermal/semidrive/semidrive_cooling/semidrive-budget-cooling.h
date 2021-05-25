@@ -30,7 +30,6 @@ struct semidrive_budget_cpufreq{
 	spinlock_t lock;
 };
 
-
 struct semidrive_budget_cooling_device {
 	struct device *dev;
 	struct thermal_cooling_device *cool_dev;
