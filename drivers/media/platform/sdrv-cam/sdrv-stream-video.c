@@ -177,7 +177,7 @@ static int __kstream_video_try_format(struct kstream_video *video,
 {
 	struct v4l2_pix_format_mplane *pix_mp;
 	const struct kstream_pix_format *kpf;
-	u32 width, height;
+	u32 width, height, field;
 	int i, ret;
 	const u8 *bpp;
 
@@ -189,6 +189,7 @@ static int __kstream_video_try_format(struct kstream_video *video,
 
 	width = pix_mp->width;
 	height = pix_mp->height;
+	field = pix_mp->field;
 	bpp = kpf->bpp;
 	memset(pix_mp, 0, sizeof(*pix_mp));
 
@@ -196,6 +197,7 @@ static int __kstream_video_try_format(struct kstream_video *video,
 	pix_mp->width = clamp_t(u32, width, 1, SDRV_IMG_X_MAX);
 	pix_mp->height = clamp_t(u32, height, 1, SDRV_IMG_Y_MAX);
 	pix_mp->num_planes = kpf->planes;
+	pix_mp->field = field;
 	if(pix_mp->field == V4L2_FIELD_ANY)
 		pix_mp->field = V4L2_FIELD_NONE;
 	pix_mp->colorspace = V4L2_COLORSPACE_SRGB;
