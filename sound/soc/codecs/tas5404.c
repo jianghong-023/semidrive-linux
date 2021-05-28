@@ -155,7 +155,7 @@ static int tas5404_power_off(struct snd_soc_codec *codec)
 	}
 	tas5404->HIZ_flag = false;
 	cancel_delayed_work_sync(&tas5404->fault_check_work);
-	regcache_cache_only(tas5404->regmap, true);
+	regcache_cache_only(tas5404->regmap, false);
 	regcache_mark_dirty(tas5404->regmap);
 
 /* 	ret = regulator_bulk_disable(ARRAY_SIZE(tas5404->supplies),
