@@ -103,7 +103,7 @@ static ssize_t vircan_read(struct file *filp, char __user *buf,
 
 	kfree(kbuf);
 
-	dev_err(fdev->dev, "%s recv %d bytes\n", __func__, rev_len);
+	dev_dbg(fdev->dev, "%s recv %d bytes\n", __func__, rev_len);
 
 	return ret < 0 ? ret : rev_len;
 }
@@ -141,7 +141,7 @@ static ssize_t vircan_write(struct file *filp, const char __user *buf,
 	ret = sock_sendmsg(sock, &msg);
 
 	mutex_unlock(&fdev->ept_lock);
-	dev_err(fdev->dev, "%s sent %d bytes\n", __func__, ret);
+	dev_dbg(fdev->dev, "%s sent %d bytes\n", __func__, ret);
 
 free_kbuf:
 	kfree(kbuf);
@@ -153,7 +153,7 @@ static int vircan_open(struct inode *inode, struct file *filp)
 {
 	struct dcf_front_device *fdev = filp->private_data;
 	struct device *dev = fdev->dev;
-	struct socket *sock;
+	struct socket *sock = NULL;
 	struct sockaddr_rpmsg sa;
 	int ret;
 
@@ -176,14 +176,22 @@ static int vircan_open(struct inode *inode, struct file *filp)
 		goto out;
 
 	ret = kernel_connect(sock, (struct sockaddr *)&sa, sizeof(sa), 0);
-	if (ret < 0) {
-		sock_release(sock);
+	if (ret < 0)
 		goto out;
-	}
+
 	fdev->sock = sock;
 	dev_info(dev, "device open ept:%d\n", fdev->myaddr);
 
+	return 0;
+
 out:
+	if (sock)
+		sock_release(sock);
+
+	atomic_dec(&fdev->user_count);
+	put_device(dev);
+
+	dev_err(dev, "open ept:%d fail:%d\n", fdev->myaddr, ret);
 
 	return ret;
 }
@@ -490,7 +498,7 @@ static struct platform_driver dcf_front_driver = {
 	.remove = dcf_front_remove,
 	.driver = {
 		.owner = THIS_MODULE,
-		.name = "sd,dcf-front",
+		.name = "sd,dcfv",
 		.of_match_table = dcf_front_of_ids,
 	},
 };
@@ -500,21 +508,18 @@ static int __init dcf_front_init(void)
 	int major;
 	int ret;
 
-	if (!xen_domain() || xen_initial_domain())
-		return -ENODEV;
-
 	pr_info("initialize dcf front driver!\n");
 
-	major = register_chrdev(0, "dcf", &dcf_file_fops);
+	major = register_chrdev(0, "dcfv", &dcf_file_fops);
 	if (major < 0) {
 		pr_err("dcf: failed to register char dev region\n");
 		return major;
 	}
 
 	dcf_major = MKDEV(major, 0);
-	dcf_class = class_create(THIS_MODULE, "dcf");
+	dcf_class = class_create(THIS_MODULE, "dcfv");
 	if (IS_ERR(dcf_class)) {
-		unregister_chrdev(major, "dcf");
+		unregister_chrdev(major, "dcfv");
 		return PTR_ERR(dcf_class);
 	}
 
@@ -524,7 +529,7 @@ static int __init dcf_front_init(void)
 	if (ret < 0) {
 		pr_err("dcf: failed to register rpmsg driver\n");
 		class_destroy(dcf_class);
-		unregister_chrdev(major, "dcf");
+		unregister_chrdev(major, "dcfv");
 	}
 
 	return 0;
@@ -532,8 +537,6 @@ static int __init dcf_front_init(void)
 
 static void __exit dcf_front_fini(void)
 {
-	if (!xen_domain() || !xen_initial_domain())
-		return;
 
 	pr_info("unregister dcf front driver!\n");
 
