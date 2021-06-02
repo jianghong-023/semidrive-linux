@@ -5001,7 +5001,7 @@ static int mxt_probe(struct i2c_client *client, const struct i2c_device_id *id)
 	error = du90ub948_gpio_output(client, data->addr_ds948, data->reset_channel, 0);
 	if (error)
 		return error;
-	msleep(MXT_RESET_GPIO_TIME);
+	usleep_range(10000, 12000);
 
 	error = devm_request_threaded_irq(&client->dev, client->irq,
 					  NULL, mxt_interrupt, IRQF_ONESHOT,
@@ -5030,7 +5030,7 @@ static int mxt_probe(struct i2c_client *client, const struct i2c_device_id *id)
 	error = du90ub948_gpio_output(client, data->addr_ds948, data->reset_channel, 1);
 	if (error)
 		return error;
-	msleep(MXT_RESET_INVALID_CHG);
+	msleep(80);
 #endif
 
 	data->msg_num.txseq_num = 0x00; //Initialize the TX seq_num
