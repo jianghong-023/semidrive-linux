@@ -126,27 +126,27 @@ int cyttsp6_xres(struct cyttsp6_core_platform_data *pdata,
 	rc = du90ub941_or_947_enable_i2c_passthrough(client, pdata->addr_ds941);
 	if (rc)
 		return rc;
-	msleep(2);
+	usleep_range(1000, 2000);
 
 	rc = du90ub941_or_947_enable_int(client, pdata->addr_ds941);
 	if (rc)
 		return rc;
-	msleep(2);
+	usleep_range(1000, 2000);
 
 	rc = du90ub948_gpio_output(client, pdata->addr_ds948, pdata->reset_channel, 1);
 	if (rc)
 		return rc;
-	msleep(20);
+	usleep_range(5000, 6000);
 
 	rc = du90ub948_gpio_output(client, pdata->addr_ds948, pdata->reset_channel, 0);
 	if (rc)
 		return rc;
-	msleep(40);
+	usleep_range(10000, 12000);
 
 	rc = du90ub948_gpio_output(client, pdata->addr_ds948, pdata->reset_channel, 1);
 	if (rc)
 		return rc;
-	msleep(20);
+	usleep_range(10000, 12000);
 #endif
 
 	return rc;
