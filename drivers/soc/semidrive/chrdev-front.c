@@ -148,6 +148,114 @@ free_kbuf:
 	return ret < 0 ? ret : len;
 }
 
+
+enum sts_op_type {
+	CP_OP_GET_VERSION = 1,
+	CP_OP_GET_CONFIG,
+	CP_OP_START,
+	CP_OP_STOP,
+};
+
+/* Do not exceed 32 bytes so far */
+struct canctl_cmd {
+	u16 op;
+	u16 tag;
+	union {
+		struct {
+			u16 what;
+		} s;
+	} msg;
+};
+
+/* Do not exceed 16 bytes so far */
+struct canctl_result {
+	u16 op;
+	u16 tag;
+	union {
+		/** used for get_version */
+		struct {
+			u16 version;
+			u16 id;
+			u16 vendor;
+		} v;
+		/** used for get_config */
+		struct {
+			u8 baudrate;
+			u8 canfd_support;
+			u8 instances;
+			u8 padding;
+		} cfg;
+		u8 data[12];
+	} msg;
+};
+
+static int vircan_if_control(struct dcf_front_device *candev, int command,
+	struct canctl_result *data)
+{
+	struct rpc_ret_msg result = {0,};
+	struct rpc_req_msg request;
+	struct canctl_cmd *ctl = DCF_RPC_PARAM(request, struct canctl_cmd);
+	struct canctl_result *rs = (struct canctl_result *) &result.result[0];
+	int ret = 0;
+
+	DCF_INIT_RPC_REQ(request, MOD_RPC_REQ_CP_IOCTL);
+	ctl->op = command;
+	ctl->tag = candev->myaddr;
+	ret = semidrive_rpcall(&request, &result);
+	if (ret < 0 || result.retcode < 0) {
+		dev_err(candev->dev, "rpcall failed=%d %d\n", ret, result.retcode);
+		goto fail_call;
+	}
+
+	memcpy(data, rs, sizeof(*rs));
+
+fail_call:
+
+	return ret;
+}
+
+static int vircan_if_start(struct dcf_front_device *candev)
+{
+	struct canctl_result op_ret;
+
+	return vircan_if_control(candev, CP_OP_START, &op_ret);
+}
+
+static int vircan_if_stop(struct dcf_front_device *candev)
+{
+	struct canctl_result op_ret;
+
+	return vircan_if_control(candev, CP_OP_STOP, &op_ret);
+}
+
+static int vircan_if_getconfig(struct dcf_front_device *candev)
+{
+	struct canctl_result op_ret;
+	int ret;
+
+	ret = vircan_if_control(candev, CP_OP_GET_CONFIG, &op_ret);
+	if (ret == 0) {
+		dev_info(candev->dev, "baud: %d, canfd: %d, if#: %d\n",
+			op_ret.msg.cfg.baudrate, op_ret.msg.cfg.canfd_support,
+			op_ret.msg.cfg.instances);
+	}
+
+	return ret;
+}
+
+static int vircan_if_getversion(struct dcf_front_device *candev)
+{
+	struct canctl_result op_ret;
+	int ret;
+
+	ret = vircan_if_control(candev, CP_OP_GET_VERSION, &op_ret);
+	if (ret == 0)
+		dev_info(candev->dev, "id: %d, version: %04x, vendor: %d\n",
+				op_ret.msg.v.id, op_ret.msg.v.version, op_ret.msg.v.vendor);
+
+	return ret;
+}
+
 /* This device support single user */
 static int vircan_open(struct inode *inode, struct file *filp)
 {
@@ -160,6 +268,12 @@ static int vircan_open(struct inode *inode, struct file *filp)
 	if (atomic_read(&fdev->user_count)) {
 		dev_err(dev, "already open ept:%d\n", fdev->myaddr);
 		return -EBUSY;
+	}
+
+	ret = vircan_if_getversion(fdev);
+	if (ret < 0) {
+		dev_err(dev, "dev:%d no response\n", fdev->myaddr);
+		return -EAGAIN;
 	}
 
 	atomic_inc(&fdev->user_count);
@@ -180,6 +294,9 @@ static int vircan_open(struct inode *inode, struct file *filp)
 		goto out;
 
 	fdev->sock = sock;
+
+	vircan_if_getconfig(fdev);
+	vircan_if_start(fdev);
 	dev_info(dev, "device open ept:%d\n", fdev->myaddr);
 
 	return 0;
@@ -202,6 +319,7 @@ static int vircan_release(struct inode *inode, struct file *filp)
 	struct socket *sock = fdev->sock;
 	struct device *dev = fdev->dev;
 
+	vircan_if_stop(fdev);
 	sock_release(sock);
 	atomic_dec(&fdev->user_count);
 	dev_info(dev, "device close\n");

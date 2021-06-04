@@ -172,6 +172,8 @@ typedef enum {
 #define MOD_RPC_REQ_SCS_IOCTL		(MOD_RPC_REQ_BASE + 24)
 /* Audio service ioctl RPC cmd */
 #define MOD_RPC_REQ_AUDIO_IOCTL		(MOD_RPC_REQ_BASE + 32)
+/* Safe CAN proxy ioctl RPC cmd */
+#define MOD_RPC_REQ_CP_IOCTL		(MOD_RPC_REQ_BASE + 0x40)
 
 int semidrive_rpcall(struct rpc_req_msg *req, struct rpc_ret_msg *result);
 int semidrive_get_property(u32 id, u32 *val);
