@@ -11,8 +11,5 @@
 
 	fragment@0 {
 		target = <&sound_ak7738>;
-		__overlay__ {
-			compatible = "semidrive,x9-ref04-ak7738";
-		};
 	};
 };
