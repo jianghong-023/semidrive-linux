@@ -1,2 +1,1 @@
-obj-$(CONFIG_SEMIDRIVE_THERMAL)		+= semidrive_sensor/ \
-						semidrive_cooling/
+obj-$(CONFIG_SEMIDRIVE_THERMAL)		+= semidrive_cooling/ semidrive_sensor/
