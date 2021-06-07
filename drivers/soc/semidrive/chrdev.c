@@ -435,9 +435,8 @@ static struct dcf_device devlist[] = {
 	[2] = { "earlyapp", 0666, &avm_fops,     FMODE_UNSIGNED_OFFSET, SD_EARLYAPP_EPT},
 	[3] = { "ssystem",  0600, &sec_fops,     FMODE_UNSIGNED_OFFSET, SD_SSYSTEM_EPT},
 	[4] = { "ivi",      0666, &cluster_fops, FMODE_UNSIGNED_OFFSET, SD_IVI_EPT},
-	[5] = { "vircan",   0666, &vircan_fops,  FMODE_UNSIGNED_OFFSET, SD_VIRCAN_EPT},
-	[6] = { "loopback", 0666, &cluster_fops, FMODE_UNSIGNED_OFFSET, SD_LOOPBACK_EPT},
-	[7] = { "property", 0600, &property_fops,FMODE_UNSIGNED_OFFSET, SD_PROPERTY_EPT},
+	[5] = { "loopback", 0666, &cluster_fops, FMODE_UNSIGNED_OFFSET, SD_LOOPBACK_EPT},
+	[6] = { "property", 0600, &property_fops,FMODE_UNSIGNED_OFFSET, SD_PROPERTY_EPT},
 };
 
 static struct rpmsg_device_id rpmsg_bridge_id_table[] = {
@@ -445,7 +444,6 @@ static struct rpmsg_device_id rpmsg_bridge_id_table[] = {
 	{.name = "rpmsg-earlyapp"},
 	{.name = "rpmsg-ssystem"},
 	{.name = "rpmsg-ivi"},
-	{.name = "rpmsg-vircan"},
 	{.name = "rpmsg-loopback"},
 	{.name = "rpmsg-property"},
 	{},
@@ -537,7 +535,7 @@ static struct rpmsg_driver rpmsg_bridge_driver = {
 	.remove = rpmsg_bridge_remove,
 	.id_table = rpmsg_bridge_id_table,
 	.drv = {
-		.name = "sd,rpmsg-br"
+		.name = "rpmsg_dcf"
 	},
 };
 
@@ -546,7 +544,8 @@ static int __init dcf_char_init(void)
 	int major;
 	int ret;
 
-	if (xen_domain())
+	/* Not support this in DomU */
+	if (xen_domain() && !xen_initial_domain())
 		return -ENODEV;
 
 	pr_info("initialize dcf platform driver!\n");
@@ -577,7 +576,7 @@ static int __init dcf_char_init(void)
 
 static void __exit dcf_char_exit(void)
 {
-	if (xen_domain())
+	if (xen_domain() && !xen_initial_domain())
 		return;
 
 	pr_info("unregister dcf platform driver!\n");

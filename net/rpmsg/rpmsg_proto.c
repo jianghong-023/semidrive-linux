@@ -729,7 +729,7 @@ static int __init rpmsg_proto_init(void)
 		goto proto_unreg;
 	}
 
-	/* for Native and XEN Dom-0 */
+	/* for Native or XEN Dom-0 */
 	if (!xen_domain() || xen_initial_domain()) {
 		ret = register_rpmsg_driver(&rpmsg_proto_driver);
 		if (ret) {
