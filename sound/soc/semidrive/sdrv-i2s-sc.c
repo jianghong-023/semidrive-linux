@@ -1763,6 +1763,7 @@ static const struct of_device_id sdrv_i2s_sc_of_match[] = {
     {
 	.compatible = "semidrive,x9-i2s-sc",
     },
+    {},
 };
 
 static struct platform_driver snd_afe_i2s_sc_driver = {

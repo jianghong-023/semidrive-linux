@@ -136,12 +136,12 @@ static struct snd_soc_dai_link snd_x9_ref04_soc_dai_links[] = {
 };
 /*-Init Machine Driver
  * ---------------------------------------------------------------------*/
-#define SND_X9_MACH_DRIVER "x9-ref04-mach"
-#define SND_CARD_NAME SND_X9_MACH_DRIVER
+#define SND_X9_REF_MACH_DRIVER "x9-ref04-mach"
+#define SND_REF_CARD_NAME SND_X9_REF_MACH_DRIVER
 /*Sound Card Driver
  * ------------------------------------------------------------------------*/
 static struct snd_soc_card x9_ref04_card = {
-    .name = SND_CARD_NAME,
+    .name = SND_REF_CARD_NAME,
     .dai_link = snd_x9_ref04_soc_dai_links,
     .num_links = ARRAY_SIZE(snd_x9_ref04_soc_dai_links),
     .late_probe = x9_ref04_late_probe,
@@ -197,22 +197,24 @@ static int snd_x9_ref04_resume(struct platform_device *pdev)
 	return 0;
 }
 #endif
-
 static const struct of_device_id x9_ref04_dt_match[] = {
     {
 	.compatible = "semidrive,x9-ref04-mach",
     },
+    {},
 };
-MODULE_DEVICE_TABLE(of, x9_ref04_hs_dt_match);
+
+MODULE_DEVICE_TABLE(of, x9_ref04_dt_match);
 
 static struct platform_driver x9_ref04_mach_driver = {
     .driver =
 	{
-	    .name = SND_X9_MACH_DRIVER,
+	    .name = SND_X9_REF_MACH_DRIVER,
 	    .of_match_table = x9_ref04_dt_match,
 #ifdef CONFIG_PM
 	    .pm = &snd_soc_pm_ops,
 #endif
+		.probe_type = PROBE_PREFER_ASYNCHRONOUS,
 	},
 
     .probe = x9_ref04_probe,

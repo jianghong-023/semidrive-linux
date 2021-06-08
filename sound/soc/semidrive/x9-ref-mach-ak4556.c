@@ -259,6 +259,7 @@ static const struct of_device_id x9_ref_hs_dt_match[] = {
     {
 	.compatible = "semidrive,x9-ref-ak4556",
     },
+    {},
 };
 MODULE_DEVICE_TABLE(of, x9_ref_hs_dt_match);
 

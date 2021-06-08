@@ -250,6 +250,7 @@ static const struct of_device_id x9_cs42888_dt_match[] = {
     {
 	.compatible = "semidrive,x9-cs42888",
     },
+    {},
 };
 MODULE_DEVICE_TABLE(of, x9_cs42888_dt_match);
 
