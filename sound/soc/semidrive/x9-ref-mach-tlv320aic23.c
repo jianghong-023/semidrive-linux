@@ -284,8 +284,9 @@ static int snd_x9_ref_tlv320aic23_resume(struct platform_device *pdev)
 
 static const struct of_device_id x9_ref_tlv320aic23_dt_match[] = {
     {
-		.compatible = "semidrive,x9-ref-tlv320aic23",
+	.compatible = "semidrive,x9-ref-tlv320aic23",
     },
+    {},
 };
 MODULE_DEVICE_TABLE(of, x9_ref_tlv320aic23_dt_match);
 

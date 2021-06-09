@@ -662,8 +662,9 @@ static const struct of_device_id x9_ref04_ak7738_dt_match[] = {
     {
 	.compatible = "semidrive,x9-ref04-ak7738",
     },
+    {},
 };
-MODULE_DEVICE_TABLE(of, x9_ref04_hs_dt_match);
+MODULE_DEVICE_TABLE(of, x9_ref04_ak7738_dt_match);
 
 static struct platform_driver x9_ref04_ak7738_mach_driver = {
     .driver =

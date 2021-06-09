@@ -581,9 +581,10 @@ static int snd_afe_spdif_remove(struct platform_device *pdev)
 }
 
 static const struct of_device_id sdrv_spdif_of_match[] = {
-	{
-		.compatible = "semidrive,x9-spdif",
-	},
+    {
+	.compatible = "semidrive,x9-spdif",
+    },
+    {},
 };
 
 static struct platform_driver snd_afe_spdif_driver = {

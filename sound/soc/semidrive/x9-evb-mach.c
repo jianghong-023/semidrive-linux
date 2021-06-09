@@ -404,6 +404,7 @@ static const struct of_device_id x9_evb_dt_match[] = {
     {
 	.compatible = "semidrive,x9-tlv320aic23",
     },
+    {},
 };
 MODULE_DEVICE_TABLE(of, x9_evb_dt_match);
 

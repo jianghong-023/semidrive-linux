@@ -1242,9 +1242,10 @@ static int snd_afe_i2s_mc_remove(struct platform_device *pdev)
 }
 
 static const struct of_device_id sdrv_i2s_mc_of_match[] = {
-	{
+    {
 	.compatible = "semidrive,x9-i2s-mc",
-	},
+    },
+    {},
 };
 
 static struct platform_driver snd_afe_i2s_mc_driver = {
