@@ -24,7 +24,7 @@
 #include <linux/bitops.h>
 #define BIT_(nr) (1UL << (nr))
 #define I2S_MC_SAMPLE_RATE_CALC(fclk, fsample, chn_width)                      \
-	((2 * fclk + fsample * chn_width) / (2 * fsample * chn_width))
+	(( fclk + fsample * chn_width) / (2 * fsample * chn_width))
 
 #define I2S_MC_SAMPLE_RESOLUTION_TO_CONFIG(bit_format) (bit_format - 1)
 
