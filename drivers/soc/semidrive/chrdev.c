@@ -412,16 +412,6 @@ static const struct file_operations __maybe_unused sec_fops = {
 	.release	= dcf_dev_release,
 };
 
-static const struct file_operations __maybe_unused vircan_fops = {
-	.llseek		= no_llseek,
-	.read		= dcf_dev_read,
-	.write		= dcf_dev_write,
-	.unlocked_ioctl = dcf_dev_ioctl,
-	.poll		= dcf_dev_poll,
-	.open		= dcf_dev_open,
-	.release	= dcf_dev_release,
-};
-
 static const struct file_operations property_fops = {
 	.owner   = THIS_MODULE,
 	.unlocked_ioctl = dcf_dev_ioctl,
