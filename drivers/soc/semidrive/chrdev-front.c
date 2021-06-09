@@ -28,6 +28,10 @@
 #include <linux/platform_device.h>
 #include <linux/soc/semidrive/ipcc.h>
 #include <uapi/linux/rpmsg_socket.h>
+#include <uapi/linux/can.h>
+#include <uapi/linux/can/raw.h>
+#include <net/busy_poll.h>
+
 #include "uapi/dcf-ioctl.h"
 #define CONFIG_DCF_ENDPOINT (0)
 
@@ -63,6 +67,20 @@ struct dcf_user {
 	int pid;
 };
 
+/*!< CAN Frame Type(0:DATA or 1:REMOTE). */
+#define RPMSG_CAN_FLAG_TYPE		(1 << 29)
+/*!< CAN FD or classic frame? 0: classic or 1: canfd */
+#define RPMSG_CAN_FLAG_CANFD	(1 << 30)
+/*!< CAN Frame Identifier(0: STD or 1: EXT format). */
+#define RPMSG_CAN_FLAG_FMT		(1 << 31)
+struct rpmsg_can_frame {
+	canid_t can_id;  /* 32 bit CAN_ID + FORMAT/CANFD/TYPE flags */
+	__u8    len;     /* frame payload length in byte */
+	__u8    data[CANFD_MAX_DLEN];
+}__attribute__((packed));
+
+#define RPMSG_CAN_MTU	(sizeof(struct rpmsg_can_frame))
+
 static long vircan_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 {
 	pr_warn_once("%s: not supported\n", __func__);
@@ -72,22 +90,24 @@ static ssize_t vircan_read(struct file *filp, char __user *buf,
 				 size_t len, loff_t *f_pos)
 {
 	struct dcf_front_device *fdev = filp->private_data;
+	struct rpmsg_can_frame *vcanframe;
 	struct socket *sock = fdev->sock;
+	struct canfd_frame frame = {0, };
 	unsigned int msg_flags = 0;
 	struct msghdr msg;
 	struct kvec vec[2];
 	void *kbuf;
 	int ret, rev_len = 0;
 
-	kbuf = kmalloc(len, GFP_KERNEL);
+	kbuf = kmalloc(RPMSG_CAN_MTU, GFP_KERNEL);
 	if (!kbuf)
 		return -ENOMEM;
 
 	memset(&msg, 0, sizeof(msg));
 	msg.msg_iter.type = ITER_KVEC|READ;
-	msg.msg_iter.count = len;
+	msg.msg_iter.count = RPMSG_CAN_MTU;
 	vec[0].iov_base = kbuf;
-	vec[0].iov_len = len;
+	vec[0].iov_len = RPMSG_CAN_MTU;
 	msg.msg_iter.kvec = vec;
 	msg.msg_iter.nr_segs = 1;
 
@@ -96,9 +116,29 @@ static ssize_t vircan_read(struct file *filp, char __user *buf,
 
 	ret = sock_recvmsg(sock, &msg, msg_flags);
 	if (ret > 0) {
-		rev_len = min_t(size_t, len, ret);
-		ret = copy_to_user(buf, kbuf, rev_len);
-//		print_hex_dump_bytes("vircan_rx: ", DUMP_PREFIX_ADDRESS, kbuf, rev_len);
+		/* reserve flag and padding data */
+		vcanframe = (struct rpmsg_can_frame *)kbuf;
+
+		if (vcanframe->can_id & RPMSG_CAN_FLAG_FMT) {
+			frame.can_id = vcanframe->can_id & CAN_EFF_MASK;
+			frame.can_id |= CAN_EFF_FLAG;
+		} else {
+			frame.can_id = vcanframe->can_id & CAN_SFF_MASK;
+		}
+
+		if (vcanframe->can_id & RPMSG_CAN_FLAG_TYPE)
+			frame.can_id |= CAN_RTR_FLAG;
+
+		if (vcanframe->can_id & RPMSG_CAN_FLAG_CANFD)
+			rev_len = min_t(size_t, len, CANFD_MTU);
+		else
+			rev_len = min_t(size_t, len, CAN_MTU);
+
+		frame.len = vcanframe->len;
+		memcpy(&frame.data[0], &vcanframe->data[0], vcanframe->len);
+
+		ret = copy_to_user(buf, &frame, rev_len);
+//		print_hex_dump_bytes("vircan_rx: ", DUMP_PREFIX_ADDRESS, kbuf, vcanframe->len + sizeof(canid_t));
 	}
 
 	kfree(kbuf);
@@ -113,14 +153,27 @@ static ssize_t vircan_write(struct file *filp, const char __user *buf,
 {
 	struct dcf_front_device *fdev = filp->private_data;
 	struct socket *sock = fdev->sock;
+	struct rpmsg_can_frame vcanframe = {0,};
+	struct canfd_frame *frame;
 	struct msghdr msg;
 	struct kvec vec[2];
 	void *kbuf;
-	int ret;
+	int ret = 0;
+
+	if (len > CANFD_MTU) {
+		dev_err(fdev->dev, "invalid canframe size=%ld\n", len);
+		return -EBUSY;
+	}
 
 	kbuf = memdup_user(buf, len);
 	if (IS_ERR(kbuf))
 		return PTR_ERR(kbuf);
+
+	frame = kbuf;
+	if (frame->len > CANFD_MAX_DLEN) {
+		dev_err(fdev->dev, "invalid data length=%d\n", frame->len);
+		goto free_kbuf;
+	}
 
 	if (mutex_lock_interruptible(&fdev->ept_lock)) {
 		ret = -ERESTARTSYS;
@@ -131,10 +184,25 @@ static ssize_t vircan_write(struct file *filp, const char __user *buf,
 	if (filp->f_flags & O_NONBLOCK)
 		msg.msg_flags |= MSG_DONTWAIT;
 
+	if (frame->can_id & CAN_EFF_FLAG) {
+		vcanframe.can_id = frame->can_id & CAN_EFF_MASK;
+		vcanframe.can_id |= RPMSG_CAN_FLAG_FMT;
+	} else
+		vcanframe.can_id = frame->can_id & CAN_SFF_MASK;
+
+	if (frame->can_id & CAN_RTR_FLAG)
+		vcanframe.can_id |= RPMSG_CAN_FLAG_TYPE;
+
+	if (frame->len > CAN_MAX_DLEN)
+		vcanframe.can_id |= RPMSG_CAN_FLAG_CANFD;
+
+	vcanframe.len = frame->len;
+	memcpy(&vcanframe.data[0], &frame->data[0], frame->len);
+
 	msg.msg_iter.type = ITER_KVEC|WRITE;
-	msg.msg_iter.count = len;
-	vec[0].iov_base = kbuf;
-	vec[0].iov_len = len;
+	msg.msg_iter.count = RPMSG_CAN_MTU;
+	vec[0].iov_base = &vcanframe;
+	vec[0].iov_len = RPMSG_CAN_MTU;
 	msg.msg_iter.kvec = vec;
 	msg.msg_iter.nr_segs = 1;
 
@@ -331,8 +399,20 @@ static int vircan_release(struct inode *inode, struct file *filp)
 
 static unsigned int vircan_poll(struct file *filp, poll_table *wait)
 {
-	pr_warn_once("%s: not supported\n", __func__);
-	return -ENOTSUPP;
+	struct dcf_front_device *fdev = filp->private_data;
+	struct socket *sock = fdev->sock;
+	unsigned int busy_flag = 0;
+
+	if (sk_can_busy_loop(sock->sk)) {
+		/* this socket can poll_ll so tell the system call */
+		busy_flag = POLL_BUSY_LOOP;
+
+		/* once, only if requested by syscall */
+		if (wait && (wait->_key & POLL_BUSY_LOOP))
+			sk_busy_loop(sock->sk, 1);
+	}
+
+	return busy_flag | sock->ops->poll(filp, sock, wait);
 }
 
 static int validate_ioctl_arg(unsigned int cmd, union dcf_ioctl_arg *arg)
