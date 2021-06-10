@@ -1504,6 +1504,15 @@ static int dwc3_suspend(struct device *dev)
 	return 0;
 }
 
+static void dwc3_resume_quirk(struct dwc3 *dwc)
+{
+	dwc3_writel(dwc->regs, DWC3_NCR_INTEN, 0x3f);
+
+	if (dwc->current_dr_role == DWC3_GCTL_PRTCAP_HOST
+		|| dwc->dr_mode == USB_DR_MODE_HOST)
+		dwc3_set_prtcap(dwc, DWC3_GCTL_PRTCAP_HOST);
+}
+
 static int dwc3_resume(struct device *dev)
 {
 	struct dwc3	*dwc = dev_get_drvdata(dev);
@@ -1511,6 +1520,7 @@ static int dwc3_resume(struct device *dev)
 
 	pinctrl_pm_select_default_state(dev);
 
+	dwc3_resume_quirk(dwc);
 	ret = dwc3_resume_common(dwc);
 	if (ret)
 		return ret;
