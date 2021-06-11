@@ -13,9 +13,9 @@
 #include <dt-bindings/gpio/gpio.h>
 #include <dt-bindings/soc/sdrv-common-reg.h>
 #include <dt-bindings/soc/sdrv,scr_signal.h>
+#include <dt-bindings/thermal/thermal.h>
 #include "d9-clk-base.dtsi"
 #include "d9-opp.dtsi"
-#include <dt-bindings/thermal/thermal.h>
 / {
 	compatible = "semidrive,kunlun";
 	#address-cells = <2>;
@@ -2055,17 +2055,17 @@
 			regctl = <&regctl SDRV_REG_BOOTREASON>;
 			status = "disabled";
 		};
-		cpu_budget_cooling:cpu_budget_cool{
-			compatible = "semidrive,budget_cooling";
-			device_type = "cpu_budget_cooling";
-			#cooling-cells = <2>;
+
+		cooling_devices: cooling_devices {
+			compatible = "simple-mfd";
 			status = "disabled";
-			state_cnt = <4>;
-			cluster_num = <1>;
-			state0 = <800000>;
-			state1 = <400000>;
-			state2 = <200000>;
-			state3 = <100000>;
+
+			cpufreq_cluster0: cpufreq_cluster0 {
+				compatible = "semidrive, cpufreq-cooling";
+				status = "okay";
+				#cooling-cells = <2>;
+				cluster_id = <0>;
+			};
 		};
 
 		pvt_sensor: pvt_sensor@0x30880000{
@@ -2090,22 +2090,17 @@
 				thermal-sensors = <&pvt_sensor 0>;
 				trips{
 					cpu_trip0:t0{
-						temperature = <105>;
+						temperature = <100>;
 						type = "passive";
 						hysteresis = <0>;
 					};
 					cpu_trip1:t1{
-						temperature = <115>;
+						temperature = <110>;
 						type = "passive";
 						hysteresis = <0>;
 					};
 					cpu_trip2:t2{
 						temperature = <120>;
-						type = "passive";
-						hysteresis = <0>;
-					};
-					cpu_trip3:t3{
-						temperature = <127>;
 						type = "passive";
 						hysteresis = <0>;
 					};
@@ -2119,22 +2114,17 @@
 					bind0 {
 						contribution = <0>;
 						trip = <&cpu_trip0>;
-						cooling-device = <&cpu_budget_cooling THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
+						cooling-device = <&cpufreq_cluster0 THERMAL_NO_LIMIT 2>;
 					};
 					bind1{
 						contribution = <0>;
 						trip = <&cpu_trip1>;
-						cooling-device = <&cpu_budget_cooling THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
+						cooling-device = <&cpufreq_cluster0 THERMAL_NO_LIMIT 3>;
 					};
 					bind2{
 						contribution = <0>;
 						trip = <&cpu_trip2>;
-						cooling-device = <&cpu_budget_cooling THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
-					};
-					bind3{
-						contribution = <0>;
-						trip = <&cpu_trip3>;
-						cooling-device = <&cpu_budget_cooling THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
+						cooling-device = <&cpufreq_cluster0 THERMAL_NO_LIMIT 3>;
 					};
 				};
 			};

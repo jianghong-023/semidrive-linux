@@ -963,3 +963,11 @@
 	op-mode = <3>;
 	status = "okay";
 };
+
+&cooling_devices {
+	status = "okay";
+};
+
+&pvt_sensor {
+	status = "okay";
+};
