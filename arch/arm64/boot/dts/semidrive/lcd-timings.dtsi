@@ -116,15 +116,15 @@
 	};
 
 	fhd1920x1080: z1_1920x1080@60 {
-		clock-frequency = <132220000>;
+		clock-frequency = <149457300>;
 		hactive = <1920>;
 		vactive = <1080>;
-		hback-porch = <1>;
-		hfront-porch = <39>;
-		vback-porch = <1>;
-		vfront-porch = <20>;
-		hsync-len = <20>;
-		vsync-len = <12>;
+		hback-porch = <80>;
+		hfront-porch = <15>;
+		vback-porch = <15>;
+		vfront-porch = <80>;
+		hsync-len = <80>;
+		vsync-len = <14>;
 	};
 
 	qxga2560x1600: z1_2560x1600@60 {
@@ -310,15 +310,15 @@
 	};
 
 	fhd1920x1080_1: z1_1920x1080@60 {
-		clock-frequency = <132220000>;
+		clock-frequency = <149457300>;
 		hactive = <1920>;
 		vactive = <1080>;
-		hback-porch = <1>;
-		hfront-porch = <39>;
-		vback-porch = <1>;
-		vfront-porch = <20>;
-		hsync-len = <20>;
-		vsync-len = <12>;
+		hback-porch = <80>;
+		hfront-porch = <15>;
+		vback-porch = <15>;
+		vfront-porch = <80>;
+		hsync-len = <80>;
+		vsync-len = <14>;
 	};
 
 	qxga2560x1600_1: z1_2560x1600@60 {
