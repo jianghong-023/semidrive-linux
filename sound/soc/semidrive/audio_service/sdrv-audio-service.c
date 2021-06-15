@@ -43,21 +43,38 @@ static struct cdev cdev;
 
 #define AM_MINOR 32
 #define NUMBER_OF_DEVICES 2
+#define TYPE 'S'
+#define IOCTL_OP_HANDSHAKE _IOWR(TYPE, 0, int)
+#define IOCTL_OP_START _IOWR(TYPE, 1, int)
+#define IOCTL_OP_STOP _IOWR(TYPE, 2, int)
+#define IOCTL_OP_MUTE _IOWR(TYPE, 3, int)
+#define IOCTL_OP_SETVOL _IOWR(TYPE, 4, int)
+#define IOCTL_OP_SWITCH _IOWR(TYPE, 5, int)
+#define IOCTL_OP_RESET _IOWR(TYPE, 6, int)
+#define IOCTL_OP_RESTORE _IOWR(TYPE, 7, int)
+#define IOCTL_OP_PLAY_AGENT _IOWR(TYPE, 8, int)
+#define IOCTL_OP_PCM_PLAYBACK_CTL _IOWR(TYPE, 9, int)
+#define IOCTL_OP_PCM_CAPTURE_CTL _IOWR(TYPE, 10, int)
+#define IOCTL_OP_PCM_PLAYBACK_STREAM _IOWR(TYPE, 11, int)
+#define IOCTL_OP_PCM_CAPTURE_STREAM _IOWR(TYPE, 12, int)
+#define IOCTL_OP_PCM_LOOPBACK_CTL _IOWR(TYPE, 13, int)
 
-enum audio_service_cmd {
-	PCM_PLAYBACK_CTL,
-	PCM_CAPTURE_CTL,
-	PCM_PLAYBACK_STREAM,
-	PCM_CAPTURE_STREAM,
-	PCM_LOOPBACK_CTL,
-	PCM_HANDSHAKE,
-	AM_CMD_INIT,
-	AM_CMD_START,
-	AM_CMD_STOP,
-	AM_CMD_SETVOL,
-	AM_CMD_MUTE,
-	AM_CMD_SWITCH,
-	IPC_OPCODE_AUDIO = 0xFFFF,
+enum audiomanager_cmd {
+    OP_HANDSHAKE = 0,
+    OP_START = 1,
+    OP_STOP = 2,
+    OP_MUTE = 3,
+    OP_SETVOL = 4,
+    OP_SWITCH = 5,
+    OP_RESET = 6,
+    OP_RESTORE = 7,
+    OP_PLAY_AGENT = 8,
+    OP_PCM_PLAYBACK_CTL = 9,
+    OP_PCM_CAPTURE_CTL = 10,
+    OP_PCM_PLAYBACK_STREAM = 11,
+    OP_PCM_CAPTURE_STREAM = 12,
+    OP_PCM_LOOPBACK_CTL = 13,
+    OP_NUMB
 };
 
 typedef enum {
@@ -152,7 +169,7 @@ int sdrv_audio_svc_test(void)
 	struct audio_rpc_cmd ctl;
 	struct audio_rpc_result result;
 
-	ctl.op = PCM_CAPTURE_CTL;
+	ctl.op = OP_PCM_CAPTURE_CTL;
 	ret = sdrv_audio_svc_rpcall(audio_service_hdr, &ctl, &result);
 	if (ret < 0) {
 		dev_err(audio_service_hdr->dev,
@@ -238,9 +255,56 @@ long am_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	struct audio_rpc_result result;
 	copy_from_user(&data, (struct msg __user *)arg,
 		       sizeof(struct usr_data));
-	printk("%s: cmd: %d, path:%d, vol:%d\n", __func__, cmd, data.path,
-	       data.vol);
-	ctl.op = cmd;
+
+	switch (cmd)
+	{
+		case IOCTL_OP_HANDSHAKE:
+			ctl.op = OP_HANDSHAKE;
+			break;
+		case IOCTL_OP_START:
+			ctl.op = OP_START;
+			break;
+		case IOCTL_OP_STOP:
+			ctl.op = OP_STOP;
+			break;
+		case IOCTL_OP_MUTE:
+			ctl.op = IOCTL_OP_MUTE;
+			break;
+		case IOCTL_OP_SETVOL:
+			ctl.op = OP_SETVOL;
+			break;
+		case IOCTL_OP_SWITCH:
+			ctl.op = OP_SWITCH;
+			break;
+		case IOCTL_OP_RESET:
+			ctl.op = OP_RESET;
+			break;
+		case IOCTL_OP_RESTORE:
+			ctl.op = OP_RESTORE;
+			break;
+		case IOCTL_OP_PLAY_AGENT:
+			ctl.op = OP_PLAY_AGENT;
+			break;
+		case IOCTL_OP_PCM_PLAYBACK_CTL:
+			ctl.op = OP_PCM_PLAYBACK_CTL;
+			break;
+		case IOCTL_OP_PCM_CAPTURE_CTL:
+			ctl.op = OP_PCM_CAPTURE_CTL;
+			break;
+		case IOCTL_OP_PCM_PLAYBACK_STREAM:
+			ctl.op = OP_PCM_PLAYBACK_STREAM;
+			break;
+		case IOCTL_OP_PCM_CAPTURE_STREAM:
+			ctl.op = OP_PCM_CAPTURE_STREAM;
+			break;
+		case IOCTL_OP_PCM_LOOPBACK_CTL:
+			ctl.op = OP_PCM_LOOPBACK_CTL;
+			break;
+		default:
+			pr_err("am_ioctl Unknow CMD");
+			break;
+	}
+	ctl.msg.recv_msg.data = data.data;
 	ctl.msg.recv_msg.path = data.path;
 	ctl.msg.recv_msg.vol = data.vol;
 	ret = sdrv_audio_svc_rpcall(audio_service_hdr, &ctl, &result);
