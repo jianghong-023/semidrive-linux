@@ -14,6 +14,7 @@
 #include <linux/device.h>
 #include <linux/file.h>
 #include <linux/fs.h>
+#include <linux/io.h>
 #include <linux/idr.h>
 #include <linux/kernel.h>
 #include <linux/major.h>
@@ -86,6 +87,16 @@ static long vircan_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 	pr_warn_once("%s: not supported\n", __func__);
 	return -ENOTSUPP;
 }
+
+/*
+ * Special canid for time test, store the sys count (uint32)from/to can driver
+ * into payload of the canframe at offset 4~7 and store the timestamp of
+ * linux vircan driver in offset 0~3
+ * sys counter is a global clock counter with 3MHz frequency.
+ */
+#define CAN_ID_TIMESTAMP_TEST	(1)
+uint32_t semidrive_get_syscntr(void);
+
 static ssize_t vircan_read(struct file *filp, char __user *buf,
 				 size_t len, loff_t *f_pos)
 {
@@ -136,6 +147,12 @@ static ssize_t vircan_read(struct file *filp, char __user *buf,
 
 		frame.len = vcanframe->len;
 		memcpy(&frame.data[0], &vcanframe->data[0], vcanframe->len);
+
+		if ((frame.can_id & CAN_SFF_MASK) == CAN_ID_TIMESTAMP_TEST) {
+			u32 temp = semidrive_get_syscntr();
+			if (temp)
+				memcpy(&frame.data[0], &temp, sizeof(temp));
+		}
 
 		ret = copy_to_user(buf, &frame, rev_len);
 //		print_hex_dump_bytes("vircan_rx: ", DUMP_PREFIX_ADDRESS, kbuf, vcanframe->len + sizeof(canid_t));
@@ -199,6 +216,11 @@ static ssize_t vircan_write(struct file *filp, const char __user *buf,
 	vcanframe.len = frame->len;
 	memcpy(&vcanframe.data[0], &frame->data[0], frame->len);
 
+	if ((frame->can_id & CAN_SFF_MASK) == CAN_ID_TIMESTAMP_TEST) {
+		u32 temp = semidrive_get_syscntr();
+		if (temp)
+			memcpy(&vcanframe.data[0], &temp, sizeof(temp));
+	}
 	msg.msg_iter.type = ITER_KVEC|WRITE;
 	msg.msg_iter.count = RPMSG_CAN_MTU;
 	vec[0].iov_base = &vcanframe;

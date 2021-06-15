@@ -13,5 +13,5 @@ obj-$(CONFIG_SEMIDRIVE_IPCC)	+= ipcc_rpc.o \
 
 obj-$(CONFIG_SEMIDRIVE_SCR)	+= sdrv_scr.o
 obj-$(CONFIG_SEMIDRIVE_VCE)	+= sdrv_vce.o
-obj-$(CONFIG_ARCH_SEMIDRIVE)	+= sdrv_boardinfo_hwid.o
+obj-$(CONFIG_ARCH_SEMIDRIVE)	+= sdrv_boardinfo_hwid.o sys_counter.o
 obj-$(CONFIG_SEMIDRIVE_SDPE_RPC) += sdpe_rpc.o
