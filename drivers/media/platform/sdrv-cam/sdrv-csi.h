@@ -134,7 +134,7 @@ struct kstream_device {
 	enum kstream_state state;
 	bool enabled;
 	bool iommu_enable;
-
+	int field;
 	struct kstream_ops *ops;
 };
 

@@ -100,7 +100,7 @@
 #define IMG_PARA_BT0_(n)			(0x500 + (n) * 0x40)
 #define IMG_PARA_BT1_(n)			(0x504 + (n) * 0x40)
 #define IMG_PARA_BT2_(n)			(0x508 + (n) * 0x40)
-#define IMG_PARA_MAP_(n,i)			(0x50C + (n) * 0x40 + (i) * 0x04)
+#define IMG_PARA_MAP_(n, i)			(0x50C + (n) * 0x40 + (i) * 0x04)
 
 #define PARA_EXIT_SHIFT				0
 #define PARA_PACK_ODD_SHIFT			1
@@ -111,6 +111,8 @@
 #define PARA_VS_POL					BIT(11)
 #define PARA_HS_POL					BIT(12)
 #define PARA_CLK_POL				BIT(13)
+#define PARA_EVEN_EN				BIT(14)
+#define PARA_EVEN_HEIGHT_SHIFT		15
 
 #define BT_PROGRESSIVE_SHIFT		0
 #define BT_VSYNC_SHIFT				1
@@ -366,7 +368,10 @@ static int kstream_set_stride(struct kstream_device *kstream)
 		width = in_fmt->width - (1 + mbus_fmts[pos_i].pix_odd);
 
 	if (kstream->core->sync == 0) {
-		height = in_fmt->height - 1;
+		if (V4L2_FIELD_HAS_BOTH(in_fmt->field))
+			height = (in_fmt->height + 1) / 2 - 1;
+		else
+			height = in_fmt->height - 1;
 	} else {
 		height = in_fmt->height / 4 - 1;
 	}
@@ -385,7 +390,10 @@ static int kstream_set_stride(struct kstream_device *kstream)
 	}
 
 	for (n = 0; n < pix_fmt->num_planes; n++) {
-		stride = out_fmt->width * pix_fmts[pos_o].bpp[n] / 8;
+		if (V4L2_FIELD_HAS_BOTH(in_fmt->field))
+			stride = 2 * out_fmt->width * pix_fmts[pos_o].bpp[n] / 8;
+		else
+			stride = out_fmt->width * pix_fmts[pos_o].bpp[n] / 8;
 
 		if (stride) {
 			if (kstream->core->sync == 0) {
@@ -435,7 +443,7 @@ static int kstream_set_wdma(struct kstream_device *kstream)
 		}
 
 		kcsi_set(kstream->core->base, IMG_REG_LOAD,
-			 REG_LOAD_WDMA_CFG /* | REG_LOAD_WDMA_ARB */ );
+			 REG_LOAD_WDMA_CFG /* | REG_LOAD_WDMA_ARB */);
 	} else {
 		for (j = 0; j < IMG_CNT; j++) {
 			for (i = 0; i < pix_fmt->num_planes; i++) {
@@ -452,7 +460,7 @@ static int kstream_set_wdma(struct kstream_device *kstream)
 			}
 
 			kcsi_set(kstream->core->base, IMG_REG_LOAD,
-				 REG_LOAD_WDMA_CFG /* | REG_LOAD_WDMA_ARB */ );
+				 REG_LOAD_WDMA_CFG /* | REG_LOAD_WDMA_ARB */);
 		}
 	}
 
@@ -470,7 +478,9 @@ static int kstream_set_para_bt(struct kstream_device *kstream)
 		0xe34c2ca4, 0x4d24503c, 0x5c6da658, 0x85d65547,
 		0x75c6da65, 0xe69648e2, 0x28607de9, 0x9e69648e
 	};
+	struct v4l2_mbus_framefmt *in_fmt;
 
+	in_fmt = &kstream->mbus_fmt[SDRV_IMG_PAD_SINK];
 	pos = kstream_get_pix_fmt(kstream, &pix_fmt);
 
 	if (pos < 0)
@@ -493,9 +503,12 @@ static int kstream_set_para_bt(struct kstream_device *kstream)
 		    (pix_fmts[pos].pack_pix_even << PARA_PACK_EVEN_SHIFT);
 
 		if (kstream->interface.mbus_type == V4L2_MBUS_BT656) {
-			value1 |= (1 << BT_PROGRESSIVE_SHIFT) |
-			    (pix_fmt->width << BT_VSYNC_POSTPONE_SHIF) |
-			    (1 << BT_FIELD_SHIFT);
+			if (V4L2_FIELD_HAS_BOTH(in_fmt->field))
+				value1 = (1 << BT_FIELD_SHIFT);
+			else
+				value1 |= (1 << BT_PROGRESSIVE_SHIFT) |
+				    (pix_fmt->width << BT_VSYNC_POSTPONE_SHIF) |
+				    (1 << BT_FIELD_SHIFT);
 		}
 
 		if (bus->flags & V4L2_MBUS_PCLK_SAMPLE_RISING)
@@ -507,17 +520,22 @@ static int kstream_set_para_bt(struct kstream_device *kstream)
 		if (bus->flags & V4L2_MBUS_VSYNC_ACTIVE_LOW)
 			value0 |= PARA_VS_POL;
 
+		if (V4L2_FIELD_HAS_BOTH(in_fmt->field))
+			value0 |= (((pix_fmt->height/2) << PARA_EVEN_HEIGHT_SHIFT) | PARA_EVEN_EN);
 		break;
 
 	default:
 		break;
 	}
 
-	value2 = 1 << BT_VSYNC_EDGE_SHIFT;
+	if (V4L2_FIELD_HAS_BOTH(in_fmt->field))
+		value2 = 0;
+	else
+		value2 = 1 << BT_VSYNC_EDGE_SHIFT;
 
 	if (kstream->interface.mbus_type == V4L2_MBUS_CSI2) {
 		kcsi_writel(kstream->core->base, IMG_PARA_BT0_(0), value0);
-		value1 = 0x2800005;
+		//value1 = 0x2800005;
 		kcsi_writel(kstream->core->base, IMG_PARA_BT1_(0), value1);
 		kcsi_writel(kstream->core->base, IMG_PARA_BT2_(0), value2);
 
@@ -527,7 +545,7 @@ static int kstream_set_para_bt(struct kstream_device *kstream)
 	} else {
 		kcsi_writel(kstream->core->base, IMG_PARA_BT0_(kstream->id),
 			    value0);
-		value1 = 0x2800005;
+		//value1 = 0x2800005;
 		kcsi_writel(kstream->core->base, IMG_PARA_BT1_(kstream->id),
 			    value1);
 		kcsi_writel(kstream->core->base, IMG_PARA_BT2_(kstream->id),
@@ -789,6 +807,10 @@ static int kstream_set_baddr(struct kstream_device *kstream)
 	unsigned int i;
 	u32 val, addr_h, addr_l;
 	u32 j;
+	dma_addr_t paddr;
+	struct v4l2_mbus_framefmt *in_fmt;
+
+	in_fmt = &kstream->mbus_fmt[SDRV_IMG_PAD_SINK];
 
 	if (list_empty(&video->buf_list)) {
 		if (kstream->state == RUNNING)
@@ -801,6 +823,29 @@ static int kstream_set_baddr(struct kstream_device *kstream)
 	if (video->vbuf_active)
 		return -EFAULT;
 
+	if (V4L2_FIELD_HAS_BOTH(in_fmt->field)) {
+		if (kstream->field == 1) {
+			kstream->field = 0;
+			for (i = 0; i < format->num_planes; i++) {
+				addr_h = kcsi_readl(kstream->base, IMG_BADDR_H_(i));
+				addr_l = kcsi_readl(kstream->base, IMG_BADDR_L_(i));
+				val = kcsi_readl(kstream->base, IMG_STRIDE_(i));
+				if ((in_fmt->field == V4L2_FIELD_INTERLACED) || (in_fmt->field == V4L2_FIELD_INTERLACED_BT) || (in_fmt->field == V4L2_FIELD_SEQ_BT))
+					paddr = ((dma_addr_t)(addr_h) << IMG_BADDR_H_SHIFT) + addr_l - val/2;
+				else
+					paddr = ((dma_addr_t)(addr_h) << IMG_BADDR_H_SHIFT) + addr_l + val/2;
+				addr_h = (paddr & IMG_BADDR_H_MASK) >> IMG_BADDR_H_SHIFT;
+				addr_l = (paddr & IMG_BADDR_L_MASK) >> IMG_BADDR_L_SHIFT;
+				kcsi_writel(kstream->base, IMG_BADDR_H_(i), addr_h);
+				kcsi_writel(kstream->base, IMG_BADDR_L_(i), addr_l);
+			}
+
+			val = (1 << kstream->id) << IMG_SHADOW_SET_SHIFT;
+			kcsi_set(kstream->core->base, IMG_REG_LOAD, val);
+			return 0;
+		} else if (kstream->field == 0)
+			kstream->field = 1;
+	}
 	spin_lock_irqsave(&video->buf_lock, flags);
 	kbuf = list_first_entry(&video->buf_list, struct kstream_buffer, queue);
 	list_del(&kbuf->queue);
@@ -811,11 +856,15 @@ static int kstream_set_baddr(struct kstream_device *kstream)
 	if (video->core->sync == 0) {
 		for (i = 0; i < format->num_planes; i++) {
 			addr_h =
-			    (kbuf->
-			     paddr[i] & IMG_BADDR_H_MASK) >> IMG_BADDR_H_SHIFT;
+			    (kbuf->paddr[i] & IMG_BADDR_H_MASK) >> IMG_BADDR_H_SHIFT;
 			addr_l =
-			    (kbuf->
-			     paddr[i] & IMG_BADDR_L_MASK) >> IMG_BADDR_L_SHIFT;
+			    (kbuf->paddr[i] & IMG_BADDR_L_MASK) >> IMG_BADDR_L_SHIFT;
+			if ((in_fmt->field == V4L2_FIELD_INTERLACED) || (in_fmt->field == V4L2_FIELD_INTERLACED_BT) || (in_fmt->field == V4L2_FIELD_SEQ_BT)) {
+				val = kcsi_readl(kstream->base, IMG_STRIDE_(i));
+				paddr = kbuf->paddr[i] + val/2;
+				addr_h = (paddr & IMG_BADDR_H_MASK) >> IMG_BADDR_H_SHIFT;
+				addr_l = (paddr & IMG_BADDR_L_MASK) >> IMG_BADDR_L_SHIFT;
+			}
 			kcsi_writel(kstream->base, IMG_BADDR_H_(i), addr_h);
 			kcsi_writel(kstream->base, IMG_BADDR_L_(i), addr_l);
 		}
@@ -1013,6 +1062,7 @@ static int kstream_disable_stream(struct kstream_device *kstream)
 	u32 ctrl = 0;
 	u8 id = kstream->id;
 	int j;
+
 	pos = kstream_get_pix_fmt(kstream, &pix_fmt);
 
 	if (pos < 0)
@@ -1063,6 +1113,7 @@ static int kstream_enable(struct kstream_device *kstream)
 
 	video->sequence = 0;
 
+	kstream->field = 0;
 	ret = kstream_setup_regs(kstream);
 
 	if (ret < 0)
@@ -1109,14 +1160,13 @@ static void kstream_reset_device(struct kstream_device *kstream)
 {
 	int j;
 
-	if (kstream->core->sync == 0) {
+	if (kstream->core->sync == 0)
 		kcsi_set(kstream->core->base, IMG_ENABLE,
 			 IMG_RST_(kstream->id));
-	} else {
-		for (j = 0; j < 4; j++) {
+	else
+		for (j = 0; j < 4; j++)
 			kcsi_set(kstream->core->base, IMG_ENABLE, 0xf << 4);
-		}
-	}
+
 
 	usleep_range(2, 10);
 
@@ -1132,9 +1182,8 @@ static int kstream_set_power(struct v4l2_subdev *sd, int on)
 {
 	struct kstream_device *kstream = v4l2_get_subdevdata(sd);
 
-	if (on) {
+	if (on)
 		kstream_reset_device(kstream);
-	}
 
 	return 0;
 }
@@ -1532,7 +1581,7 @@ static int kstream_get_pixelaspect(struct v4l2_subdev *sd,
 	return v4l2_subdev_call(if_sd, video, g_pixelaspect, aspect);
 }
 
-static int kstream_get_input_status(struct v4l2_subdev *sd, u32 * status)
+static int kstream_get_input_status(struct v4l2_subdev *sd, u32 *status)
 {
 	struct kstream_device *kstream = v4l2_get_subdevdata(sd);
 	struct v4l2_subdev *if_sd = kstream->interface.subdev;
@@ -1543,7 +1592,7 @@ static int kstream_get_input_status(struct v4l2_subdev *sd, u32 * status)
 	return v4l2_subdev_call(if_sd, video, g_input_status, status);
 }
 
-static int kstream_query_std(struct v4l2_subdev *sd, v4l2_std_id * std)
+static int kstream_query_std(struct v4l2_subdev *sd, v4l2_std_id *std)
 {
 	struct kstream_device *kstream = v4l2_get_subdevdata(sd);
 	struct v4l2_subdev *if_sd = kstream->interface.subdev;
@@ -1554,7 +1603,7 @@ static int kstream_query_std(struct v4l2_subdev *sd, v4l2_std_id * std)
 	return v4l2_subdev_call(if_sd, video, querystd, std);
 }
 
-static int kstream_get_std(struct v4l2_subdev *sd, v4l2_std_id * norm)
+static int kstream_get_std(struct v4l2_subdev *sd, v4l2_std_id *norm)
 {
 	struct kstream_device *kstream = v4l2_get_subdevdata(sd);
 	struct v4l2_subdev *if_sd = kstream->interface.subdev;
@@ -1688,14 +1737,19 @@ static void sdrv_stream_frm_done_isr(struct kstream_device *kstream)
 	struct kstream_video *video = &kstream->video;
 	struct vb2_v4l2_buffer *vbuf;
 	unsigned long flags;
+	struct v4l2_mbus_framefmt *in_fmt;
 
+	in_fmt = &kstream->mbus_fmt[SDRV_IMG_PAD_SINK];
 	if (video->vbuf_active == NULL) {
 		if (kstream->state == RUNNING)
 			pr_err("wrong state machine! Maybe app can't get the data in time.\n");
 			//WARN_ON(video->vbuf_active == NULL);
 		return;
 	}
-
+	if (V4L2_FIELD_HAS_BOTH(in_fmt->field)) {
+		if (kstream->field == 0)
+			return;
+	}
 	spin_lock_irqsave(&video->buf_lock, flags);
 	vbuf = video->vbuf_active;
 
@@ -1719,6 +1773,7 @@ static void sdrv_stream_init_interface(struct kstream_device *kstream)
 {
 	u32 val;
 	int j;
+
 	val = kcsi_readl(kstream->base, IMG_CTRL);
 	val &= ~IMG_INTERFACE_MASK;
 
