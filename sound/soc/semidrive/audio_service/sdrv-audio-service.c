@@ -149,7 +149,6 @@ static int sdrv_audio_svc_rpcall(struct audio_rpc *audio_rpc_dev,
 	DCF_INIT_RPC_REQ(request, MOD_RPC_REQ_AUDIO_IOCTL);
 	memcpy(ctl, cmd, sizeof(*cmd));
 	/* rpcall safety, add rpcall to security in future */
-	dev_err(audio_rpc_dev->dev, "%s():\n", __func__);
 	ret = semidrive_rpcall(&request, &result);
 
 	if (ret < 0 || result.retcode < 0) {
@@ -228,22 +227,16 @@ static int sdrv_audio_svc_request_irq(struct audio_rpc *audio_rpc_dev)
 static ssize_t am_read(struct file *file, char __user *buf, size_t count,
 		       loff_t *ppos)
 {
-	char *str = "hello world";
-
-	copy_to_user(buf, str, strlen(str));
-	return count;
+	return -ENOSYS;
 }
 ssize_t am_write(struct file *file, const char __user *buf, size_t sz,
 		 loff_t *oft)
 {
-	int cmd;
-	copy_from_user(&cmd, buf, sizeof(cmd));
 	sdrv_audio_svc_test();
 	return sz;
 }
 static int am_open(struct inode *inode, struct file *file)
 {
-	printk("%s !!!!\n", __func__);
 	return 0;
 }
 
@@ -253,8 +246,13 @@ long am_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	struct usr_data data;
 	struct audio_rpc_cmd ctl;
 	struct audio_rpc_result result;
-	copy_from_user(&data, (struct msg __user *)arg,
-		       sizeof(struct usr_data));
+	if (copy_from_user(&data, (struct msg __user *)arg,
+		       sizeof(struct usr_data)))
+	{
+		dev_err(audio_service_hdr->dev,
+				"got data from user failed!\n");
+		return -EINVAL;
+	}
 
 	switch (cmd)
 	{
@@ -268,7 +266,7 @@ long am_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 			ctl.op = OP_STOP;
 			break;
 		case IOCTL_OP_MUTE:
-			ctl.op = IOCTL_OP_MUTE;
+			ctl.op = OP_MUTE;
 			break;
 		case IOCTL_OP_SETVOL:
 			ctl.op = OP_SETVOL;
@@ -301,23 +299,25 @@ long am_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 			ctl.op = OP_PCM_LOOPBACK_CTL;
 			break;
 		default:
-			pr_err("am_ioctl Unknow CMD");
-			break;
+			dev_err(audio_service_hdr->dev,
+				"am_ioctl unknown cmd: %#x", ctl.op);
+			return -EINVAL;
 	}
 	ctl.msg.recv_msg.data = data.data;
 	ctl.msg.recv_msg.path = data.path;
 	ctl.msg.recv_msg.vol = data.vol;
 	ret = sdrv_audio_svc_rpcall(audio_service_hdr, &ctl, &result);
 	if (ret < 0) {
-		printk("%s :ioctl test failed. ret code: %d\n", __func__, ret);
+		dev_err(audio_service_hdr->dev,
+			"%s :rpcall failed. ret code: %d\n",
+			__func__, ret);
 		return ret;
 	}
 	return 0;
 }
 long am_unlock_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 {
-	printk("%s cmd: %d\n", __func__, cmd);
-	am_ioctl(file, cmd, arg);
+	return am_ioctl(file, cmd, arg);
 }
 static const struct file_operations am_fops = {
     .open = am_open,
@@ -349,7 +349,7 @@ static int sdrv_audio_service_probe(struct platform_device *pdev)
 	ret = of_property_read_u32(np, "major", &major);
 	if (ret < 0) {
 		dev_err(dev, "Must config major in dts\n");
-		return -1;
+		return -ENODEV;
 	}
 	devno = MKDEV(major, AM_MINOR);
 	if (major) {
@@ -360,13 +360,13 @@ static int sdrv_audio_service_probe(struct platform_device *pdev)
 					  "audio_rpc");
 	}
 	if (ret < 0) {
-		printk("%s register audio_rpc error\n", __func__);
+		dev_err(dev, "%s register audio_rpc error\n", __func__);
 		return ret;
 	}
 
 	am_class = class_create(THIS_MODULE, "audiomanager");
 	if (IS_ERR(am_class)) {
-		printk("%s create class error\n", __func__);
+		dev_err(dev, "%s create class error\n", __func__);
 		return -1;
 	}
 
