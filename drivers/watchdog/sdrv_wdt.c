@@ -77,7 +77,7 @@ typedef enum {
 	HALT_REASON_LOWVOLTAGE,     // LV/Brownout condition
 	HALT_REASON_HIGHVOLTAGE,    // High voltage condition.
 	HALT_REASON_THERMAL,        // Thermal reason (probably overtemp)
-	HALT_REASON_OTHER_HW,       // Other hardware (platform) specific reason
+	HALT_REASON_SW_RECOVERY,    // SW triggered reboot in order to enter recovery mode
 	HALT_REASON_SW_RESET,       // Generic Software Initiated Reboot
 	HALT_REASON_SW_WATCHDOG,    // Reboot triggered by a SW watchdog timer
 	HALT_REASON_SW_PANIC,       // Reboot triggered by a SW panic or ASSERT
@@ -347,8 +347,10 @@ void sdrv_restart(enum reboot_mode reboot_mode, const char *cmd)
 	reason = HALT_REASON_SW_RESET;
 	if (cmd && !strcmp(cmd, "bootloader"))
 		reason = HALT_REASON_SW_UPDATE;
-	if (cmd && !strcmp(cmd, "shutdown"))
+	else if (cmd && !strcmp(cmd, "shutdown"))
 		reason = HALT_REASON_POR;
+	else if (cmd && !strcmp(cmd, "recovery"))
+		reason = HALT_REASON_SW_RECOVERY;
 
 	sdrv_wdt = watchdog_get_drvdata(&sdrv_wtd_wdd);
 	np = sdrv_wdt->dev->of_node;
