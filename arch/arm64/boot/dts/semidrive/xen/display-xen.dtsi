@@ -109,6 +109,28 @@
 			sdrv,ip = "dc-r0p1";
 		};
 
+		dp_dummy0: dp_dummy@0 {
+			compatible = "sdrv,dummy";
+
+			status = "disabled";
+			sdrv,ip = "dp-dummy";
+		};
+
+		dp_rpcall0: dp_dummy2@0 {
+			compatible = "sdrv,dummy";
+			mboxes = <&mbox 0x90 0x8000>;
+
+			status = "disabled";
+			sdrv,ip = "dp-rpcall";
+		};
+
+		dp_dummy1: dp_dummy1@0 {
+			compatible = "sdrv,dummy";
+
+			status = "disabled";
+			sdrv,ip = "dp-op";
+		};
+
 		crtc0: crtc0 {
 			compatible = "semidrive,kunlun-crtc";
 			dpc-master = <&dc1>;
