@@ -86,6 +86,8 @@ obj-$(CONFIG_TOUCHSCREEN_TSC_SERIO)	+= tsc40.o
 obj-$(CONFIG_TOUCHSCREEN_TSC200X_CORE)	+= tsc200x-core.o
 obj-$(CONFIG_TOUCHSCREEN_TSC2004)	+= tsc2004.o
 obj-$(CONFIG_TOUCHSCREEN_TSC2005)	+= tsc2005.o
+obj-$(CONFIG_TOUCHSCREEN_EGALAX_I2C)	+= egalax_i2c.o
+obj-$(CONFIG_TOUCHSCREEN_SERDES_9XX)	+= serdes_9xx.o
 tsc2007-y := tsc2007_core.o
 tsc2007-$(CONFIG_TOUCHSCREEN_TSC2007_IIO)	+= tsc2007_iio.o
 obj-$(CONFIG_TOUCHSCREEN_TSC2007)	+= tsc2007.o
@@ -109,7 +111,7 @@ obj-$(CONFIG_TOUCHSCREEN_ZFORCE)	+= zforce_ts.o
 obj-$(CONFIG_TOUCHSCREEN_COLIBRI_VF50)	+= colibri-vf50-ts.o
 obj-$(CONFIG_TOUCHSCREEN_ROHM_BU21023)	+= rohm_bu21023.o
 
-obj-$(CONFIG_TOUCHSCREEN_ATMEL_MXT_TSC)	+= atmel_mxt_tsc.o serdes_9xx.o
+obj-$(CONFIG_TOUCHSCREEN_ATMEL_MXT_TSC)	+= atmel_mxt_tsc.o
 obj-$(CONFIG_TOUCHSCREEN_CYPRESS_CYTTSP6)       += cyttsp6.o
 cyttsp6-y := cyttsp6_core.o cyttsp6_mt_common.o
 cyttsp6-$(CONFIG_TOUCHSCREEN_CYPRESS_CYTTSP6_MT_A)      += cyttsp6_mta.o
@@ -120,7 +122,7 @@ obj-$(CONFIG_TOUCHSCREEN_CYPRESS_CYTTSP6_DEVICETREE_SUPPORT)    += cyttsp6_devtr
 ifdef CONFIG_TOUCHSCREEN_CYPRESS_CYTTSP6
 obj-y += cyttsp6_platform.o
 endif
-obj-$(CONFIG_TOUCHSCREEN_CYPRESS_CYTTSP6_I2C)   += cyttsp6_i2c.o serdes_9xx.o
+obj-$(CONFIG_TOUCHSCREEN_CYPRESS_CYTTSP6_I2C)   += cyttsp6_i2c.o
 obj-$(CONFIG_TOUCHSCREEN_CYPRESS_CYTTSP6_SPI)   += cyttsp6_spi.o
 obj-$(CONFIG_TOUCHSCREEN_CYPRESS_CYTTSP6_LOADER)        += cyttsp6_loader.o
 obj-$(CONFIG_TOUCHSCREEN_CYPRESS_CYTTSP6_DEBUG_MDL)     += cyttsp6_debug.o

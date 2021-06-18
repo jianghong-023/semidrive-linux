@@ -357,6 +357,25 @@ config TOUCHSCREEN_SEMIDRIVE
 	  To compile this driver as a module, choose M here: the
 	  module will be called safetouch.
 
+config TOUCHSCREEN_SERDES_9XX
+	bool "Enable SERDES 9XX api interface"
+	help
+	  Say Y here to enable SERDES api interface for Egalax/ATMEL/CYPRESS
+	  Standard Product Generation4 drivers set.
+	  If unsure, say N.
+
+config TOUCHSCREEN_EGALAX_I2C
+	tristate "EGALAX I2C touchscreen"
+	depends on I2C
+	depends on GPIOLIB || COMPILE_TEST
+	depends on TOUCHSCREEN_SERDES_9XX
+	help
+	  Say Y here if you have the EGALAX I2C touchscreen connected
+	  to your system.
+	  If unsure, say N.
+	  To compile this driver as a module, choose M here: the
+	  module will be called safetouch.
+
 config TOUCHSCREEN_DS941_DS948_GOODIX
         tristate "DS941_DS948_Goodix I2C touchscreen"
         depends on I2C
@@ -1308,6 +1327,7 @@ config TOUCHSCREEN_ROHM_BU21023
 config TOUCHSCREEN_ATMEL_MXT_TSC
 	tristate "Atmel mXT I2C Touchscreen"
 	depends on I2C
+	depends on TOUCHSCREEN_SERDES_9XX
 	select FW_LOADER
 	help
 	  Say Y here if you have Atmel mXT series I2C touchscreen,
@@ -1356,6 +1376,7 @@ config TOUCHSCREEN_CYPRESS_CYTTSP6_VDEBUG
 config TOUCHSCREEN_CYPRESS_CYTTSP6_I2C
 	tristate "Cypress TrueTouch Gen6 I2C"
 	depends on TOUCHSCREEN_CYPRESS_CYTTSP6
+	depends on TOUCHSCREEN_SERDES_9XX
 	select I2C
 	help
 	  Say Y here to enable I2C bus interface to Cypress TrueTouch(tm)
