@@ -48,6 +48,7 @@ enum sd_boardid_major_e {//3 bit
 enum sd_boardid_ms_major_e {//3 bit
 	BOARDID_MAJOR_MPS = 1,
 	BOARDID_MAJOR_TI_A01,
+	BOARDID_MAJOR_TI_A02,
 };
 enum sd_boardid_ms_minor_e {//4 bit
 	BOARDID_MINOR_UNKNOWN,

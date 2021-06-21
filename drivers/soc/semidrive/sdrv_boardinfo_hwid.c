@@ -193,6 +193,9 @@ char *get_hwid_friendly_name(char *hwid, int len)
 		case BOARDID_MAJOR_TI_A01:
 			strcat(hwid, "TI-");
 			break;
+		case BOARDID_MAJOR_TI_A02:
+			strcat(hwid, "A02-");
+			break;
 		default:
 			strcat(hwid, "UNKNOWN-");
 			break;
