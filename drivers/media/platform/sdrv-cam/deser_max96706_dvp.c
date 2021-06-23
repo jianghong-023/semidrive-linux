@@ -1450,7 +1450,7 @@ static int max96706_initialization(deser_dev_t *sensor)
 	max96705_write_reg(sensor,  (MAX96705_DEF-MAX96705_CH_A)>>1, 0x00, sensor->addr_serer << 1);
 	usleep_range(5000, 6000);
 	max96705_write_reg(sensor, 0, 0x01, (sensor->addr_deser) << 1);
-	usleep_range(5000, 6000);
+	usleep_range(10000, 11000);
 
 	if (sensor->gpi_gpio) {
 		#if 0
@@ -1528,9 +1528,7 @@ static int max96706_initialization(deser_dev_t *sensor)
 
 
 	//dev_err(&client->dev, "0101, end msb. i=%d\n", i);
-
-
-	//printk("max96706 init -\n");
+	dev_info(&client->dev, "%s: end.\n", __func__);
 
 	return 0;
 }

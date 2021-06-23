@@ -572,7 +572,7 @@ static int kstream_set_channel(struct kstream_device *kstream)
 		return pos;
 
 	for (n = 0; n < IMG_HW_NUM_PLANES; n++) {
-		dev_err(kstream->dev, "%s: pix_fmts[pos=%d]\n", __func__, pos);
+		dev_info(kstream->dev, "%s: pix_fmts[pos=%d]\n", __func__, pos);
 
 		if ((kstream->core->host_id == 0)
 		    || (kstream->core->host_id == 1)
