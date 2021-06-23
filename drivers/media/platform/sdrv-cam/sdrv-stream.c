@@ -376,6 +376,11 @@ static int kstream_set_stride(struct kstream_device *kstream)
 		height = in_fmt->height / 4 - 1;
 	}
 
+	if (V4L2_FIELD_HAS_BOTH(in_fmt->field))
+		height += (kstream->hcrop_back + kstream->hcrop_front + 1) / 2;
+	else
+		height += kstream->hcrop_back + kstream->hcrop_front;
+
 	WARN_ON(width <= 0 || height <= 0);
 
 	val = (width << IMG_SIZE_WIDTH_SHIFT) |
@@ -521,7 +526,7 @@ static int kstream_set_para_bt(struct kstream_device *kstream)
 			value0 |= PARA_VS_POL;
 
 		if (V4L2_FIELD_HAS_BOTH(in_fmt->field))
-			value0 |= (((pix_fmt->height/2) << PARA_EVEN_HEIGHT_SHIFT) | PARA_EVEN_EN);
+			value0 |= ((((pix_fmt->height + kstream->hcrop_back + kstream->hcrop_front)/2) << PARA_EVEN_HEIGHT_SHIFT) | PARA_EVEN_EN);
 		break;
 
 	default:

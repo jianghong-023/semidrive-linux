@@ -180,6 +180,10 @@ static int __kstream_video_try_format(struct kstream_video *video,
 	u32 width, height, field;
 	int i, ret;
 	const u8 *bpp;
+	#ifdef CONFIG_ARCH_SEMIDRIVE_PROCESSOR9
+	struct kstream_device *kstream = container_of(video,
+			struct kstream_device, video);
+	#endif
 
 	pix_mp = &f->fmt.pix_mp;
 
@@ -231,6 +235,12 @@ static int __kstream_video_try_format(struct kstream_video *video,
 		pix_mp->plane_fmt[i].bytesperline = pix_mp->width * bpp[i] / 8;
 		pix_mp->plane_fmt[i].sizeimage =
 			pix_mp->plane_fmt[i].bytesperline * pix_mp->height;
+		#ifdef CONFIG_ARCH_SEMIDRIVE_PROCESSOR9
+			if (kstream->hcrop_back || kstream->hcrop_front) {
+				video->queue.sd_hcrop_b = pix_mp->plane_fmt[i].bytesperline * kstream->hcrop_back;
+				video->queue.sd_hcrop_f = pix_mp->plane_fmt[i].bytesperline * kstream->hcrop_front;
+			}
+		#endif
 	}
 
 	return 0;
@@ -726,6 +736,10 @@ static int kstream_buf_init(struct vb2_buffer *vb)
 			kbuffer->paddr[i] = vb2_dma_contig_plane_dma_addr(vb, i);
 			if(!kbuffer->paddr[i])
 				return -EFAULT;
+			#ifdef CONFIG_ARCH_SEMIDRIVE_PROCESSOR9
+			if (video->queue.sd_hcrop_b)
+				kbuffer->paddr[i] -= video->queue.sd_hcrop_b;
+			#endif
 		}
 
 		return 0;
@@ -840,6 +854,10 @@ int sdrv_stream_video_register(struct kstream_video *video,
 	q->ops = &sdrv_video_vb2_q_ops;
 	q->type = V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE;
 	q->io_modes = VB2_DMABUF | VB2_MMAP | VB2_READ | VB2_USERPTR;
+	#ifdef CONFIG_ARCH_SEMIDRIVE_PROCESSOR9
+		if (kstream->hcrop_back || kstream->hcrop_front)
+			q->io_modes = VB2_MMAP | VB2_READ;
+	#endif
 	q->timestamp_flags = V4L2_BUF_FLAG_TIMESTAMP_MONOTONIC;
 	q->buf_struct_size = sizeof(struct kstream_buffer);
 	q->dev = video->dev;

@@ -565,6 +565,10 @@ struct vb2_queue {
 	u32				cnt_start_streaming;
 	u32				cnt_stop_streaming;
 #endif
+#ifdef CONFIG_ARCH_SEMIDRIVE_PROCESSOR9
+	u32 sd_hcrop_b;
+	u32 sd_hcrop_f;
+#endif
 };
 
 /**
