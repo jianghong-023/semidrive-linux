@@ -9,6 +9,7 @@
 #include <linux/i2c.h>
 #include <linux/delay.h>
 #include <linux/gpio/consumer.h>
+#include <linux/kthread.h>
 
 #include "sdrv-deser.h"
 
