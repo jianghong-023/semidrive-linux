@@ -364,7 +364,7 @@ static long vpu_ioctl(struct file *filp, u_int cmd, u_long arg)
                     return -ENOMEM;
                 }
 
-                ret = copy_from_user(& (vbp->vb), (vpudrv_buffer_t *) arg,
+                ret = copy_from_user(&vbp->vb, (vpudrv_buffer_t *) arg,
                                      sizeof(vpudrv_buffer_t));
 
                 if (ret) {
@@ -373,7 +373,7 @@ static long vpu_ioctl(struct file *filp, u_int cmd, u_long arg)
                     return -EFAULT;
                 }
 
-                ret = vpu_alloc_dma_buffer(& (vbp->vb));
+                ret = vpu_alloc_dma_buffer(&vbp->vb);
 
                 if (ret == -1) {
                     ret = -ENOMEM;
@@ -382,10 +382,11 @@ static long vpu_ioctl(struct file *filp, u_int cmd, u_long arg)
                     break;
                 }
 
-                ret = copy_to_user((void __user *) arg, & (vbp->vb),
+                ret = copy_to_user((void __user *) arg, &vbp->vb,
                                    sizeof(vpudrv_buffer_t));
 
                 if (ret) {
+                    vpu_free_dma_buffer(&vbp->vb);
                     kfree(vbp);
                     ret = -EFAULT;
                     up(&s_vpu_sem);
@@ -499,8 +500,7 @@ static long vpu_ioctl(struct file *filp, u_int cmd, u_long arg)
 
                     if (ret != 0)
                         ret = -EFAULT;
-                }
-                else {
+                } else {
                     ret = copy_from_user(&s_instance_pool, (vpudrv_buffer_t *) arg,
                                          sizeof(vpudrv_buffer_t));
 
@@ -520,24 +520,26 @@ static long vpu_ioctl(struct file *filp, u_int cmd, u_long arg)
                             ret = copy_to_user((void __user *) arg, &s_instance_pool,
                                                sizeof(vpudrv_buffer_t));
 
-                            if (ret == 0) {
-                                /* success to get memory for instance pool */
-                                up(&s_vpu_sem);
-                                break;
+                            if (ret) {
+                                if (s_instance_pool.base) {
+#ifdef USE_VMALLOC_FOR_INSTANCE_POOL_MEMORY
+                                    vfree((const void *)s_instance_pool.base);
+#else
+                                    vpu_free_dma_buffer(&s_instance_pool)
+#endif
+                                }
+                                s_instance_pool.base = 0;
+                                ret = -EFAULT;
                             }
                         }
-
                     }
-                    ret = -EFAULT;
                 }
                 up(&s_vpu_sem);
             }
-
         }
         break;
 
         case VDI_IOCTL_GET_COMMON_MEMORY: {
-
             if (s_common_memory.base != 0) {
                 ret = copy_to_user((void __user *) arg, &s_common_memory,
                                    sizeof(vpudrv_buffer_t));
@@ -551,29 +553,32 @@ static long vpu_ioctl(struct file *filp, u_int cmd, u_long arg)
                     if (vpu_alloc_common_buffer(&s_common_memory) != -1) {
                         ret = copy_to_user((void __user *) arg, &s_common_memory,
                                            sizeof(vpudrv_buffer_t));
-                        if (ret == 0) {
-                            /* success to get memory for common memory */
-                            break;
+                        if (ret) {
+#ifndef COMMON_MEMORY_USING_ION
+                            if (s_common_memory.base) {
+                                vpu_free_dma_buffer(&s_common_memory);
+                                s_common_memory.base = 0;
+                            }
+#endif
+                            ret = -EFAULT;
                         }
                     }
                 }
-                ret = -EFAULT;
             }
-
         }
         break;
 
         case VDI_IOCTL_OPEN_INSTANCE: {
             vpudrv_inst_info_t inst_info;
             vpudrv_instanace_list_t *vil, *n;
-            vil = kzalloc(sizeof(*vil), GFP_KERNEL);
-
-            if (!vil)
-                return -ENOMEM;
 
             if (copy_from_user(&inst_info, (vpudrv_inst_info_t *) arg,
                                sizeof(vpudrv_inst_info_t)))
                 return -EFAULT;
+
+            vil = kzalloc(sizeof(*vil), GFP_KERNEL);
+            if (!vil)
+                return -ENOMEM;
 
             vil->inst_idx = inst_info.inst_idx;
             vil->core_idx = inst_info.core_idx;
@@ -865,25 +870,28 @@ static ssize_t vpu_read(struct file *filp, char __user *buf,
 static ssize_t vpu_write(struct file *filp, const char __user *buf,
                          size_t len, loff_t *ppos)
 {
+    int ret = 0;
+    vpu_bit_firmware_info_t *bit_firmware_info = NULL;
+
     if (!buf) {
         pr_err("[VPUDRV] vpu_write buf = NULL error \n");
         return -EFAULT;
     }
 
     if (len == sizeof(vpu_bit_firmware_info_t)) {
-        vpu_bit_firmware_info_t *bit_firmware_info;
-
         bit_firmware_info = kmalloc(sizeof(vpu_bit_firmware_info_t),
                                     GFP_KERNEL);
 
         if (!bit_firmware_info) {
             pr_err("[VPUDRV-ERR] vpu_write  bit_firmware_info allocation error \n");
-            return -EFAULT;
+            ret = -EFAULT;
+            goto err_free_mm;
         }
 
         if (copy_from_user(bit_firmware_info, buf, len)) {
             pr_err("[VPUDRV-ERR] vpu_write copy_from_user error for bit_firmware_info\n");
-            return -EFAULT;
+            ret = -EFAULT;
+            goto err_free_mm;
         }
 
         if (bit_firmware_info->size == sizeof(vpu_bit_firmware_info_t)) {
@@ -894,20 +902,22 @@ static ssize_t vpu_write(struct file *filp, const char __user *buf,
             if (bit_firmware_info->core_idx != CODA_CORE_ID) {
                 pr_err("[VPUDRV-ERR] vpu_write coreIdx[%d] \n",
                         bit_firmware_info->core_idx);
-                return -ENODEV;
+                ret = -ENODEV;
+                goto err_free_mm;
             }
 
             memcpy((void *) &s_bit_firmware_info,
                    bit_firmware_info, sizeof(vpu_bit_firmware_info_t));
-            kfree(bit_firmware_info);
 
-            return len;
+            ret = len;
         }
-
-        kfree(bit_firmware_info);
     }
 
-    return -1;
+err_free_mm:
+    if (NULL != bit_firmware_info)
+        kfree(bit_firmware_info);
+
+    return ret;
 }
 
 static int vpu_release(struct inode *inode, struct file *filp)
