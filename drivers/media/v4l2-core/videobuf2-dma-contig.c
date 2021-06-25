@@ -133,13 +133,17 @@ static void vb2_dc_put(void *buf_priv)
 		sg_free_table(buf->sgt_base);
 		kfree(buf->sgt_base);
 	}
+	#ifdef CONFIG_ION_SEMIDRIVE
 	if (!strcmp(dev_name(buf->dev), "580cc0000.r_csi0") ||
 		!strcmp(dev_name(buf->dev), "580cd0000.r_csi1")) {
 		ram_free(buf->cookie, &buf->dma_addr, buf->size);
 	} else {
+	#endif
 		dma_free_attrs(buf->dev, buf->size, buf->cookie, buf->dma_addr,
 			   buf->attrs);
+	#ifdef CONFIG_ION_SEMIDRIVE
 	}
+	#endif
 	put_device(buf->dev);
 	kfree(buf);
 }
@@ -159,13 +163,17 @@ static void *vb2_dc_alloc(struct device *dev, unsigned long attrs,
 
 	if (attrs)
 		buf->attrs = attrs;
+	#ifdef CONFIG_ION_SEMIDRIVE
 	if (!strcmp(dev_name(dev), "580cc0000.r_csi0") ||
 		!strcmp(dev_name(dev), "580cd0000.r_csi1")) {
 		buf->cookie = ram_alloc(dev, size, &buf->dma_addr);
 	} else {
+	#endif
 		buf->cookie = dma_alloc_attrs(dev, size, &buf->dma_addr,
 					GFP_KERNEL | gfp_flags, buf->attrs);
+	#ifdef CONFIG_ION_SEMIDRIVE
 	}
+	#endif
 	if (!buf->cookie) {
 		dev_err(dev, "dma_alloc_coherent of size %ld failed\n", size);
 		kfree(buf);

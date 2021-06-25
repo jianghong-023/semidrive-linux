@@ -421,8 +421,7 @@ int max9296_check_chip_id(deser_dev_t *dev)
 		dev_err(&client->dev,
 			"%s: wrong chip identifier, expected 0x%x(max9296) got 0x%x\n",
 			__func__, MAX9296_DEVICE_ID, chip_id);
-		return 0;
-		//return -EIO;
+		return -EIO;
 	}
 
 	return ret;
