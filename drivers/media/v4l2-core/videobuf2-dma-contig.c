@@ -197,6 +197,21 @@ static void *vb2_dc_alloc(struct device *dev, unsigned long attrs,
 	return buf;
 }
 
+#ifdef CONFIG_ARCH_SEMIDRIVE_PROCESSOR9
+int vb2_dc_buf_update(void *buf_priv, unsigned long off)
+{
+	struct vb2_dc_buf *buf = buf_priv;
+
+	buf->size -= off;
+	buf->cookie += off;
+	buf->dma_addr += off;
+
+	printk("%s: off=0x%lx\n", __func__, off);
+
+	return 0;
+}
+#endif
+
 static int vb2_dc_mmap(void *buf_priv, struct vm_area_struct *vma)
 {
 	struct vb2_dc_buf *buf = buf_priv;

@@ -267,6 +267,42 @@ static int sdrv_stream_unregister_device(struct csi_core *csi)
 	return 0;
 }
 
+static int sdrv_of_parse_hcrop(struct kstream_device *kstream, struct device_node *node)
+{
+	uint32_t val;
+	int ret;
+	struct device_node *port_node = of_get_parent(node);
+
+	val = 0;
+	ret = of_property_read_u32(port_node, "hcrop_back", &val);
+	kstream->hcrop_back = val;
+
+	val = 0;
+	ret = of_property_read_u32(port_node, "hcrop_front", &val);
+	kstream->hcrop_front = val;
+
+	val = 0;
+	ret = of_property_read_u32(port_node, "hcrop_top_back", &val);
+	kstream->hcrop_top_back = val;
+
+	val = 0;
+	ret = of_property_read_u32(port_node, "hcrop_top_front", &val);
+	kstream->hcrop_top_front = val;
+
+	val = 0;
+	ret = of_property_read_u32(port_node, "hcrop_bottom_back", &val);
+	kstream->hcrop_bottom_back = val;
+
+	val = 0;
+	ret = of_property_read_u32(port_node, "hcrop_bottom_front", &val);
+	kstream->hcrop_bottom_front = val;
+
+	of_node_put(port_node);
+	dev_info(kstream->dev, "%d, %d, %d, %d, %d, %d\n", kstream->hcrop_back, kstream->hcrop_front,
+		kstream->hcrop_top_back, kstream->hcrop_top_front, kstream->hcrop_bottom_back, kstream->hcrop_bottom_front);
+	return ret;
+}
+
 static int sdrv_of_parse_ports(struct csi_core *csi)
 {
 	struct device_node *img_ep, *interface, *sensor, *intf_ep;
@@ -307,6 +343,8 @@ static int sdrv_of_parse_ports(struct csi_core *csi)
 		kstream->iommu_enable = false;
 		kstream->base = csi->base + SDRV_IMG_REG_BASE(kstream->id);
 		csi->kstream_nums++;
+
+		sdrv_of_parse_hcrop(kstream, img_ep);
 
 		interface = of_graph_get_remote_port_parent(img_ep);
 

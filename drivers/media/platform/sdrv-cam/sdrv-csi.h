@@ -136,6 +136,13 @@ struct kstream_device {
 	bool iommu_enable;
 	int field;
 	struct kstream_ops *ops;
+
+	uint32_t hcrop_back;
+	uint32_t hcrop_front;
+	uint32_t hcrop_top_back;
+	uint32_t hcrop_top_front;
+	uint32_t hcrop_bottom_back;
+	uint32_t hcrop_bottom_front;
 };
 
 struct csi_int_stat {

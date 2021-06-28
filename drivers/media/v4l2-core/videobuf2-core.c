@@ -188,6 +188,10 @@ module_param(debug, int, 0644);
 static void __vb2_queue_cancel(struct vb2_queue *q);
 static void __enqueue_in_driver(struct vb2_buffer *vb);
 
+#ifdef CONFIG_ARCH_SEMIDRIVE_PROCESSOR9
+extern int vb2_dc_buf_update(void *buf_priv, unsigned long off);
+#endif
+
 /**
  * __vb2_buf_mem_alloc() - allocate video memory for the given buffer
  */
@@ -197,13 +201,21 @@ static int __vb2_buf_mem_alloc(struct vb2_buffer *vb)
 	void *mem_priv;
 	int plane;
 	int ret = -ENOMEM;
+	#ifdef CONFIG_ARCH_SEMIDRIVE_PROCESSOR9
+	unsigned long temp = 0;
+	#endif
 
 	/*
 	 * Allocate memory for all planes in this buffer
 	 * NOTE: mmapped areas should be page aligned
 	 */
 	for (plane = 0; plane < vb->num_planes; ++plane) {
+		#ifdef CONFIG_ARCH_SEMIDRIVE_PROCESSOR9
+		temp = PAGE_ALIGN(q->sd_hcrop_b);
+		unsigned long size = temp + PAGE_ALIGN(vb->planes[plane].length + q->sd_hcrop_f);
+		#else
 		unsigned long size = PAGE_ALIGN(vb->planes[plane].length);
+		#endif
 
 		mem_priv = call_ptr_memop(vb, alloc,
 				q->alloc_devs[plane] ? : q->dev,
@@ -214,6 +226,9 @@ static int __vb2_buf_mem_alloc(struct vb2_buffer *vb)
 			goto free;
 		}
 
+		#ifdef CONFIG_ARCH_SEMIDRIVE_PROCESSOR9
+		vb2_dc_buf_update(mem_priv, temp);
+		#endif
 		/* Associate allocator private data with this plane */
 		vb->planes[plane].mem_priv = mem_priv;
 	}
