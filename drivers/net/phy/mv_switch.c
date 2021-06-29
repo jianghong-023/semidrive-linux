@@ -87,10 +87,18 @@ struct mv_data {
 #define MV_5050_INTERNAL_PHY_PMA_PMD_REG	0x0834
 #define MV_5050_INTERNAL_PHY_PMA_PMD_DATA	0x8000
 
+#define MV_5050_INTERNAL_PHY_DEVICE3		3
+#define MV_5050_INTERNAL_PHY_COPPER_CTRL_REG	0x8000
+#define MV_5050_INTERNAL_PHY_COPPER_CTRL_DATA	0x0200
+
 #define MV_G9X_REF_5050_MDIO_ADDR		0x1f
 #define MV_5050_PORT8				0x8
 #define MV_5050_PORT8_PHY_CTRL_REG		0x1
 #define MV_5050_PORT8_PHY_CTRL_DATA		0xe03e
+
+#define MV_5072_INTERNAL_PHY_DEVICE3		3
+#define MV_5072_INTERNAL_PHY_COPPER_CTRL_REG	0x8000
+#define MV_5072_INTERNAL_PHY_COPPER_CTRL_DATA	0x0200
 
 static struct phy_device *mv_phy[2];
 static const struct file_operations mv_5050_fops;
@@ -399,6 +407,30 @@ static int mv_5050_init(struct phy_device *phy)
 			MV_5050_INTERNAL_PHY_PMA_PMD_DATA);
 }
 
+static void mv_5050_auto_polarity_reversed(struct phy_device *phy)
+{
+	int port;
+
+	/*enable all ports's polarity can auto reversed*/
+	for (port = 1; port <= MV_5050_MAX_INTERNA_PHY; port++)
+		mv_write_phy_register(phy, MV_INTERNAL_PHY, port,
+			MV_5050_INTERNAL_PHY_DEVICE3,
+			MV_5050_INTERNAL_PHY_COPPER_CTRL_REG,
+			MV_5050_INTERNAL_PHY_COPPER_CTRL_DATA);
+}
+
+static void mv_5072_auto_polarity_reversed(struct phy_device *phy)
+{
+	int port;
+
+	/*enable all ports's polarity can auto reversed*/
+	for (port = 1; port <= MV_5072_MAX_INTERNA_PHY; port++)
+		mv_write_phy_register(phy, MV_INTERNAL_PHY, port,
+			MV_5072_INTERNAL_PHY_DEVICE3,
+			MV_5072_INTERNAL_PHY_COPPER_CTRL_REG,
+			MV_5072_INTERNAL_PHY_COPPER_CTRL_DATA);
+}
+
 static long mv_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 {
 	int ret = -1;
@@ -483,9 +515,11 @@ static int mv_probe(struct phy_device *phydev)
 					MV_5050_PORT8_PHY_CTRL_DATA);
 		else
 			mv_5050_init(phydev);
+		mv_5050_auto_polarity_reversed(phydev);
 	} else {
 		mv_misc = &mv_5072;
 		mv_phy[1] = phydev;
+		mv_5072_auto_polarity_reversed(phydev);
 	}
 
 	ret = misc_register(mv_misc);
