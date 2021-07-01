@@ -81,6 +81,7 @@ static int deser_s_power(struct v4l2_subdev *sd, int on)
 	struct v4l2_subdev *interface_sd = deser_get_interface_subdev(sd);
 	struct sdrv_csi_mipi_csi2 *kcmc = NULL;
 	deser_para_t *pdeser = sensor->priv;
+	int ret = 0;
 
 	//printk("%s on = %d +\n", __FUNCTION__, on);
 
@@ -97,7 +98,7 @@ static int deser_s_power(struct v4l2_subdev *sd, int on)
 		}
 
 		if (pdeser->init_deser) {
-			pdeser->init_deser(sensor);
+			ret = pdeser->init_deser(sensor);
 			msleep(30);
 		}
 	} else if (on == 0) {
@@ -110,8 +111,8 @@ static int deser_s_power(struct v4l2_subdev *sd, int on)
 	}
 #endif
 	//printk("%s on = %d -\n", __FUNCTION__, on);
-
-	return 0;
+	dev_info(&sensor->i2c_client->dev, "%s: ret=%d\n", __FUNCTION__, ret);
+	return ret;
 }
 
 static int deser_enum_frame_size(struct v4l2_subdev *sd,

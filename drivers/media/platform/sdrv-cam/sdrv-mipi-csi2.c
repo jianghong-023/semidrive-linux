@@ -408,6 +408,7 @@ static int mipi_csi2_initialization(struct sdrv_csi_mipi_csi2 *kcmc)
 
 static int mipi_csi2_s_power(struct v4l2_subdev *sd, int on)
 {
+#if 0
 	struct sdrv_csi_mipi_csi2 *kcmc;
 	int ret = 0;
 
@@ -425,6 +426,9 @@ static int mipi_csi2_s_power(struct v4l2_subdev *sd, int on)
 		ret = v4l2_subdev_call(sensor_sd, core, s_power, on);
 
 	return ret;
+#else
+	return 0;
+#endif
 }
 
 static int mipi_csi2_set_phy_freq(struct sdrv_csi_mipi_csi2 *kcmc,

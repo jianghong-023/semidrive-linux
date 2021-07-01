@@ -653,13 +653,13 @@ static int kstream_video_open(struct file *file)
 
 	ret = v4l2_pipeline_pm_use(&vdev->entity, 1);
 	if(ret < 0) {
-		dev_err(video->dev, "Failed to power up pipeline: %d\n", ret);
+		dev_err(video->dev, "%s: Failed to power up pipeline: %d\n", __func__, ret);
 		goto err_pm_use;
 	}
 
 	mutex_unlock(&video->lock);
 
-	return 0;
+	return ret;
 
 err_pm_use:
 	v4l2_fh_release(file);

@@ -558,7 +558,7 @@ int max96722_initialization(deser_dev_t *dev)
 	ret = max96722_read_reg(dev, 0x000d, &value);
 	if (ret < 0) {
 		dev_err(&client->dev, "max96722 fail to read 0x0006=%d\n", ret);
-		return ret;
+		return -ENODEV;
 	}
 
 	max96722_preset(dev);

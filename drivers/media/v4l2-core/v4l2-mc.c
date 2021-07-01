@@ -331,29 +331,24 @@ static int pipeline_pm_power(struct media_entity *entity, int change,
 	int ret = 0;
 
 	if (!change)
-		goto OUT;
+		return 0;
 
 	media_graph_walk_start(graph, entity);
 
-	while (!ret && (entity = media_graph_walk_next(graph))) {
-		if (is_media_entity_v4l2_subdev(entity) && (!strcmp(entity->name, "sdrv-csi-parallel")
-			|| !strcmp(entity->name, "sdrv-mipi-csi2"))) {
+	while (!ret && (entity = media_graph_walk_next(graph)))
+		if (is_media_entity_v4l2_subdev(entity))
 			ret = pipeline_pm_power_one(entity, change);
-		}
-	}
 
 	if (!ret)
-		goto OUT;
+		return 0;
 
 	media_graph_walk_start(graph, first);
 
 	while ((first = media_graph_walk_next(graph))
 	       && first != entity)
-		if (is_media_entity_v4l2_subdev(first) && (!strcmp(entity->name, "sdrv-csi-parallel")
-			|| !strcmp(entity->name, "sdrv-mipi-csi2")))
+		if (is_media_entity_v4l2_subdev(first))
 			pipeline_pm_power_one(first, -change);
 
-OUT:
 	return ret;
 }
 

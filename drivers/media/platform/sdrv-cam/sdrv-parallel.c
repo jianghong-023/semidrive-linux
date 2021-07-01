@@ -57,11 +57,15 @@ static struct v4l2_subdev *parallel_get_sensor_subdev(struct v4l2_subdev *sd)
 
 static int parallel_s_power(struct v4l2_subdev *sd, int on)
 {
+#if 0
 	struct v4l2_subdev *sensor_sd = parallel_get_sensor_subdev(sd);
 	if(!sensor_sd)
 		return -EINVAL;
 
 	return v4l2_subdev_call(sensor_sd, core, s_power, on);
+#else
+	return 0;
+#endif
 }
 
 static int parallel_g_frame_interval(struct v4l2_subdev *sd,

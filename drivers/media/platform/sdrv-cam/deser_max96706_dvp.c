@@ -1435,6 +1435,10 @@ static int max96706_initialization(deser_dev_t *sensor)
 		}
 	}
 
+	dev_info(&client->dev, "%s: scan 96705, ret=%d\n", __func__, ret);
+	if (ret < 0)
+		return -ENODEV;
+
 	if (sensor->device_type == SDRV3_ICL02) {
 		device_icl02_init(sensor);
 		return 0;

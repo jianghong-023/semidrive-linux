@@ -424,7 +424,7 @@ int max9286_initialization(deser_dev_t *dev)
 	ret = max9286_write_reg(sensor, 0x15, DES_REG15_CSIOUT_DISABLE);
 	if (ret) {
 		dev_err(&client->dev, "max9286 write fail!\n");
-		return 0;
+		return -ENODEV;
 	}
 	usleep_range(5000, 5100);
 
@@ -455,7 +455,7 @@ int max9286_initialization(deser_dev_t *dev)
 	dev_info(&client->dev, "0x49=0x%x, i=%d\n", val, i);
 	if (val == 0) {
 		dev_err(&client->dev, "max96705 detect fail!\n");
-		return 0;
+		return -ENODEV;
 	}
 
 	//config link
