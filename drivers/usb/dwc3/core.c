@@ -1374,6 +1374,7 @@ static int dwc3_suspend_common(struct dwc3 *dwc)
 		break;
 	}
 
+	synchronize_irq(dwc->irq_gadget);
 	dwc3_core_exit(dwc);
 
 	return 0;
