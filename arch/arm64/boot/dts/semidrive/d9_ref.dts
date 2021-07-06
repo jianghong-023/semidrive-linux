@@ -14,6 +14,7 @@
 #include <dt-bindings/memmap/d9/projects/default/image_cfg.h>
 #include <dt-bindings/memory/sdrv_ion.h>
 #include <dt-bindings/rpmsg/sd,x9h-default.h>
+#include <dt-bindings/media/sdrv_csi.h>
 
 / {
 	model = "Semidrive kunlun D9 REF Board";
@@ -431,6 +432,7 @@
 	mcsi0deser:mcsi0deser@7F {
 		compatible = "sdrv,mcsi0_deser";
 		reg = <0x7F>;
+		type = <SERDES_MIPI>;
 		pwdn-gpios = <&cam_gpio 2 0>;
 		sync = <1>;
 		addr_20086 = /bits/ 16 <0x28>;
@@ -499,6 +501,7 @@
 	mcsi1deser:mcsi1deser@7F {
 		compatible = "sdrv,mcsi1_deser";
 		reg = <0x7F>;
+		type = <SERDES_MIPI>;
 		pwdn-gpios = <&cam_gpios 2 0>;
 		addr_20086 = /bits/ 16 <0x29>;
 		addr_96705 = /bits/ 16 <0x40>;
@@ -544,6 +547,7 @@
 		compatible = "sdrv,dvp_deser";
 		clock-frequency = <24000000>;
 		reg = <0x7E>;
+		type = <SERDES_PARALLEL>;
 		//powerdown-gpios = <&cam_gpios 11 0>;
 		//gpi-gpios = <&cam_gpios 10 0>;
 		pwdn-gpios = <&port4c 19 0>;

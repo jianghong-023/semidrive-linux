@@ -27,6 +27,8 @@
 #include <media/v4l2-fwnode.h>
 #include <media/v4l2-subdev.h>
 
+#include <dt-bindings/media/sdrv_csi.h>
+
 #include "sdrv-csi.h"
 #include "sdrv-mipi-csi2.h"
 #include "sdrv-deser.h"
@@ -41,12 +43,15 @@
 #define MIPI_CSI2_SENS_VC3_PAD_SOURCE   3
 #define MIPI_CSI2_SENS_VCX_PADS_NUM	 4
 
-deser_para_t *desers_array[] = {
+deser_para_t *desers_array_mipi[] = {
 	&max9286_para,
 	&max96722_para,
-	&max96706_para,
 	&max9286_para_2,
 	&max9296_para,
+	NULL,
+};
+deser_para_t *desers_array_parallel[] = {
+	&max96706_para,
 	NULL,
 };
 
@@ -292,11 +297,13 @@ static int deser_probe(struct i2c_client *client,
 	u32 sec_9286;
 	u32 sync;
 	u32 device_type;
+	u32 type;
 	int ret;
 	struct gpio_desc *gpiod;
-	int deser_index;
+	int deser_index = 0;
 	deser_para_t *pdeser_param;
 	int deser_detect = false;
+	deser_para_t **pdeser;
 
 	//printk("%s %s +\n", __FUNCTION__, client->name);
 	sensor = devm_kzalloc(dev, sizeof(*sensor), GFP_KERNEL);
@@ -377,6 +384,15 @@ static int deser_probe(struct i2c_client *client,
 
 	sensor->device_type = device_type;
 
+	ret = fwnode_property_read_u32(dev_fwnode(&client->dev), "type", &type);
+	dev_info(&client->dev, "type: 0x%x, ret=%d\n", type, ret);
+
+	if (ret < 0) {
+		type = 0;
+	}
+
+	sensor->type = type;
+
 	ret = fwnode_property_read_u32(dev_fwnode(&client->dev), "sec_9286",
 					   &sec_9286);
 	dev_info(&client->dev, "sec_9286: %d, ret=%d\n", sec_9286, ret);
@@ -391,10 +407,15 @@ static int deser_probe(struct i2c_client *client,
 	}
 
 	mutex_init(&sensor->serer_lock);
-	pr_crit("Scan desers ....\n");
-	for (deser_index = 0; desers_array[deser_index] != NULL; deser_index++) {
-		pdeser_param = desers_array[deser_index];
+	dev_err(&client->dev, "Scan desers ....\n");
 
+	if (sensor->type == SERDES_MIPI)
+		pdeser = (deser_para_t **)&desers_array_mipi;
+	else
+		pdeser = (deser_para_t **)&desers_array_parallel;
+
+	for (deser_index = 0; *(pdeser + deser_index) != NULL; deser_index++) {
+		pdeser_param = *(pdeser + deser_index);
 		if (pdeser_param->used == DESER_USE_ONCE || NULL == pdeser_param->detect_deser)
 			continue;
 
@@ -432,20 +453,20 @@ static int deser_probe(struct i2c_client *client,
 	}
 
 	if (deser_detect == true) {
-		pdeser_param = desers_array[deser_index];
+		pdeser_param = *(pdeser + deser_index);
 		client->addr = pdeser_param->addr_deser;
 		if (pdeser_param->used == DESER_NOT_USED)
 			pdeser_param->used = DESER_USE_ONCE;
-		pr_crit("Done, %s\n", pdeser_param->name);
+		dev_err(&client->dev, "Done, %s\n", pdeser_param->name);
 		/* for (deser_index = 0; desers_array[deser_index] != NULL; deser_index++) {
 			if (pdeser_param->used == DESER_USE_ONCE)
 				pr_info("deser name = %s\n"	, desers_array[deser_index]->name);
 		} */
 	} else {
-		pr_crit("Can't match any deser at i2c bus %s.\n", dev_name(&client->dev));
-		pr_info("deser list:\n");
-		for (deser_index = 0; desers_array[deser_index] != NULL; deser_index++) {
-			pr_info("deser name = %s\n", desers_array[deser_index]->name);
+		dev_err(&client->dev, "Can't match any deser at i2c bus %s.\n", dev_name(&client->dev));
+		dev_info(&client->dev, "deser list:\n");
+		for (deser_index = 0; *(pdeser + deser_index) != NULL; deser_index++) {
+			dev_info(&client->dev, "deser name = %s\n", (*(pdeser + deser_index))->name);
 		}
 		return -ENODEV;
 	}

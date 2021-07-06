@@ -84,6 +84,7 @@ typedef struct __sdrv_deser_dev {
 	int sec_9286_shift;
 	u32 sync;
 	u32 device_type;
+	u32 type;
 	deser_para_t *priv;
 } deser_dev_t;
 
