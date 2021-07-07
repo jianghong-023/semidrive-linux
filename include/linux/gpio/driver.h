@@ -144,7 +144,7 @@ struct gpio_chip {
 	u16			ngpio;
 	const char		*const *names;
 	bool			can_sleep;
-#ifdef CONFIG_SEMIDRIVE_GPIO
+#ifdef CONFIG_GPIO_SEMIDRIVE
 	u32				offset;
 #endif
 
