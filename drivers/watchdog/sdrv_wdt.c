@@ -82,10 +82,15 @@ typedef enum {
 	HALT_REASON_SW_WATCHDOG,    // Reboot triggered by a SW watchdog timer
 	HALT_REASON_SW_PANIC,       // Reboot triggered by a SW panic or ASSERT
 	HALT_REASON_SW_UPDATE,      // SW triggered reboot in order to begin firmware update
+	HALT_REASON_SW_GLOBAL_POR,  // SW triggered global reboot
 } platform_halt_reason;
 
-typedef enum wdg_clock_source
-{
+struct halt_reason_desc {
+	const char *desc;
+	platform_halt_reason reason;
+};
+
+typedef enum wdg_clock_source {
 	wdg_main_clk = 0,   // main clk, 3'b000
 	wdg_bus_clk = 0x4,  // bus clk, 3'b001
 	wdg_ext_clk = 0x8,  // ext clk, 3'b010
@@ -113,8 +118,7 @@ extern void (*arm_pm_idle)(void);
 
 static int sdrv_wdt_is_running(struct sdrv_wdt_priv *sdrv_wdt);
 
-static const struct sdrv_wdt_clk_struct wdt_clk[4] =
-{
+static const struct sdrv_wdt_clk_struct wdt_clk[4] = {
 	{
 		.src = wdg_main_clk,
 		.name = "main-clk",
@@ -135,6 +139,13 @@ static const struct sdrv_wdt_clk_struct wdt_clk[4] =
 		.name = "xtal-clk",
 		.ration_to_ms= 32, /* 32KHz */
 	},
+};
+
+static const struct halt_reason_desc halt_reasons[] = {
+	{ "bootloader",	HALT_REASON_SW_UPDATE },
+	{ "shutdown",	HALT_REASON_POR },
+	{ "recovery",	HALT_REASON_SW_RECOVERY },
+	{ "soc",	HALT_REASON_SW_GLOBAL_POR },
 };
 
 static int sdrv_wdt_start(struct watchdog_device *wdd)
@@ -181,8 +192,7 @@ static int sdrv_wdt_start(struct watchdog_device *wdd)
 	writel(wtc_con, wdt_wtc);
 
 	/* refresh mode select */
-	if (wdd->min_hw_heartbeat_ms)
-	{
+	if (wdd->min_hw_heartbeat_ms) {
 		/* wdt refresh window low limit */
 		writel(wdd->min_hw_heartbeat_ms * (sdrv_wdt->wdt_clk->ration_to_ms/(clk_div + 1)),
 				wdt_wrc_val);
@@ -345,12 +355,16 @@ void sdrv_restart(enum reboot_mode reboot_mode, const char *cmd)
 	struct sdrv_wdt_priv *sdrv_wdt;
 
 	reason = HALT_REASON_SW_RESET;
-	if (cmd && !strcmp(cmd, "bootloader"))
-		reason = HALT_REASON_SW_UPDATE;
-	else if (cmd && !strcmp(cmd, "shutdown"))
-		reason = HALT_REASON_POR;
-	else if (cmd && !strcmp(cmd, "recovery"))
-		reason = HALT_REASON_SW_RECOVERY;
+	if (cmd) {
+		size_t i;
+
+		for (i = 0; i < ARRAY_SIZE(halt_reasons); i++) {
+			if (!strcmp(cmd, halt_reasons[i].desc)) {
+				reason = halt_reasons[i].reason;
+				break;
+			}
+		}
+	}
 
 	sdrv_wdt = watchdog_get_drvdata(&sdrv_wtd_wdd);
 	np = sdrv_wdt->dev->of_node;
