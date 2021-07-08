@@ -666,6 +666,7 @@ static struct platform_driver sd_pcie_driver = {
 		.name = "sd-pcie",
 		.of_match_table = sd_pcie_match,
 		.suppress_bind_attrs = true,
+		.probe_type = PROBE_PREFER_ASYNCHRONOUS,
 	},
 };
 builtin_platform_driver(sd_pcie_driver);
