@@ -73,7 +73,7 @@ extern void __clean_dcache_area_pop(void *addr, size_t len);
 extern void __clean_dcache_area_pou(void *addr, size_t len);
 extern long __flush_cache_user_range(unsigned long start, unsigned long end);
 extern void sync_icache_aliases(void *kaddr, unsigned long len);
-
+extern void arch_flush_dcache_all(void);
 static inline void flush_cache_mm(struct mm_struct *mm)
 {
 }

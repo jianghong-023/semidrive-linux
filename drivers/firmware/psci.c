@@ -35,6 +35,9 @@
 #include <asm/suspend.h>
 #include <linux/io.h>
 #include <linux/delay.h>
+#include <linux/cpu_pm.h>
+extern void sdrv_restart(enum reboot_mode reboot_mode, const char *cmd);
+static void init_str_suspend(void);
 /*
  * While a 64-bit OS can make calls with SMC32 calling conventions, for some
  * calls it is necessary to use SMC64 to pass or return 64-bit values.
@@ -242,6 +245,7 @@ static int psci_cpu_off(u32 state)
 	int err;
 	u32 fn;
 
+	arch_flush_dcache_all();
 	fn = psci_function_id[PSCI_FN_CPU_OFF];
 	err = invoke_psci_fn(fn, state, 0, 0);
 	return psci_to_linux_errno(err);
@@ -300,7 +304,7 @@ static void set_conduit(enum psci_conduit conduit)
 	default:
 		WARN(1, "Unexpected PSCI conduit %d\n", conduit);
 	}
-
+	//init_str_suspend();
 	psci_ops.conduit = conduit;
 }
 
@@ -500,7 +504,48 @@ int psci_cpu_suspend_enter(unsigned long index)
 
 	return ret;
 }
+static inline void set_str_resume(u64 addr)
+{
+	void __iomem * base = ioremap(psci_ops.mem_to_safety.start,
+				resource_size(&psci_ops.mem_to_safety));
 
+	if (!IS_ERR(base)) {
+		writel(0x1234, base);
+		writel(addr & 0xffffffff, base + 0x4);
+		iounmap(base);
+	} else {
+		pr_err("no mem_to_safety\n");
+	}
+	return;
+}
+static int str_suspend_finisher(unsigned long index)
+{
+	//arch_flush_dcache_all();
+	sdrv_restart(0, "shutdown");
+	while(1);
+	return 0;
+}
+
+static int str_system_suspend_enter(suspend_state_t state)
+{
+	int ret=0;
+	set_str_resume(__pa_symbol(cpu_resume));
+        ret = cpu_suspend(0, str_suspend_finisher);
+	return ret;
+}
+
+static const struct platform_suspend_ops str_suspend_ops = {
+	.valid          = suspend_valid_only_mem,
+	.enter          = str_system_suspend_enter,
+};
+
+static void init_str_suspend(void)
+{
+	if (!IS_ENABLED(CONFIG_SUSPEND))
+		return;
+
+	suspend_set_ops(&str_suspend_ops);
+}
 /* ARM specific CPU idle operations */
 #ifdef CONFIG_ARM
 static const struct cpuidle_ops psci_cpuidle_ops __initconst = {
@@ -514,6 +559,11 @@ CPUIDLE_METHOD_OF_DECLARE(psci, "psci", &psci_cpuidle_ops);
 
 static int psci_system_suspend(unsigned long unused)
 {
+	if (psci_ops.str_native == 1) {
+		set_str_resume(__pa_symbol(cpu_resume));
+		str_suspend_finisher(0);
+	}
+	arch_flush_dcache_all();
 	return invoke_psci_fn(PSCI_FN_NATIVE(1_0, SYSTEM_SUSPEND),
 			      __pa_symbol(cpu_resume), 0, 0);
 }
@@ -649,6 +699,7 @@ static int __init psci_probe(void)
 {
 	u32 ver = psci_get_version();
 
+
 	pr_info("PSCIv%d.%d detected in firmware.\n",
 			PSCI_VERSION_MAJOR(ver),
 			PSCI_VERSION_MINOR(ver));
@@ -680,6 +731,7 @@ typedef int (*psci_initcall_t)(const struct device_node *);
  */
 static int __init psci_0_2_init(struct device_node *np)
 {
+	u32 str;
 	int err;
 
 	err = get_set_conduit_method(np);
@@ -693,6 +745,14 @@ static int __init psci_0_2_init(struct device_node *np)
 	 * can be carried out according to the specific version reported
 	 * by firmware
 	 */
+	if (!of_property_read_u32(np, "str-native", &str))
+		psci_ops.str_native = str;
+	else
+		psci_ops.str_native = 0;
+
+	if (!of_address_to_resource(np, 0, &psci_ops.mem_to_safety))
+		pr_err("psci ioremap failed\n");
+
 	err = psci_probe();
 
 out_put_node:

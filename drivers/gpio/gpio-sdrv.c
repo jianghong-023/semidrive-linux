@@ -157,6 +157,7 @@ struct sdrv_context {
 	u32 int_mask;
 	u32 int_type;
 	u32 int_pol;
+	u32 int_edg;
 	u32 int_deb;
 };
 #endif
@@ -829,9 +830,10 @@ static int sdrv_gpio_suspend(struct device *dev)
 
 		/* interrupts */
 		ctx->int_mask = sdrv_read(gpio, GPIO_INT_MASK_PORT_X(idx));
-		ctx->int_en	= sdrv_read(gpio, GPIO_INT_EN_PORT_X(idx));
+		//ctx->int_en	= sdrv_read(gpio, GPIO_INT_EN_PORT_X(idx));
 		ctx->int_pol = sdrv_read(gpio, GPIO_INT_POL_PORT_X(idx));
 		ctx->int_type = sdrv_read(gpio, GPIO_INT_TYPE_PORT_X(idx));
+		ctx->int_edg = sdrv_read(gpio, GPIO_INT_BOTH_EDGE_PORT_X(idx));
 		ctx->int_deb = sdrv_read(gpio, GPIO_INT_DEB_EN_PORT_X(idx));
 
 		/* Mask out interrupts */
@@ -871,8 +873,9 @@ static int sdrv_gpio_resume(struct device *dev)
 		/* interrupts */
 		sdrv_write(gpio, GPIO_INT_TYPE_PORT_X(idx), ctx->int_type);
 		sdrv_write(gpio, GPIO_INT_POL_PORT_X(idx), ctx->int_pol);
+		sdrv_write(gpio, GPIO_INT_BOTH_EDGE_PORT_X(idx), ctx->int_edg);
 		sdrv_write(gpio, GPIO_INT_DEB_EN_PORT_X(idx), ctx->int_deb);
-		sdrv_write(gpio, GPIO_INT_EN_PORT_X(idx), ctx->int_en);
+		//sdrv_write(gpio, GPIO_INT_EN_PORT_X(idx), ctx->int_en);
 		sdrv_write(gpio, GPIO_INT_MASK_PORT_X(idx), ctx->int_mask);
 
 		/* Clear out spurious interrupts */
@@ -885,8 +888,10 @@ static int sdrv_gpio_resume(struct device *dev)
 }
 #endif
 
-static SIMPLE_DEV_PM_OPS(sdrv_gpio_pm_ops, sdrv_gpio_suspend,
-			 sdrv_gpio_resume);
+static struct dev_pm_ops sdrv_gpio_pm_ops = {
+	SET_NOIRQ_SYSTEM_SLEEP_PM_OPS (sdrv_gpio_suspend,
+			sdrv_gpio_resume)
+};
 
 static struct platform_driver sdrv_gpio_driver = {
 	.driver		= {

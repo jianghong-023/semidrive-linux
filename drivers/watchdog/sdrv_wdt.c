@@ -115,6 +115,7 @@ struct sdrv_wdt_priv {
 
 extern void (*arm_pm_restart)(enum reboot_mode reboot_mode, const char *cmd);
 extern void (*arm_pm_idle)(void);
+extern void arch_flush_dcache_all(void);
 
 static int sdrv_wdt_is_running(struct sdrv_wdt_priv *sdrv_wdt);
 
@@ -396,6 +397,7 @@ void sdrv_restart(enum reboot_mode reboot_mode, const char *cmd)
 
 	if (!sdrv_wdt_is_running(sdrv_wdt)) {
 		/* run watchdog, and don't kick it */
+		arch_flush_dcache_all();
 		sdrv_wdt_start(&sdrv_wtd_wdd);
 	} else {
 		/* kick watchdog with an impossible delay */

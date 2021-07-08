@@ -15,6 +15,7 @@
 #define __LINUX_PSCI_H
 
 #include <linux/init.h>
+#include <linux/of_address.h>
 #include <linux/types.h>
 
 #define PSCI_POWER_STATE_TYPE_STANDBY		0
@@ -47,6 +48,8 @@ struct psci_operations {
 	int (*migrate_info_type)(void);
 	enum psci_conduit conduit;
 	enum smccc_version smccc_version;
+	struct resource mem_to_safety;
+	u32 str_native;
 };
 
 extern struct psci_operations psci_ops;
