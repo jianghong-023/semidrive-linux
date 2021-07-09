@@ -936,11 +936,6 @@ static void mbox_front_changed(struct xenbus_device *xbdev,
 				frontend_state);
 	    break;
 	}
-
-	dev_info(&xbdev->dev, "out %s %p front(%s) back(%s)\n",
-		__func__, xbdev,
-		xenbus_strstate(frontend_state),
-		xenbus_strstate(xbdev->state));
 }
 
 

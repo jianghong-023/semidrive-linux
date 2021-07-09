@@ -258,12 +258,6 @@ static void xenipc_front_changed(struct xenbus_device *dev,
 				frontend_state);
 	    break;
 	}
-
-	dev_info(&dev->dev, "out %s %p front(%s) back(%s)\n",
-		__func__,
-		dev,
-		xenbus_strstate(frontend_state),
-		xenbus_strstate(dev->state));
 }
 
 static void xenipc_free_channel(struct xenipc_be_channel *bechan)
