@@ -36,6 +36,7 @@
 #include <linux/i2c.h>
 #include <sound/initval.h>
 #include <sound/jack.h>
+#include <linux/gpio.h>
 #include <linux/of_gpio.h>
 #include <sound/soc.h>
 #include <soc/semidrive/sdrv_boardinfo_hwid.h>
@@ -77,22 +78,21 @@ static struct snd_soc_jack_gpio hs_jack_gpios[] = {
     },
 };
 
-/* Headphones jack detection for DAPM pin */
 static struct snd_soc_jack_pin hs_jack_pin[] = {
     {
-	.pin = "Mic In",
+	.pin = "Headphones",
 	.mask = SND_JACK_HEADSET,
+
     },
     {
-	.pin = "Line In",
-	/* disable speaker when hp jack is inserted */
+	.pin = "LINE OUT",
 	.mask = SND_JACK_HEADPHONE,
 	.invert = 1,
     },
 };
 
 /*
- * Logic for a tlv320aic23 as connected on a x9_ref_hs
+ * Logic for a tlv320aic23 as connected on a x9_ms_hs
  */
 static int x9_ref_tlv320aic23_init(struct snd_soc_pcm_runtime *rtd)
 {
@@ -101,15 +101,16 @@ static int x9_ref_tlv320aic23_init(struct snd_soc_pcm_runtime *rtd)
 	/* Jack detection API stuff */
 	/*TODO: add damp &hs_jack, hs_jack_pin, ARRAY_SIZE(hs_jack_pin));*/
 	if (gpio_is_valid(hs_jack_gpios[0].gpio)) {
-	err = snd_soc_card_jack_new(rtd->card, "Headset Jack", SND_JACK_HEADSET,
-				    &hs_jack, hs_jack_pin, ARRAY_SIZE(hs_jack_pin));
+		err = snd_soc_card_jack_new(
+		    rtd->card, "Headphones", SND_JACK_HEADSET, &hs_jack,
+		    hs_jack_pin, ARRAY_SIZE(hs_jack_pin));
 
-	if (err)
-		return err;
-	DEBUG_ITEM_PRT(hs_jack_gpios[0].gpio);
-/* 	err = snd_soc_jack_add_gpios(&hs_jack, ARRAY_SIZE(hs_jack_gpios),
-				     hs_jack_gpios); */
-	DEBUG_ITEM_PRT(err);
+		if (err)
+			return err;
+		DEBUG_ITEM_PRT(hs_jack_gpios[0].gpio);
+		err = snd_soc_jack_add_gpios(
+		    &hs_jack, ARRAY_SIZE(hs_jack_gpios), hs_jack_gpios);
+		DEBUG_ITEM_PRT(err);
 	}
 	DEBUG_FUNC_PRT;
 	return err;
@@ -118,8 +119,8 @@ static int x9_ref_tlv320aic23_init(struct snd_soc_pcm_runtime *rtd)
 /*Dapm widtets*/
 static const struct snd_soc_dapm_widget sd_x9_ref_tlv320aic23_dapm_widgets[] = {
     /* Outputs */
-    SND_SOC_DAPM_HP("Headphone Jack", NULL),
-
+    SND_SOC_DAPM_HP("Headphones", NULL),
+    SND_SOC_DAPM_LINE("LINE OUT", NULL),
     /* Inputs */
     SND_SOC_DAPM_LINE("Line In", NULL),
     SND_SOC_DAPM_MIC("Mic In", NULL),
@@ -127,8 +128,14 @@ static const struct snd_soc_dapm_widget sd_x9_ref_tlv320aic23_dapm_widgets[] = {
 
 static const struct snd_soc_dapm_route sd_x9_ref_tlv320aic23_dapm_map[] = {
     /* Line Out connected to LLOUT, RLOUT */
-    {"Headphone Jack", NULL, "LOUT"},
-    {"Headphone Jack", NULL, "ROUT"},
+    {"Headphones", NULL, "LHPOUT"},
+    {"Headphones", NULL, "RHPOUT"},
+
+    {"LINE OUT", NULL, "LOUT"},
+    {"LINE OUT", NULL, "ROUT"},
+
+    {"DAC", NULL, "PCM0 OUT"},
+
     /* Line in connected to LLINEIN, RLINEIN */
     {"LLINEIN", NULL, "Line In"},
     {"RLINEIN", NULL, "Line In"},
@@ -165,20 +172,20 @@ static int x9_tlv320ai23_soc_hw_params(struct snd_pcm_substream *substream,
 }
 
 static const struct snd_soc_ops x9_ref_tlv320aic23_ops = {
-	.hw_params = x9_tlv320ai23_soc_hw_params,
+    .hw_params = x9_tlv320ai23_soc_hw_params,
 };
 
 static struct snd_soc_dai_link snd_x9_ref_soc_dai_links[] = {
     {
-		.name = "x9_hifi_hs",
-		.stream_name = "x9 hifi hs",
-		.cpu_name = "30630000.i2s",
-		.cpu_dai_name = "snd-afe-sc-i2s-dai0",
-		.platform_name = "30630000.i2s",
-		.codec_dai_name = "tlv320aic23-hifi",
-		.init = x9_ref_tlv320aic23_init,
-		.dai_fmt = SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_CBS_CFS,
-		.ops = &x9_ref_tlv320aic23_ops,
+	.name = "x9_hifi_hs",
+	.stream_name = "x9 hifi hs",
+	.cpu_name = "30630000.i2s",
+	.cpu_dai_name = "snd-afe-sc-i2s-dai0",
+	.platform_name = "30630000.i2s",
+	.codec_dai_name = "tlv320aic23-hifi",
+	.init = x9_ref_tlv320aic23_init,
+	.dai_fmt = SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_CBS_CFS,
+	.ops = &x9_ref_tlv320aic23_ops,
     },
 };
 /*-Init Machine Driver
@@ -189,10 +196,14 @@ static struct snd_soc_dai_link snd_x9_ref_soc_dai_links[] = {
  * ------------------------------------------------------------------------*/
 static struct snd_soc_card x9_ref_tlv320aic23_card = {
     .name = SND_X9_MACH_DRIVER,
-
+    .owner = THIS_MODULE,
     .dai_link = snd_x9_ref_soc_dai_links,
     .num_links = ARRAY_SIZE(snd_x9_ref_soc_dai_links),
-
+    .dapm_widgets = sd_x9_ref_tlv320aic23_dapm_widgets,
+    .num_dapm_widgets = ARRAY_SIZE(sd_x9_ref_tlv320aic23_dapm_widgets),
+    .dapm_routes = sd_x9_ref_tlv320aic23_dapm_map,
+    .num_dapm_routes = ARRAY_SIZE(sd_x9_ref_tlv320aic23_dapm_map),
+    .fully_routed = true,
 };
 
 /*GPIO probe use this function to set gpio. */
@@ -201,7 +212,6 @@ static int x9_gpio_probe(struct snd_soc_card *card)
 	int ret = 0;
 	return ret;
 }
-
 
 /*ALSA machine driver probe functions.*/
 static int x9_ref_tlv320aic23_probe(struct platform_device *pdev)
@@ -217,11 +227,12 @@ static int x9_ref_tlv320aic23_probe(struct platform_device *pdev)
 
 	dev_info(&pdev->dev, ": dev name = %s %s %d\n", pdev->name, __func__,
 		 get_part_id(PART_BOARD_ID_MIN));
-	/*FIXME:  Notice: Next part configure probe action by hwid, it is out of control of DTB.      */
+	/*FIXME:  Notice: Next part configure probe action by hwid, it is out of
+	 * control of DTB.      */
 	if ((get_part_id(PART_BOARD_TYPE) != BOARD_TYPE_REF) ||
-		(get_part_id(PART_BOARD_ID_MAJ) != 1) ||
-		((get_part_id(PART_BOARD_ID_MIN) != 3) &&
-		(get_part_id(PART_BOARD_ID_MIN) != 4))) {
+	    (get_part_id(PART_BOARD_ID_MAJ) != 1) ||
+	    ((get_part_id(PART_BOARD_ID_MIN) != 3) &&
+	     (get_part_id(PART_BOARD_ID_MIN) != 4))) {
 		/*If it is not ref A03/A04 board. dump_all_part_id();*/
 		if ((get_part_id(PART_BOARD_TYPE) != BOARD_TYPE_MS)) {
 			return -ENXIO;
@@ -236,13 +247,18 @@ static int x9_ref_tlv320aic23_probe(struct platform_device *pdev)
 	DEBUG_FUNC_PRT;
 	card->dev = dev;
 
-
 	codec_np = of_parse_phandle(np, "semidrive,audio-codec", 0);
 	if (!codec_np) {
 		dev_err(&pdev->dev, "failed to get codec info\n");
 		return -EINVAL;
 	}
 	snd_x9_ref_soc_dai_links[0].codec_of_node = codec_np;
+
+	hs_jack_gpios[0].gpio = of_get_named_gpio(np, "semidrive,jack-gpio", 0);
+	if (hs_jack_gpios[0].gpio < 0) {
+		hs_jack_gpios[0].gpio = -1;
+	}
+
 	/* Allocate chip data */
 	chip = devm_kzalloc(dev, sizeof(*chip), GFP_KERNEL);
 	if (!chip) {
@@ -269,7 +285,8 @@ static int x9_ref_tlv320aic23_remove(struct platform_device *pdev)
 }
 #ifdef CONFIG_PM
 /*pm suspend operation */
-static int snd_x9_ref_tlv320aic23_suspend(struct platform_device *pdev, pm_message_t state)
+static int snd_x9_ref_tlv320aic23_suspend(struct platform_device *pdev,
+					  pm_message_t state)
 {
 	dev_info(&pdev->dev, "%s snd_x9_suspend\n", __func__);
 	return 0;
@@ -304,8 +321,8 @@ static struct platform_driver x9_ref_tlv320aic23_mach_driver = {
     .probe = x9_ref_tlv320aic23_probe,
     .remove = x9_ref_tlv320aic23_remove,
 #ifdef CONFIG_PM
-	.suspend = snd_x9_ref_tlv320aic23_suspend,
-	.resume = snd_x9_ref_tlv320aic23_resume,
+    .suspend = snd_x9_ref_tlv320aic23_suspend,
+    .resume = snd_x9_ref_tlv320aic23_resume,
 #endif
 };
 
