@@ -496,7 +496,9 @@ static int x9_core01_ak7738_probe(struct platform_device *pdev)
 	dev_info(&pdev->dev, ": dev name =%s %s\n", pdev->name, __func__);
 	if ((get_part_id(PART_BOARD_TYPE) != BOARD_TYPE_MS)) {
 		/*If it is not MS board,exit. dump_all_part_id();*/
-		return -ENXIO;
+		if (strcmp(pdev->name, "sound@ak7738a")) {
+			return -ENXIO;
+		}
 	}
 	DEBUG_FUNC_PRT;
 	card->dev = dev;
