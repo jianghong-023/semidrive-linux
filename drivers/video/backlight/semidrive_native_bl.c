@@ -326,10 +326,51 @@ static void pwm_backlight_shutdown(struct platform_device *pdev)
 	pwm_backlight_power_off(pb);
 }
 
+#ifdef CONFIG_PM_SLEEP
+static int sd_native_bl_suspend(struct device *dev)
+{
+	dev_info(dev, "%s enter ! \n", __func__);
+	struct backlight_device *bl = dev_get_drvdata(dev);
+	struct pwm_bl_data *pb = bl_get_data(bl);
+
+	if (pb->notify)
+		pb->notify(pb->dev, 0);
+
+	pwm_backlight_power_off(pb);
+
+	if (pb->notify_after)
+		pb->notify_after(pb->dev, 0);
+
+	dev_info(dev, "%s out ! \n", __func__);
+
+	return 0;
+}
+
+static int sd_native_bl_resume(struct device *dev)
+{
+	dev_info(dev, "%s enter ! \n", __func__);
+	struct backlight_device *bl = dev_get_drvdata(dev);
+
+	backlight_update_status(bl);
+
+	dev_info(dev, "%s out ! \n", __func__);
+
+	return 0;
+}
+
+#endif //end #ifdef CONFIG_PM_SLEEP
+
+static const struct dev_pm_ops sd_native_bl_pm_ops = {
+	SET_SYSTEM_SLEEP_PM_OPS(sd_native_bl_suspend,
+				sd_native_bl_resume)
+};
+
+
 static struct platform_driver pwm_backlight_driver = {
 	.driver		= {
 		.name		= "pwm-backlight",
 		.of_match_table	= of_match_ptr(pwm_backlight_of_match),
+		.pm = &sd_native_bl_pm_ops,
 	},
 	.probe		= pwm_backlight_probe,
 	.remove		= pwm_backlight_remove,

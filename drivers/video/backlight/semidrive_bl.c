@@ -283,10 +283,45 @@ static void rpmsg_backlight_shutdown(struct platform_device *pdev)
 	rpmsg_backlight_power_off(pb, data->bl_screen_id);
 }
 
+#ifdef CONFIG_PM_SLEEP
+static int sd_rpmsg_bl_suspend(struct device *dev)
+{
+	dev_info(dev, "%s enter ! \n", __func__);
+	struct backlight_device *bl = dev_get_drvdata(dev);
+	struct rpmsg_bl_data *pb = bl_get_data(bl);
+
+	rpmsg_backlight_power_off(pb, pb->bl_screen_id);
+
+	dev_info(dev, "%s out ! \n", __func__);
+
+	return 0;
+}
+
+static int sd_rpmsg_bl_resume(struct device *dev)
+{
+	dev_info(dev, "%s enter ! \n", __func__);
+	struct backlight_device *bl = dev_get_drvdata(dev);
+
+	backlight_update_status(bl);
+
+	dev_info(dev, "%s out ! \n", __func__);
+
+	return 0;
+}
+
+#endif //end #ifdef CONFIG_PM_SLEEP
+
+static const struct dev_pm_ops sd_rpmsg_bl_pm_ops = {
+	SET_SYSTEM_SLEEP_PM_OPS(sd_rpmsg_bl_suspend,
+				sd_rpmsg_bl_resume)
+};
+
+
 static struct platform_driver rpmsg_backlight_driver = {
 	.driver		= {
 		.name	= "rpmsg-bl",
 		.of_match_table	= of_match_ptr(rpmsg_backlight_of_match),
+		.pm = &sd_rpmsg_bl_pm_ops,
 	},
 	.probe		= rpmsg_backlight_probe,
 	.remove		= rpmsg_backlight_remove,
