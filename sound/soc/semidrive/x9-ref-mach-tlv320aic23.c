@@ -235,7 +235,9 @@ static int x9_ref_tlv320aic23_probe(struct platform_device *pdev)
 	     (get_part_id(PART_BOARD_ID_MIN) != 4))) {
 		/*If it is not ref A03/A04 board. dump_all_part_id();*/
 		if ((get_part_id(PART_BOARD_TYPE) != BOARD_TYPE_MS)) {
-			return -ENXIO;
+			if (strcmp(pdev->name, "sound@tlv320aic23ab0")) {
+				return -ENXIO;
+			}
 		}
 	}
 	/*FIXME-END:  -------------------------      */
