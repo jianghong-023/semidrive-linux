@@ -452,25 +452,33 @@ static void afe_i2s_sc_stop_playback(struct sdrv_afe_i2s_sc *afe)
 				   (0 << TDM_FD_DIR_CH0_TXEN_FIELD_OFFSET));
 	} */
 
-	u32 ret, val, cnt;
+	u32 ret, val, cnt, delay_cnt;
 	cnt = 0;
-	while (cnt <50) {
-		ret = regmap_read(afe->regmap, REG_CDN_I2SSC_REGS_I2S_STAT, &val);
-		if(ret >= 0){
-			if(BIT_STAT_FIFO_EMPTY & val){
+	/* (1000000/10)  * I2S_SC_TX_DEPTH / (afe->srate * afe->tx_channels) + 1*/
+	delay_cnt = 100000 * I2S_SC_TX_DEPTH / (afe->srate * afe->tx_channels) + 1;
+	while (cnt < delay_cnt) {
+		ret =
+		    regmap_read(afe->regmap, REG_CDN_I2SSC_REGS_I2S_STAT, &val);
+		if (ret >= 0) {
+			if (BIT_STAT_FIFO_EMPTY & val) {
 				break;
 			}
 		}
-		udelay(20);
-		cnt ++;
+		udelay(10);
+		cnt++;
 	}
-
+	ret = regmap_read(afe->regmap,
+					  REG_CDN_I2SSC_REGS_FIFO_LEVEL, &val);
+	if (val > 0){
+		dev_err(afe->dev, "delay %d , afe->tx_channels %d level %d \n", delay_cnt,afe->tx_channels,val);
+	}
 	/*Disable tx sdi*/
 	regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_I2S_CTRL_FDX,
 			   BIT_CTRL_FDX_I2S_FTX_EN,
 			   (0 << I2S_CTRL_FDX_I2S_FTX_EN_FIELD_OFFSET));
 	udelay(30);
 	regmap_write(afe->regmap, REG_CDN_I2SSC_REGS_I2S_STAT, 0);
+
 }
 
 static void afe_i2s_sc_stop(struct sdrv_afe_i2s_sc *afe)
@@ -891,13 +899,7 @@ int snd_afe_dai_hw_params(struct snd_pcm_substream *substream,
 	/* 	unsigned freq, ratio, level;
 		int err; */
 	/*Filter TDM setting*/
-/* 	if ((params_channels(hwparam) != 1) &&
-	    (params_channels(hwparam) != 2) &&
-	    (params_channels(hwparam) != 4) &&
-	    (params_channels(hwparam) != 8)) {
-
-		return -EINVAL;
-	} */
+	afe->srate = srate;
 	if(afe->tdm_initialized == false){
 		if (params_channels(hwparam) == 2) {
 			/*config data channel stereo*/
@@ -913,6 +915,19 @@ int snd_afe_dai_hw_params(struct snd_pcm_substream *substream,
 			regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_I2S_CTRL,
 					BIT_CTRL_MONO_MODE,
 					(0 << I2S_CTRL_MONO_MODE_FIELD_OFFSET));
+			/*set to pack mode*/
+			if(afe->pack_en == true){
+				regmap_update_bits(
+						afe->regmap, REG_CDN_I2SSC_REGS_I2S_CTRL,
+						BIT_CTRL_LR_PACK,
+						(1 << I2S_CTRL_LR_PACK_FIELD_OFFSET));
+			}else{
+				regmap_update_bits(
+						afe->regmap, REG_CDN_I2SSC_REGS_I2S_CTRL,
+						BIT_CTRL_LR_PACK,
+						(0 << I2S_CTRL_LR_PACK_FIELD_OFFSET));
+			}
+
 		} else if (params_channels(hwparam) == 1) {
 			/*config data channel mono
 			DEBUG_FUNC_PRT*/
@@ -928,13 +943,26 @@ int snd_afe_dai_hw_params(struct snd_pcm_substream *substream,
 			regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_I2S_CTRL,
 					BIT_CTRL_MONO_MODE,
 					(0 << I2S_CTRL_MONO_MODE_FIELD_OFFSET));
+			/*clear pack mode*/
+			regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_I2S_CTRL,
+					BIT_CTRL_LR_PACK,
+					(0 << I2S_CTRL_LR_PACK_FIELD_OFFSET));
+
 		} else {
 			/* Multi channels */
 			DEBUG_FUNC_PRT
+			/*clear pack mode*/
+			regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_I2S_CTRL,
+					BIT_CTRL_LR_PACK,
+					(0 << I2S_CTRL_LR_PACK_FIELD_OFFSET));
 			snd_afe_dai_ch_cfg(afe, substream->stream, params_channels(hwparam));
 		}
 	}else{
 		/* Already set to tdm by snd_afe_set_dai_tdm_slot */
+			/*clear pack mode*/
+		regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_I2S_CTRL,
+					BIT_CTRL_LR_PACK,
+					(0 << I2S_CTRL_LR_PACK_FIELD_OFFSET));
 
 		snd_afe_dai_ch_cfg(afe, substream->stream, params_channels(hwparam));
 		DEBUG_FUNC_PRT
@@ -943,21 +971,25 @@ int snd_afe_dai_hw_params(struct snd_pcm_substream *substream,
 	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
 		DEBUG_FUNC_PRT
 		if (false == afe->is_full_duplex) {
-			regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_I2S_CTRL,
-				   BIT_CTRL_DIR_CFG,
-				   (1 << I2S_CTRL_DIR_CFG_FIELD_OFFSET));
+			regmap_update_bits(
+			    afe->regmap, REG_CDN_I2SSC_REGS_I2S_CTRL,
+			    BIT_CTRL_DIR_CFG,
+			    (1 << I2S_CTRL_DIR_CFG_FIELD_OFFSET));
 		}
 		/*set tx substream*/
 		afe->tx_substream = substream;
+		afe->tx_channels = channels;
 	} else if (substream->stream == SNDRV_PCM_STREAM_CAPTURE) {
 		DEBUG_FUNC_PRT
 		if (false == afe->is_full_duplex) {
-			regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_I2S_CTRL,
-				   BIT_CTRL_DIR_CFG,
-				   (0 << I2S_CTRL_DIR_CFG_FIELD_OFFSET));
+			regmap_update_bits(
+			    afe->regmap, REG_CDN_I2SSC_REGS_I2S_CTRL,
+			    BIT_CTRL_DIR_CFG,
+			    (0 << I2S_CTRL_DIR_CFG_FIELD_OFFSET));
 		}
 		/*set rx substream */
 		afe->rx_substream = substream;
+		afe->rx_channels = channels;
 	} else {
 		DEBUG_FUNC_PRT
 		return -EINVAL;
@@ -969,8 +1001,14 @@ int snd_afe_dai_hw_params(struct snd_pcm_substream *substream,
 				__func__,__LINE__);
 			return -EINVAL;
 		case SNDRV_PCM_FORMAT_S16_LE:
+			break;
 		case SNDRV_PCM_FORMAT_S24_LE:
 		case SNDRV_PCM_FORMAT_S32_LE:
+			/* Don't support in LR Pack mode */
+			if (params_channels(hwparam) == 2)
+			{
+				return -EINVAL;
+			}
 			break;
 		default:
 			return -EINVAL;
@@ -1111,7 +1149,6 @@ static int snd_afe_dai_set_fmt(struct snd_soc_dai *dai, unsigned int fmt)
 
 	struct sdrv_afe_i2s_sc *afe = snd_soc_dai_get_drvdata(dai);
 	unsigned int val = 0, ret;
-	DEBUG_FUNC_PRT
 	switch (fmt & SND_SOC_DAIFMT_INV_MASK) {
 	case SND_SOC_DAIFMT_NB_NF:
 		break;
@@ -1520,7 +1557,6 @@ static int sdrv_pcm_prepare_slave_config(struct snd_pcm_substream *substream,
 
 	slave_config->dst_maxburst = channels;//max((int)channels, 4);
 	slave_config->src_maxburst = channels; // max((int)channels, 4);
-
 	/*Change width by audio format */
 
 	switch (params_format(params)) {
@@ -1530,8 +1566,14 @@ static int sdrv_pcm_prepare_slave_config(struct snd_pcm_substream *substream,
 			return -EINVAL;
 		case SNDRV_PCM_FORMAT_S16_LE:
 			DEBUG_FUNC_PRT;
-			slave_config->src_addr_width = DMA_SLAVE_BUSWIDTH_2_BYTES;
-			slave_config->dst_addr_width = DMA_SLAVE_BUSWIDTH_2_BYTES;
+			if((channels == 2)&&(afe->pack_en == true)){
+				/* Set to L/R pack mode. */
+				slave_config->src_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
+				slave_config->dst_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
+			}else{
+				slave_config->src_addr_width = DMA_SLAVE_BUSWIDTH_2_BYTES;
+				slave_config->dst_addr_width = DMA_SLAVE_BUSWIDTH_2_BYTES;
+			}
 			break;
 		case SNDRV_PCM_FORMAT_S24_LE:
 		case SNDRV_PCM_FORMAT_S32_LE:
@@ -1542,10 +1584,12 @@ static int sdrv_pcm_prepare_slave_config(struct snd_pcm_substream *substream,
 		default:
 			return -EINVAL;
 	}
-	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
+	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK){
 		slave_config->dst_addr = afe->playback_dma_data.addr;
-	else
+
+	}else{
 		slave_config->src_addr = afe->capture_dma_data.addr;
+	}
 	DEBUG_FUNC_PRT;
 	return 0;
 }
@@ -1740,7 +1784,12 @@ static int snd_afe_i2s_sc_probe(struct platform_device *pdev)
 		dev_err(&pdev->dev, "couldn't register component\n");
 		goto err_disable;
 	}
+	/*init afe*/
 	afe->tdm_initialized = false;
+	afe->rx_channels = 1;
+	afe->tx_channels = 1;
+	afe->srate = 8000;
+	afe->pack_en = true;
 	afe_i2s_sc_config(afe);
 	return 0;
 err_disable:
