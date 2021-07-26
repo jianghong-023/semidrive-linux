@@ -4,6 +4,5 @@ targets += dtbs dtbs_install
 targets += $(dtbo-y)
 always          := $(dtbo-y)
 subdir-y	+= audio-overlays
-subdir-y	+= mmc-overlays
 subdir-y	+= ethernet-overlays
 clean-files     := *.dtbo
