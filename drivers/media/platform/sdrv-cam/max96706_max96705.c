@@ -908,6 +908,7 @@ static int max96706_initialization(struct max96706_dev *sensor)
 	ap0101_read_reg16(sensor, AP0101_DEV_INDEX, reg, &val16);
 	dev_info(&client->dev, "0101, reg=0x%x, val=0x%x\n", reg, val16);
 
+#if 0
 	reg = 0xca9c;		//
 	val16 = 0;
 	ap0101_read_reg16(sensor, AP0101_DEV_INDEX, reg, &val16);
@@ -944,7 +945,7 @@ static int max96706_initialization(struct max96706_dev *sensor)
 		}
 	}
 	dev_info(&client->dev, "0101, end msb. i=%d\n", i);
-
+#endif
 	val = 0;
 	max96706_read_reg(sensor, 0x5, &val);
 	dev_info(&client->dev, "96706, reg=0x5, val=0x%x\n", val);
@@ -985,7 +986,7 @@ static int max96706_probe(struct i2c_client *client,
 	 * YUV422 UYVY VGA@30fps
 	 */
 	fmt = &sensor->fmt;
-	fmt->code = MEDIA_BUS_FMT_YUYV8_2X8;
+	fmt->code = MEDIA_BUS_FMT_UYVY8_2X8;
 	fmt->colorspace = V4L2_COLORSPACE_SRGB;
 	fmt->ycbcr_enc = V4L2_MAP_YCBCR_ENC_DEFAULT(fmt->colorspace);
 	fmt->quantization = V4L2_QUANTIZATION_FULL_RANGE;

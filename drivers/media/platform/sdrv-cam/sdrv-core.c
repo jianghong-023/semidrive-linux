@@ -430,6 +430,18 @@ static int sdrv_of_parse_ports(struct csi_core *csi)
 	return notifier->num_subdevs;
 }
 
+static void translate_mbus_type_to_core_type(struct csi_core *csi)
+{
+	switch (csi->mbus_type){
+	case V4L2_MBUS_CSI2:
+	case V4L2_MBUS_CSI1:
+		csi->bt = BT_MIPI;
+		break;
+	default:
+		csi->bt = BT_PARA;
+	}
+}
+
 static int sdrv_of_parse_core(struct platform_device *pdev,
 			      struct csi_core *csi)
 {
@@ -486,6 +498,8 @@ static int sdrv_of_parse_core(struct platform_device *pdev,
 	}
 
 	csi->host_id = host_id;
+
+	translate_mbus_type_to_core_type(csi);
 
 	ret = of_property_read_u32(dev->of_node, "sync", &sync);
 

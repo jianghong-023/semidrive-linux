@@ -172,10 +172,16 @@ static const struct kstream_mbus_format mbus_fmts[] = {
 		.pix_even = 0x03,
 		.fc_dual = false,
 	},
+	{
+		.code = MEDIA_BUS_FMT_Y8_1X8, /* Grep */
+		.pix_odd = 0x03,
+		.pix_even = 0x03,
+		.fc_dual = false,
+	},
 };
 
 const struct kstream_pix_format pix_fmts[] = {
-#if 1
+#if 0
 	{
 		.pixfmt = V4L2_PIX_FMT_YUYV, /* YUYV */
 		.mbus_code = MEDIA_BUS_FMT_YUYV8_2X8,
@@ -212,6 +218,7 @@ const struct kstream_pix_format pix_fmts[] = {
 		.pack_pix_even = 0x02,
 		.split = {0x0FD3, 0x39},
 		.pack = {0x108, 0x08},
+		.bt = 0,
 	},
 	{
 		.pixfmt = V4L2_PIX_FMT_YUYV, /* YUYV */
@@ -222,8 +229,22 @@ const struct kstream_pix_format pix_fmts[] = {
 		.pack_uv_even = 0x03,
 		.pack_pix_odd = 0x03,
 		.pack_pix_even = 0x03,
-		.split = {0x53, 0x3F},
-		.pack = {0x42108, 0},
+		.split = {0x21a, 0x3F},
+		.pack = {0x108, 0},
+		.bt = 0,
+	},
+	{
+		.pixfmt = V4L2_PIX_FMT_YUYV, /* YUYV */
+		.mbus_code = MEDIA_BUS_FMT_UYVY8_2X8,
+		.planes = 1,
+		.bpp = {16},
+		.pack_uv_odd = 0x03,
+		.pack_uv_even = 0x03,
+		.pack_pix_odd = 0x03,
+		.pack_pix_even = 0x03,
+		.split = {0x13, 0x3F},
+		.pack = {0x108, 0},
+		.bt = 0,
 	},
 	{
 		.pixfmt = V4L2_PIX_FMT_UYVY, /* UYVY */
@@ -235,19 +256,21 @@ const struct kstream_pix_format pix_fmts[] = {
 		.pack_pix_odd = 0x03,
 		.pack_pix_even = 0x03,
 		.split = {0x21a, 0x3F},
-		.pack = {0x42108, 0},
+		.pack = {0x108, 0},
+		.bt = 0,
 	},
 	{
-		.pixfmt = V4L2_PIX_FMT_NV16, /* YUYV  2 planes*/
+		.pixfmt = V4L2_PIX_FMT_UYVY, /* UYVY */
 		.mbus_code = MEDIA_BUS_FMT_YUYV8_2X8,
 		.planes = 1,
-		.bpp = {8, 8},
+		.bpp = {16},
 		.pack_uv_odd = 0x03,
 		.pack_uv_even = 0x03,
 		.pack_pix_odd = 0x03,
 		.pack_pix_even = 0x03,
-		.split = {0xFCB, 0xC2},
-		.pack = {0x108, 0x108},
+		.split = {0x13, 0x3F},
+		.pack = {0x108, 0},
+		.bt = 0,
 	},
 	{
 		.pixfmt = V4L2_PIX_FMT_RGB565, /* RGB565 */
@@ -260,6 +283,7 @@ const struct kstream_pix_format pix_fmts[] = {
 		.pack_pix_even = 0x03,
 		.split = {0x53, 0x3F},
 		.pack = {0x42108, 0},
+		.bt = 0,
 	},
 	{
 		.pixfmt = V4L2_PIX_FMT_RGB24, /* RGB24 */
@@ -272,8 +296,163 @@ const struct kstream_pix_format pix_fmts[] = {
 		.pack_pix_even = 0x02,
 		.split = {0x0E53, 0x3F},
 		.pack = {0x2108, 0},
+		.bt = 0,
 	},
+	{
+		.pixfmt = V4L2_PIX_FMT_SBGGR8, /* RAW8 */
+		.mbus_code = MEDIA_BUS_FMT_SBGGR8_1X8,
+		.planes = 1,
+		.bpp = {8},
+		.pack_uv_odd = 0x03,
+		.pack_uv_even = 0x03,
+		.pack_pix_odd = 0x03,
+		.pack_pix_even = 0x03,
+		.split = {0x53, 0x3F},
+		.pack = {0x42108, 0},
+		.bt = 0,
+	},
+	{
+		.pixfmt = V4L2_PIX_FMT_GREY, /* Grep */
+		.mbus_code = MEDIA_BUS_FMT_Y8_1X8,
+		.planes = 1,
+		.bpp = {8},
+		.pack_uv_odd = 0x03,
+		.pack_uv_even = 0x03,
+		.pack_pix_odd = 0x03,
+		.pack_pix_even = 0x03,
+		.split = {0x53, 0x3F},
+		.pack = {0x42108, 0},
+		.bt = 0,
+	},
+	{
+		.pixfmt = V4L2_PIX_FMT_YUV420, /* YUV420 3 planes*/
+		.mbus_code = MEDIA_BUS_FMT_YUYV8_1_5X8,
+		.planes = 1,
+		.bpp = {8, 4, 4},
+		.pack_uv_odd = 0x01,
+		.pack_uv_even = 0x10,
+		.pack_pix_odd = 0x02,
+		.pack_pix_even = 0x02,
+		.split = {0x0FD3, 0x39},
+		.pack = {0x108, 0x08},
+		.bt = 1,
+	},
+	{
+		.pixfmt = V4L2_PIX_FMT_YUYV, /* YUYV */
+		.mbus_code = MEDIA_BUS_FMT_YUYV8_2X8,
+		.planes = 1,
+		.bpp = {16},
+		.pack_uv_odd = 0x03,
+		.pack_uv_even = 0x03,
+		.pack_pix_odd = 0x03,
+		.pack_pix_even = 0x03,
+		.split = {0x53, 0x3F},
+		.pack = {0x42108, 0},
+		.bt = 1,
+	},
+	{
+		.pixfmt = V4L2_PIX_FMT_YUYV, /* YUYV */
+		.mbus_code = MEDIA_BUS_FMT_UYVY8_2X8,
+		.planes = 1,
+		.bpp = {16},
+		.pack_uv_odd = 0x03,
+		.pack_uv_even = 0x03,
+		.pack_pix_odd = 0x03,
+		.pack_pix_even = 0x03,
+		.split = {0x21a, 0x3F},
+		.pack = {0x42108, 0},
+		.bt = 1,
+	},
+	{
+		.pixfmt = V4L2_PIX_FMT_UYVY, /* UYVY */
+		.mbus_code = MEDIA_BUS_FMT_UYVY8_2X8,
+		.planes = 1,
+		.bpp = {16},
+		.pack_uv_odd = 0x03,
+		.pack_uv_even = 0x03,
+		.pack_pix_odd = 0x03,
+		.pack_pix_even = 0x03,
+		.split = {0x53, 0x3F},
+		.pack = {0x42108, 0},
+		.bt = 1,
+	},
+	{
+		.pixfmt = V4L2_PIX_FMT_UYVY, /* UYVY */
+		.mbus_code = MEDIA_BUS_FMT_YUYV8_2X8,
+		.planes = 1,
+		.bpp = {16},
+		.pack_uv_odd = 0x03,
+		.pack_uv_even = 0x03,
+		.pack_pix_odd = 0x03,
+		.pack_pix_even = 0x03,
+		.split = {0x21a, 0x3F},
+		.pack = {0x42108, 0},
+		.bt = 1,
+	},
+	{
+		.pixfmt = V4L2_PIX_FMT_RGB565, /* RGB565 */
+		.mbus_code = MEDIA_BUS_FMT_RGB565_2X8_BE,
+		.planes = 1,
+		.bpp = {16},
+		.pack_uv_odd = 0x03,
+		.pack_uv_even = 0x03,
+		.pack_pix_odd = 0x03,
+		.pack_pix_even = 0x03,
+		.split = {0x53, 0x3F},
+		.pack = {0x42108, 0},
+		.bt = 1,
+	},
+	{
+		.pixfmt = V4L2_PIX_FMT_RGB24, /* RGB24 */
+		.mbus_code = MEDIA_BUS_FMT_RGB888_1X24,
+		.planes = 1,
+		.bpp = {24},
+		.pack_uv_odd = 0x03,
+		.pack_uv_even = 0x03,
+		.pack_pix_odd = 0x02,
+		.pack_pix_even = 0x02,
+		.split = {0x0E53, 0x3F},
+		.pack = {0x2108, 0},
+		.bt = 1,
+	},
+	{
+		.pixfmt = V4L2_PIX_FMT_SBGGR8, /* RAW8 */
+		.mbus_code = MEDIA_BUS_FMT_SBGGR8_1X8,
+		.planes = 1,
+		.bpp = {8},
+		.pack_uv_odd = 0x03,
+		.pack_uv_even = 0x03,
+		.pack_pix_odd = 0x03,
+		.pack_pix_even = 0x03,
+		.split = {0x53, 0x3F},
+		.pack = {0x42108, 0},
+		.bt = 1,
+	},
+	{
+		.pixfmt = V4L2_PIX_FMT_GREY, /* Grep */
+		.mbus_code = MEDIA_BUS_FMT_Y8_1X8,
+		.planes = 1,
+		.bpp = {8},
+		.pack_uv_odd = 0x03,
+		.pack_uv_even = 0x03,
+		.pack_pix_odd = 0x03,
+		.pack_pix_even = 0x03,
+		.split = {0x53, 0x3F},
+		.pack = {0x42108, 0},
+		.bt = 1,
+	},
+
 #endif
+};
+
+const struct kstream_pix_format_base pix_fmts_base[] = {
+	V4L2_PIX_FMT_YUV420, /* YUV420 3 planes*/
+	V4L2_PIX_FMT_YUYV, /* YUYV */
+	V4L2_PIX_FMT_UYVY, /* UYVY */
+	V4L2_PIX_FMT_RGB565, /* RGB565 */
+	V4L2_PIX_FMT_RGB24, /* RGB24 */
+	V4L2_PIX_FMT_SBGGR8, /* RAW8 */
+	V4L2_PIX_FMT_GREY, /* Grep */
 };
 
 const struct kstream_pix_format *kstream_get_kpfmt_by_mbus_code(unsigned int
@@ -314,16 +493,32 @@ const struct kstream_pix_format *kstream_get_kpfmt_by_index(unsigned int index)
 	return &pix_fmts[index];
 }
 
+const int kstream_get_kpfmt_count(void)
+{
+	return ARRAY_SIZE(pix_fmts);
+}
+
+const struct kstream_pix_format_base *kstream_get_kpfmt_base_by_index(unsigned int index)
+{
+	if (index >= ARRAY_SIZE(pix_fmts_base))
+		return NULL;
+	return &pix_fmts_base[index];
+}
+
 static inline int kstream_get_pix_fmt(struct kstream_device *kstream,
 				      struct v4l2_pix_format_mplane **pix_fmt)
 {
 	struct v4l2_pix_format_mplane *fmt;
 	int i;
+	struct v4l2_mbus_framefmt *in_fmt, *out_fmt;
+
+	in_fmt = &kstream->mbus_fmt[SDRV_IMG_PAD_SINK];
+	out_fmt = &kstream->mbus_fmt[SDRV_IMG_PAD_SRC];
 
 	fmt = &kstream->video.active_fmt.fmt.pix_mp;
 
 	for (i = 0; i < ARRAY_SIZE(pix_fmts); i++)
-		if (fmt->pixelformat == pix_fmts[i].pixfmt)
+		if ((fmt->pixelformat == pix_fmts[i].pixfmt) && (in_fmt->code == pix_fmts[i].mbus_code) && (kstream->core->bt == pix_fmts[i].bt))
 			break;
 
 	if (i >= ARRAY_SIZE(pix_fmts))
@@ -579,31 +774,21 @@ static int kstream_set_channel(struct kstream_device *kstream)
 	for (n = 0; n < IMG_HW_NUM_PLANES; n++) {
 		dev_info(kstream->dev, "%s: pix_fmts[pos=%d]\n", __func__, pos);
 
-		if ((kstream->core->host_id == 0)
-		    || (kstream->core->host_id == 1)
-		    || (kstream->core->host_id == 3)
-		    || (kstream->core->host_id == 4)) {
 			if (kstream->core->sync == 0) {
 				kcsi_writel(kstream->base, IMG_CHN_SPLIT_(n),
-					    0x13);
+					    pix_fmts[pos].split[n]);
 				kcsi_writel(kstream->base, IMG_CHN_PACK_(n),
-					    0x108);
+					    pix_fmts[pos].pack[n]);
 			} else {
 				for (j = 0; j < IMG_CNT; j++) {
 					kcsi_writel(kstream->base +
 						    IMG_REG_LEN * j,
-						    IMG_CHN_SPLIT_(n), 0x13);
+						    IMG_CHN_SPLIT_(n), pix_fmts[pos].split[n]);
 					kcsi_writel(kstream->base +
 						    IMG_REG_LEN * j,
-						    IMG_CHN_PACK_(n), 0x108);
+						    IMG_CHN_PACK_(n), pix_fmts[pos].pack[n]);
 				}
 			}
-		} else {
-			kcsi_writel(kstream->base, IMG_CHN_SPLIT_(n),
-				    pix_fmts[pos].split[n]);
-			kcsi_writel(kstream->base, IMG_CHN_PACK_(n),
-				    pix_fmts[pos].pack[n]);
-		}
 
 		if (n < pix_fmt->num_planes)
 			ctrl |= ((1 << n) << IMG_PIXEL_STREAM_EN_SHIFT);

@@ -250,6 +250,11 @@ static int deser_set_fmt(struct v4l2_subdev *sd,
 			   struct v4l2_subdev_pad_config *cfg,
 			   struct v4l2_subdev_format *format)
 {
+	deser_dev_t *sensor = to_deser_dev(sd);
+
+	if(format->format.code != sensor->fmt.code)
+		return -EINVAL;
+
 	return 0;
 }
 
@@ -406,7 +411,9 @@ static int deser_probe(struct i2c_client *client,
 		sensor->sec_9286_shift = 0;
 	}
 
+	mutex_init(&sensor->lock);
 	mutex_init(&sensor->serer_lock);
+
 	dev_err(&client->dev, "Scan desers ....\n");
 
 	if (sensor->type == SERDES_MIPI)
@@ -468,7 +475,8 @@ static int deser_probe(struct i2c_client *client,
 		for (deser_index = 0; *(pdeser + deser_index) != NULL; deser_index++) {
 			dev_info(&client->dev, "deser name = %s\n", (*(pdeser + deser_index))->name);
 		}
-		return -ENODEV;
+		ret = -ENODEV;
+		goto mutex_fail;
 	}
 
 	fmt = &sensor->fmt;
@@ -527,7 +535,8 @@ static int deser_probe(struct i2c_client *client,
 
 	if (!endpoint) {
 		dev_err(dev, "endpoint node not found\n");
-		return -EINVAL;
+		ret = -EINVAL;
+		goto mutex_fail;
 	}
 
 	ret = v4l2_fwnode_endpoint_parse(endpoint, &sensor->ep);
@@ -535,7 +544,8 @@ static int deser_probe(struct i2c_client *client,
 
 	if (ret) {
 		dev_err(dev, "Could not parse endpoint\n");
-		return ret;
+		ret = -EINVAL;
+		goto mutex_fail;
 	}
 
 	v4l2_i2c_subdev_init(&sensor->sd, client, &deser_subdev_ops);
@@ -550,7 +560,7 @@ static int deser_probe(struct i2c_client *client,
 					 MIPI_CSI2_SENS_VCX_PADS_NUM, sensor->pads);
 
 	if (ret)
-		return ret;
+		goto mutex_fail;
 
 #ifdef PROBE_INIT
 	//Power deser
@@ -565,7 +575,7 @@ static int deser_probe(struct i2c_client *client,
 	if (pdeser_param->init_deser) {
 		ret = pdeser_param->init_deser(sensor);
 		if (ret < 0)
-			return ret;
+			goto free_ctrls;
 	}
 #endif
 
@@ -579,10 +589,13 @@ static int deser_probe(struct i2c_client *client,
 
 	return 0;
 
- free_ctrls:
+free_ctrls:
 	//v4l2_ctrl_handler_free(&sensor->ctrls.handler);
-	mutex_destroy(&sensor->lock);
 	media_entity_cleanup(&sensor->sd.entity);
+mutex_fail:
+	mutex_destroy(&sensor->lock);
+	mutex_destroy(&sensor->serer_lock);
+	devm_kfree(dev, sensor);
 	return ret;
 }
 
@@ -593,6 +606,7 @@ static int deser_remove(struct i2c_client *client)
 
 	v4l2_async_unregister_subdev(&sensor->sd);
 	mutex_destroy(&sensor->lock);
+	mutex_destroy(&sensor->serer_lock);
 	media_entity_cleanup(&sensor->sd.entity);
 	//v4l2_ctrl_handler_free(&sensor->ctrls.handler);
 

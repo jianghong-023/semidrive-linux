@@ -1492,17 +1492,17 @@ static int max96706_initialization(deser_dev_t *sensor)
 	max96705_write_reg(sensor, 0, 0xa, AP0101_DEF);
 	msleep(20);
 
-
+#if 0
 	reg = 0x0;	//chip version, 0x0160
 	val16 = 0;
 	ap0101_read_reg16(sensor, 0, reg, &val16);
-	//dev_err(&client->dev, "0101, reg=0x%x, val=0x%x\n", reg, val16);
+	dev_info(&client->dev, "0101, reg=0x%x, val=0x%x\n", reg, val16);
 
 
 	reg = 0xca9c;	//
 	val16 = 0;
 	ap0101_read_reg16(sensor, 0, reg, &val16);
-	//dev_err(&client->dev, "0101, reg=0x%x, val=0x%x\n", reg, val16);
+	dev_info(&client->dev, "0101, reg=0x%x, val=0x%x\n", reg, val16);
 	if ((val16 & (0x1<<10)) == 0) {
 		val16 = 0x405;
 		ap0101_write_reg16(sensor, 0, reg, val16);
@@ -1517,7 +1517,7 @@ static int max96706_initialization(deser_dev_t *sensor)
 	}
 	val16 = 0;
 	ap0101_read_reg16(sensor, 0, reg, &val16);
-	//dev_err(&client->dev, "0101, reg=0x%x, val=0x%x\n", reg, val16);
+	dev_info(&client->dev, "0101, reg=0x%x, val=0x%x\n", reg, val16);
 	if ((val16 & (0x1<<9)) == 0) {
 		val16 = 0x605;
 		ap0101_write_reg16(sensor, 0, reg, val16);
@@ -1530,7 +1530,7 @@ static int max96706_initialization(deser_dev_t *sensor)
 			msleep(100);
 		}
 	}
-
+#endif
 
 	//dev_err(&client->dev, "0101, end msb. i=%d\n", i);
 	dev_info(&client->dev, "%s: end.\n", __func__);
@@ -1549,7 +1549,7 @@ deser_para_t max96706_para = {
 	.htot		= 1320,
 	.height		= 720,
 	.vtot		= 740,
-	.mbus_code	= MEDIA_BUS_FMT_YUYV8_2X8,
+	.mbus_code	= MEDIA_BUS_FMT_UYVY8_2X8,
 	.colorspace	= V4L2_COLORSPACE_SRGB,
 	.fps		= 25,
 	.quantization = V4L2_QUANTIZATION_FULL_RANGE,

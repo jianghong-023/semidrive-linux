@@ -112,9 +112,15 @@ done:
 static int kstream_video_enum_fmt(struct file *file, void *priv,
 		struct v4l2_fmtdesc *f)
 {
+#if 0
 	const struct kstream_pix_format *kpf;
 
 	kpf = kstream_get_kpfmt_by_index(f->index);
+#else
+	const struct kstream_pix_format_base *kpf;
+
+	kpf = kstream_get_kpfmt_base_by_index(f->index);
+#endif
 	if(!kpf)
 		return -EINVAL;
 
@@ -187,7 +193,15 @@ static int __kstream_video_try_format(struct kstream_video *video,
 
 	pix_mp = &f->fmt.pix_mp;
 
+	#if 0
 	kpf = kstream_get_kpfmt_by_fmt(pix_mp->pixelformat);
+	#else
+	int cnt = kstream_get_kpfmt_count();
+	for (i = 0; i < cnt; i++) {
+		kpf = kstream_get_kpfmt_by_index(i);
+		if ((pix_mp->pixelformat != kpf->pixfmt) || (kpf->bt != kstream->core->bt))
+			continue;
+	#endif
 	if(!kpf)
 		return -EINVAL;
 
@@ -200,7 +214,7 @@ static int __kstream_video_try_format(struct kstream_video *video,
 	pix_mp->pixelformat = kpf->pixfmt;
 	pix_mp->width = clamp_t(u32, width, 1, SDRV_IMG_X_MAX);
 	pix_mp->height = clamp_t(u32, height, 1, SDRV_IMG_Y_MAX);
-	pix_mp->num_planes = kpf->planes;
+	pix_mp->num_planes = strlen(kpf->bpp) / sizeof(kpf->bpp[0]);
 	pix_mp->field = field;
 	if(pix_mp->field == V4L2_FIELD_ANY)
 		pix_mp->field = V4L2_FIELD_NONE;
@@ -212,8 +226,16 @@ static int __kstream_video_try_format(struct kstream_video *video,
 	pix_mp->xfer_func = V4L2_MAP_XFER_FUNC_DEFAULT(pix_mp->colorspace);
 
 	ret = __kstream_video_try_format_source(video, which, pix_mp, kpf);
+	#if 0
 	if(ret)
 		return ret;
+	#else
+	if (!ret)
+		break;
+	}
+	if (i==cnt)
+		return -EINVAL;
+	#endif
 
 	switch(pix_mp->field) {
 	case V4L2_FIELD_TOP:

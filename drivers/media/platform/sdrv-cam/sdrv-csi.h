@@ -38,6 +38,9 @@
 #define SDRV_MBUS_DC2CSI1		0x101
 #define SDRV_MBUS_DC2CSI2		0x102
 
+#define BT_MIPI		0
+#define BT_PARA		1
+
 struct csi_core;
 struct kstream_device;
 
@@ -65,8 +68,12 @@ struct kstream_pix_format {
 	u8 pack_pix_even;
 	u32 split[2];
 	u32 pack[2];
+	u32 bt;
 };
 
+struct kstream_pix_format_base {
+	u32 pixfmt;
+};
 
 enum kstream_state {
 	STOPPED = 0,
@@ -161,6 +168,7 @@ struct csi_core {
 	void __iomem *base;
 	u32 irq;
 	u32 host_id;	/* host ip id */
+	u32 bt;		/* bus type */
 	u32 sync;
 	u32 img_sync;
 	u32 img_cnt;
@@ -195,6 +203,11 @@ kstream_get_kpfmt_by_mbus_code(unsigned int mbus_code);
 
 const struct kstream_pix_format *
 kstream_get_kpfmt_by_index(unsigned int index);
+
+const int kstream_get_kpfmt_count(void);
+
+const struct kstream_pix_format_base *
+kstream_get_kpfmt_base_by_index(unsigned int index);
 
 const struct kstream_pix_format *
 kstream_get_kpfmt_by_fmt(unsigned int pixelformat);
