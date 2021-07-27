@@ -188,6 +188,17 @@ static int dwcmshc_phy_dll_config(struct sdhci_host *host)
 	return 0;
 }
 
+static void dwcmshc_phy_reset(struct sdhci_host *host)
+{
+	u32 reg;
+	ktime_t timeout;
+	struct sdhci_pltfm_host *pltfm_host;
+	pltfm_host = sdhci_priv(host);
+
+	/* reset phy */
+	sdhci_writew(host, 0, DWC_MSHC_PHY_CNFG);
+}
+
 static int dwcmshc_phy_init(struct sdhci_host *host)
 {
 	u32 reg;
@@ -330,11 +341,36 @@ static void dwcmshc_set_uhs_signaling(struct sdhci_host *host, unsigned timing)
 
 static void dwcmshc_sdhci_reset(struct sdhci_host *host, u8 mask)
 {
+	if (mask & SDHCI_RESET_ALL) {
+		/* Hold phy reset when software reset host. */
+		dwcmshc_phy_reset(host);
+	}
+
 	sdhci_reset(host, mask);
+
 	if (mask & SDHCI_RESET_ALL) {
 		emmc_card_init(host);
-		dwcmshc_phy_init(host);
 	}
+}
+
+int dwcmshc_start_signal_voltage_switch(struct mmc_host *mmc,
+				      struct mmc_ios *ios)
+{
+	int ret;
+	u32 phy_cnfg_reg;
+	struct sdhci_host *host = mmc_priv(mmc);
+
+	ret = sdhci_start_signal_voltage_switch(mmc, ios);
+
+	/* When switch signal voltage success, need init mshc phy. */
+	if (!ret) {
+		phy_cnfg_reg = sdhci_readw(host, DWC_MSHC_PHY_CNFG);
+		if ((phy_cnfg_reg & PHY_RSTN) == 0u) {
+			dwcmshc_phy_init(host);
+		}
+	}
+
+	return ret;
 }
 
 static void dwcmshc_get_property(struct platform_device *pdev, struct dwcmshc_priv *priv)
@@ -457,6 +493,9 @@ static int dwcmshc_probe(struct platform_device *pdev)
 				sizeof(struct dwcmshc_priv));
 	if (IS_ERR(host))
 		return PTR_ERR(host);
+
+	host->mmc_host_ops.start_signal_voltage_switch =
+		dwcmshc_start_signal_voltage_switch;
 
 	pltfm_host = sdhci_priv(host);
 	priv = sdhci_pltfm_priv(pltfm_host);
