@@ -165,6 +165,7 @@ struct plat_stmmacenet_data {
 	int force_thresh_dma_mode;
 	int riwt_off;
 	int max_speed;
+	int max_dma_cap;
 	int maxmtu;
 	int multicast_filter_bins;
 	int unicast_filter_entries;

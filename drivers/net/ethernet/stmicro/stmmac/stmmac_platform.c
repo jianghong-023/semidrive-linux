@@ -425,6 +425,8 @@ stmmac_probe_config_dt(struct platform_device *pdev, const char **mac)
 
 	of_property_read_u32(np, "rx-fifo-depth", &plat->rx_fifo_size);
 
+	of_property_read_u32(np, "snps,max_dma_cap_quirk", &plat->max_dma_cap);
+
 	plat->force_sf_dma_mode =
 		of_property_read_bool(np, "snps,force_sf_dma_mode");
 
