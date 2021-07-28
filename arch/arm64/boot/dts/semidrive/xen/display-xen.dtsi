@@ -42,7 +42,7 @@
 			sdrv,ip = "g2dlite-r0p0";
 		};
 
-		dp1: dp1@30440000 {
+		dp1: dp1@30d80000 {
 			compatible = "sdrv,dp";
 			reg = <DP1_BASE DPU_RANGE>;
 			interrupts = <0 DP1_IRQ 4>;
@@ -59,7 +59,7 @@
 			sdrv,ip = "dc-r0p1";
 		};
 
-		dp2: dp2@30460000 {
+		dp2: dp2@30d90000 {
 			compatible = "sdrv,dp";
 			reg = <DP2_BASE DPU_RANGE>;
 			interrupts = <0 DP2_IRQ 4>;
@@ -76,7 +76,7 @@
 			sdrv,ip = "dc-r0p1";
 		};
 
-		dp3: dp3@30480000 {
+		dp3: dp3@30da0000 {
 			compatible = "sdrv,dp";
 			reg = <DP3_BASE DPU_RANGE>;
 			interrupts = <0 DP3_IRQ 4>;
@@ -93,7 +93,7 @@
 			sdrv,ip = "dc-r0p1";
 		};
 
-		dc4: dc4@30d90000 {
+		dc4: dc4@30de0000 {
 			compatible = "sdrv,dc";
 			reg = <DC4_BASE DPU_RANGE>;
 			interrupts = <0 DC4_IRQ 4>;
@@ -101,7 +101,7 @@
 			sdrv,ip = "dc-r0p1";
 		};
 
-		dc5: dc5@30da0000 {
+		dc5: dc5@30df0000 {
 			compatible = "sdrv,dc";
 			reg = <DC5_BASE DPU_RANGE>;
 			interrupts = <0 DC5_IRQ 4>;
@@ -280,7 +280,7 @@
 			};
 		};
 
-		lvds0: lvds0@30660000 {
+		lvds0: lvds0@30c50000 {
 			compatible = "semidrive, kunlun-display-lvds";
 			reg = <0x0 0x30c40000 0x0 0x50000>;
 			lvds-select = <1>;
@@ -312,7 +312,7 @@
 			};
 		};
 
-		lvds1: lvds1@30670000 {
+		lvds1: lvds1@30c60000 {
 			compatible = "semidrive, kunlun-display-lvds";
 			reg = <0x0 0x30c40000 0x0 0x50000>;
 			lvds-select = <2>;
