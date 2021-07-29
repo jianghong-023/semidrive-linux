@@ -569,8 +569,6 @@ static int tas5404_i2c_probe(struct i2c_client *client,
 	tas5404->standby_gpio =
 	    devm_gpiod_get_optional(dev, "standby", GPIOD_OUT_LOW);
 	if (IS_ERR(tas5404->standby_gpio)) {
-		if (PTR_ERR(tas5404->standby_gpio) == -EPROBE_DEFER)
-			return -EPROBE_DEFER;
 		dev_prt(dev, "failed to get standby GPIO: %ld\n",
 			 PTR_ERR(tas5404->standby_gpio));
 		tas5404->standby_gpio = NULL;
