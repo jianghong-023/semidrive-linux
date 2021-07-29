@@ -4116,6 +4116,9 @@ static int stmmac_hw_init(struct stmmac_priv *priv)
 		dev_info(priv->device, "No HW DMA feature register supported\n");
 	}
 
+	if (priv->plat->max_dma_cap)
+		priv->dma_cap.addr64 = priv->plat->max_dma_cap;
+
 	if (priv->plat->rx_coe) {
 		priv->hw->rx_csum = priv->plat->rx_coe;
 		dev_info(priv->device, "RX Checksum Offload Engine supported\n");
