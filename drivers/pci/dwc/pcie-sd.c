@@ -517,9 +517,6 @@ static int sd_pcie_establish_link(struct pcie_port *pp)
 	int count = 0;
 	u32 exp_cap_off = 0x70;
 
-	if (sd_pcie_link_up(pcie))
-		return 0;
-
 	dw_pcie_setup_rc(pp);
 
 	reg_val = sd_ctrl_ncr_readl(sd_pcie, PCIE_CTRL_NCR_CTRL0);
