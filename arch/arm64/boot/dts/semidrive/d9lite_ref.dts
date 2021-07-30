@@ -7,30 +7,29 @@
  */
 
 /dts-v1/;
-#include "d9_ap1.dtsi"
-#include "d9_ref-clk-ctrl.dtsi"
+#include "d9_ap2.dtsi"
+#include "d9lite_ref-clk-ctrl.dtsi"
 #include "lcd-timings.dtsi"
 #include <dt-bindings/pinctrl/pins-sdx9.h>
-#include <dt-bindings/memmap/d9/projects/default/image_cfg.h>
+#include <dt-bindings/memmap/d9lite/projects/default/image_cfg.h>
 #include <dt-bindings/memory/sdrv_ion.h>
 #include <dt-bindings/rpmsg/sd,x9h-default.h>
-#include <dt-bindings/media/sdrv_csi.h>
 
 / {
-	model = "Semidrive kunlun D9 REF Board";
+	model = "Semidrive kunlun D9lite REF Board";
 
 	compatible = "semidrive,kunlun";
 
 	aliases {
 		serial0 = &uart14;
-		serial1 = &uart12;
+		//serial1 = &uart12;
 		//serial2 = &uart12;
-		ethernet2 = &ethernet2;
+		//ethernet2 = &ethernet2;
 	};
 
 	memory@50000000 {
 		device_type = "memory";
-		reg = <HIGH32(AP1_KERNEL_MEMBASE-0x80000) LOW32(AP1_KERNEL_MEMBASE-0x80000) HIGH32(AP1_KERNEL_MEMSIZE) LOW32(AP1_KERNEL_MEMSIZE) \
+		reg = <HIGH32(AP2_KERNEL_MEMBASE-0x80000) LOW32(AP2_KERNEL_MEMBASE-0x80000) HIGH32(AP2_KERNEL_MEMSIZE) LOW32(AP2_KERNEL_MEMSIZE) \
 		       0x0 (VDSP_SHARE_MEMBASE+0x4000) 0x0 (VDSP_SHARE_MEMSIZE-0x4000)>;
 	};
 
@@ -49,6 +48,7 @@
 			alloc-ranges = <0x0 0x0 0x0 0xffffffff>;
 			linux,cma-default;
 		};
+
 
 		rproc_0_safety: rproc@0 {
 			compatible = "shared-dma-pool";
@@ -432,7 +432,6 @@
 	mcsi0deser:mcsi0deser@7F {
 		compatible = "sdrv,mcsi0_deser";
 		reg = <0x7F>;
-		type = <SERDES_MIPI>;
 		pwdn-gpios = <&cam_gpio 2 0>;
 		sync = <1>;
 		addr_20086 = /bits/ 16 <0x28>;
@@ -501,7 +500,6 @@
 	mcsi1deser:mcsi1deser@7F {
 		compatible = "sdrv,mcsi1_deser";
 		reg = <0x7F>;
-		type = <SERDES_MIPI>;
 		pwdn-gpios = <&cam_gpios 2 0>;
 		addr_20086 = /bits/ 16 <0x29>;
 		addr_96705 = /bits/ 16 <0x40>;
@@ -547,7 +545,6 @@
 		compatible = "sdrv,dvp_deser";
 		clock-frequency = <24000000>;
 		reg = <0x7E>;
-		type = <SERDES_PARALLEL>;
 		//powerdown-gpios = <&cam_gpios 11 0>;
 		//gpi-gpios = <&cam_gpios 10 0>;
 		pwdn-gpios = <&port4c 19 0>;
@@ -666,7 +663,7 @@
 };
 
 &uart12 {
-	status = "okay";
+	status = "disabled";
 };
 
 &uart14 {
@@ -701,7 +698,7 @@
 };
 
 &g2d {
-	status = "okay";
+	status = "disabled";
 };
 
 &display {
@@ -727,9 +724,9 @@
 	ranges = <0x0 0x00a00000 0x0 0x00a00000 0x0 0x00020000
 		  0x0 0x00a20000 0x0 0x00a20000 0x0 0x00020000
 		  0x0 VDSP_MEMBASE 0x0 VDSP_MEMBASE 0x0 VDSP_MEMSIZE
-		  0x0 LOW32(AP1_KERNEL_MEMBASE-0x80000) 0x0 LOW32(AP1_KERNEL_MEMBASE-0x80000) 0x0 LOW32(0x100000000-AP1_KERNEL_MEMBASE+0x80000)
+		  0x0 LOW32(AP2_KERNEL_MEMBASE-0x80000) 0x0 LOW32(AP2_KERNEL_MEMBASE-0x80000) 0x0 LOW32(0x100000000-AP2_KERNEL_MEMBASE+0x80000)
 		  0x0 VDSP_SHARE_MEMBASE 0x0 VDSP_SHARE_MEMBASE 0x0 VDSP_SHARE_MEMSIZE>;
-	status = "okay";
+	status = "disabled";
 };
 
 &dp1 {
@@ -792,7 +789,7 @@
 	};
 };
 
-&gpio4 {
+&gpio5 {
 	//pinctrl-names = "default";
 	//pinctrl-0 = <&pinctrl_gpiotouch_lvds &pinctrl_gpiotouch_mipi>;
 	status = "okay";
@@ -832,7 +829,7 @@
 };
 
 &vdsp_ipc {
-	status = "okay";
+	status = "disabled";
 };
 
 &mbox_test {
@@ -842,20 +839,24 @@
 &rpmsg0 {
 	memory-region = <&rproc_0_safety>;
 	reg = <0x0 RPMSG0_MEM_HEAD_BASE 0x0 RPMSG0_MEM_HEAD_SIZE>;
+	mboxes = <&mbox 0x16 0x1600>;//for saf<->ap2
 	status = "okay";
 };
 
 &rpmsg1 {
 	memory-region = <&rproc_1_secure>;
 	reg = <0x0 RPMSG1_MEM_HEAD_BASE 0x0 RPMSG1_MEM_HEAD_SIZE>;
+	mboxes = <&mbox 0x17 0x1701>;//for sec<->ap2
 	status = "okay";
 };
 
 &ipcc0 {
+	mboxes = <&mbox 0x36 0x3600>;//for saf<->ap2
 	status = "okay";
 };
 
 &ipcc1 {
+	mboxes = <&mbox 0x37 0x3701>;//for sec<->ap2
 	status = "okay";
 };
 
@@ -890,33 +891,19 @@
 &rstgen {
 	reg = <0x0 0x38467000 0x0 0x1000>,	/* vpu1 */
 		<0x0 0x38468000 0x0 0x1000>,	/* vpu2 */
-		<0x0 0x38490000 0x0 0x1000>,	/* gpu1 core */
-		<0x0 0x38491000 0x0 0x1000>,	/* gpu1 ss */
-		<0x0 0x38461000 0x0 0x1000>,	/* GIC4 */
-		<0x0 0x38455000 0x0 0x1000>,	/* cpu1 core0 warm */
-		<0x0 0x38456000 0x0 0x1000>,	/* cpu1 core1 warm */
-		<0x0 0x38457000 0x0 0x1000>,	/* cpu1 core2 warm */
-		<0x0 0x38458000 0x0 0x1000>,	/* cpu1 core3 warm */
-		<0x0 0x38459000 0x0 0x1000>,	/* cpu1 core4 warm */
-		<0x0 0x3845a000 0x0 0x1000>,	/* cpu1 core5 warm */
-		<0x0 0x3845b000 0x0 0x1000>,	/* cpu1 scu warm */
-		<0x0 0x3846d000 0x0 0x1000>,	/* cpu1 ss */
-		<0x0 0x38407000 0x0 0x2000>;	/* cpu1 all core */
+		<0x0 0x38462000 0x0 0x1000>,	/* GIC 5 */
+		<0x0 0x38464000 0x0 0x1000>,	/* cssys treset n */
+		<0x0 0x3846e000 0x0 0x1000>,	/* cpu2 ss */
+		<0x0 0x38499000 0x0 0x1000>,	/* dbg reg */
+		<0x0 0x38409000 0x0 0x2000>;	/* cpu2 core */
 	rstgen_resource = <
 		RSTGEN_MODULE_VPU1
 		RSTGEN_MODULE_VPU2
-		RSTGEN_MODULE_GPU1_CORE
-		RSTGEN_MODULE_GPU1_SS
-		RSTGEN_MODULE_GIC4
-		RSTGEN_MODULE_CPU1_CORE0_WARM
-		RSTGEN_MODULE_CPU1_CORE1_WARM
-		RSTGEN_MODULE_CPU1_CORE2_WARM
-		RSTGEN_MODULE_CPU1_CORE3_WARM
-		RSTGEN_MODULE_CPU1_CORE4_WARM
-		RSTGEN_MODULE_CPU1_CORE5_WARM
-		RSTGEN_MODULE_CPU1_SCU_WARM
-		RSTGEN_MODULE_CPU1_SS
-		RSTGEN_CORE_CPU1_ALL
+		RSTGEN_MODULE_GIC5
+		RSTGEN_MODULE_CSSYS_TRESET_N
+		RSTGEN_MODULE_CPU2_SS
+		RSTGEN_MODULE_DBG_REG
+		RSTGEN_CORE_CPU2
 		>;
 	status = "okay";
 };
@@ -945,17 +932,21 @@
 	status = "okay";
 };
 
-&watchdog5 {
+&watchdog6 {
 	wdt,auto-run = "false";
 	status = "okay";
 };
 
 &pcie1 {
-	status = "disabled";
-	brcmf: bcrmf@1 {
-		reg = <1>;
-		compatible = "brcm,bcm4329-fmac";
-	};
+	interrupt-map = <0x0 0 0 1
+		 &gic5 GIC_SPI 78 IRQ_TYPE_LEVEL_HIGH>,
+		<0x0 0 0 2
+		 &gic5 GIC_SPI 79 IRQ_TYPE_LEVEL_HIGH>,
+		<0x0 0 0 3
+		 &gic5 GIC_SPI 80 IRQ_TYPE_LEVEL_HIGH>,
+		<0x0 0 0 4
+		 &gic5 GIC_SPI 81 IRQ_TYPE_LEVEL_HIGH>;
+	status = "okay";
 };
 
 &vce2 {
