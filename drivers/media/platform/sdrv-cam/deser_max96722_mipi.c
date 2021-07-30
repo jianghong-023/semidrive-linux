@@ -200,6 +200,30 @@ static reg_param_t max96722_reg[] = {
 //	{0x040b,0x42, 50},
 };
 
+struct max96722_pixfmt {
+	u32 code;
+	u32 colorspace;
+};
+
+static const struct max96722_pixfmt max96722_formats[] = {
+	{MEDIA_BUS_FMT_UYVY8_2X8, V4L2_COLORSPACE_SRGB,},
+};
+
+static int max96722_enum_mbus_code(struct v4l2_subdev *sd,
+				  struct v4l2_subdev_pad_config *cfg,
+				  struct v4l2_subdev_mbus_code_enum *code)
+{
+	if (code->pad != 0)
+		return -EINVAL;
+
+	if (code->index >= ARRAY_SIZE(max96722_formats))
+		return -EINVAL;
+
+	code->code = max96722_formats[code->index].code;
+
+	return 0;
+}
+
 static int max96722_write_reg(deser_dev_t *dev, u16 reg, u8 val)
 {
 	struct i2c_client *client = dev->i2c_client;
@@ -635,4 +659,5 @@ deser_para_t max96722_para = {
 	.init_deser = max96722_initialization,
 	.start_deser = start_deser,
 	.dump_deser	= max96722_reg_dump,
+	.deser_enum_mbus_code = max96722_enum_mbus_code,
 };

@@ -121,6 +121,29 @@ static reg_param_t max9296_setting[] = {
 	{0x0332, 0xC0, 0x0}, //enable PHY2 and PHY3
 };
 
+struct max9296_pixfmt {
+	u32 code;
+	u32 colorspace;
+};
+
+static const struct max9296_pixfmt max9296_formats[] = {
+	{MEDIA_BUS_FMT_UYVY8_2X8, V4L2_COLORSPACE_SRGB,},
+};
+
+static int max9296_enum_mbus_code(struct v4l2_subdev *sd,
+				  struct v4l2_subdev_pad_config *cfg,
+				  struct v4l2_subdev_mbus_code_enum *code)
+{
+	if (code->pad != 0)
+		return -EINVAL;
+
+	if (code->index >= ARRAY_SIZE(max9296_formats))
+		return -EINVAL;
+
+	code->code = max9296_formats[code->index].code;
+
+	return 0;
+}
 
 static int max9296_write_reg(deser_dev_t *sensor, u16 reg, u8 val)
 {
@@ -522,6 +545,7 @@ deser_para_t max9296_para = {
 	.init_deser = max9296_initialization,
 	.start_deser = start_deser,
 	.dump_deser	= NULL,
+	.deser_enum_mbus_code = max9296_enum_mbus_code,
 };
 
 

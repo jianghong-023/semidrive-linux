@@ -475,6 +475,11 @@ static int ar0132_set_fmt(struct v4l2_subdev *sd,
 			  struct v4l2_subdev_pad_config *cfg,
 			  struct v4l2_subdev_format *format)
 {
+	struct ar0132_dev *sensor = to_ar0132_dev(sd);
+
+	if(format->format.code != sensor->fmt.code)
+		return -EINVAL;
+
 	return 0;
 }
 

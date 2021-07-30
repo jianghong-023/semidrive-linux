@@ -445,15 +445,6 @@ const struct kstream_pix_format pix_fmts[] = {
 #endif
 };
 
-const struct kstream_pix_format_base pix_fmts_base[] = {
-	V4L2_PIX_FMT_YUV420, /* YUV420 3 planes*/
-	V4L2_PIX_FMT_YUYV, /* YUYV */
-	V4L2_PIX_FMT_UYVY, /* UYVY */
-	V4L2_PIX_FMT_RGB565, /* RGB565 */
-	V4L2_PIX_FMT_RGB24, /* RGB24 */
-	V4L2_PIX_FMT_SBGGR8, /* RAW8 */
-	V4L2_PIX_FMT_GREY, /* Grep */
-};
 
 const struct kstream_pix_format *kstream_get_kpfmt_by_mbus_code(unsigned int
 								mbus_code)
@@ -498,11 +489,43 @@ const int kstream_get_kpfmt_count(void)
 	return ARRAY_SIZE(pix_fmts);
 }
 
-const struct kstream_pix_format_base *kstream_get_kpfmt_base_by_index(unsigned int index)
+const u32 *kstream_get_support_formats_by_index(struct kstream_device *kstream, unsigned int index)
 {
-	if (index >= ARRAY_SIZE(pix_fmts_base))
+	if (index >= kstream->support_formats_num)
 		return NULL;
-	return &pix_fmts_base[index];
+	return kstream->support_formats+index;
+}
+
+static int kstream_update_support_formats(struct kstream_device *kstream, u32 pixfmt)
+{
+	int i;
+
+	for(i=0; i<kstream->support_formats_num; i++){
+		if (*(kstream->support_formats +i) == pixfmt)
+			return 0;
+	}
+
+	kstream->support_formats_num++;
+	kstream->support_formats = krealloc(kstream->support_formats, sizeof(kstream->support_formats[0])*kstream->support_formats_num, GFP_KERNEL);
+
+	if (!kstream->support_formats)
+		dev_err(kstream->dev, "%s: realloc error\n", __func__);
+
+	*(kstream->support_formats + i) = pixfmt;
+
+	return 0;
+}
+
+const int kstream_init_format_by_mbus_code(struct kstream_device *kstream, unsigned int mbus_code)
+{
+	unsigned int i;
+
+	for (i = 0; i < ARRAY_SIZE(pix_fmts); i++) {
+		if ((mbus_code == pix_fmts[i].mbus_code) && (kstream->core->bt == pix_fmts[i].bt))
+			kstream_update_support_formats(kstream, pix_fmts[i].pixfmt);
+	}
+
+	return 0;
 }
 
 static inline int kstream_get_pix_fmt(struct kstream_device *kstream,
@@ -1506,6 +1529,7 @@ static int kstream_enum_mbus_code(struct v4l2_subdev *sd,
 	struct v4l2_mbus_framefmt *format;
 	unsigned int i;
 
+#if 0
 	if (!v4l2_subdev_call(if_sd, pad, enum_mbus_code, cfg, code)) {
 		for (i = 0; i < ARRAY_SIZE(mbus_fmts); i++) {
 			if (code->code == mbus_fmts[i].code)
@@ -1531,6 +1555,14 @@ static int kstream_enum_mbus_code(struct v4l2_subdev *sd,
 	}
 
 	return 0;
+#else
+	if (!v4l2_subdev_call(if_sd, pad, enum_mbus_code, cfg, code)) {
+		return 0;
+	}
+
+	return -EINVAL;
+
+#endif
 }
 
 static int kstream_enum_frame_size(struct v4l2_subdev *sd,

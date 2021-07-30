@@ -57,6 +57,41 @@ static int kstream_video_querycap(struct file *file, void *fh,
 	return 0;
 }
 
+static int kstream_video_init_formats(struct kstream_video *video)
+{
+	struct v4l2_subdev *sd;
+	u32 pad;
+	struct kstream_device *kstream = container_of(video,
+			struct kstream_device, video);
+	struct v4l2_subdev_mbus_code_enum mbus_code = {
+		.which = V4L2_SUBDEV_FORMAT_ACTIVE,
+	};
+
+	sd = video_remote_subdev(video, &pad);
+	if(sd == NULL)
+		return -EINVAL;
+
+	while (!v4l2_subdev_call(sd, pad, enum_mbus_code,
+	       NULL, &mbus_code)) {
+		mbus_code.index++;
+		kstream_init_format_by_mbus_code(kstream, mbus_code.code);
+		dev_info(video->dev, "%s: mbus_code.code=0x%x, mbus_code.index=%d\n", __func__, mbus_code.code, mbus_code.index);
+	}
+	return 0;
+}
+
+static int kstream_video_free_formats(struct kstream_video *video)
+{
+	struct kstream_device *kstream = container_of(video,
+			struct kstream_device, video);
+
+	kzfree(kstream->support_formats);
+	kstream->support_formats = NULL;
+	kstream->support_formats_num = 0;
+
+	return 0;
+}
+
 static int kstream_video_g_fmt(struct file *file, void *fh,
 		struct v4l2_format *f)
 {
@@ -116,15 +151,24 @@ static int kstream_video_enum_fmt(struct file *file, void *priv,
 	const struct kstream_pix_format *kpf;
 
 	kpf = kstream_get_kpfmt_by_index(f->index);
-#else
-	const struct kstream_pix_format_base *kpf;
 
-	kpf = kstream_get_kpfmt_base_by_index(f->index);
-#endif
 	if(!kpf)
 		return -EINVAL;
 
 	f->pixelformat = kpf->pixfmt;
+#else
+	u32 *kpf;
+	struct kstream_video *video = video_drvdata(file);
+	struct kstream_device *kstream = container_of(video,
+				struct kstream_device, video);
+
+	kpf = kstream_get_support_formats_by_index(kstream, f->index);
+
+	if(!kpf)
+		return -EINVAL;
+
+	f->pixelformat = *kpf;
+#endif
 
 	return 0;
 }
@@ -186,10 +230,10 @@ static int __kstream_video_try_format(struct kstream_video *video,
 	u32 width, height, field;
 	int i, ret;
 	const u8 *bpp;
-	#ifdef CONFIG_ARCH_SEMIDRIVE_PROCESSOR9
+	//#ifdef CONFIG_ARCH_SEMIDRIVE_PROCESSOR9
 	struct kstream_device *kstream = container_of(video,
 			struct kstream_device, video);
-	#endif
+	//#endif
 
 	pix_mp = &f->fmt.pix_mp;
 
@@ -679,6 +723,8 @@ static int kstream_video_open(struct file *file)
 		goto err_pm_use;
 	}
 
+	kstream_video_init_formats(video);
+
 	mutex_unlock(&video->lock);
 
 	return ret;
@@ -694,10 +740,13 @@ err_alloc:
 static int kstream_video_release(struct file *file)
 {
 	struct video_device *vdev = video_devdata(file);
+	struct kstream_video *video = video_drvdata(file);
 
 	vb2_fop_release(file);
 
 	v4l2_pipeline_pm_use(&vdev->entity, 0);
+
+	kstream_video_free_formats(video);
 
 	file->private_data = NULL;
 	return 0;

@@ -52,6 +52,29 @@ enum SUBBOARD_TYPE {
 	BOARD_DB5071 = 0x20,
 };
 
+struct max96706_pixfmt {
+	u32 code;
+	u32 colorspace;
+};
+
+static const struct max96706_pixfmt max96706_formats[] = {
+	{MEDIA_BUS_FMT_UYVY8_2X8, V4L2_COLORSPACE_SRGB,},
+};
+
+static int max96706_enum_mbus_code(struct v4l2_subdev *sd,
+				   struct v4l2_subdev_pad_config *cfg,
+				   struct v4l2_subdev_mbus_code_enum *code)
+{
+	if (code->pad != 0)
+		return -EINVAL;
+
+	if (code->index >= ARRAY_SIZE(max96706_formats))
+		return -EINVAL;
+
+	code->code = max96706_formats[code->index].code;
+
+	return 0;
+}
 
 static int max96706_write_reg(deser_dev_t *sensor, u8 reg, u8 val)
 {
@@ -1565,4 +1588,5 @@ deser_para_t max96706_para = {
 	.init_deser = max96706_initialization,
 	.start_deser = start_deser,
 	.dump_deser	= max96706_reg_dump,
+	.deser_enum_mbus_code = max96706_enum_mbus_code,
 };

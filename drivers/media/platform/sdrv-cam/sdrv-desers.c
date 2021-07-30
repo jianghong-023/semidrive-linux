@@ -189,18 +189,16 @@ static int deser_enum_mbus_code(struct v4l2_subdev *sd,
 				  struct v4l2_subdev_mbus_code_enum *code)
 {
 	deser_dev_t *sensor = to_deser_dev(sd);
+	deser_para_t *pdeser = sensor->priv;
+	int ret = 0;
 
 	if (code->pad != 0)
 		return -EINVAL;
 
-	//if (code->index >= ARRAY_SIZE(deser_formats))
-	//	return -EINVAL;
+	if (pdeser->deser_enum_mbus_code)
+		ret = pdeser->deser_enum_mbus_code(sd, cfg, code);
 
-	//printk("%s index = %d\n", __FUNCTION__, code->index);
-
-	code->code = sensor->fmt.code;
-
-	return 0;
+	return ret;
 }
 
 static int deser_s_stream(struct v4l2_subdev *sd, int enable)

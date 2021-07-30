@@ -76,11 +76,33 @@ enum MAX96705_READ_WRITE {
 #define SER_REG67_DBLALIGN 0xe7
 
 
+struct max9286_pixfmt {
+	u32 code;
+	u32 colorspace;
+};
+
+static const struct max9286_pixfmt max9286_formats[] = {
+	{MEDIA_BUS_FMT_UYVY8_2X8, V4L2_COLORSPACE_SRGB,},
+};
 
 
 reg_param_t max9286_reg[] = {
 };
 
+static int max9286_enum_mbus_code(struct v4l2_subdev *sd,
+				  struct v4l2_subdev_pad_config *cfg,
+				  struct v4l2_subdev_mbus_code_enum *code)
+{
+	if (code->pad != 0)
+		return -EINVAL;
+
+	if (code->index >= ARRAY_SIZE(max9286_formats))
+		return -EINVAL;
+
+	code->code = max9286_formats[code->index].code;
+
+	return 0;
+}
 
 static int max9286_write_reg(deser_dev_t *sensor, u8 reg, u8 val)
 {
@@ -704,6 +726,7 @@ deser_para_t max9286_para = {
 	.init_deser = max9286_initialization,
 	.start_deser = start_deser,
 	.dump_deser	= NULL,
+	.deser_enum_mbus_code = max9286_enum_mbus_code,
 };
 
 deser_para_t max9286_para_2 = {
@@ -733,6 +756,7 @@ deser_para_t max9286_para_2 = {
 	.init_deser = max9286_initialization,
 	.start_deser = start_deser,
 	.dump_deser	= NULL,
+	.deser_enum_mbus_code = max9286_enum_mbus_code,
 };
 
 

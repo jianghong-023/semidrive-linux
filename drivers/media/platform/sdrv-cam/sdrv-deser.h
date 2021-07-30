@@ -128,6 +128,9 @@ struct __deser_param {
 	int (*init_deser) (deser_dev_t *dev);			//Must implement this interface
 	int (*start_deser) (deser_dev_t *dev, bool on); //Must implement this interface
 	void(*dump_deser)(deser_dev_t *dev);
+	int (*deser_enum_mbus_code)(struct v4l2_subdev *sd,
+				   struct v4l2_subdev_pad_config *cfg,
+				   struct v4l2_subdev_mbus_code_enum *code);
 };
 
 
