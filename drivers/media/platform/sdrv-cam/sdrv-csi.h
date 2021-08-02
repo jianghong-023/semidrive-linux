@@ -144,6 +144,9 @@ struct kstream_device {
 	int field;
 	struct kstream_ops *ops;
 
+	u32 *support_formats;
+	int support_formats_num;
+
 	uint32_t hcrop_back;
 	uint32_t hcrop_front;
 	uint32_t hcrop_top_back;
@@ -206,8 +209,9 @@ kstream_get_kpfmt_by_index(unsigned int index);
 
 const int kstream_get_kpfmt_count(void);
 
-const struct kstream_pix_format_base *
-kstream_get_kpfmt_base_by_index(unsigned int index);
+const int kstream_init_format_by_mbus_code(struct kstream_device *kstream, unsigned int mbus_code);
+
+const u32 *kstream_get_support_formats_by_index(struct kstream_device *kstream, unsigned int index);
 
 const struct kstream_pix_format *
 kstream_get_kpfmt_by_fmt(unsigned int pixelformat);

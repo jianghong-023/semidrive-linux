@@ -86,7 +86,7 @@ struct max9286_pixfmt {
 };
 
 static const struct max9286_pixfmt max9286_formats[] = {
-	{MEDIA_BUS_FMT_YUYV8_2X8, V4L2_COLORSPACE_SRGB,},
+	{MEDIA_BUS_FMT_UYVY8_2X8, V4L2_COLORSPACE_SRGB,},
 };
 
 static const int max9286_framerates[] = {
@@ -565,6 +565,11 @@ static int max9286_set_fmt(struct v4l2_subdev *sd,
 			   struct v4l2_subdev_pad_config *cfg,
 			   struct v4l2_subdev_format *format)
 {
+	struct max9286_dev *sensor = to_max9286_dev(sd);
+
+	if(format->format.code != sensor->fmt.code)
+		return -EINVAL;
+
 	return 0;
 }
 
