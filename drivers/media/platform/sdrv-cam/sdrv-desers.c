@@ -90,11 +90,6 @@ static int deser_s_power(struct v4l2_subdev *sd, int on)
 
 	//printk("%s on = %d +\n", __FUNCTION__, on);
 
-	if(pdeser->mipi_bps){
-		kcmc = v4l2_get_subdevdata(interface_sd);
-		kcmc->lanerate = pdeser->mipi_bps/8;
-		kcmc->lane_count = 4;
-	}
 #ifndef PROBE_INIT
 	if (on == 1) {
 		if (pdeser->power_deser) {
@@ -115,6 +110,11 @@ static int deser_s_power(struct v4l2_subdev *sd, int on)
 		}
 	}
 #endif
+    if(pdeser->mipi_bps){
+		kcmc = v4l2_get_subdevdata(interface_sd);
+		kcmc->lanerate = pdeser->mipi_bps/8;
+		kcmc->lane_count = 4;
+	}
 	//printk("%s on = %d -\n", __FUNCTION__, on);
 	dev_info(&sensor->i2c_client->dev, "%s: ret=%d\n", __FUNCTION__, ret);
 	return ret;
