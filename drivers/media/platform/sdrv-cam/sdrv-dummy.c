@@ -237,7 +237,7 @@ static int sdrv_dummy_queue_setup(struct vb2_queue *q,
 		dev_err(csi->dev, "queue setup failed: %d\n", ret);
 		return ret;
 	}
-	*num_buffers = op_ret.msg.queue.bufs;
+	*num_buffers = q->min_buffers_needed = op_ret.msg.queue.bufs;
 	*num_planes = format->num_planes = op_ret.msg.queue.planes;
 	sizes[0] = format->plane_fmt[0].sizeimage = op_ret.msg.queue.size;
 
