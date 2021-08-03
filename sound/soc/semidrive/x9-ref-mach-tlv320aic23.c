@@ -191,6 +191,9 @@ static struct snd_soc_dai_link snd_x9_ref_soc_dai_links[] = {
 /*-Init Machine Driver
  * ---------------------------------------------------------------------*/
 #define SND_X9_MACH_DRIVER "x9-ref-tlv320aic23"
+#define SND_X9U_B0_MACH_DRIVER "x9u-ms_b0-tlv320aic23"
+#define SND_X9U_B1_MACH_DRIVER "x9u-ms_b1-tlv320aic23"
+
 #define SND_CARD_NAME SND_X9_MACH_DRIVER
 /*Sound Card Driver
  * ------------------------------------------------------------------------*/
@@ -236,7 +239,8 @@ static int x9_ref_tlv320aic23_probe(struct platform_device *pdev)
 		/*If it is not ref A03/A04 board. dump_all_part_id();*/
 		if ((get_part_id(PART_BOARD_TYPE) != BOARD_TYPE_MS)) {
 			if (strcmp(pdev->name, "snda1@tlv320aic23") &&
-			    strcmp(pdev->name, "sndb0@tlv320aic23")) {
+			    strcmp(pdev->name, "sndb0@tlv320aic23") &&
+			    strcmp(pdev->name, "sndb1@tlv320aic23")) {
 				return -ENXIO;
 			}
 		}
@@ -256,6 +260,20 @@ static int x9_ref_tlv320aic23_probe(struct platform_device *pdev)
 		return -EINVAL;
 	}
 	snd_x9_ref_soc_dai_links[0].codec_of_node = codec_np;
+
+	if (!strcmp(pdev->name, "sndb0@tlv320aic23")) {
+		card->name = SND_X9U_B0_MACH_DRIVER;
+		snd_x9_ref_soc_dai_links[0].cpu_name = "30630000.i2s";
+		snd_x9_ref_soc_dai_links[0].platform_name = "30630000.i2s";
+	} else if (!strcmp(pdev->name, "sndb1@tlv320aic23")) {
+		card->name = SND_X9U_B1_MACH_DRIVER;
+		snd_x9_ref_soc_dai_links[0].cpu_name = "30650000.i2s";
+		snd_x9_ref_soc_dai_links[0].platform_name = "30650000.i2s";
+	} else {
+		card->name = SND_X9_MACH_DRIVER;
+		snd_x9_ref_soc_dai_links[0].cpu_name = "30630000.i2s";
+		snd_x9_ref_soc_dai_links[0].platform_name = "30630000.i2s";
+	}
 
 	hs_jack_gpios[0].gpio = of_get_named_gpio(np, "semidrive,jack-gpio", 0);
 	if (hs_jack_gpios[0].gpio < 0) {
