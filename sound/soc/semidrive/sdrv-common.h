@@ -156,6 +156,14 @@ struct sdrv_afe_i2s_sc {
 	unsigned tx_slot_mask;
 	unsigned rx_slot_mask;
 	bool tdm_initialized;
+
+	int tx_channels;
+	int rx_channels;
+	/*Only one sample rate for i2s ws*/
+	int srate;
+
+	/* i2s l/r pack mode*/
+	bool pack_en;
 };
 
 /* x9 i2s mc audio front end structure */
