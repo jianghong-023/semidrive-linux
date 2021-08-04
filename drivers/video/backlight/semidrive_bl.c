@@ -264,31 +264,31 @@ err_alloc:
 
 static int rpmsg_backlight_remove(struct platform_device *pdev)
 {
-	struct platform_rpmsg_bl_data *data = dev_get_platdata(&pdev->dev);
 	struct backlight_device *bl = platform_get_drvdata(pdev);
 	struct rpmsg_bl_data *pb = bl_get_data(bl);
 
 	backlight_device_unregister(bl);
-	rpmsg_backlight_power_off(pb, data->bl_screen_id);
+	rpmsg_backlight_power_off(pb, pb->bl_screen_id);
 
 	return 0;
 }
 
 static void rpmsg_backlight_shutdown(struct platform_device *pdev)
 {
-	struct platform_rpmsg_bl_data *data = dev_get_platdata(&pdev->dev);
 	struct backlight_device *bl = platform_get_drvdata(pdev);
 	struct rpmsg_bl_data *pb = bl_get_data(bl);
 
-	rpmsg_backlight_power_off(pb, data->bl_screen_id);
+	if (pb != NULL)
+		rpmsg_backlight_power_off(pb, pb->bl_screen_id);
+
 }
 
 #ifdef CONFIG_PM_SLEEP
 static int sd_rpmsg_bl_suspend(struct device *dev)
 {
-	dev_info(dev, "%s enter ! \n", __func__);
 	struct backlight_device *bl = dev_get_drvdata(dev);
 	struct rpmsg_bl_data *pb = bl_get_data(bl);
+	dev_info(dev, "%s enter ! \n", __func__);
 
 	rpmsg_backlight_power_off(pb, pb->bl_screen_id);
 
@@ -299,8 +299,8 @@ static int sd_rpmsg_bl_suspend(struct device *dev)
 
 static int sd_rpmsg_bl_resume(struct device *dev)
 {
-	dev_info(dev, "%s enter ! \n", __func__);
 	struct backlight_device *bl = dev_get_drvdata(dev);
+	dev_info(dev, "%s enter ! \n", __func__);
 
 	backlight_update_status(bl);
 
