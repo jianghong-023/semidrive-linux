@@ -16,12 +16,20 @@
 #include <linux/miscdevice.h>
 #include <linux/uaccess.h>
 #include <linux/interrupt.h>
+#include <linux/rtnetlink.h>
+#include <crypto/authenc.h>
+#include <linux/uaccess.h> //put_user
+#include <linux/syscalls.h> //sys_close
 
 #include "ce.h"
 #include "sx_sm2.h"
+#include "cryptodev_int.h"
+
+#include <crypto/cryptodev.h>
 
 #define TRNG_CE2_VCE2_NUM 1
 
+#define DEVCRYPTO_CRYPTO_TYPE    0x63 //'c' for devcrypto-linux framework
 #define SEMIDRIVE_CRYPTO_ALG_SM2 0xaa
 #define SEMIDRIVE_CRYPTO_ALG_RSA 0xab
 
@@ -77,12 +85,492 @@ uint8_t __attribute__((aligned(CACHE_LINE))) crypto_gb_ver_msg[64] = "\xF5\xA0\x
                              "\xB1\xB6\xAA\x29\xDF\x21\x2F\xD8\x76\x31\x82\xBC\x0D\x42\x1C\xA1\xBB\x90\x38\xFD\x1F\x7F\x42\xD4\x84\x0B\x69\xC4\x85\xBB\xC1\xAA"; //-- s \xAA
 
 uint8_t __attribute__((aligned(CACHE_LINE))) crypto_gb_m[46];
- 
 uint8_t __attribute__((aligned(CACHE_LINE))) verify_msg_buff[512] = {0};
 uint8_t __attribute__((aligned(CACHE_LINE))) verify_sig_buff[128] = {0};
 uint8_t __attribute__((aligned(CACHE_LINE))) verify_key_buff[128] = {0};
 
 #define to_crypto_dev(priv) container_of((priv), struct crypto_dev, miscdev)
+
+
+/* Prepare session for future use. */
+/* Default (pre-allocated) and maximum size of the job queue.
+ * These are free, pending and done items all together. */
+#define DEF_COP_RINGSIZE 16
+#define MAX_COP_RINGSIZE 64
+
+struct todo_list_item {
+	struct list_head __hook;
+	struct kernel_crypt_op kcop;
+	int result;
+};
+
+struct locked_list {
+	struct list_head list;
+	struct mutex lock;
+};
+
+struct crypt_priv {
+	struct fcrypt fcrypt;
+	struct locked_list free, todo, done;
+	int itemcount;
+	struct work_struct cryptask;
+	wait_queue_head_t user_waiter;
+};
+
+static int crypto_create_session(struct fcrypt *fcr, struct session_op *sop)
+{
+	struct csession	*ses_new = NULL, *ses_ptr;
+	int ret = 0;
+	const char *alg_name = NULL;
+	const char *hash_name = NULL;
+	int hmac_mode = 1, stream = 0, aead = 0;
+	/*
+	 * With composite aead ciphers, only ckey is used and it can cover all the
+	 * structure space; otherwise both keys may be used simultaneously but they
+	 * are confined to their spaces
+	 */
+	struct {
+		uint8_t ckey[CRYPTO_CIPHER_MAX_KEY_LEN];
+		uint8_t mkey[CRYPTO_HMAC_MAX_KEY_LEN];
+		/* padding space for aead keys */
+		uint8_t pad[RTA_SPACE(sizeof(struct crypto_authenc_key_param))];
+	} keys;
+
+	/* Does the request make sense? */
+	if (unlikely(!sop->cipher && !sop->mac)) {
+		pr_err("Both 'cipher' and 'mac' unset.");
+		return -EINVAL;
+	}
+
+	switch (sop->cipher) {
+	case 0:
+		break;
+	case CRYPTO_DES_CBC:
+		alg_name = "cbc(des)";
+		break;
+	case CRYPTO_3DES_CBC:
+		alg_name = "cbc(des3_ede)";
+		break;
+	case CRYPTO_BLF_CBC:
+		alg_name = "cbc(blowfish)";
+		break;
+	case CRYPTO_AES_CBC:
+		alg_name = "cbc(aes)";
+		break;
+	case CRYPTO_AES_ECB:
+		alg_name = "ecb(aes)";
+		break;
+	case CRYPTO_AES_XTS:
+		alg_name = "xts(aes)";
+		break;
+	case CRYPTO_CAMELLIA_CBC:
+		alg_name = "cbc(camellia)";
+		break;
+	case CRYPTO_AES_CTR:
+		alg_name = "ctr(aes)";
+		stream = 1;
+		break;
+	case CRYPTO_AES_GCM:
+		alg_name = "gcm(aes)";
+		stream = 1;
+		aead = 1;
+		break;
+	case CRYPTO_TLS11_AES_CBC_HMAC_SHA1:
+		alg_name = "tls11(hmac(sha1),cbc(aes))";
+		stream = 0;
+		aead = 1;
+		break;
+	case CRYPTO_TLS12_AES_CBC_HMAC_SHA256:
+		alg_name = "tls12(hmac(sha256),cbc(aes))";
+		stream = 0;
+		aead = 1;
+		break;
+	case CRYPTO_NULL:
+		alg_name = "ecb(cipher_null)";
+		stream = 1;
+		break;
+	default:
+		pr_err("bad cipher: %d", sop->cipher);
+		return -EINVAL;
+	}
+
+	switch (sop->mac) {
+	case 0:
+		break;
+	case CRYPTO_MD5_HMAC:
+		hash_name = "hmac(md5)";
+		break;
+	case CRYPTO_RIPEMD160_HMAC:
+		hash_name = "hmac(rmd160)";
+		break;
+	case CRYPTO_SHA1_HMAC:
+		hash_name = "hmac(sha1)";
+		break;
+	case CRYPTO_SHA2_224_HMAC:
+		hash_name = "hmac(sha224)";
+		break;
+
+	case CRYPTO_SHA2_256_HMAC:
+		hash_name = "hmac(sha256)";
+		break;
+	case CRYPTO_SHA2_384_HMAC:
+		hash_name = "hmac(sha384)";
+		break;
+	case CRYPTO_SHA2_512_HMAC:
+		hash_name = "hmac(sha512)";
+		break;
+
+	/* non-hmac cases */
+	case CRYPTO_MD5:
+		hash_name = "md5";
+		hmac_mode = 0;
+		break;
+	case CRYPTO_RIPEMD160:
+		hash_name = "rmd160";
+		hmac_mode = 0;
+		break;
+	case CRYPTO_SHA1:
+		hash_name = "sha1";
+		hmac_mode = 0;
+		break;
+	case CRYPTO_SHA2_224:
+		hash_name = "sha224";
+		hmac_mode = 0;
+		break;
+	case CRYPTO_SHA2_256:
+		hash_name = "sha256";
+		hmac_mode = 0;
+		break;
+	case CRYPTO_SHA2_384:
+		hash_name = "sha384";
+		hmac_mode = 0;
+		break;
+	case CRYPTO_SHA2_512:
+		hash_name = "sha512";
+		hmac_mode = 0;
+		break;
+	default:
+		pr_err("bad mac: %d", sop->mac);
+		return -EINVAL;
+	}
+
+	/* Create a session and put it to the list. Zeroing the structure helps
+	 * also with a single exit point in case of errors */
+	ses_new = kzalloc(sizeof(*ses_new), GFP_KERNEL);
+	if (!ses_new)
+		return -ENOMEM;
+
+	/* Set-up crypto transform. */
+	if (alg_name) {
+		unsigned int keylen;
+		ret = cryptodev_get_cipher_keylen(&keylen, sop, aead);
+		if (unlikely(ret < 0)) {
+			pr_err("Setting key failed for %s-%zu.",
+				alg_name, (size_t)sop->keylen*8);
+			goto session_error;
+		}
+
+		ret = cryptodev_get_cipher_key(keys.ckey, sop, aead);
+		if (unlikely(ret < 0))
+			goto session_error;
+
+		ret = cryptodev_cipher_init(&ses_new->cdata, alg_name, keys.ckey,
+						keylen, stream, aead);
+		if (ret < 0) {
+			pr_err("Failed to load cipher for %s", alg_name);
+			ret = -EINVAL;
+			goto session_error;
+		}
+	}
+
+	if (hash_name && aead == 0) {
+		if (unlikely(sop->mackeylen > CRYPTO_HMAC_MAX_KEY_LEN)) {
+			pr_err("Setting key failed for %s-%zu.",
+				hash_name, (size_t)sop->mackeylen*8);
+			ret = -EINVAL;
+			goto session_error;
+		}
+
+		if (sop->mackey && unlikely(copy_from_user(keys.mkey, sop->mackey,
+					    sop->mackeylen))) {
+			ret = -EFAULT;
+			goto session_error;
+		}
+
+		ret = cryptodev_hash_init(&ses_new->hdata, hash_name, hmac_mode,
+							keys.mkey, sop->mackeylen);
+		if (ret != 0) {
+			pr_err("Failed to load hash for %s", hash_name);
+			ret = -EINVAL;
+			goto session_error;
+		}
+
+		ret = cryptodev_hash_reset(&ses_new->hdata);
+		if (ret != 0) {
+			goto session_error;
+		}
+	}
+
+	ses_new->alignmask = max(ses_new->cdata.alignmask,
+	                                          ses_new->hdata.alignmask);
+	pr_info("got alignmask %d", ses_new->alignmask);
+
+	ses_new->array_size = DEFAULT_PREALLOC_PAGES;
+	pr_info("preallocating for %d user pages", ses_new->array_size);
+	ses_new->pages = kzalloc(ses_new->array_size *
+			sizeof(struct page *), GFP_KERNEL);
+	ses_new->sg = kzalloc(ses_new->array_size *
+			sizeof(struct scatterlist), GFP_KERNEL);
+
+	if (ses_new->sg == NULL || ses_new->pages == NULL) {
+		pr_err("Memory error");
+		ret = -ENOMEM;
+		goto session_error;
+	}
+
+	/* put the new session to the list */
+	get_random_bytes(&ses_new->sid, sizeof(ses_new->sid));
+	mutex_init(&ses_new->sem);
+	mutex_lock(&fcr->sem);
+restart:
+	list_for_each_entry(ses_ptr, &fcr->list, entry) {
+		/* Check for duplicate SID */
+		if (unlikely(ses_new->sid == ses_ptr->sid)) {
+			get_random_bytes(&ses_new->sid, sizeof(ses_new->sid));
+			/* Unless we have a broken RNG this
+			   shouldn't loop forever... ;-) */
+			goto restart;
+		}
+	}
+
+	list_add(&ses_new->entry, &fcr->list);
+	mutex_unlock(&fcr->sem);
+
+	/* Fill in some values for the user. */
+	sop->ses = ses_new->sid;
+
+	return 0;
+
+	/* We count on ses_new to be initialized with zeroes
+	 * Since hdata and cdata are embedded within ses_new, it follows that
+	 * hdata->init and cdata->init are either zero or one as they have been
+	 * initialized or not */
+session_error:
+	cryptodev_hash_deinit(&ses_new->hdata);
+	cryptodev_cipher_deinit(&ses_new->cdata);
+	kfree(ses_new->sg);
+	kfree(ses_new->pages);
+	kfree(ses_new);
+	return ret;
+}
+
+/* Everything that needs to be done when removing a session. */
+static inline void
+crypto_destroy_session(struct csession *ses_ptr)
+{
+	if (!mutex_trylock(&ses_ptr->sem)) {
+		pr_err("Waiting for semaphore of sid=0x%08X", ses_ptr->sid);
+		mutex_lock(&ses_ptr->sem);
+	}
+
+	cryptodev_cipher_deinit(&ses_ptr->cdata);
+	cryptodev_hash_deinit(&ses_ptr->hdata);
+
+	kfree(ses_ptr->pages);
+	kfree(ses_ptr->sg);
+	mutex_unlock(&ses_ptr->sem);
+	mutex_destroy(&ses_ptr->sem);
+	kfree(ses_ptr);
+}
+
+/* Look up a session by ID and remove. */
+static int
+crypto_finish_session(struct fcrypt *fcr, uint32_t sid)
+{
+	struct csession *tmp, *ses_ptr;
+	struct list_head *head;
+	int ret = 0;
+
+	mutex_lock(&fcr->sem);
+	head = &fcr->list;
+	list_for_each_entry_safe(ses_ptr, tmp, head, entry) {
+		if (ses_ptr->sid == sid) {
+			list_del(&ses_ptr->entry);
+			crypto_destroy_session(ses_ptr);
+			break;
+		}
+	}
+
+	if (unlikely(!ses_ptr)) {
+		pr_err("Session with sid=0x%08X not found!", sid);
+		ret = -ENOENT;
+	}
+	mutex_unlock(&fcr->sem);
+
+	return ret;
+}
+
+/* Remove all sessions when closing the file */
+static int
+crypto_finish_all_sessions(struct fcrypt *fcr)
+{
+	struct csession *tmp, *ses_ptr;
+	struct list_head *head;
+
+	mutex_lock(&fcr->sem);
+
+	head = &fcr->list;
+	list_for_each_entry_safe(ses_ptr, tmp, head, entry) {
+		list_del(&ses_ptr->entry);
+		crypto_destroy_session(ses_ptr);
+	}
+	mutex_unlock(&fcr->sem);
+
+	return 0;
+}
+
+static int
+clonefd(struct file *filp)
+{
+	int ret;
+	ret = get_unused_fd_flags(0);
+	if (ret >= 0) {
+			get_file(filp);
+			fd_install(ret, filp);
+	}
+
+	return ret;
+}
+
+static void cryptask_routine(struct crypto_dev* crypto, struct work_struct *work)
+{
+	struct crypt_priv *pcr = container_of(work, struct crypt_priv, cryptask);
+	struct todo_list_item *item;
+	LIST_HEAD(tmp);
+
+	/* fetch all pending jobs into the temporary list */
+	mutex_lock(&pcr->todo.lock);
+	list_cut_position(&tmp, &pcr->todo.list, pcr->todo.list.prev);
+	mutex_unlock(&pcr->todo.lock);
+
+	/* handle each job locklessly */
+	list_for_each_entry(item, &tmp, __hook) {
+		item->result = crypto_run(crypto, &pcr->fcrypt, &item->kcop);
+		if (unlikely(item->result))
+			pr_err("crypto_run() failed: %d", item->result);
+	}
+
+	/* push all handled jobs to the done list at once */
+	mutex_lock(&pcr->done.lock);
+	list_splice_tail(&tmp, &pcr->done.list);
+	mutex_unlock(&pcr->done.lock);
+
+	/* wake for POLLIN */
+	//wake_up_interruptible(&pcr->user_waiter);
+}
+
+/* Look up session by session ID. The returned session is locked. */
+struct csession *
+crypto_get_session_by_sid(struct fcrypt *fcr, uint32_t sid)
+{
+	struct csession *ses_ptr, *retval = NULL;
+
+	if (unlikely(fcr == NULL))
+		return NULL;
+
+	mutex_lock(&fcr->sem);
+	list_for_each_entry(ses_ptr, &fcr->list, entry) {
+		if (ses_ptr->sid == sid) {
+			mutex_lock(&ses_ptr->sem);
+			retval = ses_ptr;
+			break;
+		}
+	}
+	mutex_unlock(&fcr->sem);
+
+	return retval;
+}
+
+/* this function has to be called from process context */
+static int fill_kcop_from_cop(struct kernel_crypt_op *kcop, struct fcrypt *fcr)
+{
+	struct crypt_op *cop = &kcop->cop;
+	struct csession *ses_ptr;
+	int rc;
+
+	/* this also enters ses_ptr->sem */
+	ses_ptr = crypto_get_session_by_sid(fcr, cop->ses);
+	if (unlikely(!ses_ptr)) {
+		pr_err("invalid session ID=0x%08X", cop->ses);
+		return -EINVAL;
+	}
+	kcop->ivlen = cop->iv ? ses_ptr->cdata.ivsize : 0;
+	kcop->digestsize = 0; /* will be updated during operation */
+
+	crypto_put_session(ses_ptr);
+
+	kcop->task = current;
+	kcop->mm = current->mm;
+
+	if (cop->iv) {
+		rc = copy_from_user(kcop->iv, cop->iv, kcop->ivlen);
+		if (unlikely(rc)) {
+			pr_err("error copying IV (%d bytes), copy_from_user returned %d for address %p",
+					kcop->ivlen, rc, cop->iv);
+			return -EFAULT;
+		}
+	}
+
+	return 0;
+}
+
+/* this function has to be called from process context */
+static int fill_cop_from_kcop(struct kernel_crypt_op *kcop, struct fcrypt *fcr)
+{
+	int ret;
+
+	if (kcop->digestsize) {
+		ret = copy_to_user(kcop->cop.mac,
+				kcop->hash_output, kcop->digestsize);
+		if (unlikely(ret))
+			return -EFAULT;
+	}
+	if (kcop->ivlen && kcop->cop.flags & COP_FLAG_WRITE_IV) {
+		ret = copy_to_user(kcop->cop.iv,
+				kcop->iv, kcop->ivlen);
+		if (unlikely(ret))
+			return -EFAULT;
+	}
+	return 0;
+}
+
+static int kcop_from_user(struct kernel_crypt_op *kcop,
+			struct fcrypt *fcr, void __user *arg)
+{
+	if (unlikely(copy_from_user(&kcop->cop, arg, sizeof(kcop->cop))))
+		return -EFAULT;
+
+	return fill_kcop_from_cop(kcop, fcr);
+}
+
+static int kcop_to_user(struct kernel_crypt_op *kcop,
+			struct fcrypt *fcr, void __user *arg)
+{
+	int ret;
+
+	ret = fill_cop_from_kcop(kcop, fcr);
+	if (unlikely(ret)) {
+		pr_err("Error in fill_cop_from_kcop");
+		return ret;
+	}
+
+	if (unlikely(copy_to_user(arg, &kcop->cop, sizeof(kcop->cop)))) {
+		pr_err("Cannot copy to userspace");
+		return -EFAULT;
+	}
+
+	return 0;
+}
 
 static long crypto_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 {
@@ -96,11 +584,20 @@ static long crypto_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 	block_t key;
 	block_t signature;
 
+	int __user *p = arg;
+	int fd;
+	struct session_op sop;
+	uint32_t ses;
+	struct kernel_crypt_op kcop;
+	struct fcrypt *fcr;
+	struct crypt_priv *pcr = filp->private_data;
+	fcr = &pcr->fcrypt;
+
 	ret = -ENOTTY;
 
 	crypto = to_crypto_dev(filp->private_data);
 
-    switch(_IOC_TYPE(cmd)){
+    switch(_IOC_TYPE(cmd)) {
 			case SEMIDRIVE_CRYPTO_ALG_SM2:
 			{
 				//pr_info("crypto_ioctl enter cmd=%d, arg=%p", cmd,(char __user *)arg);
@@ -214,12 +711,96 @@ static long crypto_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 				break;
 			case SEMIDRIVE_CRYPTO_ALG_RSA:
 				break;
-		default:
-			pr_warn("%s: Unhandled ioctl cmd: 0x%x\n",
-				__func__, cmd);
-			ret = -EINVAL;
+			case DEVCRYPTO_CRYPTO_TYPE:
+				switch(cmd) {
+					case CRIOGET:
+						fd = clonefd(filp);
+						ret = put_user(fd, p);
+						if (unlikely(ret)) {
+				#if (LINUX_VERSION_CODE < KERNEL_VERSION(4, 17, 0))
+							sys_close(fd);
+				#elif (LINUX_VERSION_CODE < KERNEL_VERSION(5, 11, 0))
+							ksys_close(fd);
+				#else
+							close_fd(fd);
+				#endif
+							return ret;
+						}
+						return ret;
+					case CIOCGSESSION:
+						if (unlikely(copy_from_user(&sop, arg, sizeof(sop))))
+							return -EFAULT;
+						ret = crypto_create_session(fcr, &sop);
+						if (unlikely(ret))
+							return ret;
+						ret = copy_to_user(arg, &sop, sizeof(sop));
+						if (unlikely(ret)) {
+							//crypto_finish_session(fcr, sop.ses);
+							pr_err("CIOCGSESSION Line %d, ret: %d\n", __LINE__, ret);
+							return -EFAULT;
+						}
+
+						return ret;
+					case CIOCFSESSION:
+						ret = get_user(ses, (uint32_t __user *)arg);
+						if (unlikely(ret))
+							return ret;
+						ret = crypto_finish_session(fcr, ses);
+						return ret;
+					case CIOCGSESSINFO:
+					/*
+						if (unlikely(copy_from_user(&siop, arg, sizeof(siop))))
+							return -EFAULT;
+
+						ret = get_session_info(fcr, &siop);
+						if (unlikely(ret))
+							return ret;
+						return copy_to_user(arg, &siop, sizeof(siop));
+					*/
+						return 1;
+					case CIOCCPHASH:
+					/*
+						if (unlikely(copy_from_user(&cphop, arg, sizeof(cphop))))
+							return -EFAULT;
+						return crypto_copy_hash_state(fcr, cphop.dst_ses, cphop.src_ses);
+					*/
+						return 1;
+					case CIOCCRYPT:
+						if (unlikely(ret = kcop_from_user(&kcop, fcr, arg))) {
+							pr_err("Error copying from user");
+							return ret;
+						}
+						ret = crypto_run(crypto, fcr, &kcop);
+						if (unlikely(ret)) {
+							pr_err("Error in crypto_run");
+							return ret;
+						}
+						return kcop_to_user(&kcop, fcr, arg);
+					case CIOCAUTHCRYPT:
+					/*
+						if (unlikely(ret = kcaop_from_user(&kcaop, fcr, arg))) {
+							pr_err("Error copying from user");
+							return ret;
+						}
+
+						ret = crypto_auth_run(fcr, &kcaop);
+						if (unlikely(ret)) {
+							dpr_err("Error in crypto_auth_run");
+							return ret;
+						}
+
+						return kcaop_to_user(&kcaop, fcr, arg);
+					*/
+						return 1;
+					}
+				break;
+			default:
+				pr_warn("%s: --Unhandled ioctl cmd: 0x%x\n",
+					__func__, cmd);
+				ret = -EINVAL;
 	}
 
+	return ret;
 }
 
 static ssize_t crypto_read(struct file *filp, char __user *userbuf, size_t len,
@@ -233,7 +814,7 @@ static ssize_t crypto_write(struct file *filp, const char __user *userbuf,
 			     size_t len, loff_t *f_pos)
 {
 
-	int rc;
+	int rc = 0;
 
 	return rc;
 }
@@ -274,13 +855,61 @@ static int crypto_open(struct inode *inode, struct file *filp)
 
 	crypto = to_crypto_dev(filp->private_data);
 
-	if (!mutex_trylock(&(crypto->lock))) {
+	/* temporary remove lock acquire */
+	/*if (!mutex_trylock(&(crypto->lock))) {
 		pr_info("Device Busy\n");
 		return -EBUSY;
-	}
+	}*/
 
 	sm2_load_curve(crypto, &sx_ecc_sm2_curve_p256_rev, BA414EP_BIGEND);
+
+	struct todo_list_item *tmp, *tmp_next;
+	struct crypt_priv *pcr;
+	int i;
+
+	pcr = kzalloc(sizeof(*pcr), GFP_KERNEL);
+	if (!pcr)
+		return -ENOMEM;
+	filp->private_data = pcr;
+
+	mutex_init(&pcr->fcrypt.sem);
+	mutex_init(&pcr->free.lock);
+	mutex_init(&pcr->todo.lock);
+	mutex_init(&pcr->done.lock);
+
+	INIT_LIST_HEAD(&pcr->fcrypt.list);
+	INIT_LIST_HEAD(&pcr->free.list);
+	INIT_LIST_HEAD(&pcr->todo.list);
+	INIT_LIST_HEAD(&pcr->done.list);
+
+	//INIT_WORK(&pcr->cryptask, cryptask_routine);
+	cryptask_routine(crypto, &pcr->cryptask);
+	init_waitqueue_head(&pcr->user_waiter);
+
+	for (i = 0; i < DEF_COP_RINGSIZE; i++) {
+		tmp = kzalloc(sizeof(struct todo_list_item), GFP_KERNEL);
+		if (!tmp)
+			goto err_ringalloc;
+		pcr->itemcount++;
+
+		list_add(&tmp->__hook, &pcr->free.list);
+	}
+
 	return 0;
+
+/* In case of errors, free any memory allocated so far */
+err_ringalloc:
+	list_for_each_entry_safe(tmp, tmp_next, &pcr->free.list, __hook) {
+		list_del(&tmp->__hook);
+		kfree(tmp);
+	}
+	mutex_destroy(&pcr->done.lock);
+	mutex_destroy(&pcr->todo.lock);
+	mutex_destroy(&pcr->free.lock);
+	mutex_destroy(&pcr->fcrypt.sem);
+	kfree(pcr);
+	filp->private_data = NULL;
+	return -ENOMEM;
 }
 
 
@@ -337,7 +966,6 @@ static int semidrive_crypto_probe(struct platform_device *pdev)
 	struct crypto_dev *crypto_inst;
 	struct miscdevice *crypto_fn;
 	int ret;
-	dev_t devt;
 	int irq;
     struct semidrive_vce_device *ce_device;
 
