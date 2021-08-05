@@ -36,7 +36,7 @@
 #define SDRV_SID_GPU1_2       0x23
 #define SDRV_SID_GPU1_3       0x24
 
-#define SDRV_SID_ETH2         0x30
+#define SDRV_SID_ETH1         0x30
 #define SDRV_SID_ETH2         0x31
 
 #define SDRV_SID_VPU1         0x32
