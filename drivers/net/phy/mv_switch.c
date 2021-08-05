@@ -396,6 +396,30 @@ static int mv_get_auto_negotiation_state(struct phy_device *phy, struct mv_data 
 		MV_PHY_AUTO_NEGO_STA_REG);
 }
 
+static int mv_write_tx_phy_reg(struct phy_device *phy, u16 data1, u16 data2)
+{
+	if (mv_wait_smi_idle(phy, 200) < 0)
+		return -EBUSY;
+
+	mv_write(phy, MV_GLOBAL2_PORT, MV_SMI_PHY_DATA_REG, data2);
+	mv_write(phy, MV_GLOBAL2_PORT, MV_SMI_PHY_CMD_REG, data1);
+	return 0;
+}
+
+static void mv_5050_disable_tx_EEE_and_energy_detect(struct phy_device *phy)
+{
+	mv_write_tx_phy_reg(phy, 0x94dd, 0x001b);
+	mv_write_tx_phy_reg(phy, 0x94de, 0x0e02);
+	mv_write_tx_phy_reg(phy, 0x94dc, 0x0c03);
+	mv_write_tx_phy_reg(phy, 0x94ce, 0x003c);
+	mv_write_tx_phy_reg(phy, 0x94cd, 0x0007);
+	mv_write_tx_phy_reg(phy, 0x94cd, 0x4007);
+	mv_write_tx_phy_reg(phy, 0x94ce, 0x0000);
+	mv_write_tx_phy_reg(phy, 0x94c0, 0xb100);
+	mv_write_tx_phy_reg(phy, 0x94d6, 0x0001);
+	mv_write_tx_phy_reg(phy, 0x94d0, 0x1108);
+}
+
 static int mv_5050_init(struct phy_device *phy)
 {
 	int port;
@@ -405,6 +429,7 @@ static int mv_5050_init(struct phy_device *phy)
 		mv_write_phy_register(phy, MV_INTERNAL_PHY, port,
 			MV_5050_INTERNAL_PHY_DEVICE1, MV_5050_INTERNAL_PHY_PMA_PMD_REG,
 			MV_5050_INTERNAL_PHY_PMA_PMD_DATA);
+	return 0;
 }
 
 static void mv_5050_auto_polarity_reversed(struct phy_device *phy)
@@ -516,6 +541,7 @@ static int mv_probe(struct phy_device *phydev)
 		else
 			mv_5050_init(phydev);
 		mv_5050_auto_polarity_reversed(phydev);
+		mv_5050_disable_tx_EEE_and_energy_detect(phydev);
 	} else {
 		mv_misc = &mv_5072;
 		mv_phy[1] = phydev;
