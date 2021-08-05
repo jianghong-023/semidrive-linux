@@ -24,10 +24,13 @@
 #include "ce.h"
 #include "sx_sm2.h"
 #include "cryptodev_int.h"
+#include "crypto.h"
+#include "ce_reg.h"
 
 #include <crypto/cryptodev.h>
 
 #define TRNG_CE2_VCE2_NUM 1
+#define SEMIDRIVE_QUEUE_LENGTH 1
 
 #define DEVCRYPTO_CRYPTO_TYPE    0x63 //'c' for devcrypto-linux framework
 #define SEMIDRIVE_CRYPTO_ALG_SM2 0xaa
@@ -55,13 +58,6 @@ struct crypto_sm2_msg {
 	size_t key_len;
 	uint8_t* ret;
 } __attribute__((packed));
-
-struct semidrive_vce_device{
-	u32 ce_id;
-	int irq;
-	void __iomem *base;
-    void __iomem *sram_base;
-};
 
 //sm2 gb pattern start
 /*dB：3945208F 7B2144B1 3F36E38A C6D39F95 88939369 2860B51A 42FB81EF 4DF7C5B8*/
@@ -124,6 +120,7 @@ static int crypto_create_session(struct fcrypt *fcr, struct session_op *sop)
 	const char *alg_name = NULL;
 	const char *hash_name = NULL;
 	int hmac_mode = 1, stream = 0, aead = 0;
+
 	/*
 	 * With composite aead ciphers, only ckey is used and it can cover all the
 	 * structure space; otherwise both keys may be used simultaneously but they
@@ -145,15 +142,6 @@ static int crypto_create_session(struct fcrypt *fcr, struct session_op *sop)
 	switch (sop->cipher) {
 	case 0:
 		break;
-	case CRYPTO_DES_CBC:
-		alg_name = "cbc(des)";
-		break;
-	case CRYPTO_3DES_CBC:
-		alg_name = "cbc(des3_ede)";
-		break;
-	case CRYPTO_BLF_CBC:
-		alg_name = "cbc(blowfish)";
-		break;
 	case CRYPTO_AES_CBC:
 		alg_name = "cbc(aes)";
 		break;
@@ -163,9 +151,6 @@ static int crypto_create_session(struct fcrypt *fcr, struct session_op *sop)
 	case CRYPTO_AES_XTS:
 		alg_name = "xts(aes)";
 		break;
-	case CRYPTO_CAMELLIA_CBC:
-		alg_name = "cbc(camellia)";
-		break;
 	case CRYPTO_AES_CTR:
 		alg_name = "ctr(aes)";
 		stream = 1;
@@ -173,16 +158,6 @@ static int crypto_create_session(struct fcrypt *fcr, struct session_op *sop)
 	case CRYPTO_AES_GCM:
 		alg_name = "gcm(aes)";
 		stream = 1;
-		aead = 1;
-		break;
-	case CRYPTO_TLS11_AES_CBC_HMAC_SHA1:
-		alg_name = "tls11(hmac(sha1),cbc(aes))";
-		stream = 0;
-		aead = 1;
-		break;
-	case CRYPTO_TLS12_AES_CBC_HMAC_SHA256:
-		alg_name = "tls12(hmac(sha256),cbc(aes))";
-		stream = 0;
 		aead = 1;
 		break;
 	case CRYPTO_NULL:
@@ -197,12 +172,10 @@ static int crypto_create_session(struct fcrypt *fcr, struct session_op *sop)
 	switch (sop->mac) {
 	case 0:
 		break;
-	case CRYPTO_MD5_HMAC:
+	/*case CRYPTO_MD5_HMAC:
 		hash_name = "hmac(md5)";
 		break;
-	case CRYPTO_RIPEMD160_HMAC:
-		hash_name = "hmac(rmd160)";
-		break;
+	*/
 	case CRYPTO_SHA1_HMAC:
 		hash_name = "hmac(sha1)";
 		break;
@@ -221,14 +194,11 @@ static int crypto_create_session(struct fcrypt *fcr, struct session_op *sop)
 		break;
 
 	/* non-hmac cases */
-	case CRYPTO_MD5:
+	/*case CRYPTO_MD5:
 		hash_name = "md5";
 		hmac_mode = 0;
 		break;
-	case CRYPTO_RIPEMD160:
-		hash_name = "rmd160";
-		hmac_mode = 0;
-		break;
+	*/
 	case CRYPTO_SHA1:
 		hash_name = "sha1";
 		hmac_mode = 0;
@@ -332,6 +302,7 @@ static int crypto_create_session(struct fcrypt *fcr, struct session_op *sop)
 	get_random_bytes(&ses_new->sid, sizeof(ses_new->sid));
 	mutex_init(&ses_new->sem);
 	mutex_lock(&fcr->sem);
+
 restart:
 	list_for_each_entry(ses_ptr, &fcr->list, entry) {
 		/* Check for duplicate SID */
@@ -405,6 +376,7 @@ crypto_finish_session(struct fcrypt *fcr, uint32_t sid)
 		pr_err("Session with sid=0x%08X not found!", sid);
 		ret = -ENOENT;
 	}
+
 	mutex_unlock(&fcr->sem);
 
 	return ret;
@@ -464,9 +436,6 @@ static void cryptask_routine(struct crypto_dev* crypto, struct work_struct *work
 	mutex_lock(&pcr->done.lock);
 	list_splice_tail(&tmp, &pcr->done.list);
 	mutex_unlock(&pcr->done.lock);
-
-	/* wake for POLLIN */
-	//wake_up_interruptible(&pcr->user_waiter);
 }
 
 /* Look up session by session ID. The returned session is locked. */
@@ -613,26 +582,29 @@ static long crypto_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 
 				if(cmd == SEMIDRIVE_CRYPTO_SM2_GET_TIME_STAMP){
 					ret = of_get_sys_cnt_ce();
-					copy_to_user((char __user *)arg, &ret, sizeof(int));
-					return ret;
+					return copy_to_user((char __user *)arg, &ret, sizeof(int));
 				}
-				err = copy_from_user((char *)&sm2_msg, (char __user *)arg, sizeof(struct crypto_sm2_msg));
+				err = copy_from_user((char *)&sm2_msg, (char __user *)arg,
+						sizeof(struct crypto_sm2_msg));
 				if (err < 0) {
 					//pr_info("%s: copy_from_user (%p) failed (%d)\n", __func__, (char __user *)arg, err);
 					return err;
 				}
 
-				err = copy_from_user((char *)&verify_msg_buff, (char __user *)(sm2_msg.msg), sm2_msg.msg_len);
+				err = copy_from_user((char *)&verify_msg_buff,
+						(char __user *)(sm2_msg.msg), sm2_msg.msg_len);
 				if (err < 0) {
 					//pr_info("%s: copy_from_user (%p) failed (%d)\n", __func__, (char __user *)(verify_msg.msg), err);
 					return err;
 				}
-				err = copy_from_user((char *)&verify_sig_buff, (char __user *)(sm2_msg.sig),sm2_msg.sig_len);
+				err = copy_from_user((char *)&verify_sig_buff,
+						(char __user *)(sm2_msg.sig), sm2_msg.sig_len);
 				if (err < 0) {
 					return err;
 				}
 				if(sm2_msg.key_len > 0){
-					err = copy_from_user((char *)&verify_key_buff, (char __user *)(sm2_msg.key), sm2_msg.key_len);
+					err = copy_from_user((char *)&verify_key_buff,
+							(char __user *)(sm2_msg.key), sm2_msg.key_len);
 					if (err < 0) {
 						return err;
 					}
@@ -728,15 +700,18 @@ static long crypto_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 						}
 						return ret;
 					case CIOCGSESSION:
-						if (unlikely(copy_from_user(&sop, arg, sizeof(sop))))
+						if (unlikely(copy_from_user(&sop, \
+							(void __user *)arg, sizeof(sop))))
 							return -EFAULT;
+
 						ret = crypto_create_session(fcr, &sop);
 						if (unlikely(ret))
 							return ret;
-						ret = copy_to_user(arg, &sop, sizeof(sop));
+						ret = copy_to_user(
+							(void __user *)arg, &sop, sizeof(sop));
 						if (unlikely(ret)) {
-							//crypto_finish_session(fcr, sop.ses);
-							pr_err("CIOCGSESSION Line %d, ret: %d\n", __LINE__, ret);
+							crypto_finish_session(fcr, sop.ses);
+							pr_err("CIOCG Line %d, ret: %ld\n", __LINE__, ret);
 							return -EFAULT;
 						}
 
@@ -749,7 +724,7 @@ static long crypto_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 						return ret;
 					case CIOCGSESSINFO:
 					/*
-						if (unlikely(copy_from_user(&siop, arg, sizeof(siop))))
+						if (unlikely(copy_from_user(&siop, (void __user *)arg, sizeof(siop))))
 							return -EFAULT;
 
 						ret = get_session_info(fcr, &siop);
@@ -760,13 +735,14 @@ static long crypto_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 						return 1;
 					case CIOCCPHASH:
 					/*
-						if (unlikely(copy_from_user(&cphop, arg, sizeof(cphop))))
+						if (unlikely(copy_from_user(&cphop, (void __user *)arg, sizeof(cphop))))
 							return -EFAULT;
 						return crypto_copy_hash_state(fcr, cphop.dst_ses, cphop.src_ses);
 					*/
 						return 1;
 					case CIOCCRYPT:
-						if (unlikely(ret = kcop_from_user(&kcop, fcr, arg))) {
+						ret = kcop_from_user(&kcop, fcr, (void __user *)arg);
+						if (unlikely(ret)) {
 							pr_err("Error copying from user");
 							return ret;
 						}
@@ -775,10 +751,10 @@ static long crypto_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 							pr_err("Error in crypto_run");
 							return ret;
 						}
-						return kcop_to_user(&kcop, fcr, arg);
+						return kcop_to_user(&kcop, fcr, (void __user *)arg);
 					case CIOCAUTHCRYPT:
 					/*
-						if (unlikely(ret = kcaop_from_user(&kcaop, fcr, arg))) {
+						if (unlikely(ret = kcaop_from_user(&kcaop, fcr, (void __user *)arg))) {
 							pr_err("Error copying from user");
 							return ret;
 						}
@@ -789,7 +765,7 @@ static long crypto_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 							return ret;
 						}
 
-						return kcaop_to_user(&kcaop, fcr, arg);
+						return kcaop_to_user(&kcaop, fcr, (void __user *)arg);
 					*/
 						return 1;
 					}
@@ -808,7 +784,6 @@ static ssize_t crypto_read(struct file *filp, char __user *userbuf, size_t len,
 {
 	return 0;
 }
-
 
 static ssize_t crypto_write(struct file *filp, const char __user *userbuf,
 			     size_t len, loff_t *f_pos)
@@ -848,10 +823,10 @@ static int crypto_ip_test(void*device)
 
 static int crypto_open(struct inode *inode, struct file *filp)
 {
-	int ret;
-
-	pr_info("crypto_open enter ");
 	struct crypto_dev *crypto;
+	struct todo_list_item *tmp, *tmp_next;
+	struct crypt_priv *pcr;
+	int i;
 
 	crypto = to_crypto_dev(filp->private_data);
 
@@ -862,10 +837,6 @@ static int crypto_open(struct inode *inode, struct file *filp)
 	}*/
 
 	sm2_load_curve(crypto, &sx_ecc_sm2_curve_p256_rev, BA414EP_BIGEND);
-
-	struct todo_list_item *tmp, *tmp_next;
-	struct crypt_priv *pcr;
-	int i;
 
 	pcr = kzalloc(sizeof(*pcr), GFP_KERNEL);
 	if (!pcr)
@@ -912,16 +883,162 @@ err_ringalloc:
 	return -ENOMEM;
 }
 
-
 static int crypto_release(struct inode *inode, struct file *filp)
 {
-	pr_info("crypto_release enter ");
 	struct crypto_dev *crypto;
+	struct crypt_priv *pcr = filp->private_data;
+	struct todo_list_item *item, *item_safe;
+	int items_freed = 0;
 
 	crypto = to_crypto_dev(filp->private_data);
 
-	mutex_unlock(&(crypto->lock));
+	//mutex_unlock(&(crypto->lock));
+
+	if (!pcr)
+		return 0;
+
+	cancel_work_sync(&pcr->cryptask);
+
+	list_splice_tail(&pcr->todo.list, &pcr->free.list);
+	list_splice_tail(&pcr->done.list, &pcr->free.list);
+
+	list_for_each_entry_safe(item, item_safe, &pcr->free.list, __hook) {
+		list_del(&item->__hook);
+		kfree(item);
+		items_freed++;
+	}
+
+	crypto_finish_all_sessions(&pcr->fcrypt);
+
+	mutex_destroy(&pcr->done.lock);
+	mutex_destroy(&pcr->todo.lock);
+	mutex_destroy(&pcr->free.lock);
+	mutex_destroy(&pcr->fcrypt.sem);
+
+	kfree(pcr);
+	filp->private_data = NULL;
+
 	return 0;
+}
+
+static const struct semidrive_alg_ops *sd_alg_ops[] = {
+	//&ablkcipher_ops,
+	&ahash_ops,
+};
+
+static void semidrive_unregister_algs(struct crypto_dev *sdce)
+{
+	const struct semidrive_alg_ops *ops;
+	int i;
+
+	for (i = 0; i < ARRAY_SIZE(sd_alg_ops); i++) {
+		ops = sd_alg_ops[i];
+		ops->unregister_algs(sdce);
+	}
+}
+
+static int semidrive_register_algs(struct crypto_dev *sdce)
+{
+	const struct semidrive_alg_ops *ops;
+	int i, ret = -ENODEV;
+
+	for (i = 0; i < ARRAY_SIZE(sd_alg_ops); i++) {
+		ops = sd_alg_ops[i];
+		ret = ops->register_algs(sdce);
+		if (ret)
+			break;
+	}
+
+	return ret;
+}
+
+static int semidrive_handle_request(struct crypto_async_request *async_req)
+{
+	int ret = -EINVAL, i;
+	const struct semidrive_alg_ops *ops;
+	u32 type = crypto_tfm_alg_type(async_req->tfm);
+
+	for (i = 0; i < ARRAY_SIZE(sd_alg_ops); i++) {
+		ops = sd_alg_ops[i];
+		if (type != ops->type)
+			continue;
+		ret = ops->async_req_handle(async_req);
+		break;
+	}
+
+	return ret;
+}
+
+static int semidrive_handle_queue(struct crypto_dev *sdce,
+			    struct crypto_async_request *req)
+{
+	struct crypto_async_request *async_req, *backlog;
+	unsigned long flags;
+	int ret = 0, err;
+
+	spin_lock_irqsave(&sdce->lock, flags);
+
+	if (req)
+		ret = crypto_enqueue_request(&sdce->queue, req);
+
+	/* busy, do not dequeue request */
+	if (sdce->req) {
+		spin_unlock_irqrestore(&sdce->lock, flags);
+		return ret;
+	}
+
+	backlog = crypto_get_backlog(&sdce->queue);
+	async_req = crypto_dequeue_request(&sdce->queue);
+	if (async_req)
+		sdce->req = async_req;
+
+	spin_unlock_irqrestore(&sdce->lock, flags);
+
+	if (!async_req)
+		return ret;
+
+	if (backlog) {
+		spin_lock_bh(&sdce->lock);
+		backlog->complete(backlog, -EINPROGRESS);
+		spin_unlock_bh(&sdce->lock);
+	}
+
+	err = semidrive_handle_request(async_req);
+	if (err) {
+		sdce->result = err;
+		tasklet_schedule(&sdce->done_tasklet);
+	}
+
+	return ret;
+}
+
+static void semidrive_tasklet_req_done(unsigned long data)
+{
+	struct crypto_dev *sdce = (struct crypto_dev *)data;
+	struct crypto_async_request *req;
+	unsigned long flags;
+
+	spin_lock_irqsave(&sdce->lock, flags);
+	req = sdce->req;
+	sdce->req = NULL;
+	spin_unlock_irqrestore(&sdce->lock, flags);
+
+	if (req)
+		req->complete(req, sdce->result);
+
+	semidrive_handle_queue(sdce, NULL);
+}
+
+static int semidrive_async_request_enqueue(struct crypto_dev *sdce,
+				     struct crypto_async_request *req)
+{
+	return semidrive_handle_queue(sdce, req);
+}
+
+static void semidrive_async_request_done(struct crypto_dev *sdce, int ret)
+{
+	sdce->result = ret;
+	tasklet_schedule(&sdce->done_tasklet);
 }
 
 static const struct file_operations crypto_fops = {
@@ -967,11 +1084,18 @@ static int semidrive_crypto_probe(struct platform_device *pdev)
 	struct miscdevice *crypto_fn;
 	int ret;
 	int irq;
-    struct semidrive_vce_device *ce_device;
+	struct semidrive_ce_device *ce_device;
 
 	pr_info("semidrive_crypto_probe enter");
+	if (&pdev->dev) {
+		pr_err("pdev->dev not null\n");
+	}
 
-	ce_device = (struct semidrive_vce_device *)platform_get_drvdata(pdev);
+	if (pdev->dev.dma_ops) {
+		pr_err("pdev->dev.dma_ops\n");
+	}
+
+	ce_device = (struct semidrive_ce_device *)platform_get_drvdata(pdev);
 
 	if (!ce_device)
 		return -ENOMEM;
@@ -1021,7 +1145,7 @@ static int semidrive_crypto_probe(struct platform_device *pdev)
   	crypto_fn->name = crypto_inst->name_buff;
   	crypto_fn->fops = &crypto_fops;
 
-	mutex_init(&(crypto_inst->lock));
+	//mutex_init(&(crypto_inst->lock));
 
 	ret = misc_register(crypto_fn);
 
@@ -1029,6 +1153,18 @@ static int semidrive_crypto_probe(struct platform_device *pdev)
 		dev_err(&pdev->dev, "failed to register ce\n");
 		return ret;
 	}
+
+	spin_lock_init(&crypto_inst->lock);
+	tasklet_init(&crypto_inst->done_tasklet, semidrive_tasklet_req_done,
+		     (unsigned long)crypto_inst);
+	crypto_init_queue(&crypto_inst->queue, SEMIDRIVE_QUEUE_LENGTH);
+
+	crypto_inst->async_req_enqueue = semidrive_async_request_enqueue;
+	crypto_inst->async_req_done = semidrive_async_request_done;
+
+	ret = semidrive_register_algs(crypto_inst);
+	if (ret)
+		return ret;
 
 	return 0;
 }

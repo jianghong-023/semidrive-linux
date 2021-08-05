@@ -18,6 +18,8 @@
 #include <linux/miscdevice.h>
 #include <linux/spinlock_types.h>
 #include <linux/dma-mapping.h>
+#include <crypto/algapi.h>
+#include <linux/interrupt.h>
 
 //TODO: need consider ce count in domain
 #if CE_IN_SAFETY_DOMAIN
@@ -81,19 +83,28 @@ struct mem_node {
 };
 
 struct crypto_dev {
-  	struct device *dev;
-  	char name_buff[32];
-  	int ce_id;
-    struct mutex lock;
-    struct miscdevice miscdev;
-  	wait_queue_head_t cehashwaitq;
-    int hash_condition;
+	struct device *dev;
+	char name_buff[32];
+	int ce_id;
+	/*struct mutex*/spinlock_t lock;
+	struct miscdevice miscdev;
+	wait_queue_head_t cehashwaitq;
+	int hash_condition;
 	wait_queue_head_t cepkewaitq;
-    int pke_condition;
+	int pke_condition;
 	wait_queue_head_t cedmawaitq;
-    int dma_condition;
+	int dma_condition;
 	void __iomem *base;
-    void __iomem *sram_base;
+	void __iomem *sram_base;
+
+	struct crypto_queue queue;
+	struct tasklet_struct queue_task;
+	struct tasklet_struct done_tasklet;
+	struct crypto_async_request *req;
+	int result;
+	int (*async_req_enqueue)(struct crypto_dev *sdce,
+				struct crypto_async_request *req);
+	void (*async_req_done)(struct crypto_dev *sdce, int ret);
 };
 
 typedef struct ec_key {

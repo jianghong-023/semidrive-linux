@@ -2,6 +2,10 @@
 # define CRYPTLIB_H
 
 #include <linux/version.h>
+#include <crypto/algapi.h>
+#include <crypto/cryptodev.h>
+#include <crypto/aead.h>
+
 #include "ce.h"
 
 struct cryptodev_result {
@@ -106,5 +110,6 @@ int cryptodev_hash_init(struct hash_data *hdata, const char *alg_name,
 int cryptodev_hash_copy(struct hash_data *dst, struct hash_data *src);
 #endif
 
+void semidrive_cpu_to_be32p_array(__be32 *dst, const u8 *src, unsigned int len);
 
 #endif
