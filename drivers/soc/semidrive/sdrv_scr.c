@@ -33,6 +33,8 @@ struct sdrv_scr_device {
 	struct device *dev;
 	phys_addr_t addr;
 	struct hwspinlock *hwlock;
+	spinlock_t lock;	/*if no hwlock, will using the spin lock */
+	unsigned long flags;
 	struct list_head signals;
 };
 
@@ -77,6 +79,8 @@ static inline int _scr_dev_lock(struct sdrv_scr_device *scr)
 		if (ret)
 			dev_alert(scr->dev,
 				  "Cannot lock scr device (%d)!\n", ret);
+	} else {
+		spin_lock_irqsave(&scr->lock, scr->flags);
 	}
 
 	return ret;
@@ -86,6 +90,8 @@ static inline void _scr_dev_unlock(struct sdrv_scr_device *scr)
 {
 	if (scr->hwlock) {
 		__hwspin_unlock(scr->hwlock, 0, NULL);
+	} else {
+		spin_unlock_irqrestore(&scr->lock, scr->flags);
 	}
 }
 
@@ -404,9 +410,11 @@ static int sdrv_scr_probe(struct platform_device *pdev)
 	if (!of_property_read_u32(dev->of_node, "sdrv,hwsem", &hwsem))
 		scr_dev->hwlock = hwspin_lock_request_specific(hwsem);
 
-	if (!scr_dev->hwlock)
-		dev_alert(dev, "hwsem undefined or not available. "
+	if (!scr_dev->hwlock) {
+		dev_alert(dev, "hwsem undefined or not available. will use the spinlock,"
 			  "SCR operations are not safe!\n");
+		spin_lock_init(&scr_dev->lock);
+	}
 
 	ret = _scr_init_signals(dev);
 	if (ret)
