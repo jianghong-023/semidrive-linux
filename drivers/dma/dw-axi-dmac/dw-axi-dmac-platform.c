@@ -2055,8 +2055,26 @@ static int dw_remove(struct platform_device *pdev)
 	return 0;
 }
 
+#ifdef CONFIG_PM_SLEEP
+
+static int axi_dma_suspend_late(struct device *dev)
+{
+	struct axi_dma_chip *chip = dev_get_drvdata(dev);
+	return axi_dma_suspend(chip);
+}
+
+static int axi_dma_resume_early(struct device *dev)
+{
+	struct axi_dma_chip *chip = dev_get_drvdata(dev);
+	return axi_dma_resume(chip);
+}
+
+#endif /* CONFIG_PM_SLEEP */
+
 static const struct dev_pm_ops dw_axi_dma_pm_ops = {
-    SET_RUNTIME_PM_OPS(axi_dma_runtime_suspend, axi_dma_runtime_resume, NULL)};
+	SET_RUNTIME_PM_OPS(axi_dma_runtime_suspend, axi_dma_runtime_resume, NULL)
+	SET_LATE_SYSTEM_SLEEP_PM_OPS(axi_dma_suspend_late,
+				     axi_dma_resume_early)};
 
 static const struct of_device_id dw_dma_of_id_table[] = {
     {.compatible = "snps,axi-dma-1.01a"}, {}};
