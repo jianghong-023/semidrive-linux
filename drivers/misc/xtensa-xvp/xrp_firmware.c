@@ -187,7 +187,8 @@ static int xrp_firmware_find_symbol(struct xvp *xvp, const char *name,
 			sh_symtab = shdr;
 			break;
 		case SHT_STRTAB:
-			sh_strtab = shdr;
+			if (ehdr->e_shstrndx != i) /* for xt-clang */
+				sh_strtab = shdr;
 			break;
 		default:
 			break;
