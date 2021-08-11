@@ -57,6 +57,8 @@
 			interrupts = <0 DC1_IRQ 4>;
 			status = "disabled";
 			sdrv,ip = "dc-r0p1";
+			clocks = <&PLL_LVDS1 PLL_DIVA>;
+			clock-names = "pll_clk";
 		};
 
 		dp2: dp2@30d90000 {
@@ -74,6 +76,8 @@
 			interrupts = <0 DC2_IRQ 4>;
 			status = "disabled";
 			sdrv,ip = "dc-r0p1";
+			clocks = <&PLL_LVDS2 PLL_DIVA>;
+			clock-names = "pll_clk";
 		};
 
 		dp3: dp3@30da0000 {
@@ -91,6 +95,8 @@
 			interrupts = <0 DC3_IRQ 4>;
 			status = "disabled";
 			sdrv,ip = "dc-r0p1";
+			clocks = <&PLL_LVDS3 PLL_DIVA>;
+			clock-names = "pll_clk";
 		};
 
 		dc4: dc4@30de0000 {
@@ -99,6 +105,8 @@
 			interrupts = <0 DC4_IRQ 4>;
 			status = "disabled";
 			sdrv,ip = "dc-r0p1";
+			clocks = <&PLL_LVDS4 PLL_DIVA>;		//set PLL_LVDS1 in X9U
+			clock-names = "pll_clk";
 		};
 
 		dc5: dc5@30df0000 {
@@ -107,6 +115,8 @@
 			interrupts = <0 DC5_IRQ 4>;
 			status = "disabled";
 			sdrv,ip = "dc-r0p1";
+			clocks = <&PLL_LVDS4 PLL_DIVA>;
+			clock-names = "pll_clk";
 		};
 
 		dp_dummy0: dp_dummy@0 {
