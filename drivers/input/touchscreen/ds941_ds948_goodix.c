@@ -30,9 +30,7 @@
 #include <linux/acpi.h>
 #include <linux/of.h>
 #include <asm/unaligned.h>
-
 #include <linux/kthread.h>
-
 
 struct goodix_ts_data {
     struct i2c_client *client;
@@ -50,6 +48,7 @@ struct goodix_ts_data {
     u16 id;
     u16 version;
     u32 dev_type;   /* 0: main device, 1: aux device */
+    u32 port_type;   /* 0: primary, 1: second, 2: doul */
     u8 addr_ds941;
     u8 addr_ds948;
     int irq_channel;
@@ -1335,6 +1334,7 @@ static int goodix_ts_probe(struct i2c_client *client,
     int error;
     u8 dreg, dval, daddr;
     u32 val;
+    int count = 0;
 
     dev_err(&client->dev, "I2C Address: 0x%02x\n", client->addr);
 
@@ -1399,8 +1399,50 @@ static int goodix_ts_probe(struct i2c_client *client,
     dev_err(&client->dev, "ts->irq_channel=%d, ts->reset_channel=%d\n",
             ts->irq_channel, ts->reset_channel);
 
-    du90ub941_enable_port(ts, 1);
+    error = of_property_read_u32(client->dev.of_node, "dev_type",
+                                 &ts->dev_type);
 
+    if (error < 0) {
+        dev_err(&client->dev, "Missing type, use default\n");
+        ts->dev_type = 0;
+    }
+
+    error = of_property_read_u32(client->dev.of_node, "port_type",
+                                 &ts->port_type);
+
+    if (error < 0) {
+        dev_err(&client->dev, "Missing port type, use default\n");
+        ts->port_type = 1;
+    }
+
+    dreg = 0x6;
+    dval = 0x0;
+    error = du90ub941_i2c_read(ts, dreg, &dval, 1);
+    if (error < 0) {
+        dev_err(&client->dev, "ds941 offline\n");
+        return error;
+    }
+    else if ((dval >> 1) != ts->addr_ds948) {
+        dev_err(&client->dev, "ds948 offline, addr=0x%x\n", dval >> 1);
+        return -1;
+    }
+    else {
+        dev_err(&client->dev, "ds948 online, addr=0x%x\n", dval >> 1);
+    }
+
+
+    while (1) {
+        dreg = 0x5a;
+        du90ub941_i2c_read(ts, dreg, &dval, 1);
+        if (dval == 0xd9 || count >= 20) {
+            dev_err(&client->dev, "serdes link count=%d\n",count);
+            break;
+        }
+        count++;
+        msleep(100);
+    }
+
+    du90ub941_enable_port(ts, ts->port_type);
 
 #if 1
     dreg = 0x17;
@@ -1473,14 +1515,6 @@ static int goodix_ts_probe(struct i2c_client *client,
     if (error) {
         dev_err(&client->dev, "Read version failed.\n");
         return error;
-    }
-
-    error = of_property_read_u32(client->dev.of_node, "dev_type",
-                                 &ts->dev_type);
-
-    if (error < 0) {
-        dev_err(&client->dev, "Missing type, use default\n");
-        ts->dev_type = 0;
     }
 
     ts->cfg_len = goodix_get_cfg_len(ts->id);
