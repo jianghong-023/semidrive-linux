@@ -164,6 +164,23 @@ struct sdrv_afe_i2s_sc {
 
 	/* i2s l/r pack mode*/
 	bool pack_en;
+
+	/*PM Cache*/
+	unsigned int reg_i2s_ctrl;
+	unsigned int reg_i2s_ctrl_fdx;
+	unsigned int reg_i2s_sres;
+	unsigned int reg_i2s_sres_fdr;
+	unsigned int reg_i2s_srate;
+	unsigned int reg_i2s_stat;
+	unsigned int reg_i2s_fifo_level;
+	unsigned int reg_i2s_fifo_aempty;
+	unsigned int reg_i2s_fifo_afull;
+	unsigned int reg_i2s_fifo_level_fdr;
+	unsigned int reg_i2s_fifo_aempty_fdr;
+	unsigned int reg_i2s_fifo_afull_fdr;
+	unsigned int reg_i2s_tdm_ctrl;
+	unsigned int reg_i2s_tdm_fd_dir;
+
 };
 
 /* x9 i2s mc audio front end structure */
