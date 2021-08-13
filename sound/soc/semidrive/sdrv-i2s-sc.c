@@ -1566,7 +1566,7 @@ static int sdrv_pcm_prepare_slave_config(struct snd_pcm_substream *substream,
 			return -EINVAL;
 		case SNDRV_PCM_FORMAT_S16_LE:
 			DEBUG_FUNC_PRT;
-			if((channels == 2)&&(afe->pack_en == true)){
+			if((channels == 2)&&(afe->pack_en == true)&&(afe->tdm_initialized == false)){
 				/* Set to L/R pack mode. */
 				slave_config->src_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
 				slave_config->dst_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
@@ -1790,6 +1790,10 @@ static int snd_afe_i2s_sc_probe(struct platform_device *pdev)
 	afe->tx_channels = 1;
 	afe->srate = 8000;
 	afe->pack_en = true;
+	if (of_find_property(dev->of_node, "sdrv,disable-pack-mode", NULL)){
+		dev_info(&pdev->dev, "disable pack mode.\n");
+		afe->pack_en = false;
+	}
 	afe_i2s_sc_config(afe);
 	return 0;
 err_disable:
@@ -1815,11 +1819,100 @@ static const struct of_device_id sdrv_i2s_sc_of_match[] = {
     {},
 };
 
+#ifdef CONFIG_PM_SLEEP
+static int sdrv_i2s_sc_suspend(struct device *dev)
+{
+	int ret;
+	struct sdrv_afe_i2s_sc *afe = dev_get_drvdata(dev);
+	/* dev_info(dev, "sdrv_i2s_sc_suspend.\n"); */
+	ret = regmap_read(afe->regmap, REG_CDN_I2SSC_REGS_I2S_CTRL,
+			  &afe->reg_i2s_ctrl);
+	ret = regmap_read(afe->regmap, REG_CDN_I2SSC_REGS_I2S_CTRL_FDX,
+			  &afe->reg_i2s_ctrl_fdx);
+	ret = regmap_read(afe->regmap, REG_CDN_I2SSC_REGS_I2S_SRES,
+			  &afe->reg_i2s_sres);
+	ret = regmap_read(afe->regmap, REG_CDN_I2SSC_REGS_I2S_SRES_FDR,
+			  &afe->reg_i2s_sres_fdr);
+	ret = regmap_read(afe->regmap, REG_CDN_I2SSC_REGS_I2S_SRATE,
+			  &afe->reg_i2s_srate);
+	ret = regmap_read(afe->regmap, REG_CDN_I2SSC_REGS_I2S_STAT,
+			  &afe->reg_i2s_stat);
+	ret = regmap_read(afe->regmap, REG_CDN_I2SSC_REGS_FIFO_LEVEL,
+			  &afe->reg_i2s_fifo_level);
+	ret = regmap_read(afe->regmap, REG_CDN_I2SSC_REGS_FIFO_AEMPTY,
+			  &afe->reg_i2s_fifo_aempty);
+	ret = regmap_read(afe->regmap, REG_CDN_I2SSC_REGS_FIFO_AFULL,
+			  &afe->reg_i2s_fifo_afull);
+	ret = regmap_read(afe->regmap, REG_CDN_I2SSC_REGS_FIFO_LEVEL_FDR,
+			  &afe->reg_i2s_fifo_level_fdr);
+	ret = regmap_read(afe->regmap, REG_CDN_I2SSC_REGS_FIFO_AEMPTY_FDR,
+			  &afe->reg_i2s_fifo_aempty_fdr);
+	ret = regmap_read(afe->regmap, REG_CDN_I2SSC_REGS_FIFO_AFULL_FDR,
+			  &afe->reg_i2s_fifo_afull_fdr);
+	ret = regmap_read(afe->regmap, REG_CDN_I2SSC_REGS_TDM_CTRL,
+			  &afe->reg_i2s_tdm_ctrl);
+	ret = regmap_read(afe->regmap, REG_CDN_I2SSC_REGS_TDM_FD_DIR,
+			  &afe->reg_i2s_tdm_fd_dir);
+
+	clk_disable_unprepare(afe->mclk);
+	clk_disable_unprepare(afe->clk_i2s);
+	return 0;
+}
+
+static int sdrv_i2s_sc_resume(struct device *dev)
+{
+	int ret;
+	struct sdrv_afe_i2s_sc *afe = dev_get_drvdata(dev);
+	/* dev_info(dev, "sdrv_i2s_sc_resume.\n"); */
+	ret = clk_prepare_enable(afe->mclk);
+	if (ret) {
+		dev_err(dev, "mclk clk_prepare_enable failed: %d\n", ret);
+		return ret;
+	}
+	ret = clk_prepare_enable(afe->clk_i2s);
+	if (ret) {
+		dev_err(dev, "clk_i2s clk_prepare_enable failed: %d\n", ret);
+		return ret;
+	}
+
+	regmap_write(afe->regmap, REG_CDN_I2SSC_REGS_I2S_CTRL_FDX,
+		     afe->reg_i2s_ctrl_fdx);
+	regmap_write(afe->regmap, REG_CDN_I2SSC_REGS_I2S_SRES,
+		     afe->reg_i2s_sres);
+	regmap_write(afe->regmap, REG_CDN_I2SSC_REGS_I2S_SRES_FDR,
+		     afe->reg_i2s_sres_fdr);
+	regmap_write(afe->regmap, REG_CDN_I2SSC_REGS_I2S_SRATE,
+		     afe->reg_i2s_srate);
+	regmap_write(afe->regmap, REG_CDN_I2SSC_REGS_I2S_STAT,
+		     afe->reg_i2s_stat);
+	regmap_write(afe->regmap, REG_CDN_I2SSC_REGS_FIFO_AEMPTY,
+		     afe->reg_i2s_fifo_aempty);
+	regmap_write(afe->regmap, REG_CDN_I2SSC_REGS_FIFO_AFULL,
+		     afe->reg_i2s_fifo_afull);
+	regmap_write(afe->regmap, REG_CDN_I2SSC_REGS_FIFO_AEMPTY_FDR,
+		     afe->reg_i2s_fifo_aempty_fdr);
+	regmap_write(afe->regmap, REG_CDN_I2SSC_REGS_FIFO_AFULL_FDR,
+		     &afe->reg_i2s_fifo_afull_fdr);
+	regmap_write(afe->regmap, REG_CDN_I2SSC_REGS_TDM_CTRL,
+		     afe->reg_i2s_tdm_ctrl);
+	regmap_write(afe->regmap, REG_CDN_I2SSC_REGS_TDM_FD_DIR,
+		     afe->reg_i2s_tdm_fd_dir);
+	regmap_write(afe->regmap, REG_CDN_I2SSC_REGS_I2S_CTRL,
+		     afe->reg_i2s_ctrl);
+
+	return 0;
+}
+#endif /* CONFIG_PM_SLEEP */
+static const struct dev_pm_ops i2s_sc_pm_ops = {
+	SET_SYSTEM_SLEEP_PM_OPS(sdrv_i2s_sc_suspend, sdrv_i2s_sc_resume)
+};
+
 static struct platform_driver snd_afe_i2s_sc_driver = {
     .driver =
 	{
 	    .name = DRV_NAME "-i2s",
 	    .of_match_table = sdrv_i2s_sc_of_match,
+	    .pm = &i2s_sc_pm_ops,
 	    .probe_type = PROBE_PREFER_ASYNCHRONOUS,
 	},
     .probe = snd_afe_i2s_sc_probe,
