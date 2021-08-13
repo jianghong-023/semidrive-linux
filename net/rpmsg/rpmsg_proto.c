@@ -701,6 +701,7 @@ static struct rpmsg_device_id rpmsg_proto_id_table[] = {
 	{ .name	= "safety,vcan" },
 	{ .name = "rpmsg-vircan" },
 	{ .name = "safety,vi2c" },
+	{ .name = "sms_monitor" },
 	{ },
 };
 MODULE_DEVICE_TABLE(rpmsg, rpmsg_proto_id_table);
