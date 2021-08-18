@@ -153,7 +153,7 @@ static inline bool xrp_section_bad(struct xvp *xvp, const Elf32_Shdr *shdr)
 }
 
 static int xrp_firmware_find_symbol(struct xvp *xvp, const char *name,
-				    void **paddr, size_t *psize)
+				    void **paddr, size_t *psize, Elf32_Addr *pvalue)
 {
 	const Elf32_Ehdr *ehdr = (Elf32_Ehdr *)xvp->firmware->data;
 	const void *shdr_data = xvp->firmware->data + ehdr->e_shoff;
@@ -267,6 +267,9 @@ static int xrp_firmware_find_symbol(struct xvp *xvp, const char *name,
 	*paddr = addr;
 	*psize = esym->st_size;
 
+	if (pvalue)
+		*pvalue = esym->st_value;
+
 	return 0;
 }
 
@@ -278,7 +281,7 @@ static int xrp_firmware_fixup_symbol(struct xvp *xvp, const char *name,
 	size_t sz;
 	int rc;
 
-	rc = xrp_firmware_find_symbol(xvp, name, &addr, &sz);
+	rc = xrp_firmware_find_symbol(xvp, name, &addr, &sz, NULL);
 	if (rc < 0) {
 		dev_err(xvp->dev, "%s: symbol \"%s\" is not found",
 			__func__, name);
@@ -308,6 +311,10 @@ static int xrp_load_firmware(struct xvp *xvp)
 {
 	Elf32_Ehdr *ehdr = (Elf32_Ehdr *)xvp->firmware->data;
 	int i;
+	int rc;
+	void *log_addr;
+	size_t log_sz;
+	Elf32_Addr log_val;
 
 	if (memcmp(ehdr->e_ident, ELFMAG, SELFMAG)) {
 		dev_err(xvp->dev, "bad firmware ELF magic\n");
@@ -334,6 +341,21 @@ static int xrp_load_firmware(struct xvp *xvp)
 	xrp_firmware_fixup_symbol(xvp, "xrp_dsp_comm_base",
 				  xrp_translate_to_dsp(&xvp->address_map,
 						       xvp->comm_phys));
+
+
+	rc = xrp_firmware_find_symbol(xvp, "_minrt_stdout", &log_addr, &log_sz, &log_val);
+	if (rc < 0) {
+		dev_err(xvp->dev, "%s: vdsp log is not found",
+			__func__);
+		xvp->log_phys = 0;
+		xvp->log_size = 0;
+	} else {
+		dev_dbg(xvp->dev, "%s: vdsp log is at 0x%x, sz = %d\n",
+                        __func__, log_val, log_sz);
+		xvp->log_phys = log_val;
+		xvp->log_size = log_sz;
+	}
+
 
 	for (i = 0; i < ehdr->e_phnum; ++i) {
 		Elf32_Phdr *phdr = (void *)xvp->firmware->data +
