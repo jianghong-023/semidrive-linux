@@ -63,6 +63,11 @@ struct xvp {
 	phys_addr_t pmem;
 	phys_addr_t comm_phys;
 	phys_addr_t shared_size;
+
+	phys_addr_t log_phys;
+	phys_addr_t log_size;
+	struct dentry *debugfs_dir;
+
 	atomic_t reboot_cycle;
 	atomic_t reboot_cycle_complete;
 

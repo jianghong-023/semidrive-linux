@@ -55,6 +55,7 @@
 #include <linux/sched.h>
 #include <linux/slab.h>
 #include <linux/sort.h>
+#include <linux/debugfs.h>
 #include <asm/mman.h>
 #include <asm/uaccess.h>
 #include "xrp_cma_alloc.h"
@@ -1906,6 +1907,71 @@ static const struct file_operations xvp_fops = {
 	.release = xvp_close,
 };
 
+#ifdef CONFIG_DEBUG_FS
+#define LOG_HDR_SZ 23
+static ssize_t xvp_dbgfs_log_read(struct file *filep, char __user *ubuf,
+				  size_t count, loff_t *offp)
+{
+	struct xvp *xvp = filep->private_data;
+	void __iomem *p;
+	char *buf;
+	int size;
+	ssize_t ret;
+
+	if (xvp->log_phys && xvp->log_size)
+		buf = kzalloc(LOG_HDR_SZ + xvp->log_size, GFP_KERNEL);
+	else
+		buf = kzalloc(LOG_HDR_SZ, GFP_KERNEL);
+	if (!buf)
+		return 0;
+
+	/* Print the "0x<log addr>:0x<size>" to buffer */
+	size = snprintf(buf, LOG_HDR_SZ, "0x%08x:0x%08x\n",
+		(unsigned int)xvp->log_phys, (unsigned int)xvp->log_size);
+
+	if (xvp->log_phys && xvp->log_size) {
+		p = ioremap(xvp->log_phys, xvp->log_size);
+		if (!p) {
+			dev_err(xvp->dev,
+			"couldn't ioremap %pap x 0x%08x\n",
+			&xvp->log_phys, (u32)xvp->log_size);
+			return 0;
+		}
+		memcpy_fromio(buf + size, p, xvp->log_size);
+		size += xvp->log_size;
+		iounmap(p);
+	}
+
+	/* Copy data to User-space */
+	ret = simple_read_from_buffer(ubuf, count, offp, buf, size);
+	kfree(buf);
+	return ret;
+}
+
+static const struct file_operations xvp_dbgfs_ops = {
+	.owner = THIS_MODULE,
+	.open  = simple_open,
+	.write = NULL,
+	.read  = xvp_dbgfs_log_read
+};
+
+static void xvp_create_dbgfs_files(struct xvp *xvp)
+{
+	struct dentry *file;
+
+	xvp->debugfs_dir = debugfs_create_dir("xvp", NULL);
+
+	/* Create Debugfs file for log read operations */
+	file = debugfs_create_file("stdout", S_IRUGO,
+		xvp->debugfs_dir, xvp, &xvp_dbgfs_ops);
+}
+
+static void xvp_remove_dbgfs_files(struct xvp *xvp)
+{
+	debugfs_remove_recursive(xvp->debugfs_dir);
+}
+#endif
+
 int xrp_runtime_suspend(struct device *dev)
 {
 	struct xvp *xvp = dev_get_drvdata(dev);
@@ -2147,6 +2213,11 @@ static long xrp_init_common(struct platform_device *pdev,
 	ret = misc_register(&xvp->miscdev);
 	if (ret < 0)
 		goto err_free_id;
+
+#ifdef CONFIG_DEBUG_FS
+	xvp_create_dbgfs_files(xvp);
+#endif
+
 	return PTR_ERR(xvp);
 err_free_id:
 	ida_simple_remove(&xvp_nodeid, nodeid);
@@ -2202,7 +2273,9 @@ int xrp_deinit(struct platform_device *pdev)
 		if (!pm_runtime_status_suspended(xvp->dev))
 			xrp_runtime_suspend(xvp->dev);
 
-
+#ifdef CONFIG_DEBUG_FS
+		xvp_remove_dbgfs_files(xvp);
+#endif
 		misc_deregister(&xvp->miscdev);
 		release_firmware(xvp->firmware);
 		xrp_free_pool(xvp->pool);
