@@ -36,8 +36,11 @@
 #include <linux/io.h>
 #include <linux/delay.h>
 #include <linux/cpu_pm.h>
+#ifdef CONFIG_SDRV_WATCHDOG
 extern void sdrv_restart(enum reboot_mode reboot_mode, const char *cmd);
-static void init_str_suspend(void);
+#else
+static void sdrv_restart(enum reboot_mode reboot_mode, const char *cmd) {}
+#endif
 /*
  * While a 64-bit OS can make calls with SMC32 calling conventions, for some
  * calls it is necessary to use SMC64 to pass or return 64-bit values.
@@ -304,7 +307,6 @@ static void set_conduit(enum psci_conduit conduit)
 	default:
 		WARN(1, "Unexpected PSCI conduit %d\n", conduit);
 	}
-	//init_str_suspend();
 	psci_ops.conduit = conduit;
 }
 
@@ -504,6 +506,18 @@ int psci_cpu_suspend_enter(unsigned long index)
 
 	return ret;
 }
+
+/* ARM specific CPU idle operations */
+#ifdef CONFIG_ARM
+static const struct cpuidle_ops psci_cpuidle_ops __initconst = {
+	.suspend = psci_cpu_suspend_enter,
+	.init = psci_dt_cpu_init_idle,
+};
+
+CPUIDLE_METHOD_OF_DECLARE(psci, "psci", &psci_cpuidle_ops);
+#endif
+#endif
+
 static inline void set_str_resume(u64 addr)
 {
 	void __iomem * base = ioremap(psci_ops.mem_to_safety.start,
@@ -520,42 +534,10 @@ static inline void set_str_resume(u64 addr)
 }
 static int str_suspend_finisher(unsigned long index)
 {
-	//arch_flush_dcache_all();
 	sdrv_restart(0, "shutdown");
 	while(1);
 	return 0;
 }
-
-static int str_system_suspend_enter(suspend_state_t state)
-{
-	int ret=0;
-	set_str_resume(__pa_symbol(cpu_resume));
-        ret = cpu_suspend(0, str_suspend_finisher);
-	return ret;
-}
-
-static const struct platform_suspend_ops str_suspend_ops = {
-	.valid          = suspend_valid_only_mem,
-	.enter          = str_system_suspend_enter,
-};
-
-static void init_str_suspend(void)
-{
-	if (!IS_ENABLED(CONFIG_SUSPEND))
-		return;
-
-	suspend_set_ops(&str_suspend_ops);
-}
-/* ARM specific CPU idle operations */
-#ifdef CONFIG_ARM
-static const struct cpuidle_ops psci_cpuidle_ops __initconst = {
-	.suspend = psci_cpu_suspend_enter,
-	.init = psci_dt_cpu_init_idle,
-};
-
-CPUIDLE_METHOD_OF_DECLARE(psci, "psci", &psci_cpuidle_ops);
-#endif
-#endif
 
 static int psci_system_suspend(unsigned long unused)
 {
