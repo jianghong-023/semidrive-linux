@@ -67,6 +67,7 @@ struct rpmsg_ipcc_device {
 	struct device *dev;
 	int rproc;
 	struct mbox_client client;
+	struct list_head node;
 	struct mbox_chan *mbox;
 	struct rpmsg_endpoint *ns_ept;
 	struct delayed_work ns_work;
@@ -124,6 +125,9 @@ static const struct rpmsg_endpoint_ops rpmsg_ipcc_endpoint_ops = {
 	.poll = rpmsg_ipcc_poll,
 	.get_mtu = rpmsg_ipcc_get_mtu,
 };
+
+static LIST_HEAD(ipcc_cons);
+static DEFINE_MUTEX(con_mutex);
 
 static int ipcc_has_feature(struct rpmsg_ipcc_device *vrp, int feature)
 {
@@ -631,7 +635,8 @@ static int rpmsg_ipcc_rx(struct rpmsg_ipcc_device *vrp,
 		/* farewell, ept, we don't need you anymore */
 		kref_put(&ept->refcount, __ept_release);
 	} else
-		dev_warn(dev, "msg received with no recipient\n");
+		dev_warn(dev, "msg (%d->%d) received with no recipient\n",
+					msg->src, msg->dst);
 
 	/* TODO: return the buffer back to memory pool */
 
@@ -771,7 +776,7 @@ static int rpmsg_ipcc_ns_cb(struct rpmsg_device *rpdev, void *data, int len,
 			 data, len, true);
 #endif
 
-	dev_info(dev, "rpmsg_ipcc_ns_cb in\n");
+	dev_dbg(dev, "rpmsg_ipcc_ns_cb in\n");
 
 	if (len != sizeof(*msg)) {
 		dev_err(dev, "malformed ns msg (%d)\n", len);
@@ -813,6 +818,43 @@ static int rpmsg_ipcc_ns_cb(struct rpmsg_device *rpdev, void *data, int len,
 	return 0;
 }
 
+struct rpmsg_device *
+rpmsg_ipcc_request_channel(struct platform_device *client, int index, const char *dev_name)
+{
+	struct rpmsg_channel_info chinfo;
+	struct rpmsg_ipcc_device *vrp;
+	struct rpmsg_device *rpmsg_dev = NULL;
+	struct of_phandle_args spec;
+	u32 src, dst;
+
+	mutex_lock(&con_mutex);
+
+	if (of_parse_phandle_with_args(client->dev.of_node, "rpmsg-dev",
+				       "#rpmsg-cells", index, &spec)) {
+		dev_info(&client->dev, "%s: can't parse \"rpmsg-dev\" property\n", __func__);
+		mutex_unlock(&con_mutex);
+		return ERR_PTR(-ENODEV);
+	}
+
+	list_for_each_entry(vrp, &ipcc_cons, node)
+		if (vrp->dev->of_node == spec.np) {
+			src = spec.args[0];
+			dst = spec.args[1];
+			dev_info(vrp->dev, "Creating device %s addr 0x%x->0x%x\n", dev_name, src, dst);
+
+			strncpy(chinfo.name, dev_name, sizeof(chinfo.name));
+			chinfo.src = src;
+			chinfo.dst = dst;
+			rpmsg_dev = rpmsg_create_channel(vrp, &chinfo);
+		}
+
+	of_node_put(spec.np);
+
+	mutex_unlock(&con_mutex);
+	return rpmsg_dev;
+}
+EXPORT_SYMBOL(rpmsg_ipcc_request_channel);
+
 /* invoked when a echo request arrives */
 static int rpmsg_ipcc_echo_cb(struct rpmsg_device *rpdev, void *data, int len,
 		       void *priv, u32 src)
@@ -853,6 +895,7 @@ static int rpmsg_ipcc_echo_cb(struct rpmsg_device *rpdev, void *data, int len,
 
 static int rpmsg_ipcc_probe(struct platform_device *pdev)
 {
+	struct device_node *np = pdev->dev.of_node;
 	struct rpmsg_ipcc_device *vrp;
 	struct mbox_client *client;
 	int ret = 0;
@@ -863,7 +906,10 @@ static int rpmsg_ipcc_probe(struct platform_device *pdev)
 		return -ENOMEM;
 	}
 
-	vrp->tx_buf_size = RPMSG_TX_BUF_SIZE;
+	if (of_property_read_u32(np, "rpmsg-mtu", &vrp->tx_buf_size)) {
+		vrp->tx_buf_size = RPMSG_TX_BUF_SIZE;
+	}
+
 	vrp->tx_buf_ptr = kzalloc(vrp->tx_buf_size, GFP_KERNEL);
 	if (IS_ERR(vrp->tx_buf_ptr)) {
 		dev_err(&pdev->dev, "tx buf malloc failed: %ld\n", PTR_ERR(vrp->tx_buf_ptr));
@@ -899,6 +945,11 @@ static int rpmsg_ipcc_probe(struct platform_device *pdev)
 	vrp->dev = &pdev->dev;
 	platform_set_drvdata(pdev, vrp);
 
+	/* register the ipcc device into database */
+	mutex_lock(&con_mutex);
+	list_add_tail(&vrp->node, &ipcc_cons);
+	mutex_unlock(&con_mutex);
+
 	/* if supported by the remote processor, enable the name service */
 	if (ipcc_has_feature(vrp, RPMSG_F_NS)) {
 		/* a dedicated endpoint handles the name service msgs */
@@ -925,7 +976,7 @@ static int rpmsg_ipcc_probe(struct platform_device *pdev)
 	if (ipcc_has_feature(vrp, RPMSG_F_NS)) {
 		schedule_delayed_work(&vrp->ns_work, 0);
 	}
-	dev_info(&pdev->dev, "%s done\n", __func__);
+	dev_info(&pdev->dev, "%s done mtu:%d\n", __func__, vrp->tx_buf_size);
 
 	return ret;
 
@@ -974,6 +1025,12 @@ static int rpmsg_ipcc_remove(struct platform_device *pdev)
 		skb = skb_dequeue(&vrp->queue);
 		kfree_skb(skb);
 	}
+
+	mutex_lock(&con_mutex);
+
+	list_del(&vrp->node);
+
+	mutex_unlock(&con_mutex);
 
 	if (vrp->mbox)
 		mbox_free_channel(vrp->mbox);
@@ -1025,3 +1082,4 @@ module_exit(rpmsg_ipcc_exit);
 MODULE_AUTHOR("Semidrive Semiconductor");
 MODULE_DESCRIPTION("Semidrive rpmsg IPCC Driver");
 MODULE_LICENSE("GPL v2");
+
