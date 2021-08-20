@@ -643,7 +643,9 @@ static void __ns_announce_delayed(struct work_struct *work)
 	struct delayed_work *dwork = to_delayed_work(work);
 	struct rpmsg_ipcc_device *vrp = container_of(dwork, struct rpmsg_ipcc_device,
 	                    ns_work);
+	struct rpmsg_channel_info chinfo;
 	struct rpmsg_ipcc_nsm nsm;
+	struct device *tmp;
 	int ret;
 
 	strncpy(nsm.name, "ipcc-echo", RPMSG_NAME_SIZE);
@@ -651,11 +653,26 @@ static void __ns_announce_delayed(struct work_struct *work)
 	nsm.flags = RPMSG_NS_CREATE;
 	ret = __send_offchannel_raw(vrp, RPMSG_ECHO_ADDR, RPMSG_NS_ADDR, &nsm, sizeof(nsm), true);
 	if (ret) {
-		dev_warn(vrp->dev, "failed to announce ns %d, try later\n", ret);
+		dev_warn(vrp->dev, "failed to announce %d, retry\n", ret);
 		schedule_delayed_work(&vrp->ns_work, msecs_to_jiffies(2000));
 		return;
 	}
-	dev_info(vrp->dev, "delayed announce ns %s\n", nsm.name);
+
+	/* make sure p2p rpmsg channel is created
+	 * announce ns shake hand
+	 */
+	strncpy(chinfo.name, nsm.name, RPMSG_NAME_SIZE);
+	chinfo.src = RPMSG_ADDR_ANY;
+	chinfo.dst = RPMSG_ECHO_ADDR;
+	tmp = rpmsg_find_device(vrp->dev, &chinfo);
+	if (tmp) {
+		put_device(tmp);
+		dev_info(vrp->dev, "announce ns completely\n");
+		return;
+	}
+
+	schedule_delayed_work(&vrp->ns_work, msecs_to_jiffies(100));
+	dev_info(vrp->dev, "announce ns in progress\n");
 }
 
 static void __rx_work_handler(struct work_struct *work)
