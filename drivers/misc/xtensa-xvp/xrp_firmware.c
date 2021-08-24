@@ -232,18 +232,20 @@ static int xrp_firmware_find_symbol(struct xvp *xvp, const char *name,
 				esym->st_shndx * ehdr->e_shentsize;
 			Elf32_Off in_section_off = esym->st_value - shdr->sh_addr;
 
-			if (xrp_section_bad(xvp, shdr)) {
-				dev_err(xvp->dev, "%s: bad firmware section #%d information",
-					__func__, esym->st_shndx);
-				return -EINVAL;
-			}
+			if (shdr->sh_type != SHT_NOBITS) { /* skip check when symbol is in bss section */
+				if (xrp_section_bad(xvp, shdr)) {
+					dev_dbg(xvp->dev, "%s: bad firmware section #%d information",
+						__func__, esym->st_shndx);
+					return -EINVAL;
+				}
 
-			if (esym->st_value < shdr->sh_addr ||
-			    in_section_off > shdr->sh_size ||
-			    esym->st_size > shdr->sh_size - in_section_off) {
-				dev_err(xvp->dev, "%s: bad symbol information",
-					__func__);
-				return -EINVAL;
+				if (esym->st_value < shdr->sh_addr ||
+				    in_section_off > shdr->sh_size ||
+				    esym->st_size > shdr->sh_size - in_section_off) {
+					dev_err(xvp->dev, "%s: bad symbol information",
+						__func__);
+					return -EINVAL;
+				}
 			}
 			addr = (void *)xvp->firmware->data + shdr->sh_offset +
 				in_section_off;
@@ -345,7 +347,7 @@ static int xrp_load_firmware(struct xvp *xvp)
 
 	rc = xrp_firmware_find_symbol(xvp, "_minrt_stdout", &log_addr, &log_sz, &log_val);
 	if (rc < 0) {
-		dev_err(xvp->dev, "%s: vdsp log is not found",
+		dev_dbg(xvp->dev, "%s: vdsp log is not found",
 			__func__);
 		xvp->log_phys = 0;
 		xvp->log_size = 0;
