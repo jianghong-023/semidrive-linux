@@ -1,5 +1,5 @@
 /*
- * Semidrive X9 platform DTS file
+ * Semidrive D9 platform DTS file
  *
  * Copyright (C) 2019, Semidrive Communications Inc.
  *
@@ -79,7 +79,7 @@
 	status = "disabled";
 };
 &I2C_SEC0_7 {
-	status = "disabled";
+	status = "okay";
 };
 &I2C_SEC0_9 {
 	status = "okay";
