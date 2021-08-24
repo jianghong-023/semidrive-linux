@@ -64,6 +64,8 @@ struct semidrive_sts_data {
 	struct input_dev *input_dev;
 	struct delayed_work ts_work;
 	int ts_work_count;
+	struct delayed_work ts_resume_work;
+	int ts_resume_count;
 	bool read_version_stat;
 	bool read_config_stat;
 	int abs_x_max;
@@ -239,8 +241,7 @@ static int semidrive_set_inited(struct semidrive_sts_data *ts)
 {
 	struct sts_ioctl_result op_ret;
 
-	semidrive_sts_ioctl(ts, STS_OP_SET_INITED, &op_ret);
-	return 0;
+	return semidrive_sts_ioctl(ts, STS_OP_SET_INITED, &op_ret);
 }
 
 /**
@@ -410,6 +411,24 @@ static int semidrive_configure_dev(struct semidrive_sts_data *ts)
 	return ret;
 }
 
+static void sts_resume_work_handler(struct work_struct *work)
+{
+	int ret;
+	struct semidrive_sts_data *ts =
+		container_of(work, struct semidrive_sts_data, ts_resume_work.work);
+
+	ret = semidrive_set_inited(ts);
+	if (!ret || ts->ts_resume_count >= 10) {
+		dev_err(&ts->pdev->dev, "sts resume exit ret=%d, cnt=%d\n",
+			ret, ts->ts_resume_count);
+		ts->ts_resume_count = 0;
+		cancel_delayed_work(&ts->ts_resume_work);
+	} else {
+		ts->ts_resume_count++;
+		schedule_delayed_work(&ts->ts_resume_work, msecs_to_jiffies(200));
+	}
+}
+
 static void sts_work_handler(struct work_struct *work)
 {
 	int ret;
@@ -493,6 +512,7 @@ static int semidrive_sts_probe(struct platform_device *pdev)
 		goto err;
 	}
 
+	INIT_DELAYED_WORK(&ts->ts_resume_work, sts_resume_work_handler);
 	INIT_DELAYED_WORK(&ts->ts_work, sts_work_handler);
 	schedule_delayed_work(&ts->ts_work, msecs_to_jiffies(500));
 
@@ -520,6 +540,10 @@ static int __maybe_unused semidrive_suspend(struct device *dev)
 
 static int __maybe_unused semidrive_resume(struct device *dev)
 {
+	struct platform_device *pdev = to_platform_device(dev);
+	struct semidrive_sts_data *ts = platform_get_drvdata(pdev);
+
+	schedule_delayed_work(&ts->ts_resume_work, msecs_to_jiffies(200));
 	return 0;
 }
 
