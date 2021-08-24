@@ -36,6 +36,9 @@ obj-$(CONFIG_SND_X9_REF_MACH_HS) += x9-ref-mach-ak4556.o
 snd-x9-ref-mach-tlv320aic23-objs := x9-ref-mach-tlv320aic23.o
 obj-$(CONFIG_SND_X9_REF_MACH_TLV320AIC23) += x9-ref-mach-tlv320aic23.o
 
+snd-x9u-msb1-mach-tlv320aic23-objs := x9u-msb1-mach-tlv320aic23.o
+obj-$(CONFIG_SND_X9_MSB1_MACH_TLV320AIC23) += x9u-msb1-mach-tlv320aic23.o
+
 snd-g9-ref-mach-objs := g9-ref-mach.o
 obj-$(CONFIG_SND_G9_REF_MACH) += snd-g9-ref-mach.o
 
