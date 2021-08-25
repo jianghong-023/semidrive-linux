@@ -36,6 +36,8 @@
 #define MAX96712_DEVICE_ID 0xa0
 #define MAX96722_DEVICE_ID 0xa1
 #define MAX96705_DEVICE_ID 0x41
+#define MAX9295A_DEVICE_ID 0x91
+#define MAX9295B_DEVICE_ID 0x93
 
 #define AP0101_SLAVE_ID (0x5d)
 #define MAX20087_SLAVE_ID (0x29)
@@ -74,6 +76,20 @@ enum MAX96705_I2C_ADDR {
 	MAX96705_CH_B = 0x92,
 	MAX96705_CH_C = 0x94,
 	MAX96705_CH_D = 0x96,
+};
+enum MAX9295_I2C_ADDR {
+	MAX9295_DEF = 0x80,
+	MAX9295_CH_A = 0x90,
+	MAX9295_CH_B = 0x92,
+	MAX9295_CH_C = 0x94,
+	MAX9295_CH_D = 0x96,
+};
+enum AP0101_I2C_ADDR {
+	AP0101_DEF  = 0xAB,
+	AP0101_CH_A = 0xA0,
+	AP0101_CH_B = 0xA2,
+	AP0101_CH_C = 0xA4,
+	AP0101_CH_D = 0xA6,
 };
 
 
@@ -354,6 +370,67 @@ static max96722_param_t max96722_reg[] = {
 
 	//Enable mipi
 	//{0x040b,0x42, 50},
+};
+static max96722_param_t max96722_reg_max9295[] = {
+	{0x0006, 0xf0, 0x0},
+	{0x0010, 0x11, 0x0},
+	{0x0011, 0x11, 0x0},
+	{0x08A0, 0x04, 0x0}, /*PHY 2x4 mode*/
+	{0x08A2, 0x30, 0x0}, //enable all the phys
+	{0x08A3, 0xE4, 0x0}, //phy1 D0->D2 D1->D3 phy0 D0->D0 D1->D1
+	{0x040B, 0x80, 0x0}, //pipe0 BPP 0x10: datatype 0x1e csi output disable
+	{0x040E, 0x5E, 0x0}, //bit0~5 pipe0:0x1e bit 7:6 pipe1 data type highest 2 bits
+	{0x040F, 0x7E, 0x0}, //bit7:4 pipe2 highest 4 bits bit3:0 pipe1 low bits
+	{0x0410, 0x7A, 0x0}, //bit7:2 pipe3 6 bits bit1:0 pipe2 low 2 bits
+	{0x0411, 0x48, 0x0}, //bit7:5 pipe2 high bits bit4:0 pipe1 BPP 0x10:datatype 0x1e
+	{0x0412, 0x20, 0x0}, //bit6:2 pipe3 BPP 0x10:0x1e bit1:0 pipe 2 BPP lower bits
+	{0x0418, 0xEF, 0x0}, //phy1 lane speed set bit0-4 for lane speed. 0xEF for 1.5G
+	{0x090B, 0x07, 0x0},
+	{0x092D, 0x15, 0x0},
+	{0x090D, 0x1E, 0x0},
+	{0x090E, 0x1E, 0x0},
+	{0x090F, 0x00, 0x0},
+	{0x0910, 0x00, 0x0},
+	{0x0911, 0x01, 0x0},
+	{0x0912, 0x01, 0x0},
+	{0x094B, 0x07, 0x0},
+	{0x096D, 0x15, 0x0},
+	{0x094D, 0x1E, 0x0},
+	{0x094E, 0x5E, 0x0},
+	{0x094F, 0x00, 0x0},
+	{0x0950, 0x40, 0x0},
+	{0x0951, 0x01, 0x0},
+	{0x0952, 0x41, 0x0},
+	{0x098B, 0x07, 0x0},
+	{0x09AD, 0x15, 0x0},
+	{0x098D, 0x1E, 0x0},
+	{0x098E, 0x9E, 0x0},
+	{0x098F, 0x00, 0x0},
+	{0x0990, 0x80, 0x0},
+	{0x0991, 0x01, 0x0},
+	{0x0992, 0x81, 0x0},
+	{0x09CB, 0x07, 0x0},
+	{0x09ED, 0x15, 0x0},
+	{0x09CD, 0x1E, 0x0},
+	{0x09CE, 0xDE, 0x0},
+	{0x09CF, 0x00, 0x0},
+	{0x09D0, 0xC0, 0x0},
+	{0x09D1, 0x01, 0x0},
+	{0x09D2, 0xC1, 0x0},
+	{0x04A0, 0x04, 0x0},//manual frame sync on MPF2
+	{0x04A2, 0x00, 0x0},//Turn off auto master link selection
+	{0x04AA, 0x00, 0x0},//Disable overlap window
+	{0x04AB, 0x00, 0x0},
+	{0x04AF, 0xC0, 0x0},//AUTO_FS_LINKS = 0, FS_USE_XTAL = 1, FS_LINK_[3:0] = 0
+	{0x04A7, 0x0C, 0x0},//set FSYNC period to 25M/30 CLK cycles. PCLK at 25MHz
+	{0x04A6, 0xB7, 0x0},
+	{0x04A5, 0x35, 0x0},
+	{0x04B1, 0x38, 0x0},//FSYNC TX ID is 7
+};
+static max96722_param_t max9295_reg[] = {
+	{0x02be, 0x10, 0x0},
+	{0x0318, 0x5e, 0x0},
+	{0x02d3, 0x84, 0x0},
 };
 static void max96722_link_enable(struct max96722_dev *sensor, int en);
 static void max96722_mipi_enable(struct max96722_dev *sensor, int en);
@@ -663,10 +740,11 @@ static int max96722_s_stream(struct v4l2_subdev *sd, int enable)
 
 	printk("%s +\n", __func__);
 	if (enable == 1) {
-		max96722_link_enable(sensor, 1);
+		msleep(20);
 		max96722_mipi_enable(sensor, 1);
 	} else if (enable == 0) {
 		max96722_link_enable(sensor, 0);
+		usleep_range(2000, 3000);
 		max96722_mipi_enable(sensor, 0);
 	}
 	printk("%s -\n", __func__);
@@ -771,7 +849,88 @@ static int max20087_power(struct max96722_dev *sensor, bool enable)
 	return ret;
 }
 
+#define MAX_WAIT_COUNT (20)
 
+static int max9295_read_reg(struct max96722_dev  *dev, int channel,
+							u16 reg,
+							u8 *val)
+{
+	struct i2c_client *client = dev->i2c_client;
+	struct i2c_msg msg[2];
+	u8 buf[2];
+	int ret;
+
+	client->addr = MAX9295_CH_A>>1;
+	buf[0] = reg >> 8;
+	buf[1] = reg & 0xff;
+	msg[0].addr = client->addr + channel;
+	msg[0].flags = client->flags;
+	msg[0].buf = buf;
+	msg[0].len = sizeof(buf);
+	msg[1].addr = client->addr + channel;
+	msg[1].flags = client->flags | I2C_M_RD;
+	msg[1].buf = buf;
+	msg[1].len = 1;
+	ret = i2c_transfer(client->adapter, msg, 2);
+	if (ret < 0) {
+		dev_info(&client->dev, "%s: channel %d chip 0x%02x error: reg=0x%02x\n",
+				 __func__, channel,  msg[0].addr, reg);
+		return ret;
+	}
+	*val = buf[0];
+	return 0;
+}
+static int max9295_write_reg(struct max96722_dev  *dev, int channel,
+							 u16 reg,
+							 u8 val)
+{
+	struct i2c_client *client = dev->i2c_client;
+	struct i2c_msg msg;
+	u8 buf[3];
+	int ret;
+
+	client->addr = MAX9295_CH_A>>1;
+	buf[0] = reg >> 8;
+	buf[1] = reg & 0xff;
+	buf[2] = val;
+	msg.addr = client->addr  + channel;
+	msg.flags = client->flags;
+	msg.buf = buf;
+	msg.len = sizeof(buf);
+	ret = i2c_transfer(client->adapter, &msg, 1);
+	if (ret < 0) {
+		dev_err(&client->dev,
+				"%s: channel %d chip 0x%02x error: reg=0x%02x, val=0x%02x\n",
+				__func__, channel, msg.addr, reg, val);
+		return ret;
+	}
+	dev_info(&client->dev,
+			 "%s: channel %d chip 0x%02x : reg=0x%02x, val=0x%02x\n",
+			 __func__, channel, msg.addr, reg, val);
+	return 0;
+}
+static int max9295_check_chip_id(struct max96722_dev  *dev, int channel)
+{
+	struct i2c_client *client = dev->i2c_client;
+	int ret = 0;
+	u8 chip_id = 0;
+	int i = 0;
+
+	while (i < MAX_WAIT_COUNT) {
+		msleep(20);
+		ret = max9295_read_reg(dev, (MAX9295_DEF-MAX9295_CH_A)>>1, 0x0d, &chip_id);
+		if (ret < 0) {
+			dev_info(&client->dev,
+					 "%s ch %d wrong chip identifier,  expected 0x%x(max9295), got 0x%x ret %d\n",
+					 __func__, i, MAX9295A_DEVICE_ID, chip_id, ret);
+			i++;
+		} else {
+			dev_info(&client->dev, "max9295 dev chipid = 0x%02x\n", chip_id);
+			return 0;
+		}
+	}
+	return -ENODEV;
+}
 static int max96722_check_chip_id(struct max96722_dev *sensor)
 {
 	struct i2c_client *client = sensor->i2c_client;
@@ -796,7 +955,7 @@ static int max96722_check_chip_id(struct max96722_dev *sensor)
 	return ret;
 }
 
-#define MAX_WAIT_COUNT (20)
+#define MAX_WAIT_COUNT (10)
 static int max96705_check_chip_id(struct max96722_dev *sensor)
 {
 	struct i2c_client *client = sensor->i2c_client;
@@ -805,13 +964,14 @@ static int max96705_check_chip_id(struct max96722_dev *sensor)
 	int i = 0;
 
 	while (i < MAX_WAIT_COUNT) {
+		msleep(20);
 		ret = max96705_read_reg(sensor, (MAX96705_DEF-MAX96705_CH_A)>>1, 0x1E,
 								&chip_id);
 		if (ret < 0) {
 			dev_warn(&client->dev,
 					 "%s  wrong chip identifier,  expected 0x%x(max96705), got 0x%x try count %d\n",
 					 __func__, MAX96705_DEVICE_ID, chip_id, i);
-			usleep_range(1000, 1100);
+			//usleep_range(1000, 1100);
 			i++;
 		} else {
 			printk(KERN_DEBUG "max96705 dev chipid = 0x%02x\n", chip_id);
@@ -853,11 +1013,18 @@ static void max96722_link_enable(struct max96722_dev *sensor, int en)
 static int max96722_initialization(struct max96722_dev *sensor)
 {
 	struct i2c_client *client = sensor->i2c_client;
+	struct v4l2_subdev sd = sensor->sd;
+	struct v4l2_subdev *interface_sd = max96722_get_interface_subdev(&sd);
+	struct sdrv_csi_mipi_csi2 *kcmc = v4l2_get_subdevdata(interface_sd);
+	struct v4l2_mbus_framefmt *fmt;
 	u8 value;
 	int ret;
 	int reglen = ARRAY_SIZE(max96722_reg);
 	int i = 0;
+	int j = 0;
+	u8 reg_value;
 	//printk("%s reglen = %d +\n", __FUNCTION__, reglen);
+	fmt = &sensor->fmt;
 	//Check if deser exists.
 	ret = max96722_read_reg(sensor, 0x000d, &value);
 	if (ret < 0) {
@@ -866,42 +1033,96 @@ static int max96722_initialization(struct max96722_dev *sensor)
 	}
 	max96722_preset(sensor);
 	max96722_mipi_enable(sensor, 0);
-	//Init max96722
-	for (i = 0; i < reglen; i++) {
-		max96722_write_reg(sensor, max96722_reg[i].nRegAddr,
-						   max96722_reg[i].nRegValue);
-		msleep(max96722_reg[i].nDelay);
-	}
-	//Camera Module Power On/Off
 	max20087_power(sensor, 0);
 	usleep_range(10000, 11000);
 	max20087_power(sensor, 1);
-	msleep(100);
-	for (i = 0; i < MAX_CAMERA_NUM; i++) {
-		//Modify serializer i2c address
-		max96722_write_reg(sensor, 0x0006, 1<<i);
-		if (max96705_check_chip_id(sensor) != 0) {
-			dev_err(&client->dev,
-					"%s  ch %d wrong chip identifier\n",
-					__func__, i);
-			continue;
+	msleep(120);
+	max96722_write_reg(sensor, 0x0006, 0xff);//enable GMSL2 and all the links
+	msleep(50);
+	max96722_write_reg(sensor, 0x0010, 0x11);//set phyA&B speed to 3G
+	max96722_write_reg(sensor, 0x0011, 0x11);//set phyC&D speed to 3G
+	msleep(50);
+	if (max9295_check_chip_id(sensor, 0) == 0) {
+		kcmc->lanerate = 1500*1000*1000/8;
+		fmt->width = 1920;
+		fmt->height = 1080;
+		reg_value = 0xf0;
+		reglen = ARRAY_SIZE(max96722_reg_max9295);
+		for (i = 0; i < reglen; i++) {
+			max96722_write_reg(sensor, max96722_reg_max9295[i].nRegAddr,
+							   max96722_reg_max9295[i].nRegValue);
+			msleep(max96722_reg_max9295[i].nDelay);
 		}
-		max96705_write_reg(sensor, (MAX96705_DEF-MAX96705_CH_A)>>1, 0x00,
-						   MAX96705_CH_A + i * 2);
+		reglen = ARRAY_SIZE(max9295_reg);
+		for (i = 0; i < MAX_CAMERA_NUM; i++) {
+			value = 0xf0 | (1<<i);
+			max96722_write_reg(sensor, 0x6, value);
+			if (max9295_check_chip_id(sensor, i) != 0) {
+				dev_err(&client->dev,
+						"%s: could not find 9295 on channel %d for 96722\n",
+						__func__, i);
+				continue;
+			} else {
+				max9295_write_reg(sensor, (MAX9295_DEF-MAX9295_CH_A)>>1, 0x00,
+								  MAX9295_CH_A + i * 2);
+				reg_value = reg_value|(1<<i);
+			}
+			for (j = 0; j < reglen; j++) {
+				max9295_write_reg(sensor, i, max9295_reg[j].nRegAddr,
+								  max9295_reg[j].nRegValue);
+				msleep(max9295_reg[j].nDelay);
+			}
+		}
+		max96722_write_reg(sensor, 0x6, reg_value);
+		msleep(50);
+	} else {
+		//max96722_power(sensor, 0);
+		//max96722_power(sensor, 1);
+		//msleep(30);
+		max96722_preset(sensor);
+		max96722_mipi_enable(sensor, 0);
+		//Init max96722
+		for (i = 0; i < reglen; i++) {
+			max96722_write_reg(sensor, max96722_reg[i].nRegAddr,
+							   max96722_reg[i].nRegValue);
+			msleep(max96722_reg[i].nDelay);
+		}
+		//Camera Module Power On/Off
+		max20087_power(sensor, 0);
 		usleep_range(10000, 11000);
-		max96705_access_sync(sensor, i, MAX96705_WRITE, 0x07, NULL, 0x84);
-		usleep_range(1000, 1100);
-		max96705_access_sync(sensor, i, MAX96705_WRITE, 0x43, NULL, 0x25);
-		max96705_access_sync(sensor, i, MAX96705_WRITE, 0x45, NULL, 0x01);
-		max96705_access_sync(sensor, i, MAX96705_WRITE, 0x47, NULL, 0x26);
-		usleep_range(1000, 1100);
-		max96705_access_sync(sensor, i, MAX96705_WRITE, 0x67, NULL, 0xc4);
+		max20087_power(sensor, 1);
+		msleep(120);
+		for (i = 0; i < MAX_CAMERA_NUM; i++) {
+			//Modify serializer i2c address
+			max96722_write_reg(sensor, 0x0006, 1<<i);
+			//msleep(50);
+			//usleep_range(20000, 21000);
+			if (max96705_check_chip_id(sensor) != 0) {
+				dev_err(&client->dev,
+						"%s  ch %d wrong chip identifier\n",
+						__func__, i);
+				continue;
+			}
+			max96705_write_reg(sensor, (MAX96705_DEF-MAX96705_CH_A)>>1, 0x00,
+							   MAX96705_CH_A + i * 2);
+			usleep_range(10000, 11000);
+			max96705_access_sync(sensor, i, MAX96705_WRITE, 0x07, NULL, 0x84);
+			usleep_range(1000, 1100);
+			max96705_access_sync(sensor, i, MAX96705_WRITE, 0x43, NULL, 0x25);
+			max96705_access_sync(sensor, i, MAX96705_WRITE, 0x45, NULL, 0x01);
+			max96705_access_sync(sensor, i, MAX96705_WRITE, 0x47, NULL, 0x26);
+			usleep_range(1000, 1100);
+			max96705_access_sync(sensor, i, MAX96705_WRITE, 0x67, NULL, 0xc4);
+		}
+		kcmc->lanerate = 1000*1000*1000/8;
+		//For enable data
+		usleep_range(2000, 3000);
+		max96722_mipi_enable(sensor, 1);
+		usleep_range(2000, 3000);
+		max96722_link_enable(sensor, 1);
+		msleep(30);
+		max96722_mipi_enable(sensor, 0);
 	}
-	//For enable data
-	max96722_mipi_enable(sensor, 1);
-	max96722_link_enable(sensor, 1);
-	usleep_range(10000, 11000);
-	max96722_link_enable(sensor, 0);
 	//printk("%s  -\n", __FUNCTION__);
 	return 0;
 }
@@ -925,6 +1146,25 @@ static int max96722_probe(struct i2c_client *client,
 	sensor->addr_96722 = client->addr;
 	sensor->addr_96705 = MAX96705_CH_A>>1;
 	sensor->addr_max20087 = MAX20087_SLAVE_ID;
+	gpiod = devm_gpiod_get_optional(&client->dev, "pwdn", GPIOD_IN);
+	if (IS_ERR(gpiod)) {
+		ret = PTR_ERR(gpiod);
+		if (ret != -EPROBE_DEFER)
+			dev_err(&client->dev, "Failed to get %s GPIO: %d\n",
+					"pwdn", ret);
+		return ret;
+	}
+	sensor->pwdn_gpio = gpiod;
+	max96722_power(sensor, 0);
+	usleep_range(1000, 1100);
+	max96722_power(sensor, 1);
+	msleep(30);
+	ret = max96722_check_chip_id(sensor);
+	if (ret < 0) {
+		dev_err(&client->dev, "fail to init max96722.\n");
+		return ret;
+	}
+	max96722_power(sensor, 0);
 	/*
 	 * default init sequence initialize sensor to
 	 * YUV422 UYVY VGA@30fps
@@ -990,24 +1230,6 @@ static int max96722_probe(struct i2c_client *client,
 								 MIPI_CSI2_SENS_VCX_PADS_NUM, sensor->pads);
 	if (ret)
 		return ret;
-	gpiod = devm_gpiod_get_optional(&client->dev, "pwdn", GPIOD_IN);
-	if (IS_ERR(gpiod)) {
-		ret = PTR_ERR(gpiod);
-		if (ret != -EPROBE_DEFER)
-			dev_err(&client->dev, "Failed to get %s GPIO: %d\n",
-					"pwdn", ret);
-		return ret;
-	}
-	sensor->pwdn_gpio = gpiod;
-	max96722_power(sensor, 0);
-	usleep_range(1000, 1100);
-	max96722_power(sensor, 1);
-	msleep(30);
-	ret = max96722_check_chip_id(sensor);
-	if (ret < 0) {
-		dev_err(&client->dev, "fail to init max96722.\n");
-	}
-	max96722_power(sensor, 0);
 #ifdef PROBE_INIT_MAX96722
 	max96722_initialization(sensor);
 #endif
