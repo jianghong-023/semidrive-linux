@@ -11,6 +11,7 @@
  * GNU General Public License for more details.
  */
 #include <linux/io.h>
+#include <linux/input.h>
 #include <linux/kernel.h>
 #include <linux/mailbox_client.h>
 #include <linux/module.h>
@@ -22,6 +23,7 @@
 #include <linux/soc/semidrive/mb_msg.h>
 #include <linux/workqueue.h>
 
+/*str sync ap12ap2*/
 struct str_sync_device {
 	struct device		*dev;
 	struct mbox_chan	*chan;
@@ -94,7 +96,6 @@ static struct mbox_chan *str_sync_mbox_request(struct platform_device *pdev, uin
 static int str_sync_probe(struct platform_device *pdev)
 {
 	struct str_sync_device *tdev;
-	int ret;
 
 	tdev = devm_kzalloc(&pdev->dev, sizeof(*tdev), GFP_KERNEL);
 	if (!tdev)
@@ -150,7 +151,71 @@ static struct platform_driver str_sync_driver = {
 	.remove = str_sync_remove,
 };
 module_platform_driver(str_sync_driver);
+/*end str sync ap12ap2*/
 
-MODULE_DESCRIPTION("STR SYNC AP1 to AP2");
+/*v power key*/
+static struct input_dev *str_power_key;
+
+static int str_power_key_resume(struct device *dev)
+{
+        void __iomem *base;
+        unsigned int value;
+
+	if (!str_power_key)
+		return 0;
+
+        base = ioremap(0x4AE00000, 0x1000);
+        value = readl(base);
+        iounmap(base);
+
+        if (value == 0x8765) {//str resume
+                input_report_key(str_power_key, KEY_POWER, 1);
+                input_report_key(str_power_key, KEY_POWER, 0);
+                input_sync(str_power_key);
+        }
+        return 0;
+}
+
+static int str_power_key_probe(struct platform_device *pdev)
+{
+	str_power_key = input_allocate_device();
+	if (str_power_key) {
+        	str_power_key->name = "str-power-key";
+        	input_set_capability(str_power_key, EV_KEY, KEY_POWER);
+        	input_register_device(str_power_key);
+	}
+	return 0;
+}
+
+static int str_power_key_remove(struct platform_device *pdev)
+{
+	if (str_power_key) {
+        	input_unregister_device(str_power_key);
+		input_free_device(str_power_key);
+	}
+	return 0;
+}
+
+static const struct of_device_id str_power_key_match[] = {
+        { .compatible = "sd,str-power-key"},
+        {},
+};
+MODULE_DEVICE_TABLE(of, str_power_key_match);
+
+static SIMPLE_DEV_PM_OPS(str_power_key_ops, NULL, str_power_key_resume);
+
+static struct platform_driver str_power_key_driver = {
+        .driver = {
+                .name = "str_power_key",
+                .of_match_table = str_power_key_match,
+                .pm = &str_power_key_ops,
+        },
+        .probe  = str_power_key_probe,
+        .remove = str_power_key_remove,
+};
+module_platform_driver(str_power_key_driver);
+/*end v power key*/
+
+MODULE_DESCRIPTION("STR misc tools driver");
 MODULE_AUTHOR("mingmin.ling <mingmin.ling@semidrive.com");
 MODULE_LICENSE("GPL v2");
