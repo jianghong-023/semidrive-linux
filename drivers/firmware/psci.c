@@ -38,8 +38,10 @@
 #include <linux/cpu_pm.h>
 #ifdef CONFIG_SDRV_WATCHDOG
 extern void sdrv_restart(enum reboot_mode reboot_mode, const char *cmd);
+extern void sdrv_set_bootreason(enum reboot_mode reboot_mode, const char *cmd);
 #else
 static void sdrv_restart(enum reboot_mode reboot_mode, const char *cmd) {}
+static void sdrv_set_bootreason(enum reboot_mode reboot_mode, const char *cmd) {}
 #endif
 /*
  * While a 64-bit OS can make calls with SMC32 calling conventions, for some
@@ -336,11 +338,13 @@ static int get_set_conduit_method(struct device_node *np)
 
 static void psci_sys_reset(enum reboot_mode reboot_mode, const char *cmd)
 {
+	sdrv_set_bootreason(reboot_mode, cmd);
 	invoke_psci_fn(PSCI_0_2_FN_SYSTEM_RESET, 0, 0, 0);
 }
 
 static void psci_sys_poweroff(void)
 {
+	sdrv_set_bootreason(0, "shutdown");
 	invoke_psci_fn(PSCI_0_2_FN_SYSTEM_OFF, 0, 0, 0);
 }
 

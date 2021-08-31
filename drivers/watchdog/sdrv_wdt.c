@@ -344,8 +344,7 @@ static int sdrv_wdt_is_running(struct sdrv_wdt_priv *sdrv_wdt)
 	return !!((readl(wdt_ctl) & WDG_CTRL_WDG_EN_STA_MASK)
 			&& (readl(wdt_ctl + 0x4) != readl(wdt_ctl + 0x1c)));
 }
-
-void sdrv_restart(enum reboot_mode reboot_mode, const char *cmd)
+void sdrv_set_bootreason(enum reboot_mode reboot_mode, const char *cmd)
 {
 	struct of_phandle_args args;
 	struct device_node *np;
@@ -358,7 +357,6 @@ void sdrv_restart(enum reboot_mode reboot_mode, const char *cmd)
 	reason = HALT_REASON_SW_RESET;
 	if (cmd) {
 		size_t i;
-
 		for (i = 0; i < ARRAY_SIZE(halt_reasons); i++) {
 			if (!strcmp(cmd, halt_reasons[i].desc)) {
 				reason = halt_reasons[i].reason;
@@ -366,13 +364,11 @@ void sdrv_restart(enum reboot_mode reboot_mode, const char *cmd)
 			}
 		}
 	}
-
 	sdrv_wdt = watchdog_get_drvdata(&sdrv_wtd_wdd);
 	np = sdrv_wdt->dev->of_node;
 
 	ret = of_parse_phandle_with_args(np, "regctl",
 			"#regctl-cells", 0, &args);
-
 	if (!ret) {
 		regctl_node = args.np;
 		regctl_dev =  regctl_node->data;
@@ -394,7 +390,12 @@ void sdrv_restart(enum reboot_mode reboot_mode, const char *cmd)
 	} else {
 		pr_err("boot reg no found from dts\n");
 	}
+}
+void sdrv_restart(enum reboot_mode reboot_mode, const char *cmd)
+{
+	struct sdrv_wdt_priv *sdrv_wdt = watchdog_get_drvdata(&sdrv_wtd_wdd);
 
+	sdrv_set_bootreason(reboot_mode, cmd);
 	if (!sdrv_wdt_is_running(sdrv_wdt)) {
 		/* run watchdog, and don't kick it */
 		arch_flush_dcache_all();
@@ -407,43 +408,9 @@ void sdrv_restart(enum reboot_mode reboot_mode, const char *cmd)
 
 void sdrv_poweroff(void)
 {
-	struct of_phandle_args args;
-	struct device_node *np;
-	struct regmap *regmap;
-	struct device_node *regctl_node;
-	struct device *regctl_dev;
-	int ret, val;
-
-	int reason = HALT_REASON_POR;
-
 	struct sdrv_wdt_priv *sdrv_wdt = watchdog_get_drvdata(&sdrv_wtd_wdd);
-	np = sdrv_wdt->dev->of_node;
 
-	ret = of_parse_phandle_with_args(np, "regctl",
-			"#regctl-cells", 0, &args);
-
-	if (!ret) {
-		regctl_node = args.np;
-		regctl_dev =  regctl_node->data;
-		regmap = dev_get_regmap(regctl_dev, NULL);
-		if (regmap) {
-			ret = regmap_read(regmap, SDRV_REG_BOOTREASON, &val);
-			if (!ret) {
-				val &= ~BOOT_REASON_MASK;
-				val |= reason;
-				regmap_write(regmap, SDRV_REG_BOOTREASON, val);
-			} else {
-				pr_err("failed to save reboot reason\n");
-			}
-			ret = regmap_write(regmap, SDRV_REG_STATUS, 0);
-			if (ret)
-				pr_err("failed to clean status register\n");
-		}
-		of_node_put(args.np);
-	} else {
-		pr_err("failed to save reboot reason\n");
-		return;
-	}
+	sdrv_set_bootreason(0, "shutdown");
 
 	if (!sdrv_wdt_is_running(sdrv_wdt)) {
 		/* run watchdog, and don't kick it */
