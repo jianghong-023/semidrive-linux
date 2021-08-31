@@ -116,6 +116,17 @@ config SND_X9_REF_MACH_TLV320AIC23
 	  Select Y if you have such device.
 	  If unsure select "N".
 
+config SND_X9_MSB1_MACH_TLV320AIC23
+	tristate "ASoC Audio driver for ms platform x9u b1 with headset codec tlv320aic23"
+	depends on ARCH_SEMIDRIVE_X9
+	select SND_SDRV_AFE_I2S_SC
+	select SND_SOC_GENERIC_DMAENGINE_PCM
+	help
+	  This adds support for ASoC machine driver for SEMI_DRIVE X9
+	  platforms with internal audio codec and headset amplifier.
+	  Select Y if you have such device.
+	  If unsure select "N".
+
 config SND_G9_REF_MACH
 	tristate "ASoC Audio driver for g9 platform"
 	depends on ARCH_SEMIDRIVE_G9
