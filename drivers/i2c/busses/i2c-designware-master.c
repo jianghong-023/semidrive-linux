@@ -453,8 +453,8 @@ i2c_dw_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num)
 	i2c_dw_xfer_init(dev);
 	count = calc_bytes(msgs, num);
 	timeout = count * adap->timeout;
-	if (timeout > HZ)
-		timeout = HZ;
+	if (timeout > 3*HZ)
+		timeout = 3*HZ;
 
 	/* Wait for tx to complete */
 	if (!wait_for_completion_timeout(&dev->cmd_complete, timeout)) {
