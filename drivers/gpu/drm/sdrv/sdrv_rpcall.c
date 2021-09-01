@@ -23,14 +23,14 @@ struct sdrv_disp_control {
 struct disp_frame_info {
 	u32 addr_l;
 	u32 addr_h;
-	u32 width;
-	u32 height;
-	u32 pos_x;
-	u32 pos_y;
-	u32 pitch;
 	u32 format;
-	u32 mask_id;
-};
+	u16 width;
+	u16 height;
+	u16 pos_x;
+	u16 pos_y;
+	u16 pitch;
+	u16 mask_id;
+}__attribute__ ((packed));
 
 /* Do not exceed 32 bytes so far */
 struct disp_ioctl_cmd {
@@ -166,7 +166,12 @@ int sdrv_set_frameinfo(struct sdrv_dpc *dpc, struct dpc_layer layers[], u8 count
 	fi.format = layer->format;
 	fi.mask_id = 0;
 
-	if (fi.width <= 0 || fi.height <= 0) {
+	DRM_DEBUG("format[%c%c%c%c]\n",
+		layer->format & 0xff, (layer->format >> 8) & 0xff, (layer->format >> 16) & 0xff,(layer->format >> 24) & 0xff);
+	DRM_DEBUG("w:%d h:%d pitch:%d addrh:0x%x addrl:0x%x posx:%d posy:%d format:%x mk:%d\n",
+		fi.width, fi.height, fi.pitch, fi.addr_h, fi.addr_l, fi.pos_x, fi.pos_y, fi.format, fi.mask_id);
+
+	if (fi.width <= 0 || fi.height <= 0 || fi.format != DRM_FORMAT_ABGR8888) {
 		return 0;
 	}
 

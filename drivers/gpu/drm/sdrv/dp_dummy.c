@@ -68,12 +68,6 @@ static int dp_update(struct sdrv_dpc *dpc, struct dpc_layer layers[], u8 count) 
 
 #if USE_FREERTOS_RPCALL
 	struct dp_dummy_data *dummy = (struct dp_dummy_data *)dpc->priv;
-	static int first_enable = 0;
-
-	if (first_enable < 5) {
-		first_enable++;
-		return 0;
-	}
 
 	return sdrv_set_frameinfo(dpc, layers, count);
 #else
