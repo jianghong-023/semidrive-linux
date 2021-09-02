@@ -920,9 +920,6 @@ static int max9295_check_chip_id(struct max96722_dev  *dev, int channel)
 		msleep(20);
 		ret = max9295_read_reg(dev, (MAX9295_DEF-MAX9295_CH_A)>>1, 0x0d, &chip_id);
 		if (ret < 0) {
-			dev_info(&client->dev,
-					 "%s ch %d wrong chip identifier,  expected 0x%x(max9295), got 0x%x ret %d\n",
-					 __func__, i, MAX9295A_DEVICE_ID, chip_id, ret);
 			i++;
 		} else {
 			dev_info(&client->dev, "max9295 dev chipid = 0x%02x\n", chip_id);
@@ -968,10 +965,6 @@ static int max96705_check_chip_id(struct max96722_dev *sensor)
 		ret = max96705_read_reg(sensor, (MAX96705_DEF-MAX96705_CH_A)>>1, 0x1E,
 								&chip_id);
 		if (ret < 0) {
-			dev_warn(&client->dev,
-					 "%s  wrong chip identifier,  expected 0x%x(max96705), got 0x%x try count %d\n",
-					 __func__, MAX96705_DEVICE_ID, chip_id, i);
-			//usleep_range(1000, 1100);
 			i++;
 		} else {
 			printk(KERN_DEBUG "max96705 dev chipid = 0x%02x\n", chip_id);
@@ -1076,9 +1069,6 @@ static int max96722_initialization(struct max96722_dev *sensor)
 		max96722_write_reg(sensor, 0x6, reg_value);
 		msleep(50);
 	} else {
-		//max96722_power(sensor, 0);
-		//max96722_power(sensor, 1);
-		//msleep(30);
 		max96722_preset(sensor);
 		max96722_mipi_enable(sensor, 0);
 		//Init max96722
@@ -1095,8 +1085,6 @@ static int max96722_initialization(struct max96722_dev *sensor)
 		for (i = 0; i < MAX_CAMERA_NUM; i++) {
 			//Modify serializer i2c address
 			max96722_write_reg(sensor, 0x0006, 1<<i);
-			//msleep(50);
-			//usleep_range(20000, 21000);
 			if (max96705_check_chip_id(sensor) != 0) {
 				dev_err(&client->dev,
 						"%s  ch %d wrong chip identifier\n",
