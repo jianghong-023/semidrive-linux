@@ -997,6 +997,8 @@ int max96722_initialization(deser_dev_t *dev)
 		max96722_para.mipi_bps = 1500000000;
 		max96722_para.fps = 30;
 		max96722_para.denominator = 30;
+		max96722_para.width = 1920;
+		max96722_para.height = 1080;
 		reg_value = 0xf0;
 		reglen = ARRAY_SIZE(max96722_reg_max9295);
 		for (i = 0; i < reglen; i++) {
