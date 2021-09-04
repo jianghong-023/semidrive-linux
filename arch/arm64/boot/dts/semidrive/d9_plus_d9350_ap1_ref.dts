@@ -7,36 +7,45 @@
  */
 
 /dts-v1/;
-#include "d9_ap2.dtsi"
-#include "d9lite_ref-clk-ctrl.dtsi"
-#include "lcd-timings.dtsi"
 #include <dt-bindings/pinctrl/pins-sdx9.h>
-#include <dt-bindings/memmap/d9lite/projects/default/image_cfg.h>
+#include <dt-bindings/memmap/d9plus/projects/default/image_cfg.h>
 #include <dt-bindings/memory/sdrv_ion.h>
-#include <dt-bindings/rpmsg/sd,x9h-default.h>
+#include <dt-bindings/rpmsg/sd,d9p-ap1.h>
+#include "d9-plus-ap1.dtsi"
+#include "lcd-timings.dtsi"
 
 / {
-	model = "Semidrive kunlun D9lite REF Board";
+	model = "Semidrive kunlun D9plus ap1 REF Board";
 
 	compatible = "semidrive,kunlun";
 
 	aliases {
 		serial0 = &uart14;
-		//serial1 = &uart12;
+		serial1 = &uart12;
 		//serial2 = &uart12;
-		//ethernet2 = &ethernet2;
+		ethernet2 = &ethernet2;
 	};
 
 	memory@50000000 {
 		device_type = "memory";
-		reg = <HIGH32(AP2_KERNEL_MEMBASE-0x80000) LOW32(AP2_KERNEL_MEMBASE-0x80000) HIGH32(AP2_KERNEL_MEMSIZE) LOW32(AP2_KERNEL_MEMSIZE) \
-		       0x0 (VDSP_SHARE_MEMBASE+0x4000) 0x0 (VDSP_SHARE_MEMSIZE-0x4000)>;
+		reg = <HIGH32(AP1_KERNEL_MEMBASE-0x80000) LOW32(AP1_KERNEL_MEMBASE-0x80000) HIGH32(AP1_KERNEL_MEMSIZE) LOW32(AP1_KERNEL_MEMSIZE) \
+		       HIGH32(ECO_2ND_MEMBASE) LOW32(ECO_2ND_MEMBASE) HIGH32(ECO_2ND_MEMSIZE) LOW32(ECO_2ND_MEMSIZE)>;
 	};
 
 	reserved-memory {
 		#address-cells = <2>;
 		#size-cells = <2>;
 		ranges;
+
+		ramoops {
+			compatible = "ramoops";
+			reg = <HIGH32(AP1_BOARD_RAMDISK_MEMBASE + AP1_BOARD_RAMDISK_MEMSIZE + 0x1000000)
+				LOW32(AP1_BOARD_RAMDISK_MEMBASE + AP1_BOARD_RAMDISK_MEMSIZE + 0x1000000) 0x0 0x100000>;
+			record-size = <0x60000>;
+			console-size = <0x40000>;
+			ftrace-size = <0x20000>;
+			pmsg-size = <0x40000>;
+		};
 
 		/* Default Common CMA Pool */
 		/* QUIRK: Must be kept in the lower 4096 MiBs of DRAM banks for VE */
@@ -49,7 +58,6 @@
 			linux,cma-default;
 		};
 
-
 		rproc_0_safety: rproc@0 {
 			compatible = "shared-dma-pool";
 			no-map;
@@ -61,7 +69,11 @@
 			no-map;
 			reg = <0x0 RPMSG1_MEM_POOL_BASE 0x0 RPMSG1_MEM_POOL_SIZE>;
 		};
-
+		rproc_ap: rproc@4 {
+			compatible = "shared-dma-pool";
+			no-map;
+			reg = <0x0 RPMSG3_MEM_POOL_BASE 0x0 RPMSG3_MEM_POOL_SIZE>;
+		};
 		xrp_reserved: xrp@0 {
 			compatible = "shared-dma-pool";
 			status = "okay";
@@ -76,8 +88,10 @@
 	};
 
 	chosen {
-		bootargs = "skip_initramfs noinitrd root=/dev/mmcblk0p4 rootfstype=ext4 rootwait rw init=/sbin/init highres=1 earlycon loglevel=4 console=ttyS0,115200n8 fbcon=map:1 androidboot.mode=normal androidboot.selinux=permissive androidboot.debuggable=1 androidboot.dm_verity=disable";
+		bootargs = "root=/dev/ram0 rootfstype=ramfs highres=1  earlycon loglevel=4 console=ttyS0,115200n8 androidboot.mode=normal androidboot.selinux=permissive androidboot.debuggable=1 androidboot.dm_verity=disable androidboot.vdsp=disable init=/init";
 		stdout-path = "serial0";
+		linux,initrd-start = <AP1_BOARD_RAMDISK_MEMBASE>;
+		linux,initrd-end   = <AP1_BOARD_RAMDISK_MEMSIZE>;
 	};
 
 	vdd_12: fixed-vdd_12 {
@@ -177,34 +191,6 @@
 	};
 };
 
-&csi1 {
-	mbus-type = "mipi-csi2";
-	pclk-sample = <1>;
-	status = "disabled";
-
-	ports {
-		csi1_stream0: port@0 {
-			csi1_stream0_in: endpoint@0 {
-				remote-endpoint = <&csimipi1_0_out>;
-			};
-		};
-		csi1_stream1: port@1 {
-			csi1_stream1_in: endpoint@0 {
-				remote-endpoint = <&csimipi1_1_out>;
-			};
-		};
-		csi1_stream2: port@2 {
-			csi1_stream2_in: endpoint@0 {
-				remote-endpoint = <&csimipi1_2_out>;
-			};
-		};
-		csi1_stream3: port@3 {
-			csi1_stream3_in: endpoint@0 {
-				remote-endpoint = <&csimipi1_3_out>;
-			};
-		};
-	};
-};
 &csi2 {
 	mbus-type = "parallel";
 	pclk-sample = <0>;
@@ -219,6 +205,7 @@
 
 	};
 };
+
 &csimipi0 {
 	status = "disabled";
 	lanerate = <72000000>;
@@ -286,72 +273,7 @@
 		};
 	};
 };
-&csimipi1 {
-	status = "disabled";
-	lanerate = <72000000>;
-	hsa = <10>;
-	hbp = <20>;
-	hsd = <0x60>;
-	output-type = <0x1e>;
 
-	ports {
-		#address-cells = <1>;
-		#size-cells = <0>;
-
-		port@0 {
-			#address-cells = <1>;
-			#size-cells = <0>;
-			reg = <0>;
-			csimipi1_0_in: endpoint@0 {
-				remote-endpoint = <&mcsi1deser_to_mipi_0>;
-				reg = <0>;
-			};
-			csimipi1_0_out: endpoint@1 {
-				remote-endpoint = <&csi1_stream0_in>;
-				reg = <0>;
-			};
-		};
-		port@1 {
-			#address-cells = <1>;
-			#size-cells = <0>;
-			reg = <1>;
-			csimipi1_1_in: endpoint@0 {
-				remote-endpoint = <&mcsi1deser_to_mipi_1>;
-				reg = <1>;
-			};
-			csimipi1_1_out: endpoint@1 {
-				remote-endpoint = <&csi1_stream1_in>;
-				reg = <1>;
-			};
-		};
-		port@2 {
-			#address-cells = <1>;
-			#size-cells = <0>;
-			reg = <2>;
-			csimipi1_2_in: endpoint@0 {
-				remote-endpoint = <&mcsi1deser_to_mipi_2>;
-				reg = <2>;
-			};
-			csimipi1_2_out: endpoint@1 {
-				remote-endpoint = <&csi1_stream2_in>;
-				reg = <2>;
-			};
-		};
-		port@3 {
-			#address-cells = <1>;
-			#size-cells = <0>;
-			reg = <3>;
-			csimipi1_3_in: endpoint@0 {
-				remote-endpoint = <&mcsi1deser_to_mipi_3>;
-				reg = <3>;
-			};
-			csimipi1_3_out: endpoint@1 {
-				remote-endpoint = <&csi1_stream3_in>;
-				reg = <3>;
-			};
-		};
-	};
-};
 &csiparallel0 {
 	status = "disabled";
 	#address-cells = <1>;
@@ -372,45 +294,45 @@
 };
 
 &i2c5 {
-		status = "disabled";
+	status = "disabled";
 
-		ak7738:codec@1c{
-			compatible = "akm,ak7738";
-			reg = <0x1c>;
-			ak7738,pdn-gpio = <&ext_gpio74 7 0>; // If PDN GPIO pin is used
-		};
+	ak7738:codec@1c{
+		compatible = "akm,ak7738";
+		reg = <0x1c>;
+		ak7738,pdn-gpio = <&ext_gpio74 7 0>; // If PDN GPIO pin is used
+	};
 
-		tas5404:codec@6c {
-			compatible = "ti,tas5404";
-			reg = <0x6c>;
-			#sound-dai-cells = <0>;
-			pvdd-supply = <&vdd_12>;
-			standby-gpios = <&ext_gpio 0 GPIO_ACTIVE_LOW>;
-		};
+	tas5404:codec@6c {
+		compatible = "ti,tas5404";
+		reg = <0x6c>;
+		#sound-dai-cells = <0>;
+		pvdd-supply = <&vdd_12>;
+		standby-gpios = <&ext_gpio 0 GPIO_ACTIVE_LOW>;
+	};
 
-		tas6424:codec@6a {
-			compatible = "ti,tas6424";
-			reg = <0x6a>;
-			#sound-dai-cells = <0>;
-			pvdd-supply = <&vdd_12>;
-			vbat-supply = <&vdd_12>;
-			dvdd-supply = <&vdd_3v3>;
-			standby-gpios = <&ext_gpio74 2 GPIO_ACTIVE_LOW>;
-			mute-gpios = <&ext_gpio74 3 GPIO_ACTIVE_LOW>;
-			warn-gpios = <&ext_gpio74 5 GPIO_ACTIVE_LOW>;
-			fault-gpios = <&ext_gpio74 4 GPIO_ACTIVE_LOW>;
-		};
+	tas6424:codec@6a {
+		compatible = "ti,tas6424";
+		reg = <0x6a>;
+		#sound-dai-cells = <0>;
+		pvdd-supply = <&vdd_12>;
+		vbat-supply = <&vdd_12>;
+		dvdd-supply = <&vdd_3v3>;
+		standby-gpios = <&ext_gpio74 2 GPIO_ACTIVE_LOW>;
+		mute-gpios = <&ext_gpio74 3 GPIO_ACTIVE_LOW>;
+		warn-gpios = <&ext_gpio74 5 GPIO_ACTIVE_LOW>;
+		fault-gpios = <&ext_gpio74 4 GPIO_ACTIVE_LOW>;
+	};
 
-		xf6020:codec@47{
-			compatible = "iflytek,xf6020";
-			reg = <0x47>;
-			reset-gpios = <&ext_gpio74 15 GPIO_ACTIVE_LOW>;
-		};
+	xf6020:codec@47{
+		compatible = "iflytek,xf6020";
+		reg = <0x47>;
+		reset-gpios = <&ext_gpio74 15 GPIO_ACTIVE_LOW>;
+	};
 
-		tlv320aic23_ms: codec@1a {
-			compatible = "ti,tlv320aic23";
-			reg = <0x1a>;
-		};
+	tlv320aic23_ms: codec@1a {
+		compatible = "ti,tlv320aic23";
+		reg = <0x1a>;
+	};
 };
 
 &i2c6 {
@@ -485,62 +407,6 @@
 &i2c9 {
 	status = "disabled";
 
-	cam_gpios: gpio@74 {
-		compatible = "ti,tca9539";
-		reg = <0x74>;
-		#gpio-cells = <2>;
-		gpio-controller;
-	};
-
-	poc_mcsi1deser: poc@0x29 {
-		compatible = "max2008x,deser1_poc";
-		reg = <0x29>;
-	};
-
-	mcsi1deser:mcsi1deser@7F {
-		compatible = "sdrv,mcsi1_deser";
-		reg = <0x7F>;
-		pwdn-gpios = <&cam_gpios 2 0>;
-		addr_20086 = /bits/ 16 <0x29>;
-		addr_96705 = /bits/ 16 <0x40>;
-		addr_0101 = /bits/ 16 <0x5d>;
-
-		ports {
-			port@0 {
-				#address-cells = <1>;
-				#size-cells = <0>;
-
-				mcsi1deser_to_mipi_0: endpoint {
-					remote-endpoint = <&csimipi1_0_in>;
-				};
-			};
-			port@1 {
-				#address-cells = <1>;
-				#size-cells = <0>;
-
-				mcsi1deser_to_mipi_1: endpoint {
-					remote-endpoint = <&csimipi1_1_in>;
-				};
-			};
-			port@2 {
-				#address-cells = <1>;
-				#size-cells = <0>;
-
-				mcsi1deser_to_mipi_2: endpoint {
-					remote-endpoint = <&csimipi1_2_in>;
-				};
-			};
-			port@3 {
-				#address-cells = <1>;
-				#size-cells = <0>;
-
-				mcsi1deser_to_mipi_3: endpoint {
-					remote-endpoint = <&csimipi1_3_in>;
-				};
-			};
-		};
-	};
-
 	dvp_deser:dvp_deser@7E {
 		compatible = "sdrv,dvp_deser";
 		clock-frequency = <24000000>;
@@ -548,7 +414,7 @@
 		//powerdown-gpios = <&cam_gpios 11 0>;
 		//gpi-gpios = <&cam_gpios 10 0>;
 		pwdn-gpios = <&port4c 19 0>;
-		poc-gpios = <&cam_gpios 6 0>;
+		//poc-gpios = <&cam_gpios 6 0>;
 		gpi-gpios = <&ext_gpio74 10 0>;
 		port {
 			#address-cells = <1>;
@@ -663,7 +529,7 @@
 };
 
 &uart12 {
-	status = "disabled";
+	status = "okay";
 };
 
 &uart14 {
@@ -682,32 +548,13 @@
 	clk_value = <24000000>;
 	use-adc-fifo;
 	vref-supply = <&vdd_1v8>;
-	status = "disabled";
-};
-
-&vpu1 {
-	resets = <&rstgen RSTGEN_MODULE_VPU1>;
-	reset-names = "vpu-reset";
-	status = "disabled";
+	status = "okay";
 };
 
 &vpu2 {
 	resets = <&rstgen RSTGEN_MODULE_VPU2>;
 	reset-names = "vpu-reset";
-	status = "disabled";
-};
-
-&g2d {
-	status = "disabled";
-};
-
-&display {
-	sdriv,crtc = <&crtc0>;
-	status = "disabled";
-};
-
-&gpu0 {
-	status = "disabled";
+	status = "okay";
 };
 
 &vdsp {
@@ -724,17 +571,12 @@
 	ranges = <0x0 0x00a00000 0x0 0x00a00000 0x0 0x00020000
 		  0x0 0x00a20000 0x0 0x00a20000 0x0 0x00020000
 		  0x0 VDSP_MEMBASE 0x0 VDSP_MEMBASE 0x0 VDSP_MEMSIZE
-		  0x0 LOW32(AP2_KERNEL_MEMBASE-0x80000) 0x0 LOW32(AP2_KERNEL_MEMBASE-0x80000) 0x0 LOW32(0x100000000-AP2_KERNEL_MEMBASE+0x80000)
+		  0x0 LOW32(AP1_KERNEL_MEMBASE-0x80000) 0x0 LOW32(AP1_KERNEL_MEMBASE-0x80000) 0x0 LOW32(0x100000000-AP1_KERNEL_MEMBASE+0x80000)
 		  0x0 VDSP_SHARE_MEMBASE 0x0 VDSP_SHARE_MEMBASE 0x0 VDSP_SHARE_MEMSIZE>;
-	status = "disabled";
+	status = "okay";
 };
 
-&dp1 {
-	status = "disabled";
-};
-
-&crtc0 {
-	dpc-master = <&dp1>;
+&g2d {
 	status = "disabled";
 };
 
@@ -747,6 +589,36 @@
 };
 
 &ptimings0 {
+	status = "disabled";
+};
+
+&dc1 {
+	status = "disabled";
+};
+
+&crtc0 {
+	dpc-master = <&dc1>;
+	status = "disabled";
+
+	crtc0_out: port {
+		crtc0_out_interface: endpoint@0 {
+			remote-endpoint = <&dsi_in_crtc0>;
+		};
+	};
+};
+
+&dsi0 {
+	status = "disabled";
+	panel {
+		compatible = "semidrive,mipi-panel";
+		reg = <0>;
+		status = "disabled";
+		semidrive,lcd-attached = "lcd_hsd123_serdes_mipi_1920x720";
+	};
+};
+
+&display {
+	sdriv,crtc = <&crtc0>;
 	status = "disabled";
 };
 
@@ -789,7 +661,7 @@
 	};
 };
 
-&gpio5 {
+&gpio4 {
 	//pinctrl-names = "default";
 	//pinctrl-0 = <&pinctrl_gpiotouch_lvds &pinctrl_gpiotouch_mipi>;
 	status = "okay";
@@ -828,10 +700,6 @@
 	status = "okay";
 };
 
-&vdsp_ipc {
-	status = "disabled";
-};
-
 &mbox_test {
 	status = "okay";
 };
@@ -839,29 +707,31 @@
 &rpmsg0 {
 	memory-region = <&rproc_0_safety>;
 	reg = <0x0 RPMSG0_MEM_HEAD_BASE 0x0 RPMSG0_MEM_HEAD_SIZE>;
-	mboxes = <&mbox 0x16 0x1600>;//for saf<->ap2
 	status = "okay";
 };
 
 &rpmsg1 {
 	memory-region = <&rproc_1_secure>;
 	reg = <0x0 RPMSG1_MEM_HEAD_BASE 0x0 RPMSG1_MEM_HEAD_SIZE>;
-	mboxes = <&mbox 0x17 0x1701>;//for sec<->ap2
+	status = "okay";
+};
+
+&rpmsg4 {
+	memory-region = <&rproc_ap>;
+	reg = <0x0 RPMSG3_MEM_HEAD_BASE 0x0 RPMSG3_MEM_HEAD_SIZE>;
 	status = "okay";
 };
 
 &ipcc0 {
-	mboxes = <&mbox 0x36 0x3600>;//for saf<->ap2
 	status = "okay";
 };
 
 &ipcc1 {
-	mboxes = <&mbox 0x37 0x3701>;//for sec<->ap2
 	status = "okay";
 };
 
-&smmu {
-	status = "disabled";
+&ipcc4 {
+	status = "okay";
 };
 
 &rtc {
@@ -891,19 +761,33 @@
 &rstgen {
 	reg = <0x0 0x38467000 0x0 0x1000>,	/* vpu1 */
 		<0x0 0x38468000 0x0 0x1000>,	/* vpu2 */
-		<0x0 0x38462000 0x0 0x1000>,	/* GIC 5 */
-		<0x0 0x38464000 0x0 0x1000>,	/* cssys treset n */
-		<0x0 0x3846e000 0x0 0x1000>,	/* cpu2 ss */
-		<0x0 0x38499000 0x0 0x1000>,	/* dbg reg */
-		<0x0 0x38409000 0x0 0x2000>;	/* cpu2 core */
+		<0x0 0x38490000 0x0 0x1000>,	/* gpu1 core */
+		<0x0 0x38491000 0x0 0x1000>,	/* gpu1 ss */
+		<0x0 0x38461000 0x0 0x1000>,	/* GIC4 */
+		<0x0 0x38455000 0x0 0x1000>,	/* cpu1 core0 warm */
+		<0x0 0x38456000 0x0 0x1000>,	/* cpu1 core1 warm */
+		<0x0 0x38457000 0x0 0x1000>,	/* cpu1 core2 warm */
+		<0x0 0x38458000 0x0 0x1000>,	/* cpu1 core3 warm */
+		<0x0 0x38459000 0x0 0x1000>,	/* cpu1 core4 warm */
+		<0x0 0x3845a000 0x0 0x1000>,	/* cpu1 core5 warm */
+		<0x0 0x3845b000 0x0 0x1000>,	/* cpu1 scu warm */
+		<0x0 0x3846d000 0x0 0x1000>,	/* cpu1 ss */
+		<0x0 0x38407000 0x0 0x2000>;	/* cpu1 all core */
 	rstgen_resource = <
 		RSTGEN_MODULE_VPU1
 		RSTGEN_MODULE_VPU2
-		RSTGEN_MODULE_GIC5
-		RSTGEN_MODULE_CSSYS_TRESET_N
-		RSTGEN_MODULE_CPU2_SS
-		RSTGEN_MODULE_DBG_REG
-		RSTGEN_CORE_CPU2
+		RSTGEN_MODULE_GPU1_CORE
+		RSTGEN_MODULE_GPU1_SS
+		RSTGEN_MODULE_GIC4
+		RSTGEN_MODULE_CPU1_CORE0_WARM
+		RSTGEN_MODULE_CPU1_CORE1_WARM
+		RSTGEN_MODULE_CPU1_CORE2_WARM
+		RSTGEN_MODULE_CPU1_CORE3_WARM
+		RSTGEN_MODULE_CPU1_CORE4_WARM
+		RSTGEN_MODULE_CPU1_CORE5_WARM
+		RSTGEN_MODULE_CPU1_SCU_WARM
+		RSTGEN_MODULE_CPU1_SS
+		RSTGEN_CORE_CPU1_ALL
 		>;
 	status = "okay";
 };
@@ -932,22 +816,27 @@
 	status = "okay";
 };
 
-&watchdog6 {
+&watchdog5 {
 	wdt,auto-run = "false";
 	status = "okay";
 };
 
 &pcie1 {
-	interrupt-map = <0x0 0 0 1
-		 &gic5 GIC_SPI 78 IRQ_TYPE_LEVEL_HIGH>,
-		<0x0 0 0 2
-		 &gic5 GIC_SPI 79 IRQ_TYPE_LEVEL_HIGH>,
-		<0x0 0 0 3
-		 &gic5 GIC_SPI 80 IRQ_TYPE_LEVEL_HIGH>,
-		<0x0 0 0 4
-		 &gic5 GIC_SPI 81 IRQ_TYPE_LEVEL_HIGH>;
-	status = "okay";
+	status = "disabled";
+
+	endpoint {
+		#address-cells = <1>;
+		#size-cells = <0>;
+		brcmf@1 {
+			reg = <1>;
+			compatible = "brcm,bcm4329-fmac";
+		};
+	};
 };
+
+//&pcie2 {
+ //       status = "okay";
+//};
 
 &vce2 {
 	/*

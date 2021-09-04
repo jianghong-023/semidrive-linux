@@ -7,14 +7,14 @@
  */
 
 /dts-v1/;
-#include "d9_ap1.dtsi"
-#include "d9_ref-clk-ctrl.dtsi"
-#include "lcd-timings.dtsi"
+#include <dt-bindings/input/input.h>
 #include <dt-bindings/pinctrl/pins-sdx9.h>
 #include <dt-bindings/memmap/d9/projects/default/image_cfg.h>
 #include <dt-bindings/memory/sdrv_ion.h>
 #include <dt-bindings/rpmsg/sd,x9h-default.h>
-#include <dt-bindings/media/sdrv_csi.h>
+#include "d9-std.dtsi"
+#include "lcd-timings.dtsi"
+#include "lcd_hsd123_serdes_mipi_1920x720.dtsi"
 
 / {
 	model = "Semidrive kunlun D9 REF Board";
@@ -23,8 +23,23 @@
 
 	aliases {
 		serial0 = &uart14;
-		serial1 = &uart12;
-		//serial2 = &uart12;
+		serial1 = &uart0;
+		serial2 = &uart1;
+		//serial3 = &uart2;//safety debug uart
+		serial4 = &uart3;
+		serial5 = &uart4;
+		serial6 = &uart5;
+		serial7 = &uart6; /* no use */
+		serial8 = &uart7; /* no use */
+		serial9 = &uart8;
+		//serial10 = &uart9;//sec ssystem debug uart
+		serial11 = &uart10;
+		serial12 = &uart11;
+		serial13 = &uart12;
+		serial14 = &uart13;
+		//serial15 = &uart14;//linux debug uart
+		serial16 = &uart15;
+		ethernet1 = &ethernet1;
 		ethernet2 = &ethernet2;
 	};
 
@@ -38,6 +53,16 @@
 		#address-cells = <2>;
 		#size-cells = <2>;
 		ranges;
+
+		ramoops {
+			compatible = "ramoops";
+			reg = <HIGH32(AP1_BOARD_RAMDISK_MEMBASE + AP1_BOARD_RAMDISK_MEMSIZE + 0x1000000)
+				LOW32(AP1_BOARD_RAMDISK_MEMBASE + AP1_BOARD_RAMDISK_MEMSIZE + 0x1000000) 0x0 0x100000>;
+			record-size = <0x60000>;
+			console-size = <0x40000>;
+			ftrace-size = <0x20000>;
+			pmsg-size = <0x40000>;
+		};
 
 		/* Default Common CMA Pool */
 		/* QUIRK: Must be kept in the lower 4096 MiBs of DRAM banks for VE */
@@ -76,7 +101,7 @@
 	};
 
 	chosen {
-		bootargs = "skip_initramfs noinitrd root=/dev/mmcblk0p4 rootfstype=ext4 rootwait rw init=/sbin/init highres=1 earlycon loglevel=4 console=ttyS0,115200n8 fbcon=map:1 androidboot.mode=normal androidboot.selinux=permissive androidboot.debuggable=1 androidboot.dm_verity=disable";
+		bootargs = "skip_initramfs noinitrd root=/dev/mmcblk0p4 rootfstype=ext4 rootwait rw init=/sbin/init highres=1 earlycon loglevel=8 nr_uarts=16 console=ttyS0,115200n8 fbcon=map:1 androidboot.mode=normal androidboot.selinux=permissive androidboot.debuggable=1 androidboot.dm_verity=disable";
 		stdout-path = "serial0";
 	};
 
@@ -101,21 +126,70 @@
 		regulator-max-microvolt = <1800000>;
 	};
 
-	sound_ak7738: sound@ak7738 {
-		compatible = "semidrive,x9-ref-ak7738","semidrive,x9-ref04-ak7738";
-		semidrive,audio-codec = <&ak7738>;
-		status = "disabled";
+	leds {
+		compatible = "gpio-leds";
+
+		led0: heartbeat {
+			label = "heartbeat";
+			gpios = <&port4a 4 GPIO_ACTIVE_LOW> ;//sch-part-D6<->gpio_a4
+			default-state = "on";
+			linux,default-trigger = "timer";
+		};
 	};
 
-	sound_ak4556: sound@ak4556 {
-		compatible = "semidrive,x9-ref-ak4556";
-		status = "disabled";
+	gpio-keys {
+		status = "okay";
+		compatible = "gpio-keys";
+		autorepeat;
+		up {
+			label = "GPIO Key POWER";
+			linux,code = <KEY_POWER>;//KEY_POWER
+			gpios = <&port4d 28 GPIO_ACTIVE_LOW> ;//sch-part-J8<->gpio_H2 io124 Y7
+		};
 	};
 
-	sound_tlv320aic23: sound@tlv320aic23 {
-		compatible = "semidrive,x9-ref-tlv320aic23";
-		semidrive,audio-codec = <&tlv320aic23>;
-		status = "disabled";
+	adc-keys0 {
+		status = "okay";
+		compatible = "adc-keys";
+		io-channels = <&adc_ap 1>;
+		io-channel-names = "buttons0";
+		keyup-threshold-microvolt = <1800000>;
+
+		button-up {
+			label = "Volume Up";
+			linux,code = <KEY_VOLUMEUP>;
+			press-threshold-microvolt = <1500000>;
+		};
+
+	};
+
+	adc-keys1 {
+		status = "okay";
+		compatible = "adc-keys";
+		io-channels = <&adc_ap 2>;
+		io-channel-names = "buttons1";
+		keyup-threshold-microvolt = <1800000>;
+
+		button-down {
+			label = "Volume Down";
+			linux,code = <KEY_VOLUMEDOWN>;
+			press-threshold-microvolt = <1000000>;
+		};
+
+	};
+
+	adc-keys2 {
+		status = "okay";
+		compatible = "adc-keys";
+		io-channels = <&adc_ap 3>;
+		io-channel-names = "buttons2";
+		keyup-threshold-microvolt = <1800000>;
+
+		button-enter {
+			label = "Enter";
+			linux,code = <KEY_ENTER>;
+			press-threshold-microvolt = <500000>;
+		};
 	};
 };
 
@@ -130,7 +204,15 @@
 };
 
 &afe_i2s_sc2{
+//sch part u19(codec dac es4344)
 	dmas = <&dmac4 X9_DMA_SLV_ID_I2S_SC3_TX>, <&dmac4 X9_DMA_SLV_ID_I2S_SC3_RX>;
+	dma-names = "tx", "rx";
+	status = "disabled";
+};
+
+&afe_i2s_sc3{
+//sch part u20(codec adc es7243)
+	dmas = <&dmac4 X9_DMA_SLV_ID_I2S_SC4_TX>, <&dmac4 X9_DMA_SLV_ID_I2S_SC4_RX>;
 	dma-names = "tx", "rx";
 	status = "disabled";
 };
@@ -177,34 +259,6 @@
 	};
 };
 
-&csi1 {
-	mbus-type = "mipi-csi2";
-	pclk-sample = <1>;
-	status = "disabled";
-
-	ports {
-		csi1_stream0: port@0 {
-			csi1_stream0_in: endpoint@0 {
-				remote-endpoint = <&csimipi1_0_out>;
-			};
-		};
-		csi1_stream1: port@1 {
-			csi1_stream1_in: endpoint@0 {
-				remote-endpoint = <&csimipi1_1_out>;
-			};
-		};
-		csi1_stream2: port@2 {
-			csi1_stream2_in: endpoint@0 {
-				remote-endpoint = <&csimipi1_2_out>;
-			};
-		};
-		csi1_stream3: port@3 {
-			csi1_stream3_in: endpoint@0 {
-				remote-endpoint = <&csimipi1_3_out>;
-			};
-		};
-	};
-};
 &csi2 {
 	mbus-type = "parallel";
 	pclk-sample = <0>;
@@ -219,6 +273,7 @@
 
 	};
 };
+
 &csimipi0 {
 	status = "disabled";
 	lanerate = <72000000>;
@@ -286,72 +341,7 @@
 		};
 	};
 };
-&csimipi1 {
-	status = "disabled";
-	lanerate = <72000000>;
-	hsa = <10>;
-	hbp = <20>;
-	hsd = <0x60>;
-	output-type = <0x1e>;
 
-	ports {
-		#address-cells = <1>;
-		#size-cells = <0>;
-
-		port@0 {
-			#address-cells = <1>;
-			#size-cells = <0>;
-			reg = <0>;
-			csimipi1_0_in: endpoint@0 {
-				remote-endpoint = <&mcsi1deser_to_mipi_0>;
-				reg = <0>;
-			};
-			csimipi1_0_out: endpoint@1 {
-				remote-endpoint = <&csi1_stream0_in>;
-				reg = <0>;
-			};
-		};
-		port@1 {
-			#address-cells = <1>;
-			#size-cells = <0>;
-			reg = <1>;
-			csimipi1_1_in: endpoint@0 {
-				remote-endpoint = <&mcsi1deser_to_mipi_1>;
-				reg = <1>;
-			};
-			csimipi1_1_out: endpoint@1 {
-				remote-endpoint = <&csi1_stream1_in>;
-				reg = <1>;
-			};
-		};
-		port@2 {
-			#address-cells = <1>;
-			#size-cells = <0>;
-			reg = <2>;
-			csimipi1_2_in: endpoint@0 {
-				remote-endpoint = <&mcsi1deser_to_mipi_2>;
-				reg = <2>;
-			};
-			csimipi1_2_out: endpoint@1 {
-				remote-endpoint = <&csi1_stream2_in>;
-				reg = <2>;
-			};
-		};
-		port@3 {
-			#address-cells = <1>;
-			#size-cells = <0>;
-			reg = <3>;
-			csimipi1_3_in: endpoint@0 {
-				remote-endpoint = <&mcsi1deser_to_mipi_3>;
-				reg = <3>;
-			};
-			csimipi1_3_out: endpoint@1 {
-				remote-endpoint = <&csi1_stream3_in>;
-				reg = <3>;
-			};
-		};
-	};
-};
 &csiparallel0 {
 	status = "disabled";
 	#address-cells = <1>;
@@ -371,49 +361,31 @@
 	};
 };
 
+&i2c2 {
+//sch part U26(rtc rx-8025)
+        status = "disabled";
+	rx8025t: rx8025t@32 {
+		compatible = "epson,rx8025";
+		reg = <0x32>;
+        };
+};
+
+&i2c3 {
+//sch part U22(pvt sgm452t)
+        status = "disabled";
+	dtt@48 {
+		compatible = "national,lm75a";
+		reg = <0x48>;
+	};
+};
+
 &i2c5 {
-		status = "disabled";
+	status = "disabled";
 
-		ak7738:codec@1c{
-			compatible = "akm,ak7738";
-			reg = <0x1c>;
-			ak7738,pdn-gpio = <&ext_gpio74 7 0>; // If PDN GPIO pin is used
-		};
-
-		tas5404:codec@6c {
-			compatible = "ti,tas5404";
-			reg = <0x6c>;
-			#sound-dai-cells = <0>;
-			pvdd-supply = <&vdd_12>;
-			standby-gpios = <&ext_gpio 0 GPIO_ACTIVE_LOW>;
-		};
-
-		tas6424:codec@6a {
-			compatible = "ti,tas6424";
-			reg = <0x6a>;
-			#sound-dai-cells = <0>;
-			pvdd-supply = <&vdd_12>;
-			vbat-supply = <&vdd_12>;
-			dvdd-supply = <&vdd_3v3>;
-			standby-gpios = <&ext_gpio74 2 GPIO_ACTIVE_LOW>;
-			mute-gpios = <&ext_gpio74 3 GPIO_ACTIVE_LOW>;
-			warn-gpios = <&ext_gpio74 5 GPIO_ACTIVE_LOW>;
-			fault-gpios = <&ext_gpio74 4 GPIO_ACTIVE_LOW>;
-		};
-
-		xf6020:codec@47{
-			compatible = "iflytek,xf6020";
-			reg = <0x47>;
-			reset-gpios = <&ext_gpio74 15 GPIO_ACTIVE_LOW>;
-		};
-
-		tlv320aic23_ms: codec@1a {
-			compatible = "ti,tlv320aic23";
-			reg = <0x1a>;
-		};
 };
 
 &i2c6 {
+//sch part U5(tp2850)
 	status = "disabled";
 };
 
@@ -422,6 +394,7 @@
 };
 
 &i2c8 {
+//sch part U3(N4)
 	status = "disabled";
 
 	poc_mcsi0deser: poc@0x28 {
@@ -432,7 +405,6 @@
 	mcsi0deser:mcsi0deser@7F {
 		compatible = "sdrv,mcsi0_deser";
 		reg = <0x7F>;
-		type = <SERDES_MIPI>;
 		pwdn-gpios = <&cam_gpio 2 0>;
 		sync = <1>;
 		addr_20086 = /bits/ 16 <0x28>;
@@ -486,73 +458,15 @@
 &i2c9 {
 	status = "disabled";
 
-	cam_gpios: gpio@74 {
-		compatible = "ti,tca9539";
-		reg = <0x74>;
-		#gpio-cells = <2>;
-		gpio-controller;
-	};
-
-	poc_mcsi1deser: poc@0x29 {
-		compatible = "max2008x,deser1_poc";
-		reg = <0x29>;
-	};
-
-	mcsi1deser:mcsi1deser@7F {
-		compatible = "sdrv,mcsi1_deser";
-		reg = <0x7F>;
-		type = <SERDES_MIPI>;
-		pwdn-gpios = <&cam_gpios 2 0>;
-		addr_20086 = /bits/ 16 <0x29>;
-		addr_96705 = /bits/ 16 <0x40>;
-		addr_0101 = /bits/ 16 <0x5d>;
-
-		ports {
-			port@0 {
-				#address-cells = <1>;
-				#size-cells = <0>;
-
-				mcsi1deser_to_mipi_0: endpoint {
-					remote-endpoint = <&csimipi1_0_in>;
-				};
-			};
-			port@1 {
-				#address-cells = <1>;
-				#size-cells = <0>;
-
-				mcsi1deser_to_mipi_1: endpoint {
-					remote-endpoint = <&csimipi1_1_in>;
-				};
-			};
-			port@2 {
-				#address-cells = <1>;
-				#size-cells = <0>;
-
-				mcsi1deser_to_mipi_2: endpoint {
-					remote-endpoint = <&csimipi1_2_in>;
-				};
-			};
-			port@3 {
-				#address-cells = <1>;
-				#size-cells = <0>;
-
-				mcsi1deser_to_mipi_3: endpoint {
-					remote-endpoint = <&csimipi1_3_in>;
-				};
-			};
-		};
-	};
-
 	dvp_deser:dvp_deser@7E {
 		compatible = "sdrv,dvp_deser";
 		clock-frequency = <24000000>;
 		reg = <0x7E>;
-		type = <SERDES_PARALLEL>;
 		//powerdown-gpios = <&cam_gpios 11 0>;
 		//gpi-gpios = <&cam_gpios 10 0>;
 		pwdn-gpios = <&port4c 19 0>;
-		poc-gpios = <&cam_gpios 6 0>;
-		gpi-gpios = <&ext_gpio74 10 0>;
+		//poc-gpios = <&cam_gpios 6 0>;
+		//gpi-gpios = <&ext_gpio74 10 0>;
 		port {
 			#address-cells = <1>;
 			#size-cells = <0>;
@@ -565,84 +479,36 @@
 };
 
 &i2c10 {
+//sch part U7(LT9611)
 	status = "disabled";
+
+
+};
+
+&i2c11 {
+//sch part cn4(lvd tp)
+	status = "disabled";
+
 	gt9271_11_j35:gt9271_11_j35@5d {
 		//pinctrl-names = "default";
 		//pinctrl-0 = <&pinctrl_gpiotouch_mipi>;
 		compatible = "goodix,gt9271";
 		irq-gpios = <&port4e 17 0>;	/*io97*/
-		reset-gpios = <&tp_gpio 2 0>;	/*index 2*/
+		//reset-gpios = <&tp_gpio 2 0>;	/*index 2*/
 		reg = <0x5d>;
-	};
-};
-
-&i2c11 {
-	status = "okay";
-
-	tlv320aic23: codec@1b {
-	compatible = "ti,tlv320aic23";
-		reg = <0x1b>;
-	};
-
-	ext_gpio74: gpio@74 {
-		compatible = "ti,tca9539";
-		reg = <0x74>;
-		#gpio-cells = <2>;
-		gpio-controller;
-	};
-	ext_gpio: gpio@75 {
-		compatible = "ti,tca9539";
-		reg = <0x75>;
-		#gpio-cells = <2>;
-		gpio-controller;
-	};
-	tp_gpio: gpio@76 {
-		compatible = "ti,tca9539";
-		reg = <0x76>;
-		#gpio-cells = <2>;
-		gpio-controller;
 	};
 };
 
 &i2c13 {
 	status = "disabled";
-
-	gt9271_14_j33:gt9271_14_j33@14 {
-		//pinctrl-names = "default";
-		//pinctrl-0 = <&pinctrl_gpiotouch_lvds>;
-		compatible = "goodix,gt9271";
-		irq-gpios = <&port4e 2 0>;	/*io82*/
-		reset-gpios = <&ext_gpio 6 0>;	/*index 6*/
-		reg = <0x14>;
-		dev_type = <0>;
-	};
-
 };
 
 &i2c14 {
 	status = "disabled";
-
-	gt9271_15_j33:gt9271_15_j33@14 {
-		//pinctrl-names = "default";
-		//pinctrl-0 = <&pinctrl_gpiotouch_lvds>;
-		compatible = "goodix,gt9271";
-		irq-gpios = <&port4e 3 0>;	/*io83*/
-		reset-gpios = <&ext_gpio 7 0>;		/*index 7*/
-		reg = <0x14>;
-		dev_type = <1>;	/* 0: main device, 1: aux device */
-	};
 };
 
 &i2c15 {
 	status = "disabled";
-	gt9271_16_j35:gt9271_16_j35@5d {
-		//pinctrl-names = "default";
-		//pinctrl-0 = <&pinctrl_gpiotouch_mipi>;
-		compatible = "goodix,gt9271";
-		irq-gpios = <&port4e 16 0>;	/*io96*/
-		reset-gpios = <&tp_gpio 1 0>;	/*index 1*/
-		reg = <0x5d>;
-	};
 };
 
 &spi4 {
@@ -650,6 +516,7 @@
 };
 
 &spi5 {
+//sch core part U1502(IS62WVS5128GBL)
 	status = "disabled";
 };
 
@@ -661,18 +528,76 @@
 	status = "disabled";
 };
 
+&uart14 {
+//linux debug
+	dmas = <&dmac4 X9_DMA_SLV_ID_UART15_TX>, <&dmac4 X9_DMA_SLV_ID_UART15_RX>;
+	dma-names = "tx", "rx";
+	status = "okay";
+};
+
+&uart0 {
+//xm1 --need flip
+	status = "disabled";
+};
+
+&uart1 {
+//rs485
+//sch part u28 sit3485
+	status = "disabled";
+};
+
+//&uart2 {
+//saf debug uart,we not use for ever
+//	status = "disabled";
+//};
+
+&uart3 {
+	status = "disabled";
+};
+
+&uart4 {
+	status = "disabled";
+};
+
+&uart5 {
+//rs232
+//sch part u29 sit3232
+	status = "disabled";
+};
+
+&uart8 {
+//sch part xm1 --need flip
+	status = "disabled";
+};
+
 &uart9 {
+//sec debug
+	status = "disabled";
+};
+
+&uart10 {
+	status = "disabled";
+};
+
+&uart11 {
+//sch part xm7 --need flip
 	status = "disabled";
 };
 
 &uart12 {
-	status = "okay";
+//sch part xm5 --need flip
+	status = "disabled";
 };
 
-&uart14 {
-	dmas = <&dmac4 X9_DMA_SLV_ID_UART15_TX>, <&dmac4 X9_DMA_SLV_ID_UART15_RX>;
-	dma-names = "tx", "rx";
-	status = "okay";
+&uart13 {
+//sch part xm6 --need flip
+	status = "disabled";
+};
+
+
+&uart15 {
+//sch part xm8 --need flip
+	status = "disabled";
 };
 
 &generic_timer {
@@ -685,13 +610,7 @@
 	clk_value = <24000000>;
 	use-adc-fifo;
 	vref-supply = <&vdd_1v8>;
-	status = "disabled";
-};
-
-&vpu1 {
-	resets = <&rstgen RSTGEN_MODULE_VPU1>;
-	reset-names = "vpu-reset";
-	status = "disabled";
+	status = "okay";
 };
 
 &vpu2 {
@@ -700,19 +619,13 @@
 	status = "disabled";
 };
 
-&g2d {
-	status = "okay";
-};
-
-&display {
-	sdriv,crtc = <&crtc0>;
+&gpu1 {
 	status = "disabled";
 };
 
-&gpu0 {
+&clk_gpu2 {
 	status = "disabled";
 };
-
 &vdsp {
 	reg = <0x0 VDSP_SHARE_MEMBASE 0x0 0x1000>, /* DSP command queue */
 	      <0x0 (VDSP_SHARE_MEMBASE+0x4000) 0x0 (VDSP_SHARE_MEMSIZE-0x4000)>, /* DSP shared memory */
@@ -732,25 +645,52 @@
 	status = "okay";
 };
 
-&dp1 {
-	status = "disabled";
+&g2d {
+	status = "okay";
 };
-
-&crtc0 {
-	dpc-master = <&dp1>;
-	status = "disabled";
-};
-
+/*
 &parallel0 {
 	status = "disabled";
 };
-
+*/
 &dtimings0 {
 	native-mode = <&hsd_fhd1920x720>;
 };
 
 &ptimings0 {
-	status = "disabled";
+	status = "okay";
+};
+
+&dc1 {
+	status = "okay";
+};
+
+&crtc0 {
+	dpc-master = <&dc1>;
+	status = "okay";
+
+	crtc0_out: port {
+		crtc0_out_interface: endpoint@0 {
+			remote-endpoint = <&dsi_in_crtc0>;
+		};
+	};
+};
+
+&dsi0 {
+	status = "okay";
+	panel {
+		compatible = "semidrive,mipi-panel";
+		#address-cells = <1>;
+		#size-cells = <0>;
+		reg = <0>;
+		status = "okay";
+		semidrive,lcd-attached = "lcd_hsd123_serdes_mipi_1920x720";
+	};
+};
+
+&display {
+	sdriv,crtc = <&crtc0>;
+	status = "okay";
 };
 
 &pinctrl {
@@ -817,7 +757,7 @@
 	clocks = <&EMMC3>;
 	clock-names = "core";
 	max-frequency = <25000000>;
-	cd-gpios = <&ext_gpio74 14 GPIO_ACTIVE_LOW>;
+	cd-gpios = <&port4a 1 GPIO_ACTIVE_LOW>;//sch-part-D6<->gpio_a1 io1 Y19
 	bus-width = <4>;
 	no-1-8-v;
 	no-mmc;
@@ -859,9 +799,6 @@
 	status = "okay";
 };
 
-&smmu {
-	status = "disabled";
-};
 
 &rtc {
 	status = "okay";
@@ -871,7 +808,12 @@
 	status = "okay";
 };
 
+&usb3_id0 {
+	id-gpios = <&port4e 3 GPIO_ACTIVE_LOW>;
+};
+
 &usb0 {
+	dr_mode = "otg";
 	status = "okay";
 };
 
@@ -880,6 +822,11 @@
 };
 
 &usb1 {
+	status = "okay";
+};
+
+&ethernet1 {
+	snps,max_dma_cap_quirk = <32>;
 	status = "okay";
 };
 
@@ -952,10 +899,15 @@
 
 &pcie1 {
 	status = "disabled";
-	brcmf: bcrmf@1 {
-		reg = <1>;
-		compatible = "brcm,bcm4329-fmac";
-	};
+
+	endpoint {
+		#address-cells = <1>;
+		#size-cells = <0>;
+		brcmf@1 {
+			reg = <1>;
+			compatible = "brcm,bcm4329-fmac";
+		};
+        };
 };
 
 &vce2 {
