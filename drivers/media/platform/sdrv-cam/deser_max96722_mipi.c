@@ -500,9 +500,6 @@ static int max9295_check_chip_id(deser_dev_t *dev, int channel)
 		msleep(20);
 	ret = max9295_read_reg(dev, (MAX9295_DEF-MAX9295_CH_A)>>1, 0x0d, &chip_id);
 	if (ret < 0) {
-			dev_info(&client->dev,
-				"%s ch %d wrong chip identifier,  expected 0x%x(max9295), got 0x%x ret %d\n",
-				__func__, i, MAX9295A_DEVICE_ID, chip_id, ret);
 			i++;
 	} else {
 		dev_info(&client->dev, "max9295 dev chipid = 0x%02x\n", chip_id);
@@ -999,6 +996,8 @@ int max96722_initialization(deser_dev_t *dev)
 		max96722_para.denominator = 30;
 		max96722_para.width = 1920;
 		max96722_para.height = 1080;
+		dev->fmt.width = 1920;
+		dev->fmt.height = 1080;
 		reg_value = 0xf0;
 		reglen = ARRAY_SIZE(max96722_reg_max9295);
 		for (i = 0; i < reglen; i++) {
