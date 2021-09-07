@@ -676,14 +676,14 @@ static int max96722_enum_frame_size(struct v4l2_subdev *sd,
 
 	if (fse->pad != 0)
 		return -EINVAL;
-	if (fse->index >= MAX96722_NUM_MODES)
+	if (fse->index >= 1)
 		return -EINVAL;
-	fse->min_width = max96722_mode_data[0][fse->index].hact;
+	fse->min_width = sensor->fmt.width;
 	fse->max_width = fse->min_width;
 	if (sensor->sync == 0)
-		fse->min_height = max96722_mode_data[0][fse->index].vact;
+		fse->min_height = sensor->fmt.height;
 	else
-		fse->min_height = max96722_mode_data[0][fse->index].vact * 4;
+		fse->min_height = sensor->fmt.height * 4;
 	fse->max_height = fse->min_height;
 	return 0;
 }
