@@ -48,6 +48,22 @@ static bool full_duplex = true;
 module_param(full_duplex, bool, S_IRUGO | S_IWUSR);
 MODULE_PARM_DESC(full_duplex, "Set to full duplex mode (default: true)");
 
+/**
+ * @brief input slot_width such as 32.
+ * 		  return enum CDN_CHN_WIDTH_32BITS
+ *
+ */
+static int check_and_get_slot_width_enum(int slot_width){
+	int i;
+	for (i = 0; i < CDN_CHN_WIDTH_NUMB; i++) {
+		if (slot_width == ChnWidthTable[i]) {
+			return i;
+		}
+	}
+	printk(KERN_ERR "can't support this slot_width %d use 32 CDN_CHN_WIDTH_32BITS\n", slot_width);
+	return AFE_I2S_CHN_WIDTH;
+}
+
 /*i2s interrupt mode function*/
 static void sdrv_pcm_refill_fifo(struct sdrv_afe_i2s_sc *afe)
 {
@@ -261,7 +277,7 @@ static void afe_i2s_sc_config(struct sdrv_afe_i2s_sc *afe)
 	/*config total data width*/
 	regmap_update_bits(
 	    afe->regmap, REG_CDN_I2SSC_REGS_I2S_CTRL, BIT_CTRL_CHN_WIDTH,
-	    (AFE_I2S_CHN_WIDTH << I2S_CTRL_CHN_WIDTH_FIELD_OFFSET));
+	    (afe->slot_width << I2S_CTRL_CHN_WIDTH_FIELD_OFFSET));
 
 	/*config almost empty fifo level:tx fifo level */
 	regmap_write(afe->regmap, REG_CDN_I2SSC_REGS_FIFO_AEMPTY, 0x30);
@@ -818,11 +834,6 @@ int snd_afe_dai_startup(struct snd_pcm_substream *substream,
 	struct sdrv_afe_i2s_sc *afe = snd_soc_dai_get_drvdata(dai);
 
 	DEBUG_FUNC_PRT;
-	/* Debug code set to half duplex */
-	if (full_duplex == false) {
-		afe->is_full_duplex = false;
-		DEBUG_ITEM_PRT(afe->is_full_duplex);
-	}
 
 	snd_soc_dai_set_dma_data(dai, substream, afe);
 
@@ -836,7 +847,6 @@ static void snd_afe_dai_ch_cfg(struct sdrv_afe_i2s_sc *afe, int stream, unsigned
 
 
 	afe->slots = max(ch_numb,afe->slots);
-	afe->slot_width = AFE_I2S_CHN_WIDTH;
 	dev_info(afe->dev, "%s:%i : afe->slots (0x%x) ch_numb(0x%x) afe->slot_width(0x%x) \n", __func__,
 	       __LINE__,afe->slots , ch_numb, afe->slot_width);
 	/* Enable tdm mode */
@@ -1034,13 +1044,13 @@ int snd_afe_dai_hw_params(struct snd_pcm_substream *substream,
 		    afe->regmap, REG_CDN_I2SSC_REGS_I2S_SRATE,
 		    I2S_SC_SAMPLE_RATE_CALC(clk_get_rate(afe->clk_i2s), srate,
 					    max((int)channels, 2),
-					    ChnWidthTable[AFE_I2S_CHN_WIDTH]));
+					    ChnWidthTable[afe->slot_width]));
 	}
 	else{
 		regmap_write(afe->regmap, REG_CDN_I2SSC_REGS_I2S_SRATE,
 			     I2S_SC_SAMPLE_RATE_CALC(clk_get_rate(afe->clk_i2s), srate,
 						     afe->slots,
-						     ChnWidthTable[AFE_I2S_CHN_WIDTH]));
+						     ChnWidthTable[afe->slot_width]));
 	}
 	//regcache_sync(afe->regmap);
 	/* 	ret = regmap_read(afe->regmap, REG_CDN_I2SSC_REGS_I2S_CTRL,
@@ -1148,7 +1158,7 @@ static int snd_afe_dai_set_fmt(struct snd_soc_dai *dai, unsigned int fmt)
 {
 
 	struct sdrv_afe_i2s_sc *afe = snd_soc_dai_get_drvdata(dai);
-	unsigned int val = 0, ret;
+	unsigned int val = 0, sck_polar = 1, ret;
 	switch (fmt & SND_SOC_DAIFMT_INV_MASK) {
 	case SND_SOC_DAIFMT_NB_NF:
 		break;
@@ -1164,6 +1174,8 @@ static int snd_afe_dai_set_fmt(struct snd_soc_dai *dai, unsigned int fmt)
 		regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_I2S_CTRL,
 				   BIT_CTRL_MS_CFG,
 				   (1 << I2S_CTRL_MS_CFG_FIELD_OFFSET));
+		/*config sck polar*/
+		sck_polar = afe->master_sck_polar;
 		break;
 	/* codec clk & FRM master i2s slave*/
 	case SND_SOC_DAIFMT_CBM_CFM:
@@ -1171,6 +1183,8 @@ static int snd_afe_dai_set_fmt(struct snd_soc_dai *dai, unsigned int fmt)
 		regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_I2S_CTRL,
 				   BIT_CTRL_MS_CFG,
 				   (0 << I2S_CTRL_MS_CFG_FIELD_OFFSET));
+		/*config sck polar*/
+		sck_polar = afe->slave_sck_polar;
 		break;
 	default:
 		return -EINVAL;
@@ -1183,7 +1197,7 @@ static int snd_afe_dai_set_fmt(struct snd_soc_dai *dai, unsigned int fmt)
 		/*config sck polar*/
 		regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_I2S_CTRL,
 				   BIT_CTRL_SCK_POLAR,
-				   (0 << I2S_CTRL_SCK_POLAR_FIELD_OFFSET));
+				   (sck_polar << I2S_CTRL_SCK_POLAR_FIELD_OFFSET));
 		/*config ws polar*/
 		regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_I2S_CTRL,
 				   BIT_CTRL_WS_POLAR,
@@ -1211,7 +1225,7 @@ static int snd_afe_dai_set_fmt(struct snd_soc_dai *dai, unsigned int fmt)
 		/*config sck polar*/
 		regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_I2S_CTRL,
 				   BIT_CTRL_SCK_POLAR,
-				   (0 << I2S_CTRL_SCK_POLAR_FIELD_OFFSET));
+				   (sck_polar << I2S_CTRL_SCK_POLAR_FIELD_OFFSET));
 		/*config ws polar*/
 		regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_I2S_CTRL,
 				   BIT_CTRL_WS_POLAR,
@@ -1239,7 +1253,7 @@ static int snd_afe_dai_set_fmt(struct snd_soc_dai *dai, unsigned int fmt)
 		/*config sck polar*/
 		regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_I2S_CTRL,
 				   BIT_CTRL_SCK_POLAR,
-				   (0 << I2S_CTRL_SCK_POLAR_FIELD_OFFSET));
+				   (sck_polar << I2S_CTRL_SCK_POLAR_FIELD_OFFSET));
 		/*config ws polar*/
 		regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_I2S_CTRL,
 				   BIT_CTRL_WS_POLAR,
@@ -1265,7 +1279,7 @@ static int snd_afe_dai_set_fmt(struct snd_soc_dai *dai, unsigned int fmt)
 		/*config sck polar*/
 		regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_I2S_CTRL,
 				   BIT_CTRL_SCK_POLAR,
-				   (0 << I2S_CTRL_SCK_POLAR_FIELD_OFFSET));
+				   (sck_polar << I2S_CTRL_SCK_POLAR_FIELD_OFFSET));
 
 		/*config ws polar*/
 		regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_I2S_CTRL,
@@ -1297,7 +1311,7 @@ static int snd_afe_dai_set_fmt(struct snd_soc_dai *dai, unsigned int fmt)
 		/*config sck polar*/
 		regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_I2S_CTRL,
 				   BIT_CTRL_SCK_POLAR,
-				   (0 << I2S_CTRL_SCK_POLAR_FIELD_OFFSET));
+				   (sck_polar << I2S_CTRL_SCK_POLAR_FIELD_OFFSET));
 
 		/*config ws polar*/
 		regmap_update_bits(afe->regmap, REG_CDN_I2SSC_REGS_I2S_CTRL,
@@ -1396,18 +1410,16 @@ static int snd_afe_set_dai_tdm_slot(struct snd_soc_dai *dai,
 	else{
 		return -EINVAL;
 	}
-/*  	if (true == afe->is_full_duplex) {
-		regmap_write(afe->regmap, REG_CDN_I2SSC_REGS_I2S_SRES_FDR, slot_width -1);
-		regmap_write(afe->regmap, REG_CDN_I2SSC_REGS_I2S_SRES, slot_width -1);
-	} else {
-		regmap_write(afe->regmap, REG_CDN_I2SSC_REGS_I2S_SRES, slot_width -1);
-	}  */
-	afe->slot_width = slot_width;
+	afe->slot_width = check_and_get_slot_width_enum(slot_width);
 	afe->slots = slots;
 	afe->tx_slot_mask = tx_mask;
 	afe->rx_slot_mask = rx_mask;
 	/*Audio will use tdm */
 	afe->tdm_initialized = true;
+	/*config total data width*/
+	regmap_update_bits(
+	    afe->regmap, REG_CDN_I2SSC_REGS_I2S_CTRL, BIT_CTRL_CHN_WIDTH,
+	    (afe->slot_width << I2S_CTRL_CHN_WIDTH_FIELD_OFFSET));
 
 	ret = regmap_read(afe->regmap, REG_CDN_I2SSC_REGS_TDM_CTRL, &val);
 	dev_info(afe->dev, "DUMP REG_CDN_I2SSC_REGS_TDM_CTRL(0x%x)\n", val);
@@ -1416,15 +1428,26 @@ static int snd_afe_set_dai_tdm_slot(struct snd_soc_dai *dai,
 	return 0;
 }
 
+static int snd_afe_dai_set_sysclk(struct snd_soc_dai *dai, int clk_id,
+				  unsigned int freq, int dir)
+{
+	struct sdrv_afe_i2s_sc *afe = snd_soc_dai_get_drvdata(dai);
+
+	if (dir == SND_SOC_CLOCK_IN || clk_id != I2S_SCLK_MCLK)
+		return -EINVAL;
+	return clk_set_rate(afe->mclk, freq);
+}
+
 static struct snd_soc_dai_ops snd_afe_dai_ops = {
     .startup = snd_afe_dai_startup,
     .shutdown = snd_afe_dai_shutdown,
     .hw_params = snd_afe_dai_hw_params,
-    .set_tdm_slot	= snd_afe_set_dai_tdm_slot,
+    .set_tdm_slot = snd_afe_set_dai_tdm_slot,
     .hw_free = snd_afe_dai_hw_free,
     .prepare = snd_afe_dai_prepare,
     .trigger = snd_afe_dai_trigger,
     .set_fmt = snd_afe_dai_set_fmt,
+    .set_sysclk = snd_afe_dai_set_sysclk,
 };
 
 int snd_soc_dai_probe(struct snd_soc_dai *dai)
@@ -1434,9 +1457,6 @@ int snd_soc_dai_probe(struct snd_soc_dai *dai)
 
 	dev_info(dev, "DAI probe.----------vaddr(0x%llx)------------------\n",d->regs);
 
-	/* 	struct zx_i2s_info *zx_i2s = dev_get_drvdata(dai->dev);
-	snd_soc_dai_init_dma_data(dai, &d->playback_dma_data,
-		&d->capture_dma_data); */
 
 	dai->capture_dma_data = &d->capture_dma_data;
 	dai->playback_dma_data = &d->playback_dma_data;
@@ -1479,29 +1499,7 @@ static struct snd_soc_dai_driver snd_afe_dais[] = {
 	.ops = &snd_afe_dai_ops,
 	.symmetric_rates = 1,
     },
-    {
-	.name = "snd-afe-sc-i2s-dai1",
-	.probe = snd_soc_dai_probe,
-	.remove = snd_soc_dai_remove,
-	.playback =
-	    {
-		.stream_name = "I2S1 Playback",
-		.formats = SND_FORMATS,
-		.rates = SNDRV_PCM_RATE_8000_48000,
-		.channels_min = 1,
-		.channels_max = 8,
-	    },
-	.capture =
-	    {
-		.stream_name = "I2S1 Capture",
-		.formats = SND_FORMATS,
-		.rates = SNDRV_PCM_RATE_8000_48000,
-		.channels_min = 1,
-		.channels_max = 8,
-	    },
-	.ops = &snd_afe_dai_ops,
-	.symmetric_rates = 1,
-    },
+
 };
 
 static const struct snd_soc_component_driver snd_sample_soc_component = {
@@ -1685,7 +1683,6 @@ static int snd_afe_i2s_sc_probe(struct platform_device *pdev)
 	DEBUG_ITEM_PRT(clk_get_rate(afe->mclk));
 
 	/* TODO: need clean next debug code later. */
-
 /* 	ret = clk_set_rate(afe->mclk, 12288000);
 	if (ret)
 		return ret; */
@@ -1745,6 +1742,7 @@ static int snd_afe_i2s_sc_probe(struct platform_device *pdev)
 		if (value == 0) {
 			regmap_exit(afe->regmap);
 			dev_err(&pdev->dev, "Don't suppport set to half duplex mode. Please set scr register in ssystem \n");
+			ret = -EINVAL;
 			goto err_disable;
 		}
 	}
@@ -1788,11 +1786,37 @@ static int snd_afe_i2s_sc_probe(struct platform_device *pdev)
 	afe->tdm_initialized = false;
 	afe->rx_channels = 1;
 	afe->tx_channels = 1;
+	afe->master_sck_polar = 1;
+	afe->slave_sck_polar = 0;
 	afe->srate = 8000;
 	afe->pack_en = true;
+	afe->slot_width = AFE_I2S_CHN_WIDTH;
 	if (of_find_property(dev->of_node, "sdrv,disable-pack-mode", NULL)){
 		dev_info(&pdev->dev, "disable pack mode.\n");
 		afe->pack_en = false;
+	}
+	ret = device_property_read_u32(dev, "sdrv,master-sck-polar", &value);
+	if (!ret) {
+		/* sdrv,master-sck-polar  */
+		if (value == 0) {
+			afe->master_sck_polar = 0;
+		}else {
+			afe->master_sck_polar = 1;
+		}
+	}
+	ret = device_property_read_u32(dev, "sdrv,slave-sck-polar", &value);
+	if (!ret) {
+		/* sdrv,slave-sck-polar */
+		if (value == 0) {
+			afe->slave_sck_polar = 0;
+		}else {
+			afe->slave_sck_polar = 1;
+		}
+	}
+	ret = device_property_read_u32(dev, "sdrv,slot-width", &value);
+	if (!ret) {
+		/* ssdrv,slot-width  */
+		afe->slot_width = check_and_get_slot_width_enum(value);
 	}
 	afe_i2s_sc_config(afe);
 	return 0;
@@ -1892,7 +1916,7 @@ static int sdrv_i2s_sc_resume(struct device *dev)
 	regmap_write(afe->regmap, REG_CDN_I2SSC_REGS_FIFO_AEMPTY_FDR,
 		     afe->reg_i2s_fifo_aempty_fdr);
 	regmap_write(afe->regmap, REG_CDN_I2SSC_REGS_FIFO_AFULL_FDR,
-		     &afe->reg_i2s_fifo_afull_fdr);
+		     afe->reg_i2s_fifo_afull_fdr);
 	regmap_write(afe->regmap, REG_CDN_I2SSC_REGS_TDM_CTRL,
 		     afe->reg_i2s_tdm_ctrl);
 	regmap_write(afe->regmap, REG_CDN_I2SSC_REGS_TDM_FD_DIR,

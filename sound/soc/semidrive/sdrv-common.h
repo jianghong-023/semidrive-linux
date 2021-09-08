@@ -164,7 +164,9 @@ struct sdrv_afe_i2s_sc {
 
 	/* i2s l/r pack mode*/
 	bool pack_en;
-
+	/* i2s sck polar mode*/
+	unsigned master_sck_polar;
+	unsigned slave_sck_polar;
 	/*PM Cache*/
 	unsigned int reg_i2s_ctrl;
 	unsigned int reg_i2s_ctrl_fdx;
@@ -230,6 +232,7 @@ struct sdrv_afe_i2s_mc {
 	unsigned slots;
 	unsigned tx_slot_mask;
 	unsigned rx_slot_mask;
+
 };
 
 struct sdrv_afe_spdif {

@@ -152,17 +152,25 @@ static int x9u_tlv320ai23_soc_hw_params(struct snd_pcm_substream *substream,
 {
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
 	struct snd_soc_dai *codec_dai = rtd->codec_dai;
+	struct snd_soc_dai *cpu_dai = rtd->cpu_dai;
 	struct snd_soc_card *card = rtd->card;
 
 	int srate, mclk, err;
 
 	srate = params_rate(params);
 	mclk = 256 * srate;
-	/*TODO: need rearch mclk already be set to 12288000
-	Configure clk here.
+	/*WARNNING: need rearch mclk already be set to 12288000
+	If you config mclk here, need check its impact for others.
 	*/
 
 	DEBUG_ITEM_PRT(mclk);
+	err = snd_soc_dai_set_sysclk(cpu_dai, I2S_SCLK_MCLK, mclk,
+				     SND_SOC_CLOCK_OUT);
+	if (err < 0) {
+		dev_err(card->dev, "cpu_dai clock not set\n");
+		return err;
+	}
+
 	err = snd_soc_dai_set_sysclk(codec_dai, I2S_SCLK_MCLK, mclk,
 				     SND_SOC_CLOCK_IN);
 	if (err < 0) {
