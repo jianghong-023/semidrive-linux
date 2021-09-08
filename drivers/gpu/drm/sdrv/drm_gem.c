@@ -14,8 +14,8 @@
 #include <linux/iommu.h>
 #include <linux/dma-buf.h>
 
-#include "kunlun_drm_drv.h"
-#include "kunlun_drm_gem.h"
+#include "drm_drv.h"
+#include "drm_gem.h"
 
 static int kunlun_gem_iommu_map(struct kunlun_gem_object *kg_obj)
 {

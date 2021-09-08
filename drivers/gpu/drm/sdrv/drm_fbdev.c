@@ -14,10 +14,10 @@
 #include <drm/drm_gem_framebuffer_helper.h>
 #include <drm/drm_crtc_helper.h>
 
-#include "kunlun_drm_drv.h"
-#include "kunlun_drm_gem.h"
-#include "kunlun_drm_fb.h"
-#include "kunlun_drm_fbdev.h"
+#include "drm_drv.h"
+#include "drm_gem.h"
+#include "drm_fb.h"
+#include "drm_fbdev.h"
 
 #define PREFERRED_BPP		32
 

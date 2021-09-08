@@ -23,9 +23,9 @@
 #include <linux/bitops.h>
 #include <linux/dma-buf.h>
 
-#include "kunlun_drm_drv.h"
-#include "kunlun_drm_fbdev.h"
-#include "kunlun_drm_gem.h"
+#include "drm_drv.h"
+#include "drm_fbdev.h"
+#include "drm_gem.h"
 #include "rpc_define.h"
 #include "sdrv_dpc.h"
 
@@ -514,12 +514,6 @@ static int kunlun_drm_remove(struct platform_device *pdev)
 	of_platform_depopulate(&pdev->dev);
 
 	return 0;
-}
-
-static void kunlun_drm_shutdown(struct platform_device *pdev)
-{
-	DRM_INFO("%s enter !\n", __func__);
-
 }
 
 static int compare_name_crtc(struct device_node *np)

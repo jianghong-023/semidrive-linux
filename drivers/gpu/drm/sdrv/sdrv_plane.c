@@ -1,5 +1,5 @@
 #include "sdrv_plane.h"
-#include "kunlun_drm_gem.h"
+#include "drm_gem.h"
 
 #include <drm/drm.h>
 #include <drm/drmP.h>

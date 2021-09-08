@@ -16,10 +16,10 @@
 #include <drm/drm_crtc_helper.h>
 #include <video/of_display_timing.h>
 
-#include "kunlun_drm_drv.h"
+#include "drm_drv.h"
 #include "sdrv_dpc.h"
 
-#define KUNLUN_DRM_PARALLEL		"kunlun-drm-parallel"
+#define KUNLUN_DRM_PARALLEL		"sdrv-drm-parallel"
 
 struct kunlun_drm_parallel {
 	struct device *dev;
