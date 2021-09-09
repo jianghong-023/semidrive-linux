@@ -413,6 +413,79 @@ static const struct component_master_ops kunlun_drm_ops = {
 	.unbind = kunlun_drm_unbind,
 };
 
+#ifdef CONFIG_PM_SLEEP
+static void kunlun_drm_fb_suspend(struct drm_device *drm)
+{
+	struct kunlun_drm_data *priv = drm->dev_private;
+
+	console_lock();
+	drm_fb_helper_set_suspend(priv->fb_helper, true);
+	console_unlock();
+}
+
+static void kunlun_drm_fb_resume(struct drm_device *drm)
+{
+	struct kunlun_drm_data *priv = drm->dev_private;
+
+	console_lock();
+	drm_fb_helper_set_suspend(priv->fb_helper, false);
+	console_unlock();
+}
+
+static int kunlun_drm_sys_suspend(struct device *dev)
+{
+	struct drm_device *drm = dev_get_drvdata(dev);
+	struct kunlun_drm_data *priv;
+	int i;
+
+	if (!drm)
+		return 0;
+	drm_kms_helper_poll_disable(drm);
+	kunlun_drm_fb_suspend(drm);
+
+	priv = drm->dev_private;
+	priv->state = drm_atomic_helper_suspend(drm);
+	if (IS_ERR(priv->state)) {
+		kunlun_drm_fb_resume(drm);
+		drm_kms_helper_poll_enable(drm);
+		return PTR_ERR(priv->state);
+	}
+
+	for (i = 0; i < priv->num_crtcs; i++) {
+		kunlun_crtc_sys_suspend(priv->crtcs[i]);
+	}
+
+	return 0;
+}
+
+static int kunlun_drm_sys_resume(struct device *dev)
+{
+	struct drm_device *drm = dev_get_drvdata(dev);
+	struct kunlun_drm_data *priv;
+	int i;
+
+	if (!drm)
+		return 0;
+
+	priv = drm->dev_private;
+
+	for (i = 0; i < priv->num_crtcs; i++) {
+		kunlun_crtc_sys_resume(priv->crtcs[i]);
+	}
+
+	drm_atomic_helper_resume(drm, priv->state);
+	kunlun_drm_fb_resume(drm);
+	drm_kms_helper_poll_enable(drm);
+
+	return 0;
+}
+#endif
+
+static const struct dev_pm_ops kunlun_drm_pm_ops = {
+	SET_SYSTEM_SLEEP_PM_OPS(kunlun_drm_sys_suspend,
+							kunlun_drm_sys_resume)
+};
+
 static int add_components_dsd(struct device *master, struct device_node *np,
 		struct component_match **matchptr)
 {
@@ -537,6 +610,7 @@ static struct platform_driver kunlun_drm_platform_driver = {
 	.driver = {
 		.name = "kunlun-drm",
 		.of_match_table = kunlun_drm_of_table,
+		.pm = &kunlun_drm_pm_ops,
 	},
 };
 module_platform_driver(kunlun_drm_platform_driver);

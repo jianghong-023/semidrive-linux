@@ -28,6 +28,7 @@ struct kunlun_drm_data {
 	struct drm_device *drm;
 
 	struct drm_fb_helper *fb_helper;
+	struct drm_atomic_state *state;
 
 	bool iommu_enable;
 	struct iommu_domain *domain;

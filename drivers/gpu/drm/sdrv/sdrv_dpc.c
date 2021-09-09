@@ -572,16 +572,6 @@ static void kunlun_crtc_atomic_flush(struct drm_crtc *crtc,
 			layers[j] = &p->layer_data;
 		}
 
-		struct drm_display_mode *mode = &crtc->state->adjusted_mode;
-		struct kunlun_crtc_state *state = to_kunlun_crtc_state(crtc->state);
-		if (dpc && dpc->ops->modeset) {
-			dpc->ops->modeset(dpc, mode, state->bus_flags);
-			if (dpc->next && dpc->next->ops->modeset) {
-				dpc->next->ops->mlc_select(dpc->next, dpc->mlc_select);
-				dpc->next->ops->modeset(dpc->next, mode, state->bus_flags);
-			}
-		}
-
 		ret = dpc->ops->update(dpc, *layers, count);
 
 		if (ret) {
@@ -1293,26 +1283,15 @@ static void kunlun_drm_crtc_shutdown(struct platform_device *pdev)
 }
 
 #ifdef CONFIG_PM_SLEEP
-static int kunlun_crtc_sys_suspend(struct device *dev)
+int kunlun_crtc_sys_suspend(struct drm_crtc *crtc)
 {
 	int i = 0;
-	struct kunlun_crtc *kcrtc = dev_get_drvdata(dev);
-	struct drm_crtc *crtc = &kcrtc->base;
-	struct drm_device *drm = crtc->dev;
+	struct kunlun_crtc *kcrtc = container_of(crtc, struct kunlun_crtc, base);
 
-	DRM_INFO("kunlun_crtc_sys_suspend enter !\n");
+	DRM_INFO("[crtc-%d] suspend begin!\n", crtc->index);
 
-	if (!drm)
+	if (!kcrtc)
 		return 0;
-
-	drm_kms_helper_poll_disable(drm);
-	DRM_INFO("save drm state !\n");
-	kcrtc->state = drm_atomic_helper_suspend(drm);
-	if (IS_ERR(kcrtc->state)) {
-		drm_kms_helper_poll_enable(drm);
-		DRM_ERROR("drm atomic helper suspend return error !\n");
-		return PTR_ERR(kcrtc->state);
-	}
 
 	for (i = 0; i < 2; i++) {
 		struct sdrv_dpc *dpc = i % 2? kcrtc->master: kcrtc->slave;
@@ -1329,19 +1308,18 @@ static int kunlun_crtc_sys_suspend(struct device *dev)
 		}
 	}
 
-	DRM_INFO("kunlun_crtc_sys_suspend out !\n");
+	DRM_INFO("[crtc-%d] suspend completed!\n", crtc->index);
 
 	return 0;
 }
 
-static int kunlun_crtc_sys_resume(struct device *dev)
+int kunlun_crtc_sys_resume(struct drm_crtc *crtc)
 {
 	int i;
-	struct kunlun_crtc *kcrtc = dev_get_drvdata(dev);
-	struct drm_crtc *crtc = &kcrtc->base;
-	struct drm_device *drm = crtc->dev;
+	struct kunlun_crtc *kcrtc = container_of(crtc, struct kunlun_crtc, base);
+	struct sdrv_pipe *p = NULL;
 
-	DRM_INFO("kunlun_crtc_sys_resume enter !\n");
+	DRM_INFO("[crtc-%d] resume begin!\n", crtc->index);
 
 	kcrtc->recover_done = false;
 
@@ -1349,14 +1327,36 @@ static int kunlun_crtc_sys_resume(struct device *dev)
 		if (kcrtc->irq)
 			disable_irq(kcrtc->irq);
 		kcrtc->master->ops->init(kcrtc->master);
-		if (kcrtc->master->next)
+		for (i = 0; i < kcrtc->master->num_pipe; i++) {
+			p = kcrtc->master->pipes[i];
+			if (p && p->ops->init)
+				p->ops->init(p);
+		}
+		if (kcrtc->master->next) {
 			kcrtc->master->next->ops->init(kcrtc->master->next);
+			for (i = 0; i < kcrtc->master->next->num_pipe; i++) {
+				p = kcrtc->master->next->pipes[i];
+				if (p && p->ops->init)
+					p->ops->init(p);
+			}
+		}
 	}
 
 	if (kcrtc->slave) {
 		kcrtc->slave->ops->init(kcrtc->slave);
-		if (kcrtc->slave->next)
+		for (i = 0; i < kcrtc->slave->num_pipe; i++) {
+			p = kcrtc->slave->pipes[i];
+			if (p && p->ops->init)
+				p->ops->init(p);
+		}
+		if (kcrtc->slave->next) {
 			kcrtc->slave->next->ops->init(kcrtc->slave->next);
+			for (i = 0; i < kcrtc->slave->next->num_pipe; i++) {
+				p = kcrtc->slave->next->pipes[i];
+				if (p && p->ops->init)
+					p->ops->init(p);
+			}
+		}
 	}
 
 	for (i = 0; i < 2; i++) {
@@ -1374,24 +1374,10 @@ static int kunlun_crtc_sys_resume(struct device *dev)
 		enable_irq(kcrtc->irq);
 	kunlun_crtc_enable_vblank(&kcrtc->base);
 
-	if (!drm)
-		return 0;
-
-	DRM_INFO("pop drm state to atomtic!\n");
-	drm_atomic_helper_resume(drm, kcrtc->state);
-	drm_kms_helper_poll_enable(drm);
-
-	DRM_INFO("kunlun_crtc_sys_resume out !\n");
+	DRM_INFO("[crtc-%d] resume completed!\n", crtc->index);
 	return 0;
 }
-
-#endif //end #ifdef CONFIG_PM_SLEEP
-
-static const struct dev_pm_ops kunlun_crtc_pm_ops = {
-	SET_SYSTEM_SLEEP_PM_OPS(kunlun_crtc_sys_suspend,
-				kunlun_crtc_sys_resume)
-};
-
+#endif
 
 struct sdrv_dpc_data dpc_data[] = {
 	{.version = "dc-r0p1", .ops = &dc_r0p1_ops},
@@ -1414,7 +1400,6 @@ static struct platform_driver kunlun_crtc_driver = {
 	.driver = {
 		.name = "kunlun-crtc",
 		.of_match_table = kunlun_crtc_of_table,
-		.pm = &kunlun_crtc_pm_ops,
 	},
 };
 module_platform_driver(kunlun_crtc_driver);
