@@ -181,8 +181,6 @@ struct sdrv_pipe {
 };
 
 struct kunlun_plane {
-	struct drm_plane base;
-	enum drm_plane_type type;
 	struct pipe_capability *cap;
 	struct kunlun_crtc *kcrtc;
 	uint8_t plane_status;
@@ -196,6 +194,8 @@ struct kunlun_plane {
 	int pd_mode;
 	struct sdrv_pipe *pipes[2];
 	int num_pipe;
+	enum drm_plane_type type;
+	struct drm_plane base;
 };
 
 struct ops_entry {

@@ -48,7 +48,7 @@
 
 #define MLC_JUMP            0x7000
 #define S_MLC_JUMP          0x8000
-#pragma pack(4)
+
 struct pix_comp {
 	u8 bpa;
 	u8 bpy;
@@ -235,7 +235,7 @@ struct kunlun_plane;
 
 
 struct sdrv_dpc {
-	struct device dev;
+
 	struct kunlun_crtc *crtc;
 	struct sdrv_dpc *next;
 
@@ -246,6 +246,7 @@ struct sdrv_dpc {
 	void __iomem *regs;
 	uint32_t irq;
 	spinlock_t irq_lock;
+
 	const char *name;
 	int combine_mode;
 
@@ -253,15 +254,17 @@ struct sdrv_dpc {
 	struct sdrv_pipe *pipes[16];
 	int pipe_mask;
 	int num_pipe;
-	struct work_struct vsync_work;
-	struct work_struct underrun_work;
-	struct work_struct mlc_int_work;
-	struct work_struct rdma_int_work;
 	void *priv;
 	struct pd_t pd_info;
 
 	struct clk *pclk;
 	int pclk_div;
+
+	struct device dev;
+	struct work_struct vsync_work;
+	struct work_struct underrun_work;
+	struct work_struct mlc_int_work;
+	struct work_struct rdma_int_work;
 };
 
 struct dpc_operation {
@@ -348,7 +351,7 @@ struct kunlun_crtc_state {
 	unsigned int bus_format;
 	unsigned int bus_flags;
 };
-#pragma pack()
+
 #define to_kunlun_crtc_state(s) \
 	container_of(s, struct kunlun_crtc_state, base)
 

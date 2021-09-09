@@ -13,7 +13,7 @@
 #include <linux/pm_runtime.h>
 #include <linux/soc/semidrive/ipcc.h>
 
-#include "kunlun_drm_drv.h"
+#include "drm_drv.h"
 #include "sdrv_plane.h"
 #include "sdrv_dpc.h"
 
@@ -88,6 +88,7 @@ struct kunlun_crtc *kcrtc_primary = NULL;
 		};
 #endif
 
+
 static int dp_enable = 1;
 module_param(dp_enable, int, 0660);
 static DEFINE_MUTEX(udp_lock);
@@ -136,6 +137,7 @@ void dump_registers(struct sdrv_dpc *dpc, int start, int end)
 			readl(dpc->regs + start + 0x10 * i + 0x8),
 			readl(dpc->regs + start + 0x10 * i + 0xc));
 }
+EXPORT_SYMBOL(dump_registers);
 
 static inline int check_avm_alive(struct kunlun_crtc *kcrtc) {
 	disp_sync_args_t status;
@@ -393,6 +395,7 @@ int _add_pipe(struct sdrv_dpc *dpc, int type, int hwid, const char *pipe_name, u
 
 	return 0;
 }
+EXPORT_SYMBOL(_add_pipe);
 
 void kunlun_crtc_handle_vblank(struct kunlun_crtc *kcrtc)
 {
@@ -918,7 +921,7 @@ static int sdrv_dpc_get_resource(struct sdrv_dpc *dpc, struct device_node *np)
 	DRM_INFO("got %s res 0x%lx\n", dpc->name, (unsigned long)res.start);
 
 	dpc->regs = devm_ioremap_nocache(&dpc->dev, res.start, resource_size(&res));
-	if(IS_ERR_OR_NULL(dpc->regs)) {
+	if(IS_ERR(dpc->regs)) {
 		DRM_ERROR("Cannot find dpc regs 001\n");
 		return PTR_ERR(dpc->regs);
 	}

@@ -20,7 +20,7 @@
 #include <linux/slab.h>
 
 #include <drm/drmP.h>
-#include "kunlun_drm_drv.h"
+#include "drm_drv.h"
 
 struct drm_mb_pdata {
 	phys_addr_t base;
