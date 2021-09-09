@@ -340,8 +340,6 @@ struct kunlun_crtc {
 	bool evt_update;
 	bool recover_done;
 	wait_queue_head_t wait_queue;
-
-	struct drm_atomic_state *state;
 };
 #define to_kunlun_crtc(x) container_of(x, struct kunlun_crtc, base)
 
@@ -365,5 +363,7 @@ int sdrv_rpcall_start(bool enable);
 
 void kunlun_crtc_handle_vblank(struct kunlun_crtc *kcrtc);
 void dump_registers(struct sdrv_dpc *dpc, int start, int end);
+int kunlun_crtc_sys_suspend(struct drm_crtc *crtc);
+int kunlun_crtc_sys_resume(struct drm_crtc *crtc);
 #endif //_sdrv_dpc_H_
 
