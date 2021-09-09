@@ -40,7 +40,8 @@
 #include <linux/if_ether.h>
 #include <net/pkt_sched.h>
 
-#define ETHERNET_ENDPOINT       60
+#define RPMSG_ETHERNET_EPT		60
+#define RPMSG_ETHERNET_NAME		"rpmsg-net"
 
 struct rpmsg_eth_device {
 	struct rpmsg_device *rpmsg_chnl;
@@ -50,6 +51,12 @@ struct rpmsg_eth_device {
 	struct rpmsg_channel_info chinfo;
 	/* MTU is for rpmsg payload */
 	int rpmsg_mtu;
+
+	/* ether frame fragment */
+	bool frag;
+	uint32_t frame_len;
+	uint32_t frame_received;
+	struct sk_buff *skb_stage;
 
 	spinlock_t lock;
 	struct sk_buff_head txqueue;
@@ -61,14 +68,26 @@ struct rpmsg_net_device {
 	struct net_device *ether_dev;
 };
 
+
+#define PL_TYPE_FRAG_INDICATOR	(1)
+#define PL_TYPE_ENTIRE_PACK		(2)
+#define PL_TYPE_FRAG_END		(4)
+
+#define PL_MAGIC			(0x88)
+struct rpmsg_eth_header {
+	uint8_t type;
+	uint8_t	magic;
+	uint16_t len;
+};
+
 /*
  * The higher levels take care of making this non-reentrant (it's
  * called with bh's disabled).
  */
 static netdev_tx_t rpmsg_eth_xmit(struct sk_buff *skb,
-                            struct net_device *dev)
+                            struct net_device *ndev)
 {
-	struct rpmsg_eth_device *eth = netdev_priv(dev);
+	struct rpmsg_eth_device *eth = netdev_priv(ndev);
 
 	spin_lock_bh(&eth->lock);
 
@@ -81,55 +100,50 @@ static netdev_tx_t rpmsg_eth_xmit(struct sk_buff *skb,
 	return NETDEV_TX_OK;
 }
 
-
-static void rpmsg_read_mac_addr(struct net_device *dev)
-{
-	int i=0;
-	for (i = 0; i < ETH_ALEN; i++)
-		dev->dev_addr[i] = 0;
-	dev->dev_addr[0] = 0xAA;
-	dev->dev_addr[1] = 0xBB;
-	dev->dev_addr[2] = 0xCC;
-	dev->dev_addr[3] = 3;
-	dev->dev_addr[4] = 1;
-	dev->dev_addr[5] = ETHERNET_ENDPOINT;
-}
-
 static int rpmsg_eth_open(struct net_device *ndev)
 {
-	rpmsg_read_mac_addr(ndev);
 	netif_start_queue(ndev);
 
 	return 0;
 }
 
 
-int rpmsg_eth_stop(struct net_device *dev)
+int rpmsg_eth_stop(struct net_device *ndev)
 {
 	pr_info ("stop called\n");
-	netif_stop_queue(dev);
+	netif_stop_queue(ndev);
 	return 0;
 }
 
 /*
  * Configuration changes (passed on by ifconfig)
  */
-int rpmsg_eth_config(struct net_device *dev, struct ifmap *map)
+int rpmsg_eth_config(struct net_device *ndev, struct ifmap *map)
 {
-	if (dev->flags & IFF_UP) /* can't act on a running interface */
+	if (ndev->flags & IFF_UP) /* can't act on a running interface */
 		return -EBUSY;
 
 	/* ignore other fields */
 	return 0;
 }
 
-struct net_device_stats *rpmsg_eth_stats(struct net_device *dev)
+static int rpmsg_eth_set_mac_address(struct net_device *ndev, void *addr)
 {
-	struct rpmsg_eth_device *priv = netdev_priv(dev);
+	int ret = 0;
+
+	ret = eth_mac_addr(ndev, addr);
+
+	return ret;
+
+}
+
+struct net_device_stats *rpmsg_eth_stats(struct net_device *ndev)
+{
+	struct rpmsg_eth_device *priv = netdev_priv(ndev);
 	return &priv->stats;
 }
 
-static u32 always_on(struct net_device *dev)
+static u32 always_on(struct net_device *ndev)
 {
 	return 1;
 }
@@ -143,39 +157,115 @@ static const struct net_device_ops rpmsg_eth_ops = {
 	.ndo_stop           = rpmsg_eth_stop,
 	.ndo_start_xmit     = rpmsg_eth_xmit,
 	.ndo_set_config     = rpmsg_eth_config,
+	.ndo_set_mac_address = rpmsg_eth_set_mac_address,
 	.ndo_validate_addr  = eth_validate_addr,
 	.ndo_get_stats      = rpmsg_eth_stats,
 };
+
+static struct sk_buff *
+rpmsg_eth_alloc_skb(struct rpmsg_net_device *rndev, unsigned int length)
+{
+	struct net_device *ndev = rndev->ether_dev;
+	struct rpmsg_eth_device *eth;
+	struct sk_buff *skb;
+
+	eth = netdev_priv(ndev);
+	skb = netdev_alloc_skb_ip_align(ndev, eth->frame_len);
+	if (!skb) {
+		/* skb alloc fail, will drop contiguous fragment */
+		eth->stats.rx_errors++;
+		eth->stats.rx_dropped += eth->frame_len;
+		return NULL;
+	}
+
+	return skb;
+}
 
 static int rpmsg_eth_rx_cb(struct rpmsg_device *rpdev, void *data,
                                         int len, void *priv, u32 src)
 {
 	struct rpmsg_net_device *rndev = dev_get_drvdata(&rpdev->dev);
-    struct rpmsg_eth_device *eth = priv;
+	struct rpmsg_eth_device *eth = priv;
+	struct net_device *ndev = eth->dev;
+	struct rpmsg_eth_header *hdr;
 	struct sk_buff *skb;
 
-	spin_lock_bh(&eth->lock);
+	if ((eth->frag == false) && len == sizeof(*hdr)) {
+		hdr = (struct rpmsg_eth_header *)data;
+		if (hdr->magic == PL_MAGIC) {
+			eth->frag = true;
+			eth->frame_len = hdr->len;
+			eth->frame_received = 0;
 
-	skb = netdev_alloc_skb_ip_align(rndev->ether_dev, len);
-	if (!skb) {
-		eth->stats.rx_errors++;
-		eth->stats.rx_dropped += len;
-		spin_unlock_bh(&eth->lock);
-		pr_info ("rx msg dropped without skbuf\n");
-		return -1;
+			spin_lock_bh(&eth->lock);
+			eth->skb_stage = rpmsg_eth_alloc_skb(rndev, eth->frame_len);
+			if (!eth->skb_stage) {
+				/* skb alloc fail, will drop contiguous fragment */
+				spin_unlock_bh(&eth->lock);
+				dev_err(&ndev->dev, "ERROR: skbuf, drop contiguous frags\n");
+				return -ENOMEM;
+			}
+
+			spin_unlock_bh(&eth->lock);
+			dev_dbg(&ndev->dev, "RX large frame len=%d\n", eth->frame_len);
+			return 0;
+		}
+		/* Should not be here, fallback to normal frame */
+		dev_err(&ndev->dev, "ERROR: wrong fragment header\n");
 	}
+
+	/* Receive contiguous fragments by rpmsg MTU */
+	if ((eth->frag == true)) {
+		if (eth->skb_stage) {
+			/* Assembly fragments into one ether frame */
+			if (eth->frame_received < eth->frame_len) {
+				memcpy(skb_put(eth->skb_stage, len), data, len);
+				eth->frame_received += len;
+			}
+
+			dev_dbg(&ndev->dev, "RX frame assembled=%d(=%d?), len=%d\n",
+				eth->frame_received, eth->frame_len, len);
+			/* last fragment to complete ether frame */
+			if (eth->frame_received >= eth->frame_len) {
+				eth->frag = false;
+				skb = eth->skb_stage;
+				eth->skb_stage = NULL;
+				spin_lock_bh(&eth->lock);
+				goto ether_frame_recieved;
+			}
+			return 0;
+		}
+
+		/* skb alloc fail previously, drop contiguous fragment */
+		eth->frame_received += len;
+		if (eth->frame_received >= eth->frame_len)
+			eth->frag = false;
+		return -EINVAL;
+	}
+
+	/* Rx single frame packet */
+	spin_lock_bh(&eth->lock);
+	eth->frame_len = len;
+
+	skb = rpmsg_eth_alloc_skb(rndev, eth->frame_len);
+	if (!skb) {
+		spin_unlock_bh(&eth->lock);
+		dev_err(&ndev->dev, "ERROR: skbuf, drop the frame\n");
+		return -ENOMEM;
+	}
+
 	memcpy(skb_put(skb, len), data, len);
+
+ether_frame_recieved:
 
 	skb->protocol = eth_type_trans(skb, rndev->ether_dev);
 	skb->ip_summed = CHECKSUM_UNNECESSARY; /* don't check it */
 	eth->stats.rx_packets++;
-	eth->stats.rx_bytes += len;
+	eth->stats.rx_bytes += eth->frame_len;
 	netif_rx(skb);
 	spin_unlock_bh(&eth->lock);
 
-	pr_debug("rpmsg: net: RX msg len:%d\n", len);
-//	print_hex_dump_bytes("rpmsg: net:", DUMP_PREFIX_ADDRESS, data, 48);
-
+	dev_dbg(&ndev->dev, "RX frame len=%d\n", eth->frame_len);
 	return 0;
 }
 
@@ -183,9 +273,11 @@ static void eth_xmit_work_handler(struct work_struct *work)
 {
 	struct rpmsg_eth_device *eth = container_of(work, struct rpmsg_eth_device,
 	                    tx_work);
+	struct net_device *ndev = eth->dev;
 	struct sk_buff *skb;
-	int len = 0;
+	int len = 0, send_bytes, cc;
 	int err = 0;
+	struct rpmsg_eth_header frhdr;
 
 	for (;;) {
 		spin_lock_bh(&eth->lock);
@@ -202,70 +294,121 @@ static void eth_xmit_work_handler(struct work_struct *work)
 		}
 
 		len = skb->len;
-		if (len > eth->rpmsg_mtu) {
-			pr_err("ERROR: %s trim len > mtu : %d\n", __func__, len, eth->rpmsg_mtu);
-			len = eth->rpmsg_mtu;
-		}
-
 		eth->stats.tx_packets++;
 		eth->stats.tx_bytes += len;
 		spin_unlock_bh(&eth->lock);
+		dev_dbg(&ndev->dev, "TX frame len=%d\n", len);
 
-		err = rpmsg_trysendto(eth->ether_ept, skb->data, len, eth->chinfo.dst);
-		if (err < 0)
-			pr_err("ERROR: %s rc=%d no pkts\n", __func__, err);
+		if (len > eth->rpmsg_mtu) {
+			frhdr.type = PL_TYPE_FRAG_INDICATOR;
+			frhdr.magic = PL_MAGIC;
+			frhdr.len = len;
+			cc = 0;
 
-		pr_debug("rpmsg: net: TX msg len:%d\n", len);
+			err = rpmsg_trysendto(eth->ether_ept, &frhdr, sizeof(frhdr), eth->chinfo.dst);
+			if (err < 0)
+				dev_err(&ndev->dev, "ERROR: %d rpmsg_trysendto\n", err);
+
+			dev_dbg(&ndev->dev, "TX large frame len=%d\n", len);
+
+			while (len) {
+				if (len > eth->rpmsg_mtu)
+					send_bytes = eth->rpmsg_mtu;
+				else
+					send_bytes = len;
+
+				err = rpmsg_trysendto(eth->ether_ept, skb->data + cc, send_bytes, eth->chinfo.dst);
+				if (err < 0)
+					dev_err(&ndev->dev, "ERROR: rc=%d cc=%d len=%d\n", err, cc, send_bytes);
+
+				len -= send_bytes;
+				cc += send_bytes;
+				dev_dbg(&ndev->dev, "TX cc=%d, send=%d left=%d\n", cc, send_bytes, len);
+
+			}
+		} else {
+			err = rpmsg_trysendto(eth->ether_ept, skb->data, len, eth->chinfo.dst);
+			if (err < 0)
+				dev_err(&ndev->dev, "ERROR: rc=%d no len=%d\n", err, len);
+		}
 
 		dev_kfree_skb_any(skb);
 	}
 }
 
-static void rpmsg_netdev_setup(struct net_device *dev)
+static ssize_t devtype_show(struct device *dev,
+			     struct device_attribute *attr, char *buf)
 {
-	dev->header_ops		= &eth_header_ops;
-	dev->type		= ARPHRD_ETHER;
-	dev->hard_header_len 	= ETH_HLEN;
-	dev->min_header_len	= ETH_HLEN;
-	dev->mtu		= ETH_DATA_LEN; /* override later: actually not ethnet */
-	dev->min_mtu		= ETH_MIN_MTU;
-	dev->max_mtu		= ETH_DATA_LEN;
-	dev->addr_len		= ETH_ALEN;
-	dev->tx_queue_len	= DEFAULT_TX_QUEUE_LEN;
-	dev->flags		= IFF_BROADCAST|IFF_MULTICAST;
-	dev->priv_flags		|= IFF_TX_SKB_SHARING;
+	struct net_device *ndev = to_net_dev(dev);
+	struct rpmsg_eth_device *eth;
+	struct rpmsg_device *rpdev;
 
-	eth_broadcast_addr(dev->broadcast);
+	eth = netdev_priv(ndev);
+	rpdev = eth->rpmsg_chnl;
+
+	return sprintf(buf, RPMSG_DEVICE_MODALIAS_FMT "\n", rpdev->id.name);
+}
+static DEVICE_ATTR_RO(devtype);
+
+
+static struct attribute *rpmsg_net_attrs[] = {
+	&dev_attr_devtype.attr,
+	NULL,
+};
+ATTRIBUTE_GROUPS(rpmsg_net);
+
+static struct device_type rpmsg_eth_type = {
+	.name = "rpmsg",
+	.groups = rpmsg_net_groups,
+};
+
+static void rpmsg_netdev_setup(struct net_device *ndev)
+{
+	SET_NETDEV_DEVTYPE(ndev, &rpmsg_eth_type);
+	ndev->header_ops		= &eth_header_ops;
+	ndev->type		= ARPHRD_ETHER;
+	ndev->hard_header_len 	= ETH_HLEN;
+	ndev->min_header_len	= ETH_HLEN;
+	ndev->mtu		= ETH_DATA_LEN; /* override later: actually not ethnet */
+	ndev->min_mtu		= ETH_MIN_MTU;
+	ndev->max_mtu		= ETH_DATA_LEN;
+	ndev->addr_len		= ETH_ALEN;
+	ndev->tx_queue_len	= DEFAULT_TX_QUEUE_LEN;
+	ndev->flags		= IFF_BROADCAST|IFF_MULTICAST;
+	ndev->priv_flags		|= IFF_TX_SKB_SHARING;
+
+	eth_broadcast_addr(ndev->broadcast);
 }
 
 int rpmsg_net_create_etherdev(struct rpmsg_net_device *rndev)
 {
-	int result, ret = -ENOMEM;
+	struct device *dev = &rndev->rpmsg_chnl->dev;
 	struct rpmsg_eth_device *eth;
-	struct net_device *dev;
+	struct net_device *ndev;
+	int ret = -ENOMEM;
 
-	dev = alloc_netdev(sizeof(struct rpmsg_eth_device),
-                             "rpm%d", NET_NAME_UNKNOWN, rpmsg_netdev_setup);
-	if (dev ==NULL) {
-		pr_err("ERROR: %s %d\n", __func__, __LINE__);
+	ndev = alloc_netdev(sizeof(struct rpmsg_eth_device),
+                             "eth%d", NET_NAME_UNKNOWN, rpmsg_netdev_setup);
+	if (ndev == NULL) {
+		dev_err(dev, "ERROR: alloc_netdev\n");
 		return ret;
 	}
 
-	dev->ethtool_ops = &rpmsg_ethtool_ops;
-	dev->netdev_ops  = &rpmsg_eth_ops;
+	ndev->ethtool_ops = &rpmsg_ethtool_ops;
+	ndev->netdev_ops  = &rpmsg_eth_ops;
+	SET_NETDEV_DEV(ndev, dev);
 
-	eth = netdev_priv(dev);
+	eth = netdev_priv(ndev);
 	memset(eth, 0, sizeof(*eth));
 
-	pr_debug("INFO: %s %d\n", __func__, __LINE__);
-	eth->dev = dev;
-	rpmsg_read_mac_addr(dev);
+	eth->dev = ndev;
+	eth_hw_addr_random(ndev);
 
 	eth->rpmsg_chnl = rndev->rpmsg_chnl;
-	eth->chinfo.src = ETHERNET_ENDPOINT;
-	eth->chinfo.dst = ETHERNET_ENDPOINT;
+	eth->chinfo.src = RPMSG_ETHERNET_EPT;
+	eth->chinfo.dst = RPMSG_ETHERNET_EPT;
 	snprintf(eth->chinfo.name, RPMSG_NAME_SIZE, "rpmsg-net-%d", eth->chinfo.src);
-	rndev->ether_dev = dev;
+	rndev->ether_dev = ndev;
 
 	spin_lock_init(&eth->lock);
 	skb_queue_head_init(&eth->txqueue);
@@ -274,29 +417,28 @@ int rpmsg_net_create_etherdev(struct rpmsg_net_device *rndev)
 	eth->ether_ept = rpmsg_create_ept(eth->rpmsg_chnl, rpmsg_eth_rx_cb,
 					eth, eth->chinfo);
 	if (!eth->ether_ept) {
-		pr_err("%s Failed to create endpoint\n",  __func__);
+		dev_err(dev, "ERROR: rpmsg_create_ept\n");
 		goto out;
 	}
 	eth->rpmsg_mtu = rpmsg_get_mtu(eth->ether_ept);
-	dev->mtu = eth->rpmsg_mtu - ETH_HLEN;
+//	ndev->mtu = eth->rpmsg_mtu - ETH_HLEN;
+	eth->frag = false;
 
-	result = register_netdev(dev);
-	if (result) {
-		pr_err("%s: Failed to register netdev\n", __func__);
-
-	} else {
-		ret = 0;
-		pr_debug("%s: done!\n", __func__);
+	ret = register_netdev(ndev);
+	if (ret < 0 ) {
+		dev_err(dev, "ERROR: register netdev\n");
+		goto out;
 	}
 
-	return 0;
+	dev_info(&ndev->dev, "created mtu(%d,%d)\n", eth->rpmsg_mtu, ndev->mtu);
+	return ret;
 
 out:
-	if(dev) {
-		free_netdev(dev);
+	if(ndev) {
+		free_netdev(ndev);
 	}
 
-	pr_err("%s Failed!\n", __func__);
+	dev_info(dev, "ERROR: Failed!\n");
 	return ret;
 }
 
@@ -314,21 +456,18 @@ static int rpmsg_net_device_probe(struct rpmsg_device *rpdev)
 	rndev = devm_kzalloc(&rpdev->dev, sizeof(struct rpmsg_net_device),
 	                     GFP_KERNEL);
 	if (!rndev) {
-		dev_err(&rpdev->dev, "Failed to allocate memory for rpmsg user dev.\n");
+		dev_err(&rpdev->dev, "Failed to allocate memory for rpmsg netdev\n");
 		return -ENOMEM;
 	}
 
-	dev_info(&rpdev->dev, "new channel: 0x%x -> 0x%x!\n",
-	         rpdev->src, rpdev->dst);
+	dev_info(&rpdev->dev, "new channel!\n");
 
 	memset(rndev, 0x0, sizeof(struct rpmsg_net_device));
 	rndev->rpmsg_chnl = rpdev;
 
 	dev_set_drvdata(&rpdev->dev, rndev);
-	dev_dbg(&rpdev->dev, "%s\n", __func__);
 
 	if (rpmsg_net_create_etherdev(rndev)) {
-		dev_err(&rpdev->dev, "Failed: rpmsg_net\n");
 		goto error2;
 	}
 
@@ -349,7 +488,7 @@ static void rpmsg_net_device_remove(struct rpmsg_device *rpdev)
 
 static struct rpmsg_device_id rpmsg_net_driver_id_table[] =
 {
-	{ .name = "rpmsg-net" },
+	{ .name = RPMSG_ETHERNET_NAME },
 	{},
 };
 
@@ -380,7 +519,7 @@ static void __exit rpmsg_net_exit(void)
 	unregister_rpmsg_driver(&rpmsg_net_driver);
 }
 
-module_init(rpmsg_net_init);
+late_initcall(rpmsg_net_init);
 module_exit(rpmsg_net_exit);
 
 MODULE_AUTHOR("Semidrive Semiconductor");
