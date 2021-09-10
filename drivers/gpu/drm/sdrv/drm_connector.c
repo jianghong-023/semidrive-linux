@@ -186,7 +186,7 @@ static int sdrv_connector_register(struct drm_device *drm,
 				&sdrv_connector_helper_funcs);
 		drm_connector_init(drm, connector,
 				&sdrv_connector_funcs,
-				DRM_MODE_CONNECTOR_LVDS);
+				sdrv_conn->connector_type);
 		drm_mode_connector_attach_encoder(connector, encoder);
 	}
 
