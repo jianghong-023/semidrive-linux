@@ -75,7 +75,7 @@
 		bootargs = "root=/dev/ram0 rootfstype=ramfs highres=1 nr_cpus=1 loglevel=4 console=ttyS0,115200n8 fbcon=map:1 androidboot.mode=normal androidboot.selinux=permissive androidboot.debuggable=1 androidboot.dm_verity=disable init=/init";
 		stdout-path = "serial0";
 		linux,initrd-start = <AP2_BOARD_RAMDISK_MEMBASE>;
-		linux,initrd-end   = <(AP2_BOARD_RAMDISK_MEMBASE + 0x4000000)>;/* 64MB */
+		linux,initrd-end   = <(AP2_BOARD_RAMDISK_MEMBASE + AP2_BOARD_RAMDISK_MEMSIZE)>;/* 64MB */
 	};
 
 	semidrive_bl0: panel0-backlight {
