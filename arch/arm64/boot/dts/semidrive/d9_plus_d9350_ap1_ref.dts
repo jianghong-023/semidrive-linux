@@ -88,7 +88,7 @@
 	};
 
 	chosen {
-		bootargs = "root=/dev/ram0 rootfstype=ramfs highres=1  earlycon loglevel=4 console=ttyS0,115200n8 androidboot.mode=normal androidboot.selinux=permissive androidboot.debuggable=1 androidboot.dm_verity=disable androidboot.vdsp=disable init=/init";
+		bootargs = "root=/dev/ram0 rootfstype=ramfs highres=1  earlycon loglevel=4 console=ttyS0,115200n8 androidboot.mode=normal androidboot.selinux=permissive androidboot.debuggable=1 androidboot.dm_verity=disable androidboot.vdsp=disable init=/init fbcon=map:1 psplash=false";
 		stdout-path = "serial0";
 		linux,initrd-start = <AP1_BOARD_RAMDISK_MEMBASE>;
 		linux,initrd-end   = <AP1_BOARD_RAMDISK_MEMSIZE>;

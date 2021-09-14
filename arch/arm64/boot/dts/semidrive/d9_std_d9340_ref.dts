@@ -101,7 +101,7 @@
 	};
 
 	chosen {
-		bootargs = "skip_initramfs noinitrd root=/dev/mmcblk0p4 rootfstype=ext4 rootwait rw init=/sbin/init highres=1 earlycon loglevel=8 nr_uarts=16 console=ttyS0,115200n8 fbcon=map:1 androidboot.mode=normal androidboot.selinux=permissive androidboot.debuggable=1 androidboot.dm_verity=disable";
+		bootargs = "skip_initramfs noinitrd root=/dev/mmcblk0p4 rootfstype=ext4 rootwait rw init=/sbin/init highres=1 earlycon loglevel=8 nr_uarts=16 console=ttyS0,115200n8 fbcon=map:1 androidboot.mode=normal androidboot.selinux=permissive androidboot.debuggable=1 androidboot.dm_verity=disable psplash=false";
 		stdout-path = "serial0";
 	};
 
