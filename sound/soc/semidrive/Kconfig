@@ -39,7 +39,7 @@ config SND_X9_EVB_MACH
 	  Select Y if you have such device.
 	  If unsure select "N".
 
-config SND_X9_REF_MACH
+config SND_X9_REF_MACH_AK7738
 	tristate "ASoC Audio driver for ref platform x9 with ak7738"
 	depends on ARCH_SEMIDRIVE_X9
 	select SND_SDRV_AFE_I2S_SC
@@ -50,7 +50,7 @@ config SND_X9_REF_MACH
 	  Select Y if you have such device.
 	  If unsure select "N".
 
-config SND_X9_REF04_MACH
+config SND_X9_REF_MACH
 	tristate "ASoC Audio driver for ref platform x9 with dummy codec"
 	depends on ARCH_SEMIDRIVE_X9
 	select SND_SDRV_AFE_I2S_SC

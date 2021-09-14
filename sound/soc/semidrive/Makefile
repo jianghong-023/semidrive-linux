@@ -15,14 +15,14 @@ obj-$(CONFIG_SND_X9_FPGA_MACH) += snd-x9-fpga-mach.o
 snd-x9-evb-mach-objs := x9-evb-mach.o
 obj-$(CONFIG_SND_X9_EVB_MACH) += snd-x9-evb-mach.o
 
-snd-x9-ref-mach-objs := x9-ref-mach-ak7738.o
-obj-$(CONFIG_SND_X9_REF_MACH) += x9-ref-mach-ak7738.o
+snd-x9-ref-mach-ak7738-objs := x9-ref-mach-ak7738.o
+obj-$(CONFIG_SND_X9_REF_MACH_AK7738) += x9-ref-mach-ak7738.o
 
 snd-x9-ref04-mach-ak7738-objs := x9-ref04-mach-ak7738.o
 obj-$(CONFIG_SND_X9_REF04_MACH_AK7738) += x9-ref04-mach-ak7738.o
 
-snd-x9-ref04-mach-objs := x9-ref04-mach.o
-obj-$(CONFIG_SND_X9_REF04_MACH) += x9-ref04-mach.o
+snd-x9-ref-mach-objs := x9-ref-mach.o
+obj-$(CONFIG_SND_X9_REF_MACH) += x9-ref-mach.o
 
 snd-x9-icl02-mach-objs := x9-icl02-mach-ak7738.o
 obj-$(CONFIG_SND_X9_ICL02_MACH) += x9-icl02-mach-ak7738.o

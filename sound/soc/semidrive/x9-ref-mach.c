@@ -1,5 +1,5 @@
 /*
- * x9--mach
+ * x9-ref-mach
  * Copyright (C) 2020 semidrive
  *
  * This program is free software; you can redistribute it and/or modify
@@ -39,7 +39,6 @@
 #include <sound/jack.h>
 #include <linux/of_gpio.h>
 #include <sound/soc.h>
-#include <soc/semidrive/sdrv_boardinfo_hwid.h>
 /* -------------------------------- */
 /* definition of the chip-specific record  dma related ops*/
 struct snd_x9_chip {
@@ -71,37 +70,10 @@ enum snd_x9_ctrl {
 	PCM_PLAYBACK_DEVICE,
 };
 
-static int x9_ref04_late_probe(struct snd_soc_card *card) { return 0; }
+static int x9_ref_late_probe(struct snd_soc_card *card) { return 0; }
 
-/**
- * @brief setup bluetooth to dsp stream.
- *
- */
-static const struct snd_soc_pcm_stream dsp_bt_params = {
-    .formats = SNDRV_PCM_FMTBIT_S16_LE,
-    .rate_min = 16000,
-    .rate_max = 16000,
-    .channels_min = 1,
-    .channels_max = 1,
-};
 
-static const struct snd_soc_ops x9_ref04_ops = {
-
-};
-
-static const struct snd_soc_ops x9_ref04_tas5404_ops = {
-    // .hw_params = x9_tas5404_soc_hw_params,
-};
-
-static const struct snd_soc_ops x9_ref04_tas6424_ops = {
-
-};
-
-static const struct snd_soc_ops x9_ref04_hs_ops = {
-    // .hw_params = x9_ref04_hs_soc_hw_params,
-};
-
-static int x9_ref04_rtd_init(struct snd_soc_pcm_runtime *rtd)
+static int x9_ref_rtd_init(struct snd_soc_pcm_runtime *rtd)
 {
 	int ret;
 	dev_dbg(rtd->dev,
@@ -118,7 +90,7 @@ static int x9_ref04_rtd_init(struct snd_soc_pcm_runtime *rtd)
 	return 0;
 }
 
-static struct snd_soc_dai_link snd_x9_ref04_soc_dai_links[] = {
+static struct snd_soc_dai_link snd_x9_ref_soc_dai_links[] = {
     /* Front End DAI links */
     {
 	.name = "x9_hifi",
@@ -128,29 +100,28 @@ static struct snd_soc_dai_link snd_x9_ref04_soc_dai_links[] = {
 	.platform_name = "30650000.i2s",
 	.codec_name = "snd-soc-dummy",
 	.codec_dai_name = "snd-soc-dummy-dai",
-	.init = x9_ref04_rtd_init,
-	//.dai_fmt = SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_CBM_CFM,
+	.init = x9_ref_rtd_init,
 	.dai_fmt = SND_SOC_DAIFMT_DSP_A | SND_SOC_DAIFMT_CBM_CFM,
     },
 
 };
 /*-Init Machine Driver
  * ---------------------------------------------------------------------*/
-#define SND_X9_REF_MACH_DRIVER "x9-ref04-mach"
+#define SND_X9_REF_MACH_DRIVER "x9-ref-mach"
 #define SND_REF_CARD_NAME SND_X9_REF_MACH_DRIVER
 /*Sound Card Driver
  * ------------------------------------------------------------------------*/
-static struct snd_soc_card x9_ref04_card = {
+static struct snd_soc_card x9_ref_card = {
     .name = SND_REF_CARD_NAME,
-    .dai_link = snd_x9_ref04_soc_dai_links,
-    .num_links = ARRAY_SIZE(snd_x9_ref04_soc_dai_links),
-    .late_probe = x9_ref04_late_probe,
+    .dai_link = snd_x9_ref_soc_dai_links,
+    .num_links = ARRAY_SIZE(snd_x9_ref_soc_dai_links),
+    .late_probe = x9_ref_late_probe,
 };
 
 /*ALSA machine driver probe functions.*/
-static int x9_ref04_probe(struct platform_device *pdev)
+static int x9_ref_probe(struct platform_device *pdev)
 {
-	struct snd_soc_card *card = &x9_ref04_card;
+	struct snd_soc_card *card = &x9_ref_card;
 	struct device *dev = &pdev->dev;
 
 	int ret;
@@ -175,59 +146,59 @@ static int x9_ref04_probe(struct platform_device *pdev)
 	return ret;
 }
 
-static int x9_ref04_remove(struct platform_device *pdev)
+static int x9_ref_remove(struct platform_device *pdev)
 {
 	snd_card_free(platform_get_drvdata(pdev));
-	dev_info(&pdev->dev, "%s x9_ref04_removed\n", __func__);
+	dev_info(&pdev->dev, "%s x9_ref_removed\n", __func__);
 	return 0;
 }
 
 #ifdef CONFIG_PM
 /*pm suspend operation */
-static int snd_x9_ref04_suspend(struct platform_device *pdev,
+static int snd_x9_ref_suspend(struct platform_device *pdev,
 				pm_message_t state)
 {
 	dev_info(&pdev->dev, "%s snd_x9_suspend\n", __func__);
 	return 0;
 }
 /*pm resume operation */
-static int snd_x9_ref04_resume(struct platform_device *pdev)
+static int snd_x9_ref_resume(struct platform_device *pdev)
 {
 	dev_info(&pdev->dev, "%s snd_x9_resume\n", __func__);
 	return 0;
 }
 #endif
-static const struct of_device_id x9_ref04_dt_match[] = {
+static const struct of_device_id x9_ref_dt_match[] = {
     {
-	.compatible = "semidrive,x9-ref04-mach",
+	.compatible = "semidrive,x9-ref-mach",
     },
     {},
 };
 
-MODULE_DEVICE_TABLE(of, x9_ref04_dt_match);
+MODULE_DEVICE_TABLE(of, x9_ref_dt_match);
 
-static struct platform_driver x9_ref04_mach_driver = {
+static struct platform_driver x9_ref_mach_driver = {
     .driver =
 	{
 	    .name = SND_X9_REF_MACH_DRIVER,
-	    .of_match_table = x9_ref04_dt_match,
+	    .of_match_table = x9_ref_dt_match,
 #ifdef CONFIG_PM
 	    .pm = &snd_soc_pm_ops,
 #endif
 		.probe_type = PROBE_PREFER_ASYNCHRONOUS,
 	},
 
-    .probe = x9_ref04_probe,
-    .remove = x9_ref04_remove,
+    .probe = x9_ref_probe,
+    .remove = x9_ref_remove,
 #ifdef CONFIG_PM
-    .suspend = snd_x9_ref04_suspend,
-    .resume = snd_x9_ref04_resume,
+    .suspend = snd_x9_ref_suspend,
+    .resume = snd_x9_ref_resume,
 #endif
 };
 
-module_platform_driver(x9_ref04_mach_driver);
+module_platform_driver(x9_ref_mach_driver);
 
 MODULE_AUTHOR("Shao Yi <yi.shao@semidrive.com>");
-MODULE_DESCRIPTION("X9 ALSA SoC ref 04 machine driver");
+MODULE_DESCRIPTION("X9 ALSA SoC ref machine driver");
 MODULE_LICENSE("GPL");
-MODULE_ALIAS("platform:x9 ref 04 alsa mach");
+MODULE_ALIAS("platform:x9 ref alsa mach");
