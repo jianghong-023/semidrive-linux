@@ -540,26 +540,29 @@ PVRSRV_ERROR InitDVFS(PPVRSRV_DEVICE_NODE psDeviceNode)
 		goto err_exit;
 	}
 
-	img_devfreq_dev_profile.initial_freq = min_freq;
 	img_devfreq_dev_profile.polling_ms = psDVFSDeviceCfg->ui32PollMs;
+	if (psDVFSDeviceCfg->ui32PollMs > 0) {
+		img_devfreq_dev_profile.initial_freq = min_freq;
+		psRGXTimingInfo->ui32CoreClockSpeed = min_freq;
 
-	psRGXTimingInfo->ui32CoreClockSpeed = min_freq;
-
-	psDVFSDeviceCfg->pfnSetFrequency(min_freq);
-	psDVFSDeviceCfg->pfnSetVoltage(min_volt);
-
+		psDVFSDeviceCfg->pfnSetFrequency(min_freq);
+		psDVFSDeviceCfg->pfnSetVoltage(min_volt);
+	} else {
+		img_devfreq_dev_profile.initial_freq = max_freq;
+		psRGXTimingInfo->ui32CoreClockSpeed = max_freq;
+	}
 	psDVFSDevice->data.upthreshold = psDVFSGovernorCfg->ui32UpThreshold;
 	psDVFSDevice->data.downdifferential = psDVFSGovernorCfg->ui32DownDifferential;
-
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 16, 0))
 	psDVFSDevice->psDevFreq = devm_devfreq_add_device(psDev,
+
 													  &img_devfreq_dev_profile,
-													  "simple_ondemand",
+													  SD_DVFS_GOV,
 													  &psDVFSDevice->data);
 #else
 	psDVFSDevice->psDevFreq = devfreq_add_device(psDev,
 												 &img_devfreq_dev_profile,
-												 "simple_ondemand",
+												 SD_DVFS_GOV,
 												 &psDVFSDevice->data);
 #endif
 

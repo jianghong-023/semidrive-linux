@@ -21,7 +21,7 @@
 #define WAIT_TRY_COUNT                           (10000)
 
 /* unit ms, timeout interval for DVFS detection */
-#define SD_DVFS_SWITCH_INTERVAL  100
+#define SD_DVFS_SWITCH_INTERVAL  0
 
 #if defined(__linux__)
 #define SYS_RGX_DEV_NAME    "rgxkunlun"

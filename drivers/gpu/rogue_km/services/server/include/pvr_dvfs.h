@@ -91,6 +91,11 @@ typedef struct _IMG_DVFS_DEVICE_CFG_
 } IMG_DVFS_DEVICE_CFG;
 
 #if defined(SUPPORT_LINUX_DVFS)
+#if defined(CONFIG_DEVFREQ_GOV_USERSPACE)
+#define SD_DVFS_GOV "userspace"
+#else
+#define SD_DVFS_GOV "simple_ondemand"
+#endif
 typedef struct _IMG_DVFS_GOVERNOR_
 {
 	IMG_BOOL			bEnabled;
