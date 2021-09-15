@@ -39,6 +39,11 @@ config VIDEO_SEMIDRIVE_AR0132_AP0101
 	tristate "AR0132 for Semidrive"
 	depends on VIDEO_SEMIDRIVE
 
+config VIDEO_SEMIDRIVE_NEXTCHIP_N4
+	tristate "nextchip n4 for Semidrive"
+	depends on VIDEO_SEMIDRIVE
+	default n
+
 config VIDEO_SEMIDRIVE_DESERS_ADAPTIVE
 	tristate "self-adaptive semidrive deser driver"
 	depends on VIDEO_SEMIDRIVE

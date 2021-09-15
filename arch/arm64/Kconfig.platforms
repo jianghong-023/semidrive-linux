@@ -290,5 +290,9 @@ config ARCH_SEMIDRIVE_V9
         bool "Semidrive V9 SOC Family"
         help
           This enables support for Semidrive v9 SOC  Family
+config ARCH_SEMIDRIVE_D9
+        bool "Semidrive D9 SOC Family"
+        help
+          This enables support for Semidrive D9 SOC  Family
 endchoice
 endmenu

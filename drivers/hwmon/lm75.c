@@ -58,6 +58,7 @@ enum lm75_type {		/* keep sorted in alphabetical order */
 	tmp275,
 	tmp75,
 	tmp75c,
+	sgm452
 };
 
 /* Addresses scanned */
@@ -124,6 +125,7 @@ static int lm75_read(struct device *dev, enum hwmon_sensor_types type,
 			return err;
 
 		*val = lm75_reg_to_mc(regval, data->resolution);
+
 		break;
 	default:
 		return -EINVAL;
@@ -373,6 +375,12 @@ lm75_probe(struct i2c_client *client, const struct i2c_device_id *id)
 		data->resolution = 12;
 		data->sample_time = MSEC_PER_SEC / 4;
 		break;
+	case sgm452:
+		set_mask |= 1 << 2;		/* os polarity */
+		clr_mask |= 1 << 2;
+		data->resolution = 12;
+		data->sample_time = MSEC_PER_SEC / 2;
+		break;
 	}
 
 	/* configure as specified */
@@ -426,6 +434,7 @@ static const struct i2c_device_id lm75_ids[] = {
 	{ "tmp275", tmp275, },
 	{ "tmp75", tmp75, },
 	{ "tmp75c", tmp75c, },
+	{ "sgm452", sgm452, },
 	{ /* LIST END */ }
 };
 MODULE_DEVICE_TABLE(i2c, lm75_ids);
@@ -514,6 +523,10 @@ static const struct of_device_id lm75_of_match[] = {
 	{
 		.compatible = "ti,tmp75c",
 		.data = (void *)tmp75c
+	},
+	{
+		.compatible = "sgmicro,sgm452",
+		.data = (void *)sgm452
 	},
 	{ },
 };

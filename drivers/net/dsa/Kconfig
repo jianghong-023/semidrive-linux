@@ -42,6 +42,7 @@ config NET_DSA_MV88E6060
 source "drivers/net/dsa/microchip/Kconfig"
 
 source "drivers/net/dsa/mv88e6xxx/Kconfig"
+source "drivers/net/dsa/eth_switch_9896c/Kconfig"
 
 config NET_DSA_QCA8K
 	tristate "Qualcomm Atheros QCA8K Ethernet switch family support"

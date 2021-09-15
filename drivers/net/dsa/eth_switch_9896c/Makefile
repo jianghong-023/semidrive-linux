@@ -1,0 +1,1 @@
+obj-$(CONFIG_ETH_9896C_SWITCH)	+= eth_9896c_switch.o

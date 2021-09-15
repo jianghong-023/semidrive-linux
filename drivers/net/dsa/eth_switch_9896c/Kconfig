@@ -1,0 +1,6 @@
+config ETH_9896C_SWITCH
+    tristate "external support eth switch ksz9896c"
+    default n
+    depends on I2C
+    help
+    This is semidrive external external switch driver.

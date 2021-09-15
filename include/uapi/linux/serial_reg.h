@@ -153,6 +153,27 @@
 
 #define UART_SCR	7	/* I/O: Scratch Register */
 
+/* for rs485 */
+#define UART_TCR_DW	43
+#define UART_TCR_DW_XFER_MODE	0x18 /* 0: full 1: soft half 2: hard half */
+#define UART_TCR_DW_DE_POL 	0x04  /* de polarity */
+#define UART_TCR_DW_RE_POL 	0x02  /* re polarity */
+#define UART_TCR_DW_RS485_EN	0x01
+
+#define UART_DE_EN	44	/* Out:  DE Enable Register */
+#define UART_DE_EN_CTL		0x01 /* DE Enable Control bit */
+
+#define UART_RE_EN	45	/* Out:  RE Enable Register */
+#define UART_RE_EN_CTL		0x01 /* RE Enable Control bit */
+
+#define UART_DET	46
+#define UART_DET_DE_ASSERTION_TIME		0xFF /* bit 0-7 Driver Enable assertion time  Access: RW*/
+#define UART_DET_DE_DEASSERTION_TIME    0XFF0000 /* bit 16-23 Driver Enable de-assertion time  Access: RW*/
+
+#define UART_TAT	47
+#define UART_TAT_DE_TO_RE		0xFFFF /* Driver Enable to Receiver Enable TurnAround time */
+#define UART_TAT_RE_TO_DE		0xFFFF0000 /* Receiver Enable to Driver Enable TurnAround time */
+
 /*
  * DLAB=1
  */

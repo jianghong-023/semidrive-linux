@@ -26,6 +26,7 @@
 #include <linux/regulator/consumer.h>
 #include <linux/pm_runtime.h>
 #include <linux/of.h>
+#include <linux/gpio/consumer.h>
 
 #include <linux/leds.h>
 
@@ -1808,9 +1809,20 @@ void sdhci_set_power_noreg(struct sdhci_host *host, unsigned char mode,
 }
 EXPORT_SYMBOL_GPL(sdhci_set_power_noreg);
 
+void sdhci_sdrv_pwr_rst(struct sdhci_host *host) {
+	if (host->pwr_gpio) {
+		gpiod_set_value(host->pwr_gpio, 1);
+		udelay(100);
+		gpiod_set_value(host->pwr_gpio, 0);
+	}
+}
+
 void sdhci_set_power(struct sdhci_host *host, unsigned char mode,
 		     unsigned short vdd)
 {
+	if (mode == MMC_POWER_UP)
+		sdhci_sdrv_pwr_rst(host);
+
 	if (IS_ERR(host->mmc->supply.vmmc))
 		sdhci_set_power_noreg(host, mode, vdd);
 	else
@@ -2208,7 +2220,7 @@ int sdhci_start_signal_voltage_switch(struct mmc_host *mmc,
 		ctrl &= ~SDHCI_CTRL_VDD_180;
 		sdhci_writew(host, ctrl, SDHCI_HOST_CONTROL2);
 
-		if (!IS_ERR(mmc->supply.vqmmc)) {
+		if (!IS_ERR(mmc->supply.vqmmc) && (mmc->caps2 & MMC_CAP2_NO_SD)) {
 			ret = mmc_regulator_set_vqmmc(mmc, ios);
 			if (ret) {
 				pr_warn("%s: Switching to 3.3V signalling voltage failed\n",
@@ -4007,7 +4019,7 @@ int sdhci_setup_host(struct sdhci_host *host)
 
 		/* In eMMC case vqmmc might be a fixed 1.8V regulator */
 		if (!regulator_is_supported_voltage(mmc->supply.vqmmc, 2700000,
-						    3600000))
+						    3600000) && (mmc->caps2 & MMC_CAP2_NO_SD))
 			host->flags &= ~SDHCI_SIGNALING_330;
 
 		if (ret) {
@@ -4311,6 +4323,12 @@ int __sdhci_add_host(struct sdhci_host *host)
 		pr_err("%s: Failed to register LED device: %d\n",
 		       mmc_hostname(mmc), ret);
 		goto unirq;
+	}
+
+	if (!(mmc->caps & MMC_CAP_NONREMOVABLE)) {
+		host->pwr_gpio = devm_gpiod_get(mmc->parent, "pwr", GPIOD_OUT_LOW);
+		if (IS_ERR(host->pwr_gpio))
+			goto unled;
 	}
 
 	mmiowb();

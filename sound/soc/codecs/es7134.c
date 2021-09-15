@@ -24,6 +24,16 @@
  * The everest 7134 is a very simple DA converter with no register
  */
 
+static int es7134_set_sysclk(struct snd_soc_dai *dai, int clk_id,
+			     unsigned int freq, int dir)
+{
+	if (dir == SND_SOC_CLOCK_IN && clk_id == 0) {
+		return 0;
+	}
+
+	return -ENOTSUPP;
+}
+
 static int es7134_set_fmt(struct snd_soc_dai *codec_dai, unsigned int fmt)
 {
 	fmt &= (SND_SOC_DAIFMT_FORMAT_MASK | SND_SOC_DAIFMT_INV_MASK |
@@ -40,6 +50,7 @@ static int es7134_set_fmt(struct snd_soc_dai *codec_dai, unsigned int fmt)
 
 static const struct snd_soc_dai_ops es7134_dai_ops = {
 	.set_fmt	= es7134_set_fmt,
+	.set_sysclk	= es7134_set_sysclk,
 };
 
 static struct snd_soc_dai_driver es7134_dai = {
@@ -48,7 +59,11 @@ static struct snd_soc_dai_driver es7134_dai = {
 		.stream_name = "Playback",
 		.channels_min = 2,
 		.channels_max = 2,
-		.rates = SNDRV_PCM_RATE_8000_192000,
+		.rates = (SNDRV_PCM_RATE_8000_48000 |
+			  SNDRV_PCM_RATE_88200      |
+			  SNDRV_PCM_RATE_96000      |
+			  SNDRV_PCM_RATE_176400     |
+			  SNDRV_PCM_RATE_192000),
 		.formats = (SNDRV_PCM_FMTBIT_S16_LE  |
 			    SNDRV_PCM_FMTBIT_S18_3LE |
 			    SNDRV_PCM_FMTBIT_S20_3LE |

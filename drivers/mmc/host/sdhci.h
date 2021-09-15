@@ -572,6 +572,7 @@ struct sdhci_host {
 	unsigned int            ocr_avail_sd;
 	unsigned int            ocr_avail_mmc;
 	u32 ocr_mask;		/* available voltages */
+	struct gpio_desc	*pwr_gpio;
 
 	unsigned		timing;		/* Current timing */
 

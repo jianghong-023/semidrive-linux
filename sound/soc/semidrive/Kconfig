@@ -137,6 +137,28 @@ config SND_G9_REF_MACH
 	  Select Y if you have such device.
 	  If unsure select "N".
 
+config SND_D9_REF_MACH_ES7243E
+	tristate "ASoC Audio driver for ref platform d9 with 2CH adc MIC es7243e"
+	depends on ARCH_SEMIDRIVE_D9
+	select SND_SDRV_AFE_I2S_SC
+	select SND_SOC_GENERIC_DMAENGINE_PCM
+	help
+	  This adds support for ASoC machine driver for SEMI_DRIVE D9
+	  platforms with 2CH adc MIC.
+	  Select Y if you have such device.
+	  If unsure select "N".
+
+config SND_D9_REF_MACH_ES7144
+	tristate "ASoC Audio driver for ref platform d9 with dac headphone es7144"
+	depends on ARCH_SEMIDRIVE_D9
+	select SND_SDRV_AFE_I2S_SC
+	select SND_SOC_GENERIC_DMAENGINE_PCM
+	help
+	  This adds support for ASoC machine driver for SEMI_DRIVE D9
+	  platforms with dac headphone.
+	  Select Y if you have such device.
+	  If unsure select "N".
+
 config SND_X9_CS42888
 	tristate "ASoC Audio driver for x9 with cs24888 codec"
 	depends on ARCH_SEMIDRIVE_X9

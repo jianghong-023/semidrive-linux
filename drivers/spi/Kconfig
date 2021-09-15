@@ -795,6 +795,12 @@ config SPI_TLE62X0
 	  sysfs interface, with each line presented as a kind of GPIO
 	  exposing both switch control and diagnostic feedback.
 
+config SPI_IS62W
+	tristate "SPI iram is62w"
+	default n
+	help
+	  SPI slave handler is62w
+
 #
 # Add new SPI protocol masters in alphabetical order above this line
 #

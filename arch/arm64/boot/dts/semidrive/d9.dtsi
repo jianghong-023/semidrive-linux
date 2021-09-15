@@ -307,6 +307,7 @@
 			compatible = "sdrv,sdrv-adc";
 			reg = <0 0x30860000 0 0x10000>;
 			interrupts = <GIC_SPI 208 IRQ_TYPE_LEVEL_HIGH>;
+            		#io-channel-cells = <1>;
 			clocks = <&ADC>;
 			clock-names = "adc-clk";
 			status = "disabled";
@@ -1067,7 +1068,7 @@
 			interrupts = <GIC_SPI 114 IRQ_TYPE_LEVEL_HIGH>, <GIC_SPI 115 IRQ_TYPE_LEVEL_HIGH>;
 			sdrv,scr_signals_ddr = <SCR_SEC__mshc3_ddr_mode>;
 			vmmc-supply = <&vmmc_3v3>;
-			vqmmc-supply = <&vqmmc_3v3>;
+			vqmmc-supply = <&vqmmc_1v8>;
 			status = "disabled";
 		};
 
@@ -1283,21 +1284,6 @@
 			status = "disabled";
 		};
 
-		dcf_property:dcf_property@0 {
-			compatible = "dcf,property";
-			status = "disabled";
-		};
-
-		dcf_vircan0:dcf_vircan@0 {
-			compatible = "dcf,vircan0";
-			status = "disabled";
-		};
-
-		dcf_vircan1:dcf_vircan@1 {
-			compatible = "dcf,vircan1";
-			status = "disabled";
-		};
-
 		g2d: g2d@30c90000 {
 			compatible = "semidrive,g2d";
 			reg = <0x00 0x30c90000 0x00 0x10000>;
@@ -1494,7 +1480,7 @@
 				reset-gpios = <&port4a 27 GPIO_ACTIVE_LOW> ;//ospidata1 io27 ae24
 				eth_phy1: ethernet-phy@1 {
 					compatible = "ethernet-phy-ieee802.3-c22";
-					reg = <3>;
+					reg = <0>;
 				};
 			};
 		};
@@ -1505,7 +1491,7 @@
 			interrupts = <GIC_SPI 105 IRQ_TYPE_LEVEL_HIGH>;
 			clocks = <&ENET2_TX>;
 			clock-names = "stmmaceth";
-			phy-handle = <&eth_phy2>;
+			/*phy-handle = <&eth_phy2>;*/
 			phy-mode = "rgmii";
 			snps,force_sf_dma_mode;
 			snps,force_disable_asp;
@@ -1513,7 +1499,7 @@
 			tx-fifo-depth = <0x2000>;
 			status = "disabled";
 
-			mdio2: mdio@2 {
+			/*mdio2: mdio@2 {
 				compatible = "snps,dwmac-mdio";
 				#address-cells = <1>;
 				#size-cells = <0>;
@@ -1522,7 +1508,12 @@
 					compatible = "ethernet-phy-ieee802.3-c45";
 					reg = <7>;
 				};
-			};
+			};*/
+		fixed-link {
+			speed = <1000>;
+			full-duplex;
+
+		   };
 		};
 
 		gpio4: gpio@30420000 {
@@ -1717,7 +1708,7 @@
 			ranges = <0x02000000 0x0 0x00000000
 				  0x5 0x0
 				  0x0 0x8000000>;
-			num-lanes = <1>;
+			num-lanes = <2>;
 
 			#interrupt-cells = <1>;
 			interrupts = <GIC_SPI 78 IRQ_TYPE_LEVEL_HIGH>;

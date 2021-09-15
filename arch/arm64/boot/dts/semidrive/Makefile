@@ -49,6 +49,10 @@ dtb-$(CONFIG_ARCH_SEMIDRIVE_X9) += x9e_ms_native_ivi_avm.dtb
 dtb-$(CONFIG_ARCH_SEMIDRIVE_X9) += x9e_ref_native_linux_avm.dtb
 dtb-$(CONFIG_ARCH_SEMIDRIVE_X9) += x9e_refa04_native_linux_avm.dtb
 dtb-$(CONFIG_ARCH_SEMIDRIVE_X9) += x9_high_ref_native_serdes_nobt.dtb
+dtb-$(CONFIG_ARCH_SEMIDRIVE_D9) += d9_lite_d9310_ref.dtb
+dtb-$(CONFIG_ARCH_SEMIDRIVE_D9) += d9_std_d9340_ref.dtb
+dtb-$(CONFIG_ARCH_SEMIDRIVE_D9) += d9_plus_d9350_ap1_ref.dtb
+dtb-$(CONFIG_ARCH_SEMIDRIVE_D9) += d9_plus_d9350_ap2_ref.dtb
 #subdir-y	+= archive
 
 always		:= $(dtb-y)

@@ -78,10 +78,10 @@
 };
 
 &I2C_SEC0_5 {
-	status = "disabled";
+	status = "okay";
 };
 &I2C_SEC0_7 {
-	status = "disabled";
+	status = "okay";
 };
 &I2C_SEC0_9 {
 	status = "okay";
@@ -124,7 +124,7 @@
 };
 
 &SPI_SEC1 {
-	status = "disabled";
+	status = "okay";
 };
 
 &SPI_SEC0_5 {
@@ -134,7 +134,7 @@
 	status = "disabled";
 };
 &SPI_SEC1_6 {
-	status = "disabled";
+	status = "okay";
 };
 &SPI_SEC1_8 {
 	status = "disabled";
@@ -289,19 +289,19 @@
 };
 
 &I2S_SC3 {
-	status = "disabled";
+	status = "okay";
 };
 
 &I2S_SC4 {
-	status = "disabled";
+	status = "okay";
 };
 
 &I2S_SC5 {
-	status = "okay";
+	status = "disabled";
 };
 
 &I2S_SC6 {
-	status = "okay";
+	status = "disabled";
 };
 
 &I2S_SC7 {
@@ -309,7 +309,7 @@
 };
 
 &I2S_SC8 {
-	status = "okay";
+	status = "disabled";
 };
 
 &CSI_MCLK1 {

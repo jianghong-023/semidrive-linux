@@ -13,6 +13,30 @@
 		vsync-len = <10>;
 	};
 
+	s720x576_50hz: vesa_720x576@50 {
+		clock-frequency = <27000000>;
+		hactive = <720>;
+		vactive = <576>;
+		hback-porch = <68>;
+		hfront-porch = <12>;
+		vback-porch = <39>;
+		vfront-porch = <5>;
+		hsync-len = <64>;
+		vsync-len = <5>;
+	};
+
+	s720x480: vesa_720x480@60 {
+		clock-frequency = <27000000>;
+		hactive = <720>;
+		vactive = <480>;
+		hback-porch = <60>;
+		hfront-porch = <16>;
+		vback-porch = <30>;
+		vfront-porch = <9>;
+		hsync-len = <62>;
+		vsync-len = <6>;
+	};
+
 	s1280x600: vesa_1280x600@60 {
 		clock-frequency = <42612000>;
 		hactive = <1280>;
@@ -113,6 +137,18 @@
 		width-mm = <292>;
 		height-mm = <109>;
 		vrefresh = <51>;
+	};
+
+	vesa_fhd1920x1080: vesa_1920x1080@60 {
+		clock-frequency = <148500000>;
+		hactive = <1920>;
+		vactive = <1080>;
+		hback-porch = <148>;
+		hfront-porch = <88>;
+		vback-porch = <36>;
+		vfront-porch = <4>;
+		hsync-len = <44>;
+		vsync-len = <5>;
 	};
 
 	fhd1920x1080: z1_1920x1080@60 {

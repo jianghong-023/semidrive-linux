@@ -615,7 +615,7 @@ static int sdrv_gpio_add_port(struct sdrv_gpio *gpio,
 	dirout = gpio->regs + GPIO_DIR_PORT_X(pp->idx);
 
 	err = bgpio_init(&port->gc, gpio->dev, 4, dat, set, NULL, dirout,
-			 NULL, false);
+			 NULL, BGPIOF_READ_OUTPUT_REG_SET);
 	if (err) {
 		dev_err(gpio->dev, "failed to init gpio chip for port%d\n",
 			port->idx);
