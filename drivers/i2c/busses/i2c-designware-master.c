@@ -446,8 +446,10 @@ i2c_dw_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num)
 		goto done_nolock;
 
 	ret = i2c_dw_wait_bus_not_busy(dev);
-	if (ret < 0)
+	if (ret < 0) {
+		dev_err(dev->dev,"bus busy, ret=%d, addr=%x\n", ret, dev->msgs[0].addr);
 		goto done;
+	}
 
 	/* Start the transfers */
 	i2c_dw_xfer_init(dev);
@@ -477,6 +479,7 @@ i2c_dw_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num)
 
 	if (dev->msg_err) {
 		ret = dev->msg_err;
+		dev_err(dev->dev,"msg_err, ret=%d, addr=%x\n", ret, dev->msgs[0].addr);
 		goto done;
 	}
 
@@ -489,12 +492,14 @@ i2c_dw_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num)
 	/* We have an error */
 	if (dev->cmd_err == DW_IC_ERR_TX_ABRT) {
 		ret = i2c_dw_handle_tx_abort(dev);
+		dev_err(dev->dev,"cmd_err, ret=%d, addr=%x\n", ret, dev->msgs[0].addr);
 		goto done;
 	}
 
 	if (dev->status)
 		dev_err(dev->dev,
-			"transfer terminated early - interrupt latency too high?\n");
+			"status=%u, addr=%x, transfer terminated early - interrupt latency too high?\n",
+			dev->status, dev->msgs[0].addr);
 
 	ret = -EIO;
 
