@@ -1820,6 +1820,7 @@ static void dwc3_gadget_enable_irq(struct dwc3 *dwc)
 			DWC3_DEVTEN_EVNTOVERFLOWEN |
 			DWC3_DEVTEN_CMDCMPLTEN |
 			DWC3_DEVTEN_ERRTICERREN |
+			DWC3_DEVTEN_EOPFEN |
 			DWC3_DEVTEN_WKUPEVTEN |
 			DWC3_DEVTEN_CONNECTDONEEN |
 			DWC3_DEVTEN_USBRSTEN |
@@ -2694,6 +2695,7 @@ static void dwc3_gadget_reset_interrupt(struct dwc3 *dwc)
 	u32			reg;
 
 	dwc->connected = true;
+	dwc->link_state = DWC3_LINK_STATE_SS_DIS;
 
 	/*
 	 * WORKAROUND: DWC3 revisions <1.88a have an issue which
