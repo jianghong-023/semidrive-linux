@@ -46,15 +46,16 @@ static void cryptodev_complete(struct crypto_async_request *req, int err)
 {
 	struct cryptodev_result *res = req->data;
 
-	if (err == -EINPROGRESS)
+	if (err == -EINPROGRESS) {
 		return;
+	}
 
 	res->err = err;
 	complete(&res->completion);
 }
 
 int cryptodev_get_cipher_keylen(unsigned int *keylen, struct session_op *sop,
-		int aead)
+								int aead)
 {
 	/*
 	 * For blockciphers (AES-CBC) or non-composite aead ciphers (like AES-GCM),
@@ -65,12 +66,15 @@ int cryptodev_get_cipher_keylen(unsigned int *keylen, struct session_op *sop,
 	 */
 	unsigned int klen = sop->keylen;
 
-	if (unlikely(sop->keylen > CRYPTO_CIPHER_MAX_KEY_LEN))
+	if (unlikely(sop->keylen > CRYPTO_CIPHER_MAX_KEY_LEN)) {
 		return -EINVAL;
+	}
 
 	if (aead && sop->mackeylen) {
-		if (unlikely(sop->mackeylen > CRYPTO_HMAC_MAX_KEY_LEN))
+		if (unlikely(sop->mackeylen > CRYPTO_HMAC_MAX_KEY_LEN)) {
 			return -EINVAL;
+		}
+
 		klen += sop->mackeylen;
 		klen += RTA_SPACE(sizeof(struct crypto_authenc_key_param));
 	}
@@ -109,16 +113,20 @@ int cryptodev_get_cipher_key(uint8_t *key, struct session_op *sop, int aead)
 
 		/* Advance key pointer eight bytes and copy the hmac key */
 		key += RTA_SPACE(sizeof(*param));
+
 		if (unlikely(copy_from_user(key, sop->mackey, sop->mackeylen))) {
 			ret = -EFAULT;
 			goto error;
 		}
+
 		/* Advance key pointer past the hmac key */
 		key += sop->mackeylen;
 	}
+
 	/* now copy the blockcipher key */
-	if (unlikely(copy_from_user(key, sop->key, sop->keylen)))
+	if (unlikely(copy_from_user(key, sop->key, sop->keylen))) {
 		ret = -EFAULT;
+	}
 
 error:
 	return ret;
@@ -126,12 +134,12 @@ error:
 
 /* Was correct key length supplied? */
 static int check_key_size(size_t keylen, const char *alg_name,
-			  unsigned int min_keysize, unsigned int max_keysize)
+						  unsigned int min_keysize, unsigned int max_keysize)
 {
 	if (max_keysize > 0 && unlikely((keylen < min_keysize) ||
-					(keylen > max_keysize))) {
+									(keylen > max_keysize))) {
 		pr_err("Wrong keylen '%zu' for algorithm '%s'. Use %u to %u.",
-		       keylen, alg_name, min_keysize, max_keysize);
+			   keylen, alg_name, min_keysize, max_keysize);
 		return -EINVAL;
 	}
 
@@ -139,7 +147,7 @@ static int check_key_size(size_t keylen, const char *alg_name,
 }
 
 int cryptodev_cipher_init(struct cipher_data *out, const char *alg_name,
-				uint8_t *keyp, size_t keylen, int stream, int aead)
+						  uint8_t *keyp, size_t keylen, int stream, int aead)
 {
 	int ret;
 
@@ -152,6 +160,7 @@ int cryptodev_cipher_init(struct cipher_data *out, const char *alg_name,
 #endif
 
 		out->async.s = cryptodev_crypto_alloc_blkcipher(alg_name, 0, 0);
+
 		if (unlikely(IS_ERR(out->async.s))) {
 			pr_err("Failed to load cipher %s", alg_name);
 			return -EINVAL;
@@ -160,42 +169,47 @@ int cryptodev_cipher_init(struct cipher_data *out, const char *alg_name,
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 8, 0))
 		tfm = crypto_skcipher_tfm(out->async.s);
 #if (LINUX_VERSION_CODE <= KERNEL_VERSION(5, 4, 0))
+
 		if ((tfm->__crt_alg->cra_type == &crypto_ablkcipher_type)
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 0, 0))
-		    || (tfm->__crt_alg->cra_type == &crypto_givcipher_type)
+				|| (tfm->__crt_alg->cra_type == &crypto_givcipher_type)
 #endif
-							) {
+		   ) {
 			struct ablkcipher_alg *alg;
-
 			alg = &tfm->__crt_alg->cra_ablkcipher;
 			min_keysize = alg->min_keysize;
 			max_keysize = alg->max_keysize;
-		} else
+		}
+		else
 #endif
 		{
 			struct skcipher_alg *alg;
-
 			alg = crypto_skcipher_alg(out->async.s);
 			min_keysize = alg->min_keysize;
 			max_keysize = alg->max_keysize;
 		}
+
 #else
 		alg = crypto_ablkcipher_alg(out->async.s);
 		min_keysize = alg->min_keysize;
 		max_keysize = alg->max_keysize;
 #endif
 		ret = check_key_size(keylen, alg_name, min_keysize,
-				     max_keysize);
-		if (ret)
+							 max_keysize);
+
+		if (ret) {
 			goto error;
+		}
 
 		out->blocksize = cryptodev_crypto_blkcipher_blocksize(out->async.s);
 		out->ivsize = cryptodev_crypto_blkcipher_ivsize(out->async.s);
 		out->alignmask = cryptodev_crypto_blkcipher_alignmask(out->async.s);
 
 		ret = cryptodev_crypto_blkcipher_setkey(out->async.s, keyp, keylen);
-	} else {
+	}
+	else {
 		out->async.as = crypto_alloc_aead(alg_name, 0, 0);
+
 		if (unlikely(IS_ERR(out->async.as))) {
 			pr_err("Failed to load cipher %s", alg_name);
 			return -EINVAL;
@@ -204,23 +218,22 @@ int cryptodev_cipher_init(struct cipher_data *out, const char *alg_name,
 		out->blocksize = crypto_aead_blocksize(out->async.as);
 		out->ivsize = crypto_aead_ivsize(out->async.as);
 		out->alignmask = crypto_aead_alignmask(out->async.as);
-
 		ret = crypto_aead_setkey(out->async.as, keyp, keylen);
 	}
 
 	if (unlikely(ret)) {
-		pr_err("Setting key failed for %s-%zu.", alg_name, keylen*8);
+		pr_err("Setting key failed for %s-%zu.", alg_name, keylen * 8);
 		ret = -EINVAL;
 		goto error;
 	}
 
 	out->stream = stream;
 	out->aead = aead;
-
 	init_completion(&out->async.result.completion);
 
 	if (aead == 0) {
 		out->async.request = cryptodev_blkcipher_request_alloc(out->async.s, GFP_KERNEL);
+
 		if (unlikely(!out->async.request)) {
 			pr_err("error allocating async crypto request");
 			ret = -ENOMEM;
@@ -228,10 +241,12 @@ int cryptodev_cipher_init(struct cipher_data *out, const char *alg_name,
 		}
 
 		cryptodev_blkcipher_request_set_callback(out->async.request,
-					CRYPTO_TFM_REQ_MAY_BACKLOG,
-					cryptodev_complete, &out->async.result);
-	} else {
+				CRYPTO_TFM_REQ_MAY_BACKLOG,
+				cryptodev_complete, &out->async.result);
+	}
+	else {
 		out->async.arequest = aead_request_alloc(out->async.as, GFP_KERNEL);
+
 		if (unlikely(!out->async.arequest)) {
 			pr_err("error allocating async crypto request");
 			ret = -ENOMEM;
@@ -239,21 +254,26 @@ int cryptodev_cipher_init(struct cipher_data *out, const char *alg_name,
 		}
 
 		aead_request_set_callback(out->async.arequest,
-					CRYPTO_TFM_REQ_MAY_BACKLOG,
-					cryptodev_complete, &out->async.result);
+								  CRYPTO_TFM_REQ_MAY_BACKLOG,
+								  cryptodev_complete, &out->async.result);
 	}
 
 	out->init = 1;
 	return 0;
 error:
+
 	if (aead == 0) {
 		cryptodev_blkcipher_request_free(out->async.request);
 		cryptodev_crypto_free_blkcipher(out->async.s);
-	} else {
-		if (out->async.arequest)
+	}
+	else {
+		if (out->async.arequest) {
 			aead_request_free(out->async.arequest);
-		if (out->async.as)
+		}
+
+		if (out->async.as) {
 			crypto_free_aead(out->async.as);
+		}
 	}
 
 	return ret;
@@ -265,11 +285,15 @@ void cryptodev_cipher_deinit(struct cipher_data *cdata)
 		if (cdata->aead == 0) {
 			cryptodev_blkcipher_request_free(cdata->async.request);
 			cryptodev_crypto_free_blkcipher(cdata->async.s);
-		} else {
-			if (cdata->async.arequest)
+		}
+		else {
+			if (cdata->async.arequest) {
 				aead_request_free(cdata->async.arequest);
-			if (cdata->async.as)
+			}
+
+			if (cdata->async.as) {
 				crypto_free_aead(cdata->async.as);
+			}
 		}
 
 		cdata->init = 0;
@@ -279,33 +303,36 @@ void cryptodev_cipher_deinit(struct cipher_data *cdata)
 static inline int waitfor(struct cryptodev_result *cr, ssize_t ret)
 {
 	switch (ret) {
-	case 0:
-		break;
-	case -EINPROGRESS:
-	case -EBUSY:
-		wait_for_completion(&cr->completion);
-		/* At this point we known for sure the request has finished,
-		 * because wait_for_completion above was not interruptible.
-		 * This is important because otherwise hardware or driver
-		 * might try to access memory which will be freed or reused for
-		 * another request. */
+		case 0:
+			break;
 
-		if (unlikely(cr->err)) {
-			pr_err("error from async request: %d", cr->err);
-			return cr->err;
-		}
+		case -EINPROGRESS:
+		case -EBUSY:
+			wait_for_completion(&cr->completion);
 
-		break;
-	default:
-		return ret;
+			/* At this point we known for sure the request has finished,
+			 * because wait_for_completion above was not interruptible.
+			 * This is important because otherwise hardware or driver
+			 * might try to access memory which will be freed or reused for
+			 * another request. */
+
+			if (unlikely(cr->err)) {
+				pr_err("error from async request: %d", cr->err);
+				return cr->err;
+			}
+
+			break;
+
+		default:
+			return ret;
 	}
 
 	return 0;
 }
 
 ssize_t cryptodev_cipher_encrypt(struct cipher_data *cdata,
-		const struct scatterlist *src, struct scatterlist *dst,
-		size_t len)
+								 const struct scatterlist *src, struct scatterlist *dst,
+								 size_t len)
 {
 	int ret;
 
@@ -313,13 +340,14 @@ ssize_t cryptodev_cipher_encrypt(struct cipher_data *cdata,
 
 	if (cdata->aead == 0) {
 		cryptodev_blkcipher_request_set_crypt(cdata->async.request,
-			(struct scatterlist *)src, dst,
-			len, cdata->async.iv);
+											  (struct scatterlist *)src, dst,
+											  len, cdata->async.iv);
 		ret = cryptodev_crypto_blkcipher_encrypt(cdata->async.request);
-	} else {
+	}
+	else {
 		aead_request_set_crypt(cdata->async.arequest,
-			(struct scatterlist *)src, dst,
-			len, cdata->async.iv);
+							   (struct scatterlist *)src, dst,
+							   len, cdata->async.iv);
 		ret = crypto_aead_encrypt(cdata->async.arequest);
 	}
 
@@ -327,21 +355,23 @@ ssize_t cryptodev_cipher_encrypt(struct cipher_data *cdata,
 }
 
 ssize_t cryptodev_cipher_decrypt(struct cipher_data *cdata,
-		const struct scatterlist *src, struct scatterlist *dst,
-		size_t len)
+								 const struct scatterlist *src, struct scatterlist *dst,
+								 size_t len)
 {
 	int ret;
 
 	reinit_completion(&cdata->async.result.completion);
+
 	if (cdata->aead == 0) {
 		cryptodev_blkcipher_request_set_crypt(cdata->async.request,
-			(struct scatterlist *)src, dst,
-			len, cdata->async.iv);
+											  (struct scatterlist *)src, dst,
+											  len, cdata->async.iv);
 		ret = cryptodev_crypto_blkcipher_decrypt(cdata->async.request);
-	} else {
+	}
+	else {
 		aead_request_set_crypt(cdata->async.arequest,
-			(struct scatterlist *)src, dst,
-			len, cdata->async.iv);
+							   (struct scatterlist *)src, dst,
+							   len, cdata->async.iv);
 		ret = crypto_aead_decrypt(cdata->async.arequest);
 	}
 
@@ -350,11 +380,12 @@ ssize_t cryptodev_cipher_decrypt(struct cipher_data *cdata,
 
 /* Hash functions */
 int cryptodev_hash_init(struct hash_data *hdata, const char *alg_name,
-			int hmac_mode, void *mackey, size_t mackeylen)
+						int hmac_mode, void *mackey, size_t mackeylen)
 {
 	int ret;
 
 	hdata->async.s = crypto_alloc_ahash(alg_name, 0, 0);
+
 	if (unlikely(IS_ERR(hdata->async.s))) {
 		pr_err("Failed to load transform for %s", alg_name);
 		return -EINVAL;
@@ -363,9 +394,10 @@ int cryptodev_hash_init(struct hash_data *hdata, const char *alg_name,
 	/* Copy the key from user and set to TFM. */
 	if (hmac_mode != 0) {
 		ret = crypto_ahash_setkey(hdata->async.s, mackey, mackeylen);
+
 		if (unlikely(ret)) {
 			pr_err("Setting hmac key failed for %s-%zu.",
-					alg_name, mackeylen*8);
+				   alg_name, mackeylen * 8);
 			ret = -EINVAL;
 			goto error;
 		}
@@ -377,6 +409,7 @@ int cryptodev_hash_init(struct hash_data *hdata, const char *alg_name,
 	init_completion(&hdata->async.result.completion);
 
 	hdata->async.request = ahash_request_alloc(hdata->async.s, GFP_KERNEL);
+
 	if (unlikely(!hdata->async.request)) {
 		pr_err("error allocating async crypto request");
 		ret = -ENOMEM;
@@ -384,8 +417,8 @@ int cryptodev_hash_init(struct hash_data *hdata, const char *alg_name,
 	}
 
 	ahash_request_set_callback(hdata->async.request,
-			CRYPTO_TFM_REQ_MAY_BACKLOG,
-			cryptodev_complete, &hdata->async.result);
+							   CRYPTO_TFM_REQ_MAY_BACKLOG,
+							   cryptodev_complete, &hdata->async.result);
 	hdata->init = 1;
 	return 0;
 
@@ -408,6 +441,7 @@ int cryptodev_hash_reset(struct hash_data *hdata)
 	int ret;
 
 	ret = crypto_ahash_init(hdata->async.request);
+
 	if (unlikely(ret)) {
 		pr_err("error in crypto_hash_init()");
 		return ret;
@@ -416,9 +450,9 @@ int cryptodev_hash_reset(struct hash_data *hdata)
 	return 0;
 }
 
-ssize_t cryptodev_hash_update(struct crypto_dev* crypto,
-				struct hash_data *hdata,
-				struct scatterlist *sg, size_t len)
+ssize_t cryptodev_hash_update(struct crypto_dev *crypto,
+							  struct hash_data *hdata,
+							  struct scatterlist *sg, size_t len)
 {
 	int ret;
 
@@ -430,8 +464,8 @@ ssize_t cryptodev_hash_update(struct crypto_dev* crypto,
 	return waitfor(&hdata->async.result, ret);
 }
 
-int cryptodev_hash_final(struct crypto_dev* crypto,
-				struct hash_data *hdata, void *output)
+int cryptodev_hash_final(struct crypto_dev *crypto,
+						 struct hash_data *hdata, void *output)
 {
 	int ret;
 
@@ -457,35 +491,40 @@ int cryptodev_hash_copy(struct hash_data *dst, struct hash_data *src)
 	}
 
 	reinit_completion(&src->async.result.completion);
-
 	statesize = crypto_ahash_statesize(src->async.s);
+
 	if (unlikely(statesize <= 0)) {
 		return -EINVAL;
 	}
 
 	statedata = kzalloc(statesize, GFP_KERNEL);
+
 	if (unlikely(statedata == NULL)) {
 		return -ENOMEM;
 	}
 
 	ret = crypto_ahash_export(src->async.request, statedata);
+
 	if (unlikely(ret < 0)) {
 		if (unlikely(ret == -ENOSYS)) {
 			tfm = crypto_ahash_tfm(src->async.s);
 			pr_err("cryptodev_hash_copy: crypto_ahash_export not implemented for "
-				"alg='%s', driver='%s'", crypto_tfm_alg_name(tfm),
-				crypto_tfm_alg_driver_name(tfm));
+				   "alg='%s', driver='%s'", crypto_tfm_alg_name(tfm),
+				   crypto_tfm_alg_driver_name(tfm));
 		}
+
 		goto out;
 	}
 
 	ret = crypto_ahash_import(dst->async.request, statedata);
+
 	if (unlikely(ret == -ENOSYS)) {
 		tfm = crypto_ahash_tfm(dst->async.s);
 		pr_err("cryptodev_hash_copy: crypto_ahash_import not implemented for "
-			"alg='%s', driver='%s'", crypto_tfm_alg_name(tfm),
-			crypto_tfm_alg_driver_name(tfm));
+			   "alg='%s', driver='%s'", crypto_tfm_alg_name(tfm),
+			   crypto_tfm_alg_driver_name(tfm));
 	}
+
 out:
 	kfree(statedata);
 	return ret;
@@ -496,8 +535,8 @@ void semidrive_cpu_to_be32p_array(__be32 *dst, const u8 *src, unsigned int len)
 	__be32 *d = dst;
 	const u8 *s = src;
 	unsigned int n;
-
 	n = len / sizeof(u32);
+
 	for (; n > 0; n--) {
 		*d = cpu_to_be32p((const __u32 *) s);
 		s += sizeof(__u32);

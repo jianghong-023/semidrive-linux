@@ -23,7 +23,7 @@
  *         CRYPTOLIB_CRYPTO_ERR if there is an issue with the parameters
  */
 uint32_t ecdsa_validate_domain(uint32_t vce_id,
-                               const sx_ecc_curve_t* curve);
+							   const sx_ecc_curve_t *curve);
 
 /**
  * @brief Verify an ECDSA signature from a \p formatted_digest
@@ -40,11 +40,11 @@ uint32_t ecdsa_validate_domain(uint32_t vce_id,
  *       (left padded with zeros)
  */
 uint32_t ecdsa_verify_signature_digest(
-    uint32_t vce_id,
-    const sx_ecc_curve_t* curve,
-    block_t formatted_digest,
-    block_t key,
-    block_t signature);
+	uint32_t vce_id,
+	const sx_ecc_curve_t *curve,
+	block_t formatted_digest,
+	block_t key,
+	block_t signature);
 
 /**
  * @brief Configure hardware for signature generation.
@@ -61,10 +61,10 @@ uint32_t ecdsa_verify_signature_digest(
  *       (left padded with zeros)
  */
 uint32_t ecdsa_configure_signature(
-    uint32_t vce_id,
-    const sx_ecc_curve_t* curve,
-    block_t formatted_digest,
-    block_t key);
+	uint32_t vce_id,
+	const sx_ecc_curve_t *curve,
+	block_t formatted_digest,
+	block_t key);
 
 /**
  * @brief Attempt to compute an ECDSA signature
@@ -84,9 +84,9 @@ uint32_t ecdsa_configure_signature(
  *          loaded.
  */
 uint32_t ecdsa_attempt_signature(
-    uint32_t vce_id,
-    const sx_ecc_curve_t* curve,
-    block_t signatur);
+	uint32_t vce_id,
+	const sx_ecc_curve_t *curve,
+	block_t signatur);
 
 /**
  * @brief Verifies a given signature corresponds to a given message
@@ -101,12 +101,12 @@ uint32_t ecdsa_attempt_signature(
  *         CRYPTOLIB_INVALID_SIGN_ERR if signature verification failed
  */
 uint32_t ecdsa_verify_signature(
-    uint32_t vce_id,
-    const void* curve_info,
-    block_t message,
-    block_t key,
-    block_t signature,
-    hash_alg_t hash_fct);
+	uint32_t vce_id,
+	const void *curve_info,
+	block_t message,
+	block_t key,
+	block_t signature,
+	hash_alg_t hash_fct);
 
 /**
  * @brief Verifies a given signature corresponds to a given digest
@@ -125,11 +125,11 @@ uint32_t ecdsa_verify_signature(
  *       (left padded with zeros)
  */
 uint32_t ecdsa_generate_signature_digest(
-    uint32_t vce_id,
-    const sx_ecc_curve_t* curve,
-    block_t formatted_digest,
-    block_t key,
-    block_t signature);
+	uint32_t vce_id,
+	const sx_ecc_curve_t *curve,
+	block_t formatted_digest,
+	block_t key,
+	block_t signature);
 
 /**
  * @brief Generates an ECDSA signature from a \p message
@@ -144,11 +144,11 @@ uint32_t ecdsa_generate_signature_digest(
  * @return CRYPTOLIB_SUCCESS if successful
  */
 uint32_t ecdsa_generate_signature(
-    uint32_t vce_id,
-    const void* curve_info,
-    block_t message,
-    block_t key,
-    block_t signature,
-    hash_alg_t hash_fct);
+	uint32_t vce_id,
+	const void *curve_info,
+	block_t message,
+	block_t key,
+	block_t signature,
+	hash_alg_t hash_fct);
 
 #endif

@@ -11,8 +11,8 @@
 #include "sx_hash.h"
 
 uint32_t dsa_generate_private_key(uint32_t vce_id,
-                                  block_t n,
-                                  block_t priv);
+								  block_t n,
+								  block_t priv);
 
 /**
  * @brief Generates DSA public key with a given private
@@ -25,11 +25,11 @@ uint32_t dsa_generate_private_key(uint32_t vce_id,
  * @return        returns CRYPTOLIB_SUCCESS if success
  */
 uint32_t dsa_generate_public_key(
-    uint32_t vce_id,
-    block_t p,
-    block_t generator,
-    block_t priv_key,
-    block_t pub_key);
+	uint32_t vce_id,
+	block_t p,
+	block_t generator,
+	block_t priv_key,
+	block_t pub_key);
 
 /**
  * @brief Generates DSA signature of a message
@@ -45,14 +45,14 @@ uint32_t dsa_generate_public_key(
  * @return           CRYPTOLIB_SUCCESS if success
  */
 uint32_t dsa_generate_signature(
-    uint32_t vce_id,
-    hash_alg_t alg_hash,
-    block_t p,
-    block_t q,
-    block_t generator,
-    block_t priv,
-    block_t message,
-    block_t signature);
+	uint32_t vce_id,
+	hash_alg_t alg_hash,
+	block_t p,
+	block_t q,
+	block_t generator,
+	block_t priv,
+	block_t message,
+	block_t signature);
 
 /**
  * @brief Verifies a given signature corresponds to a given message
@@ -69,13 +69,13 @@ uint32_t dsa_generate_signature(
  *                   CRYPTOLIB_CRYPTO_ERR if signature or error occurs
  */
 uint32_t dsa_verify_signature(
-    uint32_t vce_id,
-    hash_alg_t alg_hash,
-    block_t p,
-    block_t q,
-    block_t generator,
-    block_t pub,
-    block_t message,
-    block_t signature);
+	uint32_t vce_id,
+	hash_alg_t alg_hash,
+	block_t p,
+	block_t q,
+	block_t generator,
+	block_t pub,
+	block_t message,
+	block_t signature);
 
 #endif

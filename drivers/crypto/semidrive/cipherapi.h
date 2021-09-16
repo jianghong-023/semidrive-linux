@@ -15,17 +15,21 @@ typedef struct ablkcipher_request cryptodev_blkcipher_request_t;
 # define cryptodev_crypto_blkcipher_alignmask crypto_ablkcipher_alignmask
 # define cryptodev_crypto_blkcipher_setkey crypto_ablkcipher_setkey
 
-static inline void cryptodev_crypto_free_blkcipher(cryptodev_crypto_blkcipher_t *c) {
-	if (c)
+static inline void cryptodev_crypto_free_blkcipher(cryptodev_crypto_blkcipher_t *c)
+{
+	if (c) {
 		crypto_free_ablkcipher(c);
+	}
 }
 
 # define cryptodev_blkcipher_request_alloc ablkcipher_request_alloc
 # define cryptodev_blkcipher_request_set_callback ablkcipher_request_set_callback
 
-static inline void cryptodev_blkcipher_request_free(cryptodev_blkcipher_request_t *r) {
-	if (r)
+static inline void cryptodev_blkcipher_request_free(cryptodev_blkcipher_request_t *r)
+{
+	if (r) {
 		ablkcipher_request_free(r);
+	}
 }
 
 # define cryptodev_blkcipher_request_set_crypt ablkcipher_request_set_crypt

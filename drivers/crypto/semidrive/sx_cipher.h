@@ -23,43 +23,43 @@
 * @brief Enumeration of possible mode of operation for AES algorithm.
 */
 typedef enum aes_fct_t {
-    FCT_ECB  = 0x0,              /**< Electronic Codebook */
-    FCT_CBC  = 0x1,              /**< Cipher Block Chaining */
-    FCT_CTR  = 0x2,              /**< Counter Feedback */
-    FCT_CFB  = 0x3,              /**< Cipher Feedback */
-    FCT_OFB  = 0x4,              /**< Output Feedback */
-    FCT_CCM  = 0x5,              /**< Counter with CBC-MAC Mode */
-    FCT_GCM  = 0x6,              /**< Galois/Counter Mode */
-    FCT_XTS  = 0x7,              /**< XEX-based tweaked-codebook mode with ciphertext stealing */
-    FCT_CMAC  = 0x8,             /**< CMAC mode */
-    FCT_NUM_MAX  = 0x9,
+	FCT_ECB  = 0x0,              /**< Electronic Codebook */
+	FCT_CBC  = 0x1,              /**< Cipher Block Chaining */
+	FCT_CTR  = 0x2,              /**< Counter Feedback */
+	FCT_CFB  = 0x3,              /**< Cipher Feedback */
+	FCT_OFB  = 0x4,              /**< Output Feedback */
+	FCT_CCM  = 0x5,              /**< Counter with CBC-MAC Mode */
+	FCT_GCM  = 0x6,              /**< Galois/Counter Mode */
+	FCT_XTS  = 0x7,              /**< XEX-based tweaked-codebook mode with ciphertext stealing */
+	FCT_CMAC  = 0x8,             /**< CMAC mode */
+	FCT_NUM_MAX  = 0x9,
 } aes_fct_t;
 
 /**
 * @brief Enumeration of possible key type for AES algorithm.
 */
 typedef enum sx_aes_key_type {
-    SX_KEY_TYPE_128 = 0,
-    SX_KEY_TYPE_256 = 1,
-    SX_KEY_TYPE_192 = 2
+	SX_KEY_TYPE_128 = 0,
+	SX_KEY_TYPE_256 = 1,
+	SX_KEY_TYPE_192 = 2
 } sx_aes_key_type_t;
 
 /**
 * @brief Enumeration of possible mode for AES algorithm.
 */
 typedef enum aes_mode {
-    MODE_ENC = 0,            /**< Encrypt */
-    MODE_DEC = 1,            /**< Decrypt but does not return any tag */
+	MODE_ENC = 0,            /**< Encrypt */
+	MODE_DEC = 1,            /**< Decrypt but does not return any tag */
 } aes_mode_t;
 
 /**
 * @brief Enumeration of possible context states for AES algorithm.
 */
 typedef enum aes_ctx_t {
-    CTX_WHOLE = 0,            /**< No context switching (whole message) */
-    CTX_BEGIN = 1,            /**< Save context (operation is not final) */
-    CTX_END = 2,              /**< Load context (operation is not initial) */
-    CTX_MIDDLE = 3            /**< Save & load context (operation is not initial & not final) */
+	CTX_WHOLE = 0,            /**< No context switching (whole message) */
+	CTX_BEGIN = 1,            /**< Save context (operation is not final) */
+	CTX_END = 2,              /**< Load context (operation is not initial) */
+	CTX_MIDDLE = 3            /**< Save & load context (operation is not initial & not final) */
 } aes_ctx_t;
 
 /**
@@ -89,17 +89,17 @@ typedef enum aes_ctx_t {
  *         not match input tag (i.e. message corruption)
  */
 uint32_t aes_blk(aes_fct_t aes_fct,
-                 uint32_t ce_id,
-                 aes_mode_t mode,
-                 aes_ctx_t ctx,
-                 uint32_t header_len,
-                 bool header_save,
-                 bool pre_cal_key,
-                 block_t key,
-                 block_t xtskey,
-                 block_t iv,
-                 block_t ctx_ptr,
-                 block_t data_in,
-                 block_t data_out);
+				 uint32_t ce_id,
+				 aes_mode_t mode,
+				 aes_ctx_t ctx,
+				 uint32_t header_len,
+				 bool header_save,
+				 bool pre_cal_key,
+				 block_t key,
+				 block_t xtskey,
+				 block_t iv,
+				 block_t ctx_ptr,
+				 block_t data_in,
+				 block_t data_out);
 
 #endif

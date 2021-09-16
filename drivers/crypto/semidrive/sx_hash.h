@@ -62,42 +62,42 @@
  Enumeration of the supported hash algorithms
 */
 typedef enum hash_alg_t {
-    ALG_MD5     = 0x0,
-    ALG_SHA1    = 0x1,
-    ALG_SHA224  = 0x2,
-    ALG_SHA256  = 0x3,
-    ALG_SHA384  = 0x4,
-    ALG_SHA512  = 0x5,
-    ALG_SM3     = 0x6
+	ALG_MD5     = 0x0,
+	ALG_SHA1    = 0x1,
+	ALG_SHA224  = 0x2,
+	ALG_SHA256  = 0x3,
+	ALG_SHA384  = 0x4,
+	ALG_SHA512  = 0x5,
+	ALG_SM3     = 0x6
 } hash_alg_t;
 
 /**
  Enumeration of the supported hash operation
 */
 typedef enum op_type_t {
-    OP_FULL_HASH = 0x1,
-    OP_FULL_HMAC = 0x2,
-    OP_PART_HASH = 0x3,
-    OP_FINAL_HASH = 0x4
+	OP_FULL_HASH = 0x1,
+	OP_FULL_HMAC = 0x2,
+	OP_PART_HASH = 0x3,
+	OP_FINAL_HASH = 0x4
 } op_type_t;
 
 typedef struct hash_reg_config_t {
-    bool hmac_en;
-    bool key_load;
-    uint32_t iv_type;
-    bool iv_load;
-    bool update;
-    bool padding;
-    hash_alg_t mode;
-    uint32_t key_addr;
-    uint32_t iv_addr;
-    uint32_t key_addr_type;
-    uint32_t key_len;
-    uint32_t data_len;
-    addr_t src_addr;
-    uint32_t src_type;
-    addr_t dst_addr;
-    uint32_t dst_type;
+	bool hmac_en;
+	bool key_load;
+	uint32_t iv_type;
+	bool iv_load;
+	bool update;
+	bool padding;
+	hash_alg_t mode;
+	uint32_t key_addr;
+	uint32_t iv_addr;
+	uint32_t key_addr_type;
+	uint32_t key_len;
+	uint32_t data_len;
+	addr_t src_addr;
+	uint32_t src_type;
+	addr_t dst_addr;
+	uint32_t dst_type;
 } hash_reg_config_t;
 
 /**
@@ -129,11 +129,11 @@ uint32_t hash_get_state_size(hash_alg_t hash_alg);
  * @return CRYPTOLIB_SUCCESS if execution was successful
  */
 uint32_t hash_blk(
-    void* device,
-    hash_alg_t hash_alg,
-    block_t* iv,
-    block_t* data_in,
-    block_t* data_out);
+	void *device,
+	hash_alg_t hash_alg,
+	block_t *iv,
+	block_t *data_in,
+	block_t *data_out);
 
 /**
  * Compute HMAC of the content of  data_in and write the result in  data_out.
@@ -144,12 +144,12 @@ uint32_t hash_blk(
  * @return CRYPTOLIB_SUCCESS if execution was successful
  */
 uint32_t hmac_blk(
-    void* device,
-    hash_alg_t hash_alg,
-    block_t* iv,
-    block_t* key,
-    block_t* data_in,
-    block_t* data_out);
+	void *device,
+	hash_alg_t hash_alg,
+	block_t *iv,
+	block_t *key,
+	block_t *data_in,
+	block_t *data_out);
 
 /**
  * Compute hash block operation with  state and  data input, and write result back to  state.
@@ -162,10 +162,10 @@ uint32_t hmac_blk(
  * @return CRYPTOLIB_SUCCESS if execution was successful
  */
 uint32_t hash_update_blk(
-    void* device,
-    hash_alg_t hash_alg,
-    bool first_part,
-    block_t* data_in);
+	void *device,
+	hash_alg_t hash_alg,
+	bool first_part,
+	block_t *data_in);
 
 /**
  * Finish a hash operation after zero or more update operations after doing necessary padding
@@ -179,11 +179,11 @@ uint32_t hash_update_blk(
  * @return CRYPTOLIB_SUCCESS if execution was successful
  */
 uint32_t hash_finish_blk(
-    void* device,
-    hash_alg_t hash_alg,
-    block_t* state,
-    block_t* data_in,
-    block_t* data_out,
-    uint32_t total_len);
+	void *device,
+	hash_alg_t hash_alg,
+	block_t *state,
+	block_t *data_in,
+	block_t *data_out,
+	uint32_t total_len);
 
 #endif

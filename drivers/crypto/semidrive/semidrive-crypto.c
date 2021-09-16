@@ -28,62 +28,183 @@
 #include "ce_reg.h"
 
 #include <crypto/cryptodev.h>
+#include "sx_rsa.h"
 
-#define TRNG_CE2_VCE2_NUM 1
-#define SEMIDRIVE_QUEUE_LENGTH 1
+#define TRNG_CE2_VCE2_NUM       1
+#define SEMIDRIVE_QUEUE_LENGTH  1
 
-#define DEVCRYPTO_CRYPTO_TYPE    0x63 //'c' for devcrypto-linux framework
-#define SEMIDRIVE_CRYPTO_ALG_SM2 0xaa
-#define SEMIDRIVE_CRYPTO_ALG_RSA 0xab
+#define DEVCRYPTO_CRYPTO_TYPE           0x63 //'c' for devcrypto-linux framework
+#define SEMIDRIVE_CRYPTO_ALG_SM2        0xaa
+#define SEMIDRIVE_CRYPTO_ALG_RSA        0xab
+#define SEMIDRIVE_CRYPTO_PAGE_OPERATE   0xaf
 
-#define SEMIDRIVE_CRYPTO_SM2_INIT _IO(SEMIDRIVE_CRYPTO_ALG_SM2, 1)
-#define SEMIDRIVE_CRYPTO_SM2_VERIFY_NO_DIGEST _IO(SEMIDRIVE_CRYPTO_ALG_SM2, 1)
-#define SEMIDRIVE_CRYPTO_SM2_VERIFY_DIGEST _IO(SEMIDRIVE_CRYPTO_ALG_SM2, 2)
-#define SEMIDRIVE_CRYPTO_SM2_VERIFY_MSG _IO(SEMIDRIVE_CRYPTO_ALG_SM2, 3)
-#define SEMIDRIVE_CRYPTO_SM2_SET_PUBKEY _IO(SEMIDRIVE_CRYPTO_ALG_SM2, 4)
-#define SEMIDRIVE_CRYPTO_SM2_SIGN _IO(SEMIDRIVE_CRYPTO_ALG_SM2, 4)
+#define SEMIDRIVE_CRYPTO_SM2_INIT               _IO(SEMIDRIVE_CRYPTO_ALG_SM2, 1)
+#define SEMIDRIVE_CRYPTO_SM2_VERIFY_NO_DIGEST   _IO(SEMIDRIVE_CRYPTO_ALG_SM2, 1)
+#define SEMIDRIVE_CRYPTO_SM2_VERIFY_DIGEST      _IO(SEMIDRIVE_CRYPTO_ALG_SM2, 2)
+#define SEMIDRIVE_CRYPTO_SM2_VERIFY_MSG         _IO(SEMIDRIVE_CRYPTO_ALG_SM2, 3)
+#define SEMIDRIVE_CRYPTO_SM2_SET_PUBKEY         _IO(SEMIDRIVE_CRYPTO_ALG_SM2, 4)
+#define SEMIDRIVE_CRYPTO_SM2_SIGN               _IO(SEMIDRIVE_CRYPTO_ALG_SM2, 4)
+
+#define SEMIDRIVE_CRYPTO_ALG_RSA_ENC                _IO(SEMIDRIVE_CRYPTO_ALG_RSA, 1)
+#define SEMIDRIVE_CRYPTO_ALG_RSA_DEC                _IO(SEMIDRIVE_CRYPTO_ALG_RSA, 2)
+
+#define SEMIDRIVE_CRYPTO_ALG_RSA_CRT_DEC            _IO(SEMIDRIVE_CRYPTO_ALG_RSA, 3)
+#define SEMIDRIVE_CRYPTO_ALG_RSA_SIG_GEN            _IO(SEMIDRIVE_CRYPTO_ALG_RSA, 4)
+#define SEMIDRIVE_CRYPTO_ALG_RSA_SIG_VERIFY         _IO(SEMIDRIVE_CRYPTO_ALG_RSA, 5)
+#define SEMIDRIVE_CRYPTO_ALG_RSA_PRIV_KEY_GEN       _IO(SEMIDRIVE_CRYPTO_ALG_RSA, 6)
+#define SEMIDRIVE_CRYPTO_ALG_RSA_CRT_KEY_GEN        _IO(SEMIDRIVE_CRYPTO_ALG_RSA, 7)
+#define SEMIDRIVE_CRYPTO_ALG_RSA_KEY_GEN            _IO(SEMIDRIVE_CRYPTO_ALG_RSA, 8)
+
+#define SEMIDRIVE_CRYPTO_GET_PAGE                   _IO(SEMIDRIVE_CRYPTO_PAGE_OPERATE,1)
+#define SEMIDRIVE_CRYPTO_FREE_PAGE                  _IO(SEMIDRIVE_CRYPTO_PAGE_OPERATE,2)
+
+
 
 #define SEMIDRIVE_CRYPTO_SM2_SET_TIME_STAMP _IO(SEMIDRIVE_CRYPTO_ALG_SM2, 9)
 #define SEMIDRIVE_CRYPTO_SM2_GET_TIME_STAMP _IO(SEMIDRIVE_CRYPTO_ALG_SM2, 0xa)
 
-#define CRYPTOLIB_SUCCESS 0
-#define CRYPTOLIB_CRYPTO_ERR 6
+#define CRYPTOLIB_SUCCESS               0
+#define CRYPTOLIB_CRYPTO_ERR            6
+
+#define MAX_OUTPUT_NUM                  5
+#define MAX_ARREY_NUM                   512
+
 
 struct crypto_sm2_msg {
-	const uint8_t* msg;
+	const uint8_t *msg;
 	size_t msg_len;
-	const uint8_t* sig;
+	const uint8_t *sig;
 	size_t sig_len;
-	const uint8_t* key;
+	const uint8_t *key;
 	size_t key_len;
-	uint8_t* ret;
+	uint32_t *ret;
 } __attribute__((packed));
 
-//sm2 gb pattern start
+typedef struct {
+	uint8_t *n;       /* Modulus */
+	uint8_t *e;       /* Public exponent */
+	uint8_t *d;       /* Private exponent */
+	uint32_t  n_len;
+	uint32_t  e_len;
+	uint32_t  d_len;
+} crypto_rsa_keypair_t;
+
+struct crypto_rsa_all_information {
+	const uint8_t *msg;
+	size_t msg_len;
+	const uint8_t *cipher;
+	size_t cipher_len;
+	const uint8_t *sig;
+	size_t sig_len;
+	crypto_rsa_keypair_t rsa_keypair;
+	rsa_pad_types_t rsa_pad_types_temp;
+	ce_addr_type_t addr_type;
+	hash_alg_t rsa_hashType;
+	uint8_t *final_result[MAX_OUTPUT_NUM];
+	size_t final_result_len[MAX_OUTPUT_NUM];
+	uint32_t *ret;
+} __attribute__((packed));
+
+struct crypto_rsa_crt_decrypt_information {
+	const uint8_t *msg;
+	size_t msg_len;
+	const uint8_t *cipher;
+	size_t cipher_len;
+	const uint8_t *p;
+	size_t p_len;
+	const uint8_t *q;
+	size_t q_len;
+	const uint8_t *dP;
+	size_t dP_len;
+	const uint8_t *dQ;
+	size_t dQ_len;
+	const uint8_t *qInv;
+	size_t qInv_len;
+	rsa_pad_types_t rsa_pad_types_temp;
+	ce_addr_type_t addr_type;
+	hash_alg_t rsa_hashType;
+	uint8_t *final_result[MAX_OUTPUT_NUM];
+	size_t final_result_len[MAX_OUTPUT_NUM];
+	uint32_t *ret;
+} __attribute__((packed));
+
+struct crypto_rsa_priv_key_gen_information {
+	const uint8_t *p;
+	size_t p_len;
+	const uint8_t *q;
+	size_t q_len;
+	const uint8_t *n;
+	size_t n_len;
+	const uint8_t *e;
+	size_t e_len;
+	const uint8_t *d;
+	size_t d_len;
+	uint8_t *final_result[MAX_OUTPUT_NUM];
+	size_t final_result_len[MAX_OUTPUT_NUM];
+	uint32_t *ret;
+} __attribute__((packed));
+
+struct crypto_rsa_crt_key_gen_information {
+	const uint8_t *p;
+	size_t p_len;
+	const uint8_t *q;
+	size_t q_len;
+	const uint8_t *d;
+	size_t d_len;
+	const uint8_t *dP;
+	size_t dP_len;
+	const uint8_t *dQ;
+	size_t dQ_len;
+	const uint8_t *qInv;
+	size_t qInv_len;
+	uint8_t *final_result[MAX_OUTPUT_NUM];
+	size_t final_result_len[MAX_OUTPUT_NUM];
+	uint32_t *ret;
+};
+struct crypto_rsa_key_information {
+	size_t  keysize;
+	const uint8_t *e;
+	size_t e_len;
+	const uint8_t *p;
+	size_t p_len;
+	const uint8_t *q;
+	size_t q_len;
+	const uint8_t *n;
+	size_t n_len;
+	const uint8_t *d;
+	size_t d_len;
+	uint8_t *final_result[MAX_OUTPUT_NUM];
+	size_t final_result_len[MAX_OUTPUT_NUM];
+	uint32_t *ret;
+} __attribute__((packed));
+
+
+
 /*dB：3945208F 7B2144B1 3F36E38A C6D39F95 88939369 2860B51A 42FB81EF 4DF7C5B8*/
-uint8_t __attribute__((aligned(CACHE_LINE))) crypto_gb_prv_key[32] = "\x39\x45\x20\x8F\x7B\x21\x44\xB1\x3F\x36\xE3\x8A\xC6\xD3\x9F\x95\x88\x93\x93\x69\x28\x60\xB5\x1A\x42\xFB\x81\xEF\x4D\xF7\xC5\xB8"; //-- d
+uint8_t __attribute__((aligned(CACHE_LINE))) crypto_gb_prv_key[32] = "\x39\x45\x20\x8F\x7B\x21\x44\xB1\x3F\x36\xE3\x8A\xC6\xD3\x9F\x95\x88\x93\x93\x69\x28\x60\xB5\x1A\x42\xFB\x81\xEF\x4D\xF7\xC5\xB8";
+
 
 /*xB：09F9DF31 1E5421A1 50DD7D16 1E4BC5C6 72179FAD 1833FC07 6BB08FF3 56F35020*/
 /*yB：CCEA490C E26775A5 2DC6EA71 8CC1AA60 0AED05FB F35E084A 6632F607 2DA9AD13*/
 
-uint8_t __attribute__((aligned(CACHE_LINE))) crypto_gb_pub_key[64] = "\x09\xF9\xDF\x31\x1E\x54\x21\xA1\x50\xDD\x7D\x16\x1E\x4B\xC5\xC6\x72\x17\x9F\xAD\x18\x33\xFC\x07\x6B\xB0\x8F\xF3\x56\xF3\x50\x20" //-- Qx
-                             "\xCC\xEA\x49\x0C\xE2\x67\x75\xA5\x2D\xC6\xEA\x71\x8C\xC1\xAA\x60\x0A\xED\x05\xFB\xF3\x5E\x08\x4A\x66\x32\xF6\x07\x2D\xA9\xAD\x13";  //-- Qy
+uint8_t __attribute__((aligned(CACHE_LINE))) crypto_gb_pub_key[64] = "\x09\xF9\xDF\x31\x1E\x54\x21\xA1\x50\xDD\x7D\x16\x1E\x4B\xC5\xC6\x72\x17\x9F\xAD\x18\x33\xFC\x07\x6B\xB0\x8F\xF3\x56\xF3\x50\x20"
+		"\xCC\xEA\x49\x0C\xE2\x67\x75\xA5\x2D\xC6\xEA\x71\x8C\xC1\xAA\x60\x0A\xED\x05\xFB\xF3\x5E\x08\x4A\x66\x32\xF6\x07\x2D\xA9\xAD\x13";
 
 /*message digest:6D65737361676520646967657374*/
-uint8_t crypto_gb_sig_msg[14] = "\x6D\x65\x73\x73\x61\x67\x65\x20\x64\x69\x67\x65\x73\x74"; //-- m
+uint8_t crypto_gb_sig_msg[14] = "\x6D\x65\x73\x73\x61\x67\x65\x20\x64\x69\x67\x65\x73\x74";
 /*IDA GB/T1988: 31323334 35363738 31323334 35363738*/
 uint8_t crypto_gb_id_test[16] = "\x31\x32\x33\x34\x35\x36\x37\x38\x31\x32\x33\x34\x35\x36\x37\x38";
 /*
 r：F5A03B06 48D2C463 0EEAC513 E1BB81A1 5944DA38 27D5B741 43AC7EAC EEE720B3
 s：B1B6AA29 DF212FD8 763182BC 0D421CA1 BB9038FD 1F7F42D4 840B69C4 85BBC1AA*/
 
-uint8_t __attribute__((aligned(CACHE_LINE))) crypto_gb_ver_msg[64] = "\xF5\xA0\x3B\x06\x48\xD2\xC4\x63\x0E\xEA\xC5\x13\xE1\xBB\x81\xA1\x59\x44\xDA\x38\x27\xD5\xB7\x41\x43\xAC\x7E\xAC\xEE\xE7\x20\xB3"  //-- r
-                             "\xB1\xB6\xAA\x29\xDF\x21\x2F\xD8\x76\x31\x82\xBC\x0D\x42\x1C\xA1\xBB\x90\x38\xFD\x1F\x7F\x42\xD4\x84\x0B\x69\xC4\x85\xBB\xC1\xAA"; //-- s \xAA
-
+uint8_t __attribute__((aligned(CACHE_LINE))) crypto_gb_ver_msg[64] = "\xF5\xA0\x3B\x06\x48\xD2\xC4\x63\x0E\xEA\xC5\x13\xE1\xBB\x81\xA1\x59\x44\xDA\x38\x27\xD5\xB7\x41\x43\xAC\x7E\xAC\xEE\xE7\x20\xB3"
+		"\xB1\xB6\xAA\x29\xDF\x21\x2F\xD8\x76\x31\x82\xBC\x0D\x42\x1C\xA1\xBB\x90\x38\xFD\x1F\x7F\x42\xD4\x84\x0B\x69\xC4\x85\xBB\xC1\xAA";
 uint8_t __attribute__((aligned(CACHE_LINE))) crypto_gb_m[46];
-uint8_t __attribute__((aligned(CACHE_LINE))) verify_msg_buff[512] = {0};
-uint8_t __attribute__((aligned(CACHE_LINE))) verify_sig_buff[128] = {0};
-uint8_t __attribute__((aligned(CACHE_LINE))) verify_key_buff[128] = {0};
+
+// uint8_t __attribute__((aligned(CACHE_LINE))) verify_msg_buff[MAX_ARREY_NUM] = {0};
+// uint8_t __attribute__((aligned(CACHE_LINE))) verify_sig_buff[MAX_ARREY_NUM] = {0};
+// uint8_t __attribute__((aligned(CACHE_LINE))) verify_key_buff[MAX_ARREY_NUM] = {0};
 
 #define to_crypto_dev(priv) container_of((priv), struct crypto_dev, miscdev)
 
@@ -94,28 +215,9 @@ uint8_t __attribute__((aligned(CACHE_LINE))) verify_key_buff[128] = {0};
 #define DEF_COP_RINGSIZE 16
 #define MAX_COP_RINGSIZE 64
 
-struct todo_list_item {
-	struct list_head __hook;
-	struct kernel_crypt_op kcop;
-	int result;
-};
-
-struct locked_list {
-	struct list_head list;
-	struct mutex lock;
-};
-
-struct crypt_priv {
-	struct fcrypt fcrypt;
-	struct locked_list free, todo, done;
-	int itemcount;
-	struct work_struct cryptask;
-	wait_queue_head_t user_waiter;
-};
-
 static int crypto_create_session(struct fcrypt *fcr, struct session_op *sop)
 {
-	struct csession	*ses_new = NULL, *ses_ptr;
+	struct csession *ses_new = NULL, *ses_ptr;
 	int ret = 0;
 	const char *alg_name = NULL;
 	const char *hash_name = NULL;
@@ -140,112 +242,134 @@ static int crypto_create_session(struct fcrypt *fcr, struct session_op *sop)
 	}
 
 	switch (sop->cipher) {
-	case 0:
-		break;
-	case CRYPTO_AES_CBC:
-		alg_name = "cbc(aes)";
-		break;
-	case CRYPTO_AES_ECB:
-		alg_name = "ecb(aes)";
-		break;
-	case CRYPTO_AES_XTS:
-		alg_name = "xts(aes)";
-		break;
-	case CRYPTO_AES_CTR:
-		alg_name = "ctr(aes)";
-		stream = 1;
-		break;
-	case CRYPTO_AES_GCM:
-		alg_name = "gcm(aes)";
-		stream = 1;
-		aead = 1;
-		break;
-	case CRYPTO_NULL:
-		alg_name = "ecb(cipher_null)";
-		stream = 1;
-		break;
-	default:
-		pr_err("bad cipher: %d", sop->cipher);
-		return -EINVAL;
+		case 0:
+			break;
+
+		case CRYPTO_AES_CBC:
+			alg_name = "cbc(aes)";
+			break;
+
+		case CRYPTO_AES_ECB:
+			alg_name = "ecb(aes)";
+			break;
+
+		case CRYPTO_AES_XTS:
+			alg_name = "xts(aes)";
+			break;
+
+		case CRYPTO_AES_CTR:
+			alg_name = "ctr(aes)";
+			stream = 1;
+			break;
+
+		case CRYPTO_AES_GCM:
+			alg_name = "gcm(aes)";
+			stream = 1;
+			aead = 1;
+			break;
+
+		case CRYPTO_NULL:
+			alg_name = "ecb(cipher_null)";
+			stream = 1;
+			break;
+
+		default:
+			pr_err("bad cipher: %d", sop->cipher);
+			return -EINVAL;
 	}
 
 	switch (sop->mac) {
-	case 0:
-		break;
-	/*case CRYPTO_MD5_HMAC:
-		hash_name = "hmac(md5)";
-		break;
-	*/
-	case CRYPTO_SHA1_HMAC:
-		hash_name = "hmac(sha1)";
-		break;
-	case CRYPTO_SHA2_224_HMAC:
-		hash_name = "hmac(sha224)";
-		break;
+		case 0:
+			break;
 
-	case CRYPTO_SHA2_256_HMAC:
-		hash_name = "hmac(sha256)";
-		break;
-	case CRYPTO_SHA2_384_HMAC:
-		hash_name = "hmac(sha384)";
-		break;
-	case CRYPTO_SHA2_512_HMAC:
-		hash_name = "hmac(sha512)";
-		break;
+		/*case CRYPTO_MD5_HMAC:
+		    hash_name = "hmac(md5)";
+		    break;
+		*/
+		case CRYPTO_SHA1_HMAC:
+			hash_name = "hmac(sha1)";
+			break;
 
-	/* non-hmac cases */
-	/*case CRYPTO_MD5:
-		hash_name = "md5";
-		hmac_mode = 0;
-		break;
-	*/
-	case CRYPTO_SHA1:
-		hash_name = "sha1";
-		hmac_mode = 0;
-		break;
-	case CRYPTO_SHA2_224:
-		hash_name = "sha224";
-		hmac_mode = 0;
-		break;
-	case CRYPTO_SHA2_256:
-		hash_name = "sha256";
-		hmac_mode = 0;
-		break;
-	case CRYPTO_SHA2_384:
-		hash_name = "sha384";
-		hmac_mode = 0;
-		break;
-	case CRYPTO_SHA2_512:
-		hash_name = "sha512";
-		hmac_mode = 0;
-		break;
-	default:
-		pr_err("bad mac: %d", sop->mac);
-		return -EINVAL;
+		case CRYPTO_SHA2_224_HMAC:
+			hash_name = "hmac(sha224)";
+			break;
+
+		case CRYPTO_SHA2_256_HMAC:
+			hash_name = "hmac(sha256)";
+			break;
+
+		case CRYPTO_SHA2_384_HMAC:
+			hash_name = "hmac(sha384)";
+			break;
+
+		case CRYPTO_SHA2_512_HMAC:
+			hash_name = "hmac(sha512)";
+			break;
+
+		/* non-hmac cases */
+		/*case CRYPTO_MD5:
+		    hash_name = "md5";
+		    hmac_mode = 0;
+		    break;
+		*/
+		case CRYPTO_SHA1:
+			hash_name = "sha1";
+			hmac_mode = 0;
+			break;
+
+		case CRYPTO_SHA2_224:
+			hash_name = "sha224";
+			hmac_mode = 0;
+			break;
+
+		case CRYPTO_SHA2_256:
+			hash_name = "sha256";
+			hmac_mode = 0;
+			break;
+
+		case CRYPTO_SHA2_384:
+			hash_name = "sha384";
+			hmac_mode = 0;
+			break;
+
+		case CRYPTO_SHA2_512:
+			hash_name = "sha512";
+			hmac_mode = 0;
+			break;
+
+		default:
+			pr_err("bad mac: %d", sop->mac);
+			return -EINVAL;
 	}
 
 	/* Create a session and put it to the list. Zeroing the structure helps
 	 * also with a single exit point in case of errors */
 	ses_new = kzalloc(sizeof(*ses_new), GFP_KERNEL);
-	if (!ses_new)
+
+	if (!ses_new) {
 		return -ENOMEM;
+	}
 
 	/* Set-up crypto transform. */
 	if (alg_name) {
 		unsigned int keylen;
 		ret = cryptodev_get_cipher_keylen(&keylen, sop, aead);
+
 		if (unlikely(ret < 0)) {
 			pr_err("Setting key failed for %s-%zu.",
-				alg_name, (size_t)sop->keylen*8);
+				   alg_name, (size_t)sop->keylen * 8);
 			goto session_error;
 		}
 
 		ret = cryptodev_get_cipher_key(keys.ckey, sop, aead);
-		if (unlikely(ret < 0))
+
+		if (unlikely(ret < 0)) {
 			goto session_error;
+		}
 
 		ret = cryptodev_cipher_init(&ses_new->cdata, alg_name, keys.ckey,
-						keylen, stream, aead);
+									keylen, stream, aead);
+
 		if (ret < 0) {
 			pr_err("Failed to load cipher for %s", alg_name);
 			ret = -EINVAL;
@@ -256,19 +380,20 @@ static int crypto_create_session(struct fcrypt *fcr, struct session_op *sop)
 	if (hash_name && aead == 0) {
 		if (unlikely(sop->mackeylen > CRYPTO_HMAC_MAX_KEY_LEN)) {
 			pr_err("Setting key failed for %s-%zu.",
-				hash_name, (size_t)sop->mackeylen*8);
+				   hash_name, (size_t)sop->mackeylen * 8);
 			ret = -EINVAL;
 			goto session_error;
 		}
 
 		if (sop->mackey && unlikely(copy_from_user(keys.mkey, sop->mackey,
-					    sop->mackeylen))) {
+									sop->mackeylen))) {
 			ret = -EFAULT;
 			goto session_error;
 		}
 
 		ret = cryptodev_hash_init(&ses_new->hdata, hash_name, hmac_mode,
-							keys.mkey, sop->mackeylen);
+								  keys.mkey, sop->mackeylen);
+
 		if (ret != 0) {
 			pr_err("Failed to load hash for %s", hash_name);
 			ret = -EINVAL;
@@ -276,21 +401,22 @@ static int crypto_create_session(struct fcrypt *fcr, struct session_op *sop)
 		}
 
 		ret = cryptodev_hash_reset(&ses_new->hdata);
+
 		if (ret != 0) {
 			goto session_error;
 		}
 	}
 
 	ses_new->alignmask = max(ses_new->cdata.alignmask,
-	                                          ses_new->hdata.alignmask);
+							 ses_new->hdata.alignmask);
 	pr_info("got alignmask %d", ses_new->alignmask);
 
 	ses_new->array_size = DEFAULT_PREALLOC_PAGES;
 	pr_info("preallocating for %d user pages", ses_new->array_size);
 	ses_new->pages = kzalloc(ses_new->array_size *
-			sizeof(struct page *), GFP_KERNEL);
+							 sizeof(struct page *), GFP_KERNEL);
 	ses_new->sg = kzalloc(ses_new->array_size *
-			sizeof(struct scatterlist), GFP_KERNEL);
+						  sizeof(struct scatterlist), GFP_KERNEL);
 
 	if (ses_new->sg == NULL || ses_new->pages == NULL) {
 		pr_err("Memory error");
@@ -406,15 +532,16 @@ clonefd(struct file *filp)
 {
 	int ret;
 	ret = get_unused_fd_flags(0);
+
 	if (ret >= 0) {
-			get_file(filp);
-			fd_install(ret, filp);
+		get_file(filp);
+		fd_install(ret, filp);
 	}
 
 	return ret;
 }
 
-static void cryptask_routine(struct crypto_dev* crypto, struct work_struct *work)
+static void cryptask_routine(struct crypto_dev *crypto, struct work_struct *work)
 {
 	struct crypt_priv *pcr = container_of(work, struct crypt_priv, cryptask);
 	struct todo_list_item *item;
@@ -428,8 +555,10 @@ static void cryptask_routine(struct crypto_dev* crypto, struct work_struct *work
 	/* handle each job locklessly */
 	list_for_each_entry(item, &tmp, __hook) {
 		item->result = crypto_run(crypto, &pcr->fcrypt, &item->kcop);
-		if (unlikely(item->result))
+
+		if (unlikely(item->result)) {
 			pr_err("crypto_run() failed: %d", item->result);
+		}
 	}
 
 	/* push all handled jobs to the done list at once */
@@ -444,8 +573,9 @@ crypto_get_session_by_sid(struct fcrypt *fcr, uint32_t sid)
 {
 	struct csession *ses_ptr, *retval = NULL;
 
-	if (unlikely(fcr == NULL))
+	if (unlikely(fcr == NULL)) {
 		return NULL;
+	}
 
 	mutex_lock(&fcr->sem);
 	list_for_each_entry(ses_ptr, &fcr->list, entry) {
@@ -469,10 +599,12 @@ static int fill_kcop_from_cop(struct kernel_crypt_op *kcop, struct fcrypt *fcr)
 
 	/* this also enters ses_ptr->sem */
 	ses_ptr = crypto_get_session_by_sid(fcr, cop->ses);
+
 	if (unlikely(!ses_ptr)) {
 		pr_err("invalid session ID=0x%08X", cop->ses);
 		return -EINVAL;
 	}
+
 	kcop->ivlen = cop->iv ? ses_ptr->cdata.ivsize : 0;
 	kcop->digestsize = 0; /* will be updated during operation */
 
@@ -483,9 +615,10 @@ static int fill_kcop_from_cop(struct kernel_crypt_op *kcop, struct fcrypt *fcr)
 
 	if (cop->iv) {
 		rc = copy_from_user(kcop->iv, cop->iv, kcop->ivlen);
+
 		if (unlikely(rc)) {
 			pr_err("error copying IV (%d bytes), copy_from_user returned %d for address %p",
-					kcop->ivlen, rc, cop->iv);
+				   kcop->ivlen, rc, cop->iv);
 			return -EFAULT;
 		}
 	}
@@ -500,34 +633,42 @@ static int fill_cop_from_kcop(struct kernel_crypt_op *kcop, struct fcrypt *fcr)
 
 	if (kcop->digestsize) {
 		ret = copy_to_user(kcop->cop.mac,
-				kcop->hash_output, kcop->digestsize);
-		if (unlikely(ret))
+						   kcop->hash_output, kcop->digestsize);
+
+		if (unlikely(ret)) {
 			return -EFAULT;
+		}
 	}
+
 	if (kcop->ivlen && kcop->cop.flags & COP_FLAG_WRITE_IV) {
 		ret = copy_to_user(kcop->cop.iv,
-				kcop->iv, kcop->ivlen);
-		if (unlikely(ret))
+						   kcop->iv, kcop->ivlen);
+
+		if (unlikely(ret)) {
 			return -EFAULT;
+		}
 	}
+
 	return 0;
 }
 
 static int kcop_from_user(struct kernel_crypt_op *kcop,
-			struct fcrypt *fcr, void __user *arg)
+						  struct fcrypt *fcr, void __user *arg)
 {
-	if (unlikely(copy_from_user(&kcop->cop, arg, sizeof(kcop->cop))))
+	if (unlikely(copy_from_user(&kcop->cop, arg, sizeof(kcop->cop)))) {
 		return -EFAULT;
+	}
 
 	return fill_kcop_from_cop(kcop, fcr);
 }
 
 static int kcop_to_user(struct kernel_crypt_op *kcop,
-			struct fcrypt *fcr, void __user *arg)
+						struct fcrypt *fcr, void __user *arg)
 {
 	int ret;
 
 	ret = fill_cop_from_kcop(kcop, fcr);
+
 	if (unlikely(ret)) {
 		pr_err("Error in fill_cop_from_kcop");
 		return ret;
@@ -541,259 +682,1657 @@ static int kcop_to_user(struct kernel_crypt_op *kcop,
 	return 0;
 }
 
-static long crypto_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
+
+uint32_t sd_sm2_integration(struct file *filp, unsigned long arg, unsigned int cmd)
 {
-	long ret;
-	struct crypto_sm2_msg sm2_msg;
+	uint32_t ret;
 	int err;
-    int time_stamp;
-	const void * curve;
-	struct crypto_dev* crypto;
+	struct crypto_sm2_msg sm2_msg;
+	int time_stamp;
+	const void *curve;
+	struct crypto_dev *crypto;
+	size_t RSA_len;
+	uint8_t i = 0;
 	block_t message;
 	block_t key;
 	block_t signature;
+	block_t cipher;
+	block_t result;
+	crypto_rsa_keypair_t rsa_key;
+	rsa_pad_types_t rsa_pad_types;
+	/* UNIX - not MSDOS         */
+	ret = -ENOTTY;
+	struct mem_node *mem_n[3];
+	uint8_t *verify_msg_buff = NULL;
+	uint8_t *verify_sig_buff = NULL;
+	uint8_t *verify_key_buff = NULL;
 
+	for (i = 0; i < 3 ; i ++) {
+		mem_n[i] = ce_malloc(MAX_DIGESTSIZE);
+
+		if (unlikely(mem_n[i] == NULL)) {
+			while (i) {
+				ce_free(mem_n[--i]);
+			}
+
+			pr_err("first ce_malloc is wrong ");
+			return 4;
+		}
+	}
+
+	verify_msg_buff = mem_n[0]->ptr;
+	verify_sig_buff = mem_n[1]->ptr;
+	verify_key_buff = mem_n[2]->ptr;
+	// memset (verify_msg_buff, 0, MAX_ARREY_NUM);
+	// memset (verify_sig_buff, 0, MAX_ARREY_NUM);
+	// memset (verify_key_buff, 0, MAX_ARREY_NUM);
+	crypto = to_crypto_dev(filp->private_data);
+
+	if (cmd == SEMIDRIVE_CRYPTO_SM2_SET_TIME_STAMP) {
+		err = copy_from_user((char *)&time_stamp, (char __user *)arg, sizeof(int));
+
+		if (err < 0) {
+			pr_err("%s: copy_from_user (%p) failed (%d)\n", __func__, (char __user *)arg, err);
+			ce_inheap_free();
+			return err;
+		}
+
+		ce_inheap_free();
+		of_set_sys_cnt_ce(time_stamp);
+		return ret;
+	}
+
+	if (cmd == SEMIDRIVE_CRYPTO_SM2_GET_TIME_STAMP) {
+		ret = of_get_sys_cnt_ce();
+		err = copy_to_user((char __user *)arg, &ret, sizeof(uint32_t));
+
+		if (err < 0) {
+
+			ce_inheap_free();
+			return err;
+		}
+
+		ce_inheap_free();
+		return ret;
+	}
+
+	err = copy_from_user((char *)&sm2_msg, (char __user *)arg, sizeof(struct crypto_sm2_msg));
+
+	if (err < 0) {
+		ce_inheap_free();
+		return err;
+	}
+
+	err = copy_from_user((char *)&verify_msg_buff, (char __user *)(sm2_msg.msg), sm2_msg.msg_len);
+
+	if (err < 0) {
+		ce_inheap_free();
+		return err;
+	}
+
+	err = copy_from_user((char *)&verify_sig_buff, (char __user *)(sm2_msg.sig), sm2_msg.sig_len);
+
+	if (err < 0) {
+		ce_inheap_free();
+		return err;
+	}
+
+	if (sm2_msg.key_len > 0) {
+		err = copy_from_user((char *)&verify_key_buff, (char __user *)(sm2_msg.key), sm2_msg.key_len);
+
+		if (err < 0) {
+			ce_inheap_free();
+			return err;
+		}
+	}
+
+	//curve =   get_curve_value_by_nid(sm2_msg.curve_nid);
+	switch (cmd) {
+		case SEMIDRIVE_CRYPTO_SM2_VERIFY_NO_DIGEST:
+			message.addr = verify_msg_buff;
+			message.addr_type = EXT_MEM;
+			message.len = sm2_msg.msg_len;
+			key.addr = verify_key_buff;
+			key.addr_type = EXT_MEM;
+			key.len = sm2_msg.key_len;
+			signature.addr = verify_sig_buff;
+			signature.addr_type = EXT_MEM;
+			signature.len = sm2_msg.sig_len;
+			//sm2_generate_digest must use sx_ecc_sm2_curve_p256 , if use sx_ecc_sm2_curve_p256_rev will error
+			ret = sm2_verify_signature((void *)crypto, &sx_ecc_sm2_curve_p256, &message, &key, &signature, ALG_SM3);
+			break;
+
+		case SEMIDRIVE_CRYPTO_SM2_VERIFY_DIGEST:
+			message.addr = verify_msg_buff;
+			message.addr_type = EXT_MEM;
+			message.len = sm2_msg.msg_len;
+			key.addr = verify_key_buff;
+			key.addr_type = EXT_MEM;
+			key.len = sm2_msg.key_len;
+			signature.addr = verify_sig_buff;
+			signature.addr_type = EXT_MEM;
+			signature.len = sm2_msg.sig_len;
+			ret = sm2_verify_signature_digest_update((void *)crypto, &sx_ecc_sm2_curve_p256_rev, 0, &message, &key, sm2_msg.key_len, &signature);
+			break;
+
+		case SEMIDRIVE_CRYPTO_SM2_SET_PUBKEY:
+			key.addr = verify_key_buff;
+			key.addr_type = EXT_MEM;
+			key.len = sm2_msg.key_len;
+			ret = sm2_verify_update_pubkey((void *)crypto, &key, sx_ecc_sm2_curve_p256_rev.bytesize);
+			break;
+
+		case SEMIDRIVE_CRYPTO_SM2_VERIFY_MSG:
+			sm2_compute_id_digest((void *)crypto, crypto_gb_id_test, 16, crypto_gb_m, 32, verify_key_buff, 64);
+
+			memcpy(&crypto_gb_m[32], verify_msg_buff, sm2_msg.msg_len);
+
+			//printf_binary("z msg", crypto_gb_m, 46);
+			message.addr = crypto_gb_m;
+			message.addr_type = EXT_MEM;
+			message.len = sm2_msg.msg_len + 32;
+			key.addr = verify_key_buff;
+			key.addr_type = EXT_MEM;
+			key.len = sm2_msg.key_len;
+			signature.addr = verify_sig_buff;
+			signature.addr_type = EXT_MEM;
+			signature.len = sm2_msg.sig_len;
+			ret = sm2_generate_signature_update((void *)crypto, &sx_ecc_sm2_curve_p256_rev, &message, &key, &signature, ALG_SM3);
+			break;
+
+		default:
+			pr_warn("%s: Unhandled ioctl cmd: 0x%x\n", __func__, cmd);
+			ret = -EINVAL;
+	}
+
+	err = copy_to_user((char __user *)(sm2_msg.ret), &ret, sizeof(uint32_t));
+
+	if (err < 0) {
+		ce_inheap_free();
+		return err;
+	}
+
+	for (i = 0; i < 3 ; i ++) {
+		ce_free(mem_n[i]);
+	}
+
+	return ret;
+}
+
+
+
+
+uint32_t sd_rsa_encrypt(struct file *filp, unsigned long arg)
+{
+	uint32_t ret;
+	struct crypto_rsa_all_information rsa_msg;
+	int err;
+	int time_stamp;
+	struct crypto_dev *crypto;
+	size_t RSA_len;
+	uint8_t i = 0;
+	block_t message;
+	block_t key;
+	block_t signature;
+	block_t cipher;
+	block_t key_n;
+	block_t key_e;
+	block_t key_d;
+	block_t result;
+	crypto_rsa_keypair_t rsa_key;
+	rsa_pad_types_t rsa_pad_types;
+	ce_addr_type_t addr_type;
+	hash_alg_t hashType ;
+
+	struct mem_node *mem_n[7];
+	uint8_t *verify_msg_buff = NULL;
+	uint8_t *verify_sig_buff = NULL;
+	uint8_t *verify_cipher_buff = NULL;
+	uint8_t *verify_key_n_buff = NULL;
+	uint8_t *verify_key_e_buff = NULL;
+	uint8_t *verify_key_d_buff = NULL;
+	uint8_t *verify_final_result = NULL;
+
+	for (i = 0; i < 7 ; i ++) {
+		mem_n[i] = ce_malloc(MAX_DIGESTSIZE);
+
+		if (mem_n[i] == NULL) {
+			while (i) {
+				ce_free(mem_n[--i]);
+			}
+
+			pr_err("first ce_malloc is wrong ");
+			return 4;
+		}
+	}
+
+	verify_msg_buff = mem_n[0]->ptr;
+	verify_sig_buff = mem_n[1]->ptr;
+	verify_cipher_buff = mem_n[2]->ptr;
+	verify_key_n_buff = mem_n[3]->ptr;
+	verify_key_e_buff = mem_n[4]->ptr;
+	verify_key_d_buff = mem_n[5]->ptr;
+	verify_final_result = mem_n[6]->ptr;
+	/* UNIX - not MSDOS         */
+	ret = -ENOTTY;
+
+	crypto = to_crypto_dev(filp->private_data);
+	err = copy_from_user((char *)&rsa_msg, (char __user *)arg, sizeof(struct crypto_rsa_all_information));
+
+	if (err < 0) {
+		pr_err("%s: copy_from_user (%p) failed (%d)\n", __func__, (char __user *)arg, err);
+		ce_inheap_free();
+		return err;
+	}
+
+	err = copy_from_user((char *)verify_msg_buff, (char __user *)rsa_msg.msg, rsa_msg.msg_len);
+
+	if (err < 0) {
+		pr_err("%s: copy_from_user (%p) failed (%d)\n", __func__, (char __user *)rsa_msg.msg, err);
+		ce_inheap_free();
+		return err;
+	}
+
+	err = copy_from_user((char *)verify_cipher_buff, (char __user *)(rsa_msg.cipher), rsa_msg.cipher_len);
+
+	if (err < 0) {
+		pr_err("%s: copy_from_user (%p) failed (%d)\n", __func__, (char __user *)(rsa_msg.cipher), err);
+		ce_inheap_free();
+		return err;
+	}
+
+	err = copy_from_user((char *)verify_key_n_buff, (char __user *)(rsa_msg.rsa_keypair.n), rsa_msg.rsa_keypair.n_len);
+
+	if (err < 0) {
+		pr_err("%s: copy_from_user (%p) failed (%d)\n", __func__, (char __user *)(rsa_msg.rsa_keypair.n), err);
+		ce_inheap_free();
+		return err;
+	}
+
+	err = copy_from_user((char *)verify_key_e_buff, (char __user *)(rsa_msg.rsa_keypair.e), rsa_msg.rsa_keypair.e_len);
+
+	if (err < 0) {
+		pr_err("%s: copy_from_user (%p) failed (%d)\n", __func__, (char __user *)(rsa_msg.rsa_keypair.e), err);
+		ce_inheap_free();
+		return err;
+	}
+
+	err = copy_from_user((char *)verify_key_d_buff, (char __user *)(rsa_msg.rsa_keypair.d), rsa_msg.rsa_keypair.d_len);
+
+	if (err < 0) {
+		pr_err("%s: copy_from_user (%p) failed (%d)\n", __func__, (char __user *)(rsa_msg.rsa_keypair.d), err);
+		ce_inheap_free();
+		return err;
+	}
+
+	RSA_len = rsa_msg.cipher_len;
+	rsa_pad_types = (rsa_pad_types_t)rsa_msg.rsa_pad_types_temp;
+	addr_type = (ce_addr_type_t)rsa_msg.addr_type;
+	hashType = (hash_alg_t)rsa_msg.rsa_hashType;
+	message.addr = verify_msg_buff;
+	message.addr_type = addr_type;
+	message.len = rsa_msg.msg_len;
+	cipher.addr = verify_cipher_buff;
+	cipher.addr_type = addr_type;
+	cipher.len = rsa_msg.cipher_len;
+
+	key_n.addr = verify_key_n_buff;
+	key_n.addr_type = addr_type;
+	key_n.len = rsa_msg.rsa_keypair.n_len;
+
+	key_e.addr = verify_key_e_buff;
+	key_e.addr_type = addr_type;
+	key_e.len = rsa_msg.rsa_keypair.e_len;
+
+	key_d.addr = verify_key_d_buff;
+	key_d.addr_type = addr_type;
+	key_d.len = rsa_msg.rsa_keypair.d_len;
+
+	result.addr = verify_final_result;
+	result.addr_type = addr_type;
+	result.len = cipher.len;
+
+	ret = rsa_encrypt_blk((void *)crypto,
+						  rsa_pad_types, &message, &key_n, &key_e, &result, hashType);
+
+	if (ret < 0) {
+		ce_inheap_free();
+		pr_err("%s: rsa_encrypt_blk  failed (%d)\n", __func__, ret);
+		return ret;
+	}
+
+	err = copy_to_user((char __user *)(rsa_msg.final_result[0]), (char *)(verify_final_result), result.len);
+
+	if (err < 0) {
+		ce_inheap_free();
+		pr_err("%s: copy_to_user (%p) failed (%d)\n", __func__, (char __user *)(rsa_msg.final_result[0]), err);
+		return err;
+	}
+
+	err = copy_to_user((char __user *)(rsa_msg.ret), (char *)(&ret), sizeof(uint32_t));
+
+	if (err < 0) {
+		pr_err("%s: copy_to_user (%p) failed (%d)\n", __func__, (char __user *)rsa_msg.ret, err);
+		ce_inheap_free();
+		return err;
+	}
+
+	for (i = 0; i < 7 ; i ++) {
+		ce_free(mem_n[i]);
+	}
+
+	return 0;
+}
+
+uint32_t sd_rsa_decrypt(struct file *filp, unsigned long arg)
+{
+	uint32_t ret;
+	struct crypto_rsa_all_information rsa_msg;
+	int err;
+	int time_stamp;
+	struct crypto_dev *crypto;
+	size_t RSA_len;
+	uint8_t i = 0;
+	block_t message;
+	block_t key;
+	block_t signature;
+	block_t cipher;
+	block_t key_n;
+	block_t key_e;
+	block_t key_d;
+	block_t result;
+	crypto_rsa_keypair_t rsa_key;
+	rsa_pad_types_t rsa_pad_types;
+	ce_addr_type_t addr_type;
+	hash_alg_t hashType ;
+	crypto = to_crypto_dev(filp->private_data);
+	struct mem_node *mem_n[7];
+	uint8_t *verify_msg_buff = NULL;
+	uint8_t *verify_sig_buff = NULL;
+	uint8_t *verify_cipher_buff = NULL;
+	uint8_t *verify_key_n_buff = NULL;
+	uint8_t *verify_key_e_buff = NULL;
+	uint8_t *verify_key_d_buff = NULL;
+	uint8_t *verify_final_result = NULL;
+
+	for (i = 0; i < 7 ; i ++) {
+		mem_n[i] = ce_malloc(MAX_DIGESTSIZE);
+
+		if (mem_n[i] == NULL) {
+			while (i) {
+				ce_free(mem_n[i--]);
+			}
+
+			return 4;
+		}
+	}
+
+	verify_msg_buff = mem_n[0]->ptr;
+	verify_sig_buff = mem_n[1]->ptr;
+	verify_cipher_buff = mem_n[2]->ptr;
+	verify_key_n_buff = mem_n[3]->ptr;
+	verify_key_e_buff = mem_n[4]->ptr;
+	verify_key_d_buff = mem_n[5]->ptr;
+	verify_final_result = mem_n[6]->ptr;
+	/* UNIX - not MSDOS         */
+	ret = -ENOTTY;
+	err = copy_from_user((char *)&rsa_msg, (char __user *)arg, sizeof(struct crypto_rsa_all_information));
+
+	if (err < 0) {
+		pr_err("%s: copy_from_user (%p) failed (%d)\n", __func__, (char __user *)arg, err);
+		ce_inheap_free();
+		return err;
+	}
+
+	err = copy_from_user((char *)verify_msg_buff, (char __user *)rsa_msg.msg, rsa_msg.msg_len);
+
+	if (err < 0) {
+		pr_err("%s: copy_from_user (%p) failed (%d)\n", __func__, (char __user *)rsa_msg.msg, err);
+		ce_inheap_free();
+		return err;
+	}
+
+	err = copy_from_user((char *)verify_cipher_buff, (char __user *)rsa_msg.cipher, rsa_msg.cipher_len);
+
+	if (err < 0) {
+		pr_err("%s: copy_from_user (%p) failed (%d)\n", __func__, (char __user *)rsa_msg.cipher, err);
+		ce_inheap_free();
+		return err;
+	}
+
+	err = copy_from_user((char *)verify_key_n_buff, (char __user *)(rsa_msg.rsa_keypair.n), rsa_msg.rsa_keypair.n_len);
+
+	if (err < 0) {
+		pr_err("%s: copy_from_user (%p) failed (%d)\n", __func__, (char __user *)(rsa_msg.rsa_keypair.n), err);
+		ce_inheap_free();
+		return err;
+	}
+
+	err = copy_from_user((char *)verify_key_e_buff, (char __user *)(rsa_msg.rsa_keypair.e), rsa_msg.rsa_keypair.e_len);
+
+	if (err < 0) {
+		pr_err("%s: copy_from_user (%p) failed (%d)\n", __func__, (char __user *)(rsa_msg.rsa_keypair.e), err);
+		ce_inheap_free();
+		return err;
+	}
+
+	err = copy_from_user((char *)verify_key_d_buff, (char __user *)(rsa_msg.rsa_keypair.d), rsa_msg.rsa_keypair.d_len);
+
+	if (err < 0) {
+		pr_err("%s: copy_from_user (%p) failed (%d)\n", __func__, (char __user *)(rsa_msg.rsa_keypair.d), err);
+		ce_inheap_free();
+		return err;
+	}
+
+	RSA_len = rsa_msg.cipher_len;
+	rsa_pad_types = (rsa_pad_types_t)rsa_msg.rsa_pad_types_temp;
+	addr_type = (ce_addr_type_t)rsa_msg.addr_type;
+	hashType = (hash_alg_t)rsa_msg.rsa_hashType;
+	message.addr = verify_msg_buff;
+	message.addr_type = addr_type;
+	message.len = rsa_msg.msg_len;
+	cipher.addr = verify_cipher_buff;
+	cipher.addr_type = addr_type;
+	cipher.len = rsa_msg.cipher_len;
+
+	key_n.addr = verify_key_n_buff;
+	key_n.addr_type = addr_type;
+	key_n.len = rsa_msg.rsa_keypair.n_len;
+
+	key_e.addr = verify_key_e_buff;
+	key_e.addr_type = addr_type;
+	key_e.len = rsa_msg.rsa_keypair.e_len;
+
+	key_d.addr = verify_key_d_buff;
+	key_d.addr_type = addr_type;
+	key_d.len = rsa_msg.rsa_keypair.d_len;
+
+	result.addr = verify_final_result;
+	result.addr_type = addr_type;
+	result.len = rsa_msg.rsa_keypair.n_len;
+	ret = rsa_decrypt_blk((void *)crypto, rsa_pad_types, &cipher,
+						  &key_n, &key_d, &result, &result.len, hashType);
+
+	if (ret < 0)  {
+		pr_err("%s: rsa_decrypt_blk  failed (%d)\n", __func__, ret);
+		ce_inheap_free();
+		return ret;
+	}
+
+	err = copy_to_user((char __user *)(rsa_msg.final_result[0]), (char *)(verify_final_result), result.len);
+
+	if (err < 0) {
+		pr_err("%s: copy_to_user (%p) failed (%d)\n", __func__, (char __user *)(rsa_msg.final_result[0]), err);
+		ce_inheap_free();
+		return err;
+	}
+
+	err = copy_to_user((char __user *)(rsa_msg.ret), (char *)(&ret), sizeof(uint32_t));
+
+	if (err < 0) {
+		pr_err("%s: copy_to_user (%p) failed (%d)\n", __func__, (char __user *)rsa_msg.ret, err);
+		ce_inheap_free();
+		return err;
+	}
+
+	for (i = 0; i < 7 ; i ++) {
+		ce_free(mem_n[i]);
+	}
+
+	return 0;
+}
+
+uint32_t sd_rsa_crt_decrypt(struct file *filp, unsigned long arg)
+{
+	uint32_t ret;
+	struct crypto_rsa_crt_decrypt_information rsa_msg;
+	int err;
+	int time_stamp;
+	struct crypto_dev *crypto;
+	size_t RSA_len;
+	uint8_t i = 0;
+	block_t message;
+	block_t cipher;
+	block_t key_p;
+	block_t key_q;
+	block_t key_dP;
+	block_t key_dQ;
+	block_t key_qInv;
+	block_t result;
+	rsa_pad_types_t rsa_pad_types;
+	ce_addr_type_t addr_type;
+	hash_alg_t hashType ;
+	crypto = to_crypto_dev(filp->private_data);
+
+	struct mem_node *mem_n[9];
+	uint8_t *verify_msg_buff = NULL;
+	uint8_t *verify_sig_buff = NULL;
+	uint8_t *verify_cipher_buff = NULL;
+	uint8_t *verify_key_p_buff = NULL;
+	uint8_t *verify_key_q_buff = NULL;
+	uint8_t *verify_key_dP_buff = NULL;
+	uint8_t *verify_key_dQ_buff = NULL;
+	uint8_t *verify_key_qInv_buff = NULL;
+	uint8_t *verify_final_result = NULL;
+
+	for (i = 0; i < 9 ; i ++) {
+		mem_n[i] = ce_malloc(MAX_DIGESTSIZE);
+
+		if (mem_n[i] == NULL) {
+			while (i) {
+				ce_free(mem_n[i--]);
+			}
+
+			return 4;
+		}
+	}
+
+	verify_msg_buff = mem_n[0]->ptr;
+	verify_sig_buff = mem_n[1]->ptr;
+	verify_cipher_buff = mem_n[2]->ptr;
+	verify_key_p_buff = mem_n[3]->ptr;
+	verify_key_q_buff = mem_n[4]->ptr;
+	verify_key_dP_buff = mem_n[5]->ptr;
+	verify_key_dQ_buff = mem_n[6]->ptr;
+	verify_key_qInv_buff = mem_n[7]->ptr;
+	verify_final_result = mem_n[8]->ptr;
+	/* UNIX - not MSDOS         */
+	ret = -ENOTTY;
+	err = copy_from_user((char *)&rsa_msg, (char __user *)arg, sizeof(struct crypto_rsa_crt_decrypt_information));
+
+	if (err < 0) {
+		pr_err("%s: copy_from_user (%p) failed (%d)\n", __func__, (char __user *)arg, err);
+		ce_inheap_free();
+		return err;
+	}
+
+	err = copy_from_user((char *)verify_cipher_buff, (char __user *)rsa_msg.cipher, rsa_msg.cipher_len);
+
+	if (err < 0) {
+		pr_err("%s: copy_from_user (%p) failed (%d)\n", __func__, (char __user *)rsa_msg.p, err);
+		ce_inheap_free();
+		return err;
+	}
+
+	err = copy_from_user((char *)verify_key_p_buff, (char __user *)rsa_msg.p, rsa_msg.p_len);
+
+	if (err < 0) {
+		pr_err("%s: copy_from_user (%p) failed (%d)\n", __func__, (char __user *)rsa_msg.p, err);
+		ce_inheap_free();
+		return err;
+	}
+
+	err = copy_from_user((char *)verify_key_q_buff, (char __user *)rsa_msg.q, rsa_msg.q_len);
+
+	if (err < 0) {
+		pr_err("%s: copy_from_user (%p) failed (%d)\n", __func__, (char __user *)rsa_msg.q, err);
+		ce_inheap_free();
+		return err;
+	}
+
+	err = copy_from_user((char *)verify_key_dP_buff, (char __user *)(rsa_msg.dP), rsa_msg.dP_len);
+
+	if (err < 0) {
+		pr_err("%s: copy_from_user (%p) failed (%d)\n", __func__, (char __user *)(rsa_msg.dP), err);
+		ce_inheap_free();
+		return err;
+	}
+
+	err = copy_from_user((char *)verify_key_dQ_buff, (char __user *)(rsa_msg.dQ), rsa_msg.dQ_len);
+
+	if (err < 0) {
+		pr_err("%s: copy_from_user (%p) failed (%d)\n", __func__, (char __user *)(rsa_msg.dQ), err);
+		ce_inheap_free();
+		return err;
+	}
+
+	err = copy_from_user((char *)verify_key_qInv_buff, (char __user *)(rsa_msg.qInv), rsa_msg.qInv_len);
+
+	if (err < 0) {
+		pr_err("%s: copy_from_user (%p) failed (%d)\n", __func__, (char __user *)(rsa_msg.qInv), err);
+		ce_inheap_free();
+		return err;
+	}
+
+	RSA_len = rsa_msg.cipher_len;
+	rsa_pad_types = (rsa_pad_types_t)rsa_msg.rsa_pad_types_temp;
+	addr_type = (ce_addr_type_t)rsa_msg.addr_type;
+	hashType = (hash_alg_t)rsa_msg.rsa_hashType;
+	cipher.addr = verify_cipher_buff;
+	cipher.addr_type = addr_type;
+	cipher.len = rsa_msg.cipher_len;
+
+	key_p.addr = verify_key_p_buff;
+	key_p.addr_type = addr_type;
+	key_p.len = rsa_msg.p_len;
+
+	key_q.addr = verify_key_q_buff;
+	key_q.addr_type = addr_type;
+	key_q.len = rsa_msg.q_len;
+
+	key_dP.addr = verify_key_dP_buff;
+	key_dP.addr_type = addr_type;
+	key_dP.len = rsa_msg.dP_len;
+
+	key_dQ.addr = verify_key_dQ_buff;
+	key_dQ.addr_type = addr_type;
+	key_dQ.len = rsa_msg.dQ_len;
+
+	key_qInv.addr = verify_key_qInv_buff;
+	key_qInv.addr_type = addr_type;
+	key_qInv.len = rsa_msg.qInv_len;
+
+	result.addr = verify_final_result;
+	result.addr_type = addr_type;
+	result.len = RSA_len;
+	ret = rsa_crt_decrypt_blk((void *)crypto, rsa_pad_types, &cipher,
+							  &key_p, &key_q, &key_dP, &key_dQ, &key_qInv, &result, &result.len, hashType);
+
+	if (ret < 0)  {
+		pr_err("%s: rsa_crt_decrypt_blk  failed (%d)\n", __func__, ret);
+		ce_inheap_free();
+		return ret;
+	}
+
+	err = copy_to_user((char __user *)(rsa_msg.final_result[0]), (char *)(verify_final_result), result.len);
+
+	if (err < 0) {
+		pr_err("%s: copy_to_user (%p) failed (%d)\n", __func__, (char __user *)(rsa_msg.final_result[0]), err);
+		ce_inheap_free();
+		return err;
+	}
+
+	err = copy_to_user((char __user *)(rsa_msg.ret), (char *)(&ret), sizeof(uint32_t));
+
+	if (err < 0) {
+		pr_err("%s: copy_to_user (%p) failed (%d)\n", __func__, (char __user *)rsa_msg.ret, err);
+		ce_inheap_free();
+		return err;
+	}
+
+	for (i = 0; i < 8 ; i ++) {
+		ce_free(mem_n[i]);
+	}
+
+	return 0;
+}
+
+uint32_t sd_rsa_signature_generation(struct file *filp, unsigned long arg)
+{
+	uint32_t ret;
+	struct crypto_rsa_all_information rsa_msg;
+	int err;
+	int time_stamp;
+	struct crypto_dev *crypto;
+	size_t RSA_len;
+	uint8_t i = 0;
+	block_t message;
+	block_t key;
+	block_t signature;
+	block_t cipher;
+	block_t key_n;
+	block_t key_e;
+	block_t key_d;
+	block_t result;
+	crypto_rsa_keypair_t rsa_key;
+	rsa_pad_types_t rsa_pad_types;
+	ce_addr_type_t addr_type;
+	hash_alg_t hashType ;
+	int crt_status = 0;
+	crypto = to_crypto_dev(filp->private_data);
+	struct mem_node *mem_n[7];
+	uint8_t *verify_msg_buff = NULL;
+	uint8_t *verify_sig_buff = NULL;
+	uint8_t *verify_cipher_buff = NULL;
+	uint8_t *verify_key_n_buff = NULL;
+	uint8_t *verify_key_e_buff = NULL;
+	uint8_t *verify_key_d_buff = NULL;
+	uint8_t *verify_final_result = NULL;
+
+	for (i = 0; i < 7 ; i ++) {
+		mem_n[i] = ce_malloc(MAX_DIGESTSIZE);
+
+		if (mem_n[i] == NULL) {
+			while (i) {
+				ce_free(mem_n[i--]);
+			}
+
+			return 4;
+		}
+	}
+
+	verify_msg_buff = mem_n[0]->ptr;
+	verify_sig_buff = mem_n[1]->ptr;
+	verify_cipher_buff = mem_n[2]->ptr;
+	verify_key_n_buff = mem_n[3]->ptr;
+	verify_key_e_buff = mem_n[4]->ptr;
+	verify_key_d_buff = mem_n[5]->ptr;
+	verify_final_result = mem_n[6]->ptr;
+	/* UNIX - not MSDOS         */
+	ret = -ENOTTY;
+	err = copy_from_user((char *)&rsa_msg, (char __user *)arg, sizeof(struct crypto_rsa_all_information));
+
+	if (err < 0) {
+		pr_err("%s: copy_from_user (%p) failed (%d)\n", __func__, (char __user *)arg, err);
+		ce_inheap_free();
+		return err;
+	}
+
+	err = copy_from_user((char *)verify_msg_buff, (char __user *)rsa_msg.msg, rsa_msg.msg_len);
+
+	if (err < 0) {
+		pr_err("%s: copy_from_user (%p) failed (%d)\n", __func__, (char __user *)rsa_msg.msg, err);
+		ce_inheap_free();
+		return err;
+	}
+
+	err = copy_from_user((char *)verify_cipher_buff, (char __user *)rsa_msg.cipher, rsa_msg.cipher_len);
+
+	if (err < 0) {
+		pr_err("%s: copy_from_user (%p) failed (%d)\n", __func__, (char __user *)rsa_msg.cipher, err);
+		ce_inheap_free();
+		return err;
+	}
+
+	err = copy_from_user((char *)verify_sig_buff, (char __user *)rsa_msg.sig, rsa_msg.sig_len);
+
+	if (err < 0) {
+		pr_err("%s: copy_from_user (%p) failed (%d)\n", __func__, (char __user *)rsa_msg.sig, err);
+		ce_inheap_free();
+		return err;
+	}
+
+	err = copy_from_user((char *)verify_key_n_buff, (char __user *)(rsa_msg.rsa_keypair.n), rsa_msg.rsa_keypair.n_len);
+
+	if (err < 0) {
+		pr_err("%s: copy_from_user (%p) failed (%d)\n", __func__, (char __user *)(rsa_msg.rsa_keypair.n), err);
+		ce_inheap_free();
+		return err;
+	}
+
+	err = copy_from_user((char *)verify_key_e_buff, (char __user *)(rsa_msg.rsa_keypair.e), rsa_msg.rsa_keypair.e_len);
+
+	if (err < 0) {
+		pr_err("%s: copy_from_user (%p) failed (%d)\n", __func__, (char __user *)(rsa_msg.rsa_keypair.e), err);
+		ce_inheap_free();
+		return err;
+	}
+
+	err = copy_from_user((char *)verify_key_d_buff, (char __user *)(rsa_msg.rsa_keypair.d), rsa_msg.rsa_keypair.d_len);
+
+	if (err < 0) {
+		pr_err("%s: copy_from_user (%p) failed (%d)\n", __func__, (char __user *)(rsa_msg.rsa_keypair.d), err);
+		ce_inheap_free();
+		return err;
+	}
+
+	RSA_len = rsa_msg.cipher_len;
+	rsa_pad_types = (rsa_pad_types_t)rsa_msg.rsa_pad_types_temp;
+	addr_type = (ce_addr_type_t)rsa_msg.addr_type;
+	hashType = (hash_alg_t)rsa_msg.rsa_hashType;
+	message.addr = verify_msg_buff;
+	message.addr_type = addr_type;
+	message.len = rsa_msg.msg_len;
+	cipher.addr = verify_cipher_buff;
+	cipher.addr_type = addr_type;
+	cipher.len = rsa_msg.cipher_len;
+	signature.addr = verify_sig_buff;
+	signature.addr_type = addr_type;
+	signature.len = rsa_msg.sig_len;
+	key_n.addr = verify_key_n_buff;
+	key_n.addr_type = addr_type;
+	key_n.len = rsa_msg.rsa_keypair.n_len;
+
+	key_e.addr = verify_key_e_buff;
+	key_e.addr_type = addr_type;
+	key_e.len = rsa_msg.rsa_keypair.e_len;
+
+	key_d.addr = verify_key_d_buff;
+	key_d.addr_type = addr_type;
+	key_d.len = rsa_msg.rsa_keypair.d_len;
+
+	result.addr = verify_final_result;
+	result.addr_type = addr_type;
+	result.len = RSA_len;
+	ret = rsa_signature_generation_blk((void *)crypto, hashType, rsa_pad_types, &message,
+									   &result, &key_n, &key_d, 0);
+
+	if (ret < 0) {
+		pr_err("%s: rsa_signature_generation_blk  failed (%d)\n", __func__, ret);
+		ce_inheap_free();
+		return ret;
+	}
+
+	err = copy_to_user((char __user *)(rsa_msg.ret), (char *)(&ret), sizeof(uint32_t));
+
+	if (err < 0) {
+		pr_err("%s: copy_to_user (%p) failed (%d)\n", __func__, (char __user *)rsa_msg.ret, err);
+		ce_inheap_free();
+		return err;
+	}
+
+	err = copy_to_user((char __user *)(rsa_msg.final_result[0]), (char *)(verify_final_result), result.len);
+
+	if (err < 0) {
+		pr_err("%s: copy_to_user (%p) failed (%d)\n", __func__, (char __user *)(rsa_msg.final_result[0]), err);
+		ce_inheap_free();
+		return err;
+	}
+
+	for (i = 0; i < 7 ; i ++) {
+		ce_free(mem_n[i]);
+	}
+
+	return 0;
+}
+
+uint32_t sd_rsa_signature_verification(struct file *filp, unsigned long arg)
+{
+	uint32_t ret;
+	struct crypto_rsa_all_information rsa_msg;
+	int err;
+	int time_stamp;
+	struct crypto_dev *crypto;
+	size_t RSA_len;
+	uint8_t i = 0;
+	block_t message;
+	block_t key;
+	block_t signature;
+	block_t cipher;
+	block_t key_n;
+	block_t key_e;
+	block_t key_d;
+	block_t result;
+	crypto_rsa_keypair_t rsa_key;
+	rsa_pad_types_t rsa_pad_types;
+	ce_addr_type_t addr_type;
+	hash_alg_t hashType ;
+	int crt_status = 0;
+	crypto = to_crypto_dev(filp->private_data);
+	struct mem_node *mem_n[7];
+	uint8_t *verify_msg_buff = NULL;
+	uint8_t *verify_sig_buff = NULL;
+	uint8_t *verify_cipher_buff = NULL;
+	uint8_t *verify_key_n_buff = NULL;
+	uint8_t *verify_key_e_buff = NULL;
+	uint8_t *verify_key_d_buff = NULL;
+	uint8_t *verify_final_result = NULL;
+
+	for (i = 0; i < 7 ; i ++) {
+		mem_n[i] = ce_malloc(MAX_DIGESTSIZE);
+
+		if (mem_n[i] == NULL) {
+			while (i) {
+				ce_free(mem_n[i--]);
+			}
+
+			return 4;
+		}
+	}
+
+	verify_msg_buff = mem_n[0]->ptr;
+	verify_sig_buff = mem_n[1]->ptr;
+	verify_cipher_buff = mem_n[2]->ptr;
+	verify_key_n_buff = mem_n[3]->ptr;
+	verify_key_e_buff = mem_n[4]->ptr;
+	verify_key_d_buff = mem_n[5]->ptr;
+	verify_final_result = mem_n[6]->ptr;
+	/* UNIX - not MSDOS         */
+	ret = -ENOTTY;
+	err = copy_from_user((char *)&rsa_msg, (char __user *)arg, sizeof(struct crypto_rsa_all_information));
+
+	if (err < 0) {
+		pr_err("%s: copy_from_user (%p) failed (%d)\n", __func__, (char __user *)arg, err);
+		ce_inheap_free();
+		return err;
+	}
+
+	err = copy_from_user((char *)verify_msg_buff, (char __user *)rsa_msg.msg, rsa_msg.msg_len);
+
+	if (err < 0) {
+		pr_err("%s: copy_from_user (%p) failed (%d)\n", __func__, (char __user *)rsa_msg.msg, err);
+		ce_inheap_free();
+		return err;
+	}
+
+	err = copy_from_user((char *)verify_sig_buff, (char __user *)rsa_msg.sig, rsa_msg.sig_len);
+
+	if (err < 0) {
+		pr_err("%s: copy_from_user (%p) failed (%d)\n", __func__, (char __user *)rsa_msg.sig, err);
+		ce_inheap_free();
+		return err;
+	}
+
+	err = copy_from_user((char *)verify_key_n_buff, (char __user *)(rsa_msg.rsa_keypair.n), rsa_msg.rsa_keypair.n_len);
+
+	if (err < 0) {
+		pr_err("%s: copy_from_user (%p) failed (%d)\n", __func__, (char __user *)(rsa_msg.rsa_keypair.n), err);
+		ce_inheap_free();
+		return err;
+	}
+
+	err = copy_from_user((char *)verify_key_e_buff, (char __user *)(rsa_msg.rsa_keypair.e), rsa_msg.rsa_keypair.e_len);
+
+	if (err < 0) {
+		pr_err("%s: copy_from_user (%p) failed (%d)\n", __func__, (char __user *)(rsa_msg.rsa_keypair.e), err);
+		ce_inheap_free();
+		return err;
+	}
+
+	err = copy_from_user((char *)verify_key_d_buff, (char __user *)(rsa_msg.rsa_keypair.d), rsa_msg.rsa_keypair.d_len);
+
+	if (err < 0) {
+		pr_err("%s: copy_from_user (%p) failed (%d)\n", __func__, (char __user *)(rsa_msg.rsa_keypair.d), err);
+		ce_inheap_free();
+		return err;
+	}
+
+	RSA_len = rsa_msg.msg_len;
+	rsa_pad_types = (rsa_pad_types_t)rsa_msg.rsa_pad_types_temp;
+	addr_type = (ce_addr_type_t)rsa_msg.addr_type;
+	hashType = (hash_alg_t)rsa_msg.rsa_hashType;
+	message.addr = verify_msg_buff;
+	message.addr_type = addr_type;
+	message.len = rsa_msg.msg_len;
+	cipher.addr = NULL;
+	cipher.addr_type = addr_type;
+	cipher.len = rsa_msg.cipher_len;
+
+	key_n.addr = verify_key_n_buff;
+	key_n.addr_type = addr_type;
+	key_n.len = rsa_msg.rsa_keypair.n_len;
+
+	key_e.addr = verify_key_e_buff;
+	key_e.addr_type = addr_type;
+	key_e.len = rsa_msg.rsa_keypair.e_len;
+
+	key_d.addr = verify_key_d_buff;
+	key_d.addr_type = addr_type;
+	key_d.len = rsa_msg.rsa_keypair.d_len;
+
+	signature.addr = verify_sig_buff;
+	signature.addr_type = addr_type;
+	signature.len = rsa_msg.sig_len;
+
+	result.addr = verify_final_result;
+	result.addr_type = addr_type;
+	result.len = RSA_len;
+	ret = rsa_signature_verification_blk((void *)crypto, hashType, rsa_pad_types, &message,
+										 &key_n, &key_e, &signature, 0);
+
+	if (ret < 0) {
+		pr_err("%s: rsa_signature_verification_blk  failed (%d)\n", __func__, ret);
+		ce_inheap_free();
+		return ret;
+	}
+
+	err = copy_to_user((char __user *)(rsa_msg.ret), (char *)(&ret), sizeof(uint32_t));
+
+	if (err < 0) {
+		pr_err("%s: copy_to_user (%p) failed (%d)\n", __func__, (char __user *)rsa_msg.ret, err);
+		ce_inheap_free();
+		return err;
+	}
+
+	for (i = 0; i < 7 ; i ++) {
+		ce_free(mem_n[i]);
+	}
+
+	return 0;
+}
+
+uint32_t sd_rsa_priv_key_generation(struct file *filp, unsigned long arg)
+{
+	uint32_t ret;
+	struct crypto_rsa_priv_key_gen_information rsa_key;
+	int err;
+	int time_stamp;
+	struct crypto_dev *crypto;
+	size_t RSA_len;
+	uint8_t i = 0;
+	block_t key_p;
+	block_t key_q;
+	block_t key_n;
+	block_t key_e;
+	block_t key_d;
+	block_t result;
+	block_t result_1;
+	crypto = to_crypto_dev(filp->private_data);
+	struct mem_node *mem_n[7];
+	uint8_t *verify_key_p_buff = NULL;
+	uint8_t *verify_key_q_buff = NULL;
+	uint8_t *verify_key_n_buff = NULL;
+	uint8_t *verify_key_e_buff = NULL;
+	uint8_t *verify_key_d_buff = NULL;
+	uint8_t *verify_final_result = NULL;
+	uint8_t *verify_final_result_1 = NULL;
+
+	for (i = 0; i < 7 ; i ++) {
+		mem_n[i] = ce_malloc(MAX_DIGESTSIZE);
+
+		if (mem_n[i] == NULL) {
+			while (i) {
+				ce_free(mem_n[i--]);
+			}
+
+			return 4;
+		}
+	}
+
+	verify_key_p_buff = mem_n[0]->ptr;
+	verify_key_q_buff = mem_n[1]->ptr;
+	verify_key_n_buff = mem_n[2]->ptr;
+	verify_key_e_buff = mem_n[3]->ptr;
+	verify_key_d_buff = mem_n[4]->ptr;
+	verify_final_result = mem_n[5]->ptr;
+	verify_final_result_1 = mem_n[6]->ptr;
+	/* UNIX - not MSDOS         */
+	ret = -ENOTTY;
+	err = copy_from_user((char *)&rsa_key, (char __user *)arg, sizeof(struct crypto_rsa_priv_key_gen_information));
+
+	if (err < 0) {
+		pr_err("%s: copy_from_user (%p) failed (%d)\n", __func__, (char __user *)arg, err);
+		ce_inheap_free();
+		return err;
+	}
+
+	err = copy_from_user((char *)verify_key_p_buff, (char __user *)rsa_key.p, rsa_key.p_len);
+
+	if (err < 0) {
+		pr_err("%s: copy_from_user (%p) failed (%d)\n", __func__, (char __user *)rsa_key.p, err);
+		ce_inheap_free();
+		return err;
+	}
+
+	err = copy_from_user((char *)verify_key_q_buff, (char __user *)rsa_key.q, rsa_key.q_len);
+
+	if (err < 0) {
+		pr_err("%s: copy_from_user (%p) failed (%d)\n", __func__, (char __user *)rsa_key.q, err);
+		ce_inheap_free();
+		return err;
+	}
+
+	err = copy_from_user((char *)verify_key_e_buff, (char __user *)rsa_key.e, rsa_key.e_len);
+
+	if (err < 0) {
+		pr_err("%s: copy_from_user (%p) failed (%d)\n", __func__, (char __user *)rsa_key.e, err);
+		ce_inheap_free();
+		return err;
+	}
+
+	key_p.addr = verify_key_p_buff;
+	key_p.addr_type = EXT_MEM;
+	key_p.len = rsa_key.p_len;
+	key_q.addr = verify_key_q_buff;
+	key_q.addr_type = EXT_MEM;
+	key_q.len = rsa_key.q_len;
+	key_e.addr = verify_key_e_buff;
+	key_e.addr_type = EXT_MEM;
+	key_e.len = rsa_key.e_len;
+	result.addr = verify_final_result;
+	result.addr_type = EXT_MEM;
+	result.len = rsa_key.e_len;
+	result_1.addr = verify_final_result_1;
+	result_1.addr_type = EXT_MEM;
+	result_1.len = rsa_key.e_len;
+	ret = rsa_private_key_generation_blk((void *)crypto, &key_p, &key_q, &key_e, &result, &result_1,
+										 rsa_key.p_len, 0);
+
+	if (ret < 0) {
+		pr_err("%s: rsa_private_key_generation_blk  failed (%d)\n", __func__, ret);
+		ce_inheap_free();
+		return ret;
+	}
+
+	err = copy_to_user((char __user *)(rsa_key.ret), (char *)(&ret), sizeof(uint32_t));
+
+	if (err < 0) {
+		pr_err("%s: copy_to_user (%p) failed (%d)\n", __func__, (char __user *)rsa_key.ret, err);
+		ce_inheap_free();
+		return err;
+	}
+
+	err = copy_to_user((char __user *)(rsa_key.final_result[0]), (char *)(verify_final_result), result.len);
+
+	if (err < 0) {
+		pr_err("%s: copy_to_user (%p) failed (%d)\n", __func__, (char __user *)(rsa_key.final_result[0]), err);
+		ce_inheap_free();
+		return err;
+	}
+
+	err = copy_to_user((char __user *)(rsa_key.final_result[1]), (char *)(verify_final_result_1), result_1.len);
+
+	if (err < 0) {
+		pr_err("%s: copy_to_user (%p) failed (%d)\n", __func__, (char __user *)(rsa_key.final_result[1]), err);
+		ce_inheap_free();
+		return err;
+	}
+
+	for (i = 0; i < 7 ; i ++) {
+		ce_free(mem_n[i]);
+	}
+
+	return 0;
+}
+uint32_t sd_rsa_crt_key_generation(struct file *filp, unsigned long arg)
+{
+	uint32_t ret;
+	struct crypto_rsa_crt_key_gen_information rsa_key;
+	int err;
+	int time_stamp;
+	struct crypto_dev *crypto;
+	size_t RSA_len;
+	uint8_t i = 0;
+	block_t key_p;
+	block_t key_q;
+	block_t key_d;
+	block_t key_dp;
+	block_t key_dq;
+	block_t key_inv;
+	block_t result;
+	block_t result_1;
+	block_t result_2;
+	crypto = to_crypto_dev(filp->private_data);
+	struct mem_node *mem_n[9];
+	uint8_t *verify_key_p_buff = NULL;
+	uint8_t *verify_key_q_buff = NULL;
+	uint8_t *verify_key_d_buff = NULL;
+	uint8_t *verify_key_dP_buff = NULL;
+	uint8_t *verify_key_dQ_buff = NULL;
+	uint8_t *verify_key_qInv_buff = NULL;
+	uint8_t *verify_final_result = NULL;
+	uint8_t *verify_final_result_1 = NULL;
+	uint8_t *verify_final_result_2 = NULL;
+
+	for (i = 0; i < 9 ; i ++) {
+		mem_n[i] = ce_malloc(MAX_DIGESTSIZE);
+
+		if (mem_n[i] == NULL) {
+			while (i) {
+				ce_free(mem_n[i--]);
+			}
+
+			return 4;
+		}
+	}
+
+	verify_key_p_buff = mem_n[0]->ptr;
+	verify_key_q_buff = mem_n[1]->ptr;
+	verify_key_d_buff = mem_n[2]->ptr;
+	verify_key_dP_buff = mem_n[3]->ptr;
+	verify_key_dQ_buff = mem_n[4]->ptr;
+	verify_key_qInv_buff = mem_n[5]->ptr;
+	verify_final_result = mem_n[6]->ptr;
+	verify_final_result_1 = mem_n[7]->ptr;
+	verify_final_result_2 = mem_n[8]->ptr;
+	/* UNIX - not MSDOS         */
+	ret = -ENOTTY;
+	err = copy_from_user((char *)&rsa_key, (char __user *)arg, sizeof(struct crypto_rsa_priv_key_gen_information));
+
+	if (err < 0) {
+		pr_err("%s: copy_from_user (%p) failed (%d)\n", __func__, (char __user *)arg, err);
+		ce_inheap_free();
+		return err;
+	}
+
+	err = copy_from_user((char *)verify_key_p_buff, (char __user *)rsa_key.p, rsa_key.p_len);
+
+	if (err < 0) {
+		pr_err("%s: copy_from_user (%p) failed (%d)\n", __func__, (char __user *)rsa_key.p, err);
+		ce_inheap_free();
+		return err;
+	}
+
+	err = copy_from_user((char *)verify_key_q_buff, (char __user *)rsa_key.q, rsa_key.q_len);
+
+	if (err < 0) {
+		pr_err("%s: copy_from_user (%p) failed (%d)\n", __func__, (char __user *)rsa_key.q, err);
+		ce_inheap_free();
+		return err;
+	}
+
+	err = copy_from_user((char *)verify_key_d_buff, (char __user *)rsa_key.d, rsa_key.d_len);
+
+	if (err < 0) {
+		pr_err("%s: copy_from_user (%p) failed (%d)\n", __func__, (char __user *)rsa_key.d, err);
+		ce_inheap_free();
+		return err;
+	}
+
+	key_p.addr = verify_key_p_buff;
+	key_p.addr_type = EXT_MEM;
+	key_p.len = rsa_key.p_len;
+	key_q.addr = verify_key_q_buff;
+	key_q.addr_type = EXT_MEM;
+	key_q.len = rsa_key.q_len;
+	key_d.addr = verify_key_d_buff;
+	key_d.addr_type = EXT_MEM;
+	key_d.len = rsa_key.d_len;
+	result.addr = verify_final_result;
+	result.addr_type = EXT_MEM;
+	result.len = rsa_key.d_len;
+	result_1.addr = verify_final_result_1;
+	result_1.addr_type = EXT_MEM;
+	result_1.len = rsa_key.d_len;
+	result_2.addr = verify_final_result_2;
+	result_2.addr_type = EXT_MEM;
+	result_2.len = rsa_key.d_len;
+	ret = rsa_crt_key_generation_blk((void *)crypto, &key_p, &key_q, &key_d, &result, &result_1, &result_2,
+									 rsa_key.p_len);
+
+	if (ret < 0) {
+		pr_err("%s: rsa_crt_key_generation_blk  failed (%d)\n", __func__, ret);
+		ce_inheap_free();
+		return ret;
+	}
+
+	err = copy_to_user((char __user *)(rsa_key.ret), (char *)(&ret), sizeof(uint32_t));
+
+	if (err < 0) {
+		pr_err("%s: copy_to_user (%p) failed (%d)\n", __func__, (char __user *)rsa_key.ret, err);
+		ce_inheap_free();
+		return err;
+	}
+
+	err = copy_to_user((char __user *)(rsa_key.final_result[0]), (char *)(verify_final_result), result.len);
+
+	if (err < 0) {
+		pr_err("%s: copy_to_user (%p) failed (%d)\n", __func__, (char __user *)(rsa_key.final_result[0]), err);
+		ce_inheap_free();
+		return err;
+	}
+
+	err = copy_to_user((char __user *)(rsa_key.final_result[1]), (char *)(verify_final_result_1), result_1.len);
+
+	if (err < 0) {
+		pr_err("%s: copy_to_user (%p) failed (%d)\n", __func__, (char __user *)(rsa_key.final_result[1]), err);
+		ce_inheap_free();
+		return err;
+	}
+
+	err = copy_to_user((char __user *)(rsa_key.final_result[2]), (char *)(verify_final_result_2), result_2.len);
+
+	if (err < 0) {
+		pr_err("%s: copy_to_user (%p) failed (%d)\n", __func__, (char __user *)(rsa_key.final_result[2]), err);
+		ce_inheap_free();
+		return err;
+	}
+
+	for (i = 0; i < 9 ; i ++) {
+		ce_free(mem_n[i]);
+	}
+
+	return 0;
+}
+
+uint32_t sd_rsa_key_generation(struct file *filp, unsigned long arg)
+{
+	uint32_t ret;
+	struct crypto_rsa_key_information rsa_key;
+	int err;
+	uint8_t i = 0;
+	int time_stamp;
+	struct crypto_dev *crypto;
+	size_t RSA_len;
+	block_t key_e;
+	block_t key_n;
+	block_t key_p;
+	block_t key_q;
+	block_t key_d;
+	block_t result;
+	block_t result_1;
+	block_t result_2;
+	block_t result_3;
+	crypto = to_crypto_dev(filp->private_data);
+	struct mem_node *mem_n[9];
+	uint8_t *verify_key_e_buff = NULL;
+	uint8_t *verify_key_n_buff = NULL;
+	uint8_t *verify_key_p_buff = NULL;
+	uint8_t *verify_key_q_buff = NULL;
+	uint8_t *verify_key_d_buff = NULL;
+	uint8_t *verify_final_result = NULL;
+	uint8_t *verify_final_result_1 = NULL;
+	uint8_t *verify_final_result_2 = NULL;
+	uint8_t *verify_final_result_3 = NULL;
+
+	for (i = 0; i < 9 ; i ++) {
+		mem_n[i] = ce_malloc(MAX_DIGESTSIZE);
+
+		if (mem_n[i] == NULL) {
+			while (i) {
+				ce_free(mem_n[i--]);
+			}
+
+			return 4;
+		}
+	}
+
+	verify_key_e_buff = mem_n[0]->ptr;
+	verify_key_n_buff = mem_n[1]->ptr;
+	verify_key_p_buff = mem_n[2]->ptr;
+	verify_key_q_buff = mem_n[3]->ptr;
+	verify_key_d_buff = mem_n[4]->ptr;
+	verify_final_result = mem_n[5]->ptr;
+	verify_final_result_1 = mem_n[6]->ptr;
+	verify_final_result_2 = mem_n[7]->ptr;
+	verify_final_result_3 = mem_n[8]->ptr;
+	 /* UNIX - not MSDOS         */
+	ret = -ENOTTY;
+	err = copy_from_user((char *)&rsa_key, (char __user *)arg, sizeof(struct crypto_rsa_key_information));
+
+	if (err < 0) {
+		pr_err("%s: copy_from_user (%p) failed (%d)\n", __func__, (char __user *)arg, err);
+		ce_inheap_free();
+		return err;
+	}
+
+	err = copy_from_user((char *)verify_key_e_buff, (char __user *)rsa_key.e, rsa_key.keysize);
+
+	if (err < 0) {
+		pr_err("%s: copy_from_user (%p) failed (%d)\n", __func__, (char __user *)rsa_key.e, err);
+		ce_inheap_free();
+		return err;
+	}
+
+	RSA_len = rsa_key.keysize;
+	key_e.addr = verify_key_e_buff;
+	key_e.addr_type = EXT_MEM;
+	key_e.len = RSA_len;
+
+	key_n.addr = verify_final_result;
+	key_n.addr_type = EXT_MEM;
+	key_n.len = RSA_len;
+	key_p.addr = verify_final_result_1;
+	key_p.addr_type = EXT_MEM;
+	key_p.len = RSA_len;
+	key_q.addr = verify_final_result_2;
+	key_q.addr_type = EXT_MEM;
+	key_q.len = RSA_len;
+	key_d.addr = verify_final_result_3;
+	key_d.addr_type = EXT_MEM;
+	key_d.len = RSA_len;
+	ret = rsa_key_generation_blk((void *)crypto, RSA_len, &key_e, &key_p, &key_q, &key_n, &key_d, 0, 0);
+
+	if (ret < 0) {
+		pr_err("%s: rsa_key_generation_blk  failed (%d)\n", __func__, ret);
+		ce_inheap_free();
+		return ret;
+	}
+
+	err = copy_to_user((char __user *)(rsa_key.ret), (char *)(&ret), sizeof(uint32_t));
+
+	if (err < 0) {
+		pr_err("%s: copy_to_user (%p) failed (%d)\n", __func__, (char __user *)rsa_key.ret, err);
+		ce_inheap_free();
+		return err;
+	}
+
+	err = copy_to_user((char __user *)(rsa_key.final_result[0]), (char *)(verify_final_result), RSA_len);
+
+	if (err < 0) {
+		pr_err("%s: copy_to_user (%p) failed (%d)\n", __func__, (char __user *)(rsa_key.final_result[0]), err);
+		ce_inheap_free();
+		return err;
+	}
+
+	err = copy_to_user((char __user *)(rsa_key.final_result[1]), (char *)(verify_final_result_1), RSA_len);
+
+	if (err < 0) {
+		pr_err("%s: copy_to_user (%p) failed (%d)\n", __func__, (char __user *)(rsa_key.final_result[1]), err);
+		ce_inheap_free();
+		return err;
+	}
+
+	err = copy_to_user((char __user *)(rsa_key.final_result[2]), (char *)(verify_final_result_2), RSA_len);
+
+	if (err < 0) {
+		pr_err("%s: copy_to_user (%p) failed (%d)\n", __func__, (char __user *)(rsa_key.final_result[2]), err);
+		ce_inheap_free();
+		return err;
+	}
+
+	err = copy_to_user((char __user *)(rsa_key.final_result[3]), (char *)(verify_final_result_3), RSA_len);
+
+	if (err < 0) {
+		pr_err("%s: copy_to_user (%p) failed (%d)\n", __func__, (char __user *)(rsa_key.final_result[3]), err);
+		ce_inheap_free();
+		return err;
+	}
+
+	for (i = 0; i < 9 ; i ++) {
+		ce_free(mem_n[i]);
+	}
+
+	return 0;
+}
+
+
+static long crypto_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
+{
+	long ret;
+	int err;
+	struct crypto_dev *crypto;
+	crypto = to_crypto_dev(filp->private_data);
 	int __user *p = arg;
 	int fd;
 	struct session_op sop;
 	uint32_t ses;
 	struct kernel_crypt_op kcop;
 	struct fcrypt *fcr;
-	struct crypt_priv *pcr = filp->private_data;
+	struct crypt_priv *pcr = crypto->pcr;
 	fcr = &pcr->fcrypt;
 
 	ret = -ENOTTY;
 
-	crypto = to_crypto_dev(filp->private_data);
+	switch (_IOC_TYPE(cmd)) {
+		case SEMIDRIVE_CRYPTO_ALG_SM2:
 
-    switch(_IOC_TYPE(cmd)) {
-			case SEMIDRIVE_CRYPTO_ALG_SM2:
-			{
-				//pr_info("crypto_ioctl enter cmd=%d, arg=%p", cmd,(char __user *)arg);
-				if(cmd == SEMIDRIVE_CRYPTO_SM2_SET_TIME_STAMP){
-					err = copy_from_user((char *)&time_stamp, (char __user *)arg, sizeof(int));
-					if (err < 0) {
-					//pr_info("%s: copy_from_user (%p) failed (%d)\n", __func__, (char __user *)arg, err);
-						return err;
-					}
-					of_set_sys_cnt_ce(time_stamp);
-					return ret;
-				}
+			sd_sm2_integration(filp, arg, cmd);
+			break;
 
-				if(cmd == SEMIDRIVE_CRYPTO_SM2_GET_TIME_STAMP){
-					ret = of_get_sys_cnt_ce();
-					return copy_to_user((char __user *)arg, &ret, sizeof(int));
-				}
-				err = copy_from_user((char *)&sm2_msg, (char __user *)arg,
-						sizeof(struct crypto_sm2_msg));
-				if (err < 0) {
-					//pr_info("%s: copy_from_user (%p) failed (%d)\n", __func__, (char __user *)arg, err);
-					return err;
-				}
+		case SEMIDRIVE_CRYPTO_ALG_RSA:
 
-				err = copy_from_user((char *)&verify_msg_buff,
-						(char __user *)(sm2_msg.msg), sm2_msg.msg_len);
-				if (err < 0) {
-					//pr_info("%s: copy_from_user (%p) failed (%d)\n", __func__, (char __user *)(verify_msg.msg), err);
-					return err;
-				}
-				err = copy_from_user((char *)&verify_sig_buff,
-						(char __user *)(sm2_msg.sig), sm2_msg.sig_len);
-				if (err < 0) {
-					return err;
-				}
-				if(sm2_msg.key_len > 0){
-					err = copy_from_user((char *)&verify_key_buff,
-							(char __user *)(sm2_msg.key), sm2_msg.key_len);
-					if (err < 0) {
-						return err;
-					}
-				}
-				//curve =	get_curve_value_by_nid(sm2_msg.curve_nid);
-				switch (cmd) {
-				case SEMIDRIVE_CRYPTO_SM2_VERIFY_NO_DIGEST:
+			switch (cmd) {
+				case SEMIDRIVE_CRYPTO_ALG_RSA_ENC:
 
-					message.addr = verify_msg_buff;
-					message.addr_type = EXT_MEM;
-					message.len = sm2_msg.msg_len;
-
-					key.addr = verify_key_buff;
-					key.addr_type = EXT_MEM;
-					key.len = sm2_msg.key_len;
-
-					signature.addr = verify_sig_buff;
-					signature.addr_type = EXT_MEM;
-					signature.len = sm2_msg.sig_len;
-                    //sm2_generate_digest must use sx_ecc_sm2_curve_p256 , if use sx_ecc_sm2_curve_p256_rev will error
-					ret = sm2_verify_signature((void *)crypto, &sx_ecc_sm2_curve_p256, &message, &key, &signature, ALG_SM3);
-
+					ret = sd_rsa_encrypt(filp, arg);
 					break;
-				case SEMIDRIVE_CRYPTO_SM2_VERIFY_DIGEST:
-					message.addr = verify_msg_buff;
-					message.addr_type = EXT_MEM;
-					message.len = sm2_msg.msg_len;
 
-					key.addr = verify_key_buff;
-					key.addr_type = EXT_MEM;
-					key.len = sm2_msg.key_len;
+				case SEMIDRIVE_CRYPTO_ALG_RSA_DEC:
 
-					signature.addr = verify_sig_buff;
-					signature.addr_type = EXT_MEM;
-					signature.len = sm2_msg.sig_len;
-
-					ret = sm2_verify_signature_digest_update((void *)crypto, &sx_ecc_sm2_curve_p256_rev, 0, &message, &key, sm2_msg.key_len, &signature);
-
+					ret = sd_rsa_decrypt(filp, arg);
 					break;
-				case SEMIDRIVE_CRYPTO_SM2_SET_PUBKEY:
-					key.addr = verify_key_buff;
-					key.addr_type = EXT_MEM;
-					key.len = sm2_msg.key_len;
-					ret = sm2_verify_update_pubkey((void *)crypto, &key, sx_ecc_sm2_curve_p256_rev.bytesize);
+
+				case SEMIDRIVE_CRYPTO_ALG_RSA_CRT_DEC:
+
+					ret = sd_rsa_crt_decrypt(filp, arg);
 					break;
-				case SEMIDRIVE_CRYPTO_SM2_VERIFY_MSG:
-					sm2_compute_id_digest((void *)crypto, crypto_gb_id_test, 16, crypto_gb_m, 32, verify_key_buff, 64);
 
-					memcpy(&crypto_gb_m[32], verify_msg_buff, sm2_msg.msg_len);
+				case SEMIDRIVE_CRYPTO_ALG_RSA_SIG_GEN:
 
-					//printf_binary("z msg", crypto_gb_m, 46);
-
-					message.addr = crypto_gb_m;
-					message.addr_type = EXT_MEM;
-					message.len = sm2_msg.msg_len+32;
-
-					key.addr = verify_key_buff;
-					key.addr_type = EXT_MEM;
-					key.len = sm2_msg.key_len;
-
-					signature.addr = verify_sig_buff;
-					signature.addr_type = EXT_MEM;
-					signature.len = sm2_msg.sig_len;
-
-					ret = sm2_generate_signature_update((void *)crypto, &sx_ecc_sm2_curve_p256_rev, &message, &key, &signature, ALG_SM3);
+					ret = sd_rsa_signature_generation(filp, arg);
 					break;
-				default:
-					pr_warn("%s: Unhandled ioctl cmd: 0x%x\n",
-						__func__, cmd);
-					ret = -EINVAL;
-				}
-				//pr_info("crypto_ioctl out ret=%d", ret);
-				copy_to_user((char __user *)(sm2_msg.ret), &ret, sizeof(int));
-				return ret;
+
+				case SEMIDRIVE_CRYPTO_ALG_RSA_SIG_VERIFY:
+
+					ret = sd_rsa_signature_verification(filp, arg);
+					break;
+
+				case SEMIDRIVE_CRYPTO_ALG_RSA_PRIV_KEY_GEN:
+
+					ret = sd_rsa_priv_key_generation(filp, arg);
+					break;
+
+				case SEMIDRIVE_CRYPTO_ALG_RSA_CRT_KEY_GEN:
+
+					ret = sd_rsa_crt_key_generation(filp, arg);
+					break;
+
+				case SEMIDRIVE_CRYPTO_ALG_RSA_KEY_GEN:
+
+					ret = sd_rsa_key_generation(filp, arg);
+					break;
+
+				case 0:
+					break;
 			}
-				break;
-			case SEMIDRIVE_CRYPTO_ALG_RSA:
-				break;
-			case DEVCRYPTO_CRYPTO_TYPE:
-				switch(cmd) {
-					case CRIOGET:
-						fd = clonefd(filp);
-						ret = put_user(fd, p);
-						if (unlikely(ret)) {
-				#if (LINUX_VERSION_CODE < KERNEL_VERSION(4, 17, 0))
-							sys_close(fd);
-				#elif (LINUX_VERSION_CODE < KERNEL_VERSION(5, 11, 0))
-							ksys_close(fd);
-				#else
-							close_fd(fd);
-				#endif
-							return ret;
-						}
+
+
+
+
+		case SEMIDRIVE_CRYPTO_PAGE_OPERATE:
+			switch (cmd) {
+				case SEMIDRIVE_CRYPTO_GET_PAGE:
+
+					ret = ce_inheap_init();
+					break;
+
+				case SEMIDRIVE_CRYPTO_FREE_PAGE:
+
+					ce_inheap_free();
+					break;
+
+				case 0:
+					break;
+			}
+
+			break;
+
+		case DEVCRYPTO_CRYPTO_TYPE:
+			switch (cmd) {
+				case CRIOGET:
+					fd = clonefd(filp);
+					ret = put_user(fd, p);
+
+					if (unlikely(ret)) {
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(4, 17, 0))
+						sys_close(fd);
+#elif (LINUX_VERSION_CODE < KERNEL_VERSION(5, 11, 0))
+						ksys_close(fd);
+#else
+						close_fd(fd);
+#endif
 						return ret;
-					case CIOCGSESSION:
-						if (unlikely(copy_from_user(&sop, \
-							(void __user *)arg, sizeof(sop))))
-							return -EFAULT;
-
-						ret = crypto_create_session(fcr, &sop);
-						if (unlikely(ret))
-							return ret;
-						ret = copy_to_user(
-							(void __user *)arg, &sop, sizeof(sop));
-						if (unlikely(ret)) {
-							crypto_finish_session(fcr, sop.ses);
-							pr_err("CIOCG Line %d, ret: %ld\n", __LINE__, ret);
-							return -EFAULT;
-						}
-
-						return ret;
-					case CIOCFSESSION:
-						ret = get_user(ses, (uint32_t __user *)arg);
-						if (unlikely(ret))
-							return ret;
-						ret = crypto_finish_session(fcr, ses);
-						return ret;
-					case CIOCGSESSINFO:
-					/*
-						if (unlikely(copy_from_user(&siop, (void __user *)arg, sizeof(siop))))
-							return -EFAULT;
-
-						ret = get_session_info(fcr, &siop);
-						if (unlikely(ret))
-							return ret;
-						return copy_to_user(arg, &siop, sizeof(siop));
-					*/
-						return 1;
-					case CIOCCPHASH:
-					/*
-						if (unlikely(copy_from_user(&cphop, (void __user *)arg, sizeof(cphop))))
-							return -EFAULT;
-						return crypto_copy_hash_state(fcr, cphop.dst_ses, cphop.src_ses);
-					*/
-						return 1;
-					case CIOCCRYPT:
-						ret = kcop_from_user(&kcop, fcr, (void __user *)arg);
-						if (unlikely(ret)) {
-							pr_err("Error copying from user");
-							return ret;
-						}
-						ret = crypto_run(crypto, fcr, &kcop);
-						if (unlikely(ret)) {
-							pr_err("Error in crypto_run");
-							return ret;
-						}
-						return kcop_to_user(&kcop, fcr, (void __user *)arg);
-					case CIOCAUTHCRYPT:
-					/*
-						if (unlikely(ret = kcaop_from_user(&kcaop, fcr, (void __user *)arg))) {
-							pr_err("Error copying from user");
-							return ret;
-						}
-
-						ret = crypto_auth_run(fcr, &kcaop);
-						if (unlikely(ret)) {
-							dpr_err("Error in crypto_auth_run");
-							return ret;
-						}
-
-						return kcaop_to_user(&kcaop, fcr, (void __user *)arg);
-					*/
-						return 1;
 					}
-				break;
-			default:
-				pr_warn("%s: --Unhandled ioctl cmd: 0x%x\n",
-					__func__, cmd);
-				ret = -EINVAL;
+
+					return ret;
+
+				case CIOCGSESSION:
+					if (unlikely(copy_from_user(&sop, \
+												(void __user *)arg, sizeof(sop)))) {
+						return -EFAULT;
+					}
+
+					ret = crypto_create_session(fcr, &sop);
+
+					if (unlikely(ret)) {
+						return ret;
+					}
+
+					ret = copy_to_user(
+							  (void __user *)arg, &sop, sizeof(sop));
+
+					if (unlikely(ret)) {
+						crypto_finish_session(fcr, sop.ses);
+						pr_err("CIOCG Line %d, ret: %ld\n", __LINE__, ret);
+						return -EFAULT;
+					}
+
+					return ret;
+
+				case CIOCFSESSION:
+					ret = get_user(ses, (uint32_t __user *)arg);
+
+					if (unlikely(ret)) {
+						return ret;
+					}
+
+					ret = crypto_finish_session(fcr, ses);
+					return ret;
+
+				case CIOCGSESSINFO:
+					/*
+					    if (unlikely(copy_from_user(&siop, (void __user *)arg, sizeof(siop))))
+					        return -EFAULT;
+
+					    ret = get_session_info(fcr, &siop);
+					    if (unlikely(ret))
+					        return ret;
+					    return copy_to_user(arg, &siop, sizeof(siop));
+					*/
+					return 1;
+
+				case CIOCCPHASH:
+					/*
+					    if (unlikely(copy_from_user(&cphop, (void __user *)arg, sizeof(cphop))))
+					        return -EFAULT;
+					    return crypto_copy_hash_state(fcr, cphop.dst_ses, cphop.src_ses);
+					*/
+					return 1;
+
+				case CIOCCRYPT:
+					ret = kcop_from_user(&kcop, fcr, (void __user *)arg);
+
+					if (unlikely(ret)) {
+						pr_err("Error copying from user");
+						return ret;
+					}
+
+					ret = crypto_run(crypto, fcr, &kcop);
+
+					if (unlikely(ret)) {
+						pr_err("Error in crypto_run");
+						return ret;
+					}
+
+					return kcop_to_user(&kcop, fcr, (void __user *)arg);
+
+				case CIOCAUTHCRYPT:
+					/*
+					    if (unlikely(ret = kcaop_from_user(&kcaop, fcr, (void __user *)arg))) {
+					        pr_err("Error copying from user");
+					        return ret;
+					    }
+
+					    ret = crypto_auth_run(fcr, &kcaop);
+					    if (unlikely(ret)) {
+					        dpr_err("Error in crypto_auth_run");
+					        return ret;
+					    }
+
+					    return kcaop_to_user(&kcaop, fcr, (void __user *)arg);
+					*/
+					return 1;
+			}
+
+			break;
+
+		case 0:
+			break;
+
+		default:
+			pr_warn("%s: Unhandled ioctl cmd: 0x%x\n", __func__, cmd);
+			ret = -EINVAL;
 	}
 
 	return ret;
 }
 
 static ssize_t crypto_read(struct file *filp, char __user *userbuf, size_t len,
-			    loff_t *f_pos)
+						   loff_t *f_pos)
 {
 	return 0;
 }
 
 static ssize_t crypto_write(struct file *filp, const char __user *userbuf,
-			     size_t len, loff_t *f_pos)
+							size_t len, loff_t *f_pos)
 {
 
 	int rc = 0;
 
 	return rc;
 }
-static int crypto_ip_test(void*device)
+static int crypto_ip_test(void *device)
 {
 	int ret;
 	block_t message;
@@ -804,16 +2343,16 @@ static int crypto_ip_test(void*device)
 
 	sm2_compute_id_digest(device, crypto_gb_id_test, 16, crypto_gb_m, 32, crypto_gb_pub_key, 64);
 
-    memcpy(&crypto_gb_m[32], crypto_gb_sig_msg, 14);
+	memcpy(&crypto_gb_m[32], crypto_gb_sig_msg, 14);
 
 	//printf_binary("z msg", crypto_gb_m, 46);
-	message.addr = (uint8_t*)&crypto_gb_m;
+	message.addr = (uint8_t *)&crypto_gb_m;
 	message.addr_type = EXT_MEM;
 	message.len = 46;
-	key.addr = (uint8_t*)&crypto_gb_pub_key;
+	key.addr = (uint8_t *)&crypto_gb_pub_key;
 	key.addr_type = EXT_MEM;
 	key.len = 64;
-	signature.addr = (uint8_t*)&crypto_gb_ver_msg;
+	signature.addr = (uint8_t *)&crypto_gb_ver_msg;
 	signature.addr_type = EXT_MEM;
 	signature.len = 64;
 	ret = sm2_verify_signature(device, &sx_ecc_sm2_curve_p256, &message, &key, &signature, ALG_SM3);
@@ -823,26 +2362,22 @@ static int crypto_ip_test(void*device)
 
 static int crypto_open(struct inode *inode, struct file *filp)
 {
-	struct crypto_dev *crypto;
+	int ret;
+
+	pr_info("crypto_open enter ");
+	struct crypto_dev *crypto = to_crypto_dev(filp->private_data);
 	struct todo_list_item *tmp, *tmp_next;
 	struct crypt_priv *pcr;
 	int i;
 
-	crypto = to_crypto_dev(filp->private_data);
-
-	/* temporary remove lock acquire */
-	/*if (!mutex_trylock(&(crypto->lock))) {
-		pr_info("Device Busy\n");
-		return -EBUSY;
-	}*/
-
 	sm2_load_curve(crypto, &sx_ecc_sm2_curve_p256_rev, BA414EP_BIGEND);
-
 	pcr = kzalloc(sizeof(*pcr), GFP_KERNEL);
-	if (!pcr)
-		return -ENOMEM;
-	filp->private_data = pcr;
 
+	if (!pcr) {
+		return -ENOMEM;
+	}
+
+	crypto->pcr = pcr;
 	mutex_init(&pcr->fcrypt.sem);
 	mutex_init(&pcr->free.lock);
 	mutex_init(&pcr->todo.lock);
@@ -859,17 +2394,20 @@ static int crypto_open(struct inode *inode, struct file *filp)
 
 	for (i = 0; i < DEF_COP_RINGSIZE; i++) {
 		tmp = kzalloc(sizeof(struct todo_list_item), GFP_KERNEL);
-		if (!tmp)
+
+		if (!tmp) {
 			goto err_ringalloc;
+		}
+
 		pcr->itemcount++;
 
 		list_add(&tmp->__hook, &pcr->free.list);
 	}
 
 	return 0;
-
-/* In case of errors, free any memory allocated so far */
+	/* In case of errors, free any memory allocated so far */
 err_ringalloc:
+
 	list_for_each_entry_safe(tmp, tmp_next, &pcr->free.list, __hook) {
 		list_del(&tmp->__hook);
 		kfree(tmp);
@@ -879,23 +2417,21 @@ err_ringalloc:
 	mutex_destroy(&pcr->free.lock);
 	mutex_destroy(&pcr->fcrypt.sem);
 	kfree(pcr);
-	filp->private_data = NULL;
+	crypto->pcr = NULL;
 	return -ENOMEM;
 }
 
 static int crypto_release(struct inode *inode, struct file *filp)
 {
-	struct crypto_dev *crypto;
-	struct crypt_priv *pcr = filp->private_data;
+	pr_info("crypto_release enter ");
+	struct crypto_dev *crypto = to_crypto_dev(filp->private_data);
+	struct crypt_priv *pcr = crypto->pcr;
 	struct todo_list_item *item, *item_safe;
 	int items_freed = 0;
 
-	crypto = to_crypto_dev(filp->private_data);
-
-	//mutex_unlock(&(crypto->lock));
-
-	if (!pcr)
+	if (!pcr) {
 		return 0;
+	}
 
 	cancel_work_sync(&pcr->cryptask);
 
@@ -916,13 +2452,12 @@ static int crypto_release(struct inode *inode, struct file *filp)
 	mutex_destroy(&pcr->fcrypt.sem);
 
 	kfree(pcr);
-	filp->private_data = NULL;
+	crypto->pcr = NULL;
 
 	return 0;
 }
-
 static const struct semidrive_alg_ops *sd_alg_ops[] = {
-	//&ablkcipher_ops,
+
 	&ahash_ops,
 };
 
@@ -945,8 +2480,10 @@ static int semidrive_register_algs(struct crypto_dev *sdce)
 	for (i = 0; i < ARRAY_SIZE(sd_alg_ops); i++) {
 		ops = sd_alg_ops[i];
 		ret = ops->register_algs(sdce);
-		if (ret)
+
+		if (ret) {
 			break;
+		}
 	}
 
 	return ret;
@@ -960,8 +2497,11 @@ static int semidrive_handle_request(struct crypto_async_request *async_req)
 
 	for (i = 0; i < ARRAY_SIZE(sd_alg_ops); i++) {
 		ops = sd_alg_ops[i];
-		if (type != ops->type)
+
+		if (type != ops->type) {
 			continue;
+		}
+
 		ret = ops->async_req_handle(async_req);
 		break;
 	}
@@ -970,7 +2510,7 @@ static int semidrive_handle_request(struct crypto_async_request *async_req)
 }
 
 static int semidrive_handle_queue(struct crypto_dev *sdce,
-			    struct crypto_async_request *req)
+								  struct crypto_async_request *req)
 {
 	struct crypto_async_request *async_req, *backlog;
 	unsigned long flags;
@@ -978,8 +2518,9 @@ static int semidrive_handle_queue(struct crypto_dev *sdce,
 
 	spin_lock_irqsave(&sdce->lock, flags);
 
-	if (req)
+	if (req) {
 		ret = crypto_enqueue_request(&sdce->queue, req);
+	}
 
 	/* busy, do not dequeue request */
 	if (sdce->req) {
@@ -989,13 +2530,16 @@ static int semidrive_handle_queue(struct crypto_dev *sdce,
 
 	backlog = crypto_get_backlog(&sdce->queue);
 	async_req = crypto_dequeue_request(&sdce->queue);
-	if (async_req)
+
+	if (async_req) {
 		sdce->req = async_req;
+	}
 
 	spin_unlock_irqrestore(&sdce->lock, flags);
 
-	if (!async_req)
+	if (!async_req) {
 		return ret;
+	}
 
 	if (backlog) {
 		spin_lock_bh(&sdce->lock);
@@ -1004,6 +2548,7 @@ static int semidrive_handle_queue(struct crypto_dev *sdce,
 	}
 
 	err = semidrive_handle_request(async_req);
+
 	if (err) {
 		sdce->result = err;
 		tasklet_schedule(&sdce->done_tasklet);
@@ -1023,14 +2568,15 @@ static void semidrive_tasklet_req_done(unsigned long data)
 	sdce->req = NULL;
 	spin_unlock_irqrestore(&sdce->lock, flags);
 
-	if (req)
+	if (req) {
 		req->complete(req, sdce->result);
+	}
 
 	semidrive_handle_queue(sdce, NULL);
 }
 
 static int semidrive_async_request_enqueue(struct crypto_dev *sdce,
-				     struct crypto_async_request *req)
+		struct crypto_async_request *req)
 {
 	return semidrive_handle_queue(sdce, req);
 }
@@ -1042,12 +2588,12 @@ static void semidrive_async_request_done(struct crypto_dev *sdce, int ret)
 }
 
 static const struct file_operations crypto_fops = {
-	.open		= crypto_open,
-	.release	= crypto_release,
-	.unlocked_ioctl	= crypto_ioctl,
-	.read	= crypto_read,
-	.write	= crypto_write,
-	.owner		= THIS_MODULE,
+	.open       = crypto_open,
+	.release    = crypto_release,
+	.unlocked_ioctl = crypto_ioctl,
+	.read   = crypto_read,
+	.write  = crypto_write,
+	.owner      = THIS_MODULE,
 };
 
 static irqreturn_t crypto_irq_handler(int irq, void *data)
@@ -1059,18 +2605,20 @@ static irqreturn_t crypto_irq_handler(int irq, void *data)
 
 	//pr_info("crypto_irq_handler irq_value:%d\n", irq_value);
 
-    writel(0x1f, (crypto->base +REG_INTCLR_CE_(crypto->ce_id)));
+	writel(0x1f, (crypto->base + REG_INTCLR_CE_(crypto->ce_id)));
 
-	if(irq_value== 0x1){
+	if (irq_value == 0x1) {
 		crypto->dma_condition = 1;
 		wake_up_interruptible(&crypto->cedmawaitq);
 	}
-	if(irq_value== 0x8){
+
+	if (irq_value == 0x8) {
 		//pr_info("crypto_irq_handler wakeup hash %p\n",sm2);
 		crypto->hash_condition = 1;
 		wake_up_interruptible(&crypto->cehashwaitq);
 	}
-	if(irq_value== 0x10){
+
+	if (irq_value == 0x10) {
 		crypto->pke_condition = 1;
 		//wake_up_interruptible(&sm2->cepkewaitq);
 	}
@@ -1087,6 +2635,7 @@ static int semidrive_crypto_probe(struct platform_device *pdev)
 	struct semidrive_ce_device *ce_device;
 
 	pr_info("semidrive_crypto_probe enter");
+
 	if (&pdev->dev) {
 		pr_err("pdev->dev not null\n");
 	}
@@ -1097,24 +2646,29 @@ static int semidrive_crypto_probe(struct platform_device *pdev)
 
 	ce_device = (struct semidrive_ce_device *)platform_get_drvdata(pdev);
 
-	if (!ce_device)
+	if (!ce_device) {
 		return -ENOMEM;
+	}
 
 	crypto_inst = devm_kzalloc(&pdev->dev, sizeof(*crypto_inst), GFP_KERNEL);
-	if (!crypto_inst)
+
+	if (!crypto_inst) {
 		return -ENOMEM;
+	}
 
 	platform_set_drvdata(pdev, crypto_inst);
 
 	crypto_inst->base = ce_device->base;
 
-	if (IS_ERR(crypto_inst->base))
+	if (IS_ERR(crypto_inst->base)) {
 		return PTR_ERR(crypto_inst->base);
+	}
 
 	crypto_inst->sram_base = ce_device->sram_base;
 
-	if (IS_ERR(crypto_inst->sram_base))
+	if (IS_ERR(crypto_inst->sram_base)) {
 		return PTR_ERR(crypto_inst->sram_base);
+	}
 
 	crypto_inst->ce_id = ce_device->ce_id;
 	crypto_inst->dev = &pdev->dev;
@@ -1131,21 +2685,24 @@ static int semidrive_crypto_probe(struct platform_device *pdev)
 	}
 
 	ret = devm_request_threaded_irq(&pdev->dev, irq, crypto_irq_handler,
-					NULL, IRQF_ONESHOT,
-					dev_name(&pdev->dev), crypto_inst);
+									NULL, IRQF_ONESHOT,
+									dev_name(&pdev->dev), crypto_inst);
 
-    writel(0x1f, (crypto_inst->base +REG_INTCLR_CE_(crypto_inst->ce_id)));
-    //writel(0xe, (crypto_inst->base +REG_INTEN_CE_(ce_id))); //disable dma/pke intrrupt
-	writel(0x0, (crypto_inst->base +REG_INTEN_CE_(crypto_inst->ce_id))); //disable all intrrupt
+	writel(0x1f, (crypto_inst->base + REG_INTCLR_CE_(crypto_inst->ce_id)));
+	pr_err("crypto_inst->base is %x\n", crypto_inst->base);
+	pr_err("crypto_inst->ce_id is %x\n", crypto_inst->ce_id);
+	pr_err("addr is %x\n", (crypto_inst->base + REG_INTCLR_CE_(crypto_inst->ce_id)));
+	//writel(0xe, (crypto_inst->base +REG_INTEN_CE_(ce_id))); //disable dma/pke intrrupt
+	writel(0x0, (crypto_inst->base + REG_INTEN_CE_(crypto_inst->ce_id))); //disable all intrrupt
 
 	crypto_fn = &crypto_inst->miscdev;
 	sprintf(crypto_inst->name_buff, "semidrive-ce%d", crypto_inst->ce_id);
 
 	crypto_fn->minor = MISC_DYNAMIC_MINOR;
-  	crypto_fn->name = crypto_inst->name_buff;
-  	crypto_fn->fops = &crypto_fops;
+	crypto_fn->name = crypto_inst->name_buff;
+	crypto_fn->fops = &crypto_fops;
 
-	//mutex_init(&(crypto_inst->lock));
+	// mutex_init(&(crypto_inst->lock));
 
 	ret = misc_register(crypto_fn);
 
@@ -1156,15 +2713,17 @@ static int semidrive_crypto_probe(struct platform_device *pdev)
 
 	spin_lock_init(&crypto_inst->lock);
 	tasklet_init(&crypto_inst->done_tasklet, semidrive_tasklet_req_done,
-		     (unsigned long)crypto_inst);
+				 (unsigned long)crypto_inst);
 	crypto_init_queue(&crypto_inst->queue, SEMIDRIVE_QUEUE_LENGTH);
 
 	crypto_inst->async_req_enqueue = semidrive_async_request_enqueue;
 	crypto_inst->async_req_done = semidrive_async_request_done;
 
 	ret = semidrive_register_algs(crypto_inst);
-	if (ret)
+
+	if (ret) {
 		return ret;
+	}
 
 	return 0;
 }
@@ -1177,9 +2736,9 @@ static const struct of_device_id semidrive_crypto_match[] = {
 MODULE_DEVICE_TABLE(of, semidrive_crypto_match);
 
 static struct platform_driver semidrive_crypto_driver = {
-	.probe		= semidrive_crypto_probe,
-	.driver		= {
-		.name	= "semidrive-ce",
+	.probe      = semidrive_crypto_probe,
+	.driver     = {
+		.name   = "semidrive-ce",
 		.of_match_table = of_match_ptr(semidrive_crypto_match),
 	},
 };

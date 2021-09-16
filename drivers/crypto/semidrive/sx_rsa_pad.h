@@ -7,14 +7,12 @@
 #ifndef SX_RSA_PAD_H
 #define SX_RSA_PAD_H
 
-#include <stdint.h>
 #include <stddef.h>
 #include "sx_hash.h"
-//#include "sx_rng.h"
 
 /**
  * Encode a message using OAEP
- * @param  vce_id   vce index
+ * @param  device   device pointer
  * @param  k        RSA parameter length in bytes
  * @param  hashType The hash function to use (default is SHA1)
  * @param  EM       Pointer to the encoded message (EM) buffer
@@ -23,16 +21,16 @@
  * @param  rng      Random number generator to use
  * @return          CRYPTOLIB_SUCCESS when no error occurs
  */
-uint32_t rsa_pad_eme_oaep_encode(uint32_t vce_id,
-                                 uint32_t k,
-                                 hash_alg_t hashType,
-                                 uint8_t* EM,
-                                 block_t message,
-                                 size_t mLen);
+uint32_t rsa_pad_eme_oaep_encode(void *device,
+								 uint32_t k,
+								 hash_alg_t hashType,
+								 uint8_t *EM,
+								 block_t *message,
+								 size_t mLen);
 
 /**
  * Decode a message using OEAP
- * @param  vce_id   vce index
+ * @param  device   device pointer
  * @param  k        RSA parameter length in bytes
  * @param  hashType the hash function to use (default is SHA1)
  * @param  EM       Pointer to the encoded message (EM) buffer
@@ -41,28 +39,28 @@ uint32_t rsa_pad_eme_oaep_encode(uint32_t vce_id,
  * @param  mLen     Output: Length of the decoded message
  * @return          CRYPTOLIB_SUCCESS when no error occurs
  */
-uint32_t rsa_pad_eme_oaep_decode(uint32_t vce_id,
-                                 uint32_t k,
-                                 hash_alg_t hashType,
-                                 uint8_t* EM,
-                                 uint8_t** message,
-                                 size_t* mLen);
+uint32_t rsa_pad_eme_oaep_decode(void *device,
+								 uint32_t k,
+								 hash_alg_t hashType,
+								 uint8_t *EM,
+								 uint8_t **message,
+								 size_t *mLen);
 
 /**
  * Encode message using PKCS
- * @param  vce_id   vce index
+ * @param  device   device pointer
  * @param  k        RSA parameter length in bytes
  * @param  EM       Pointer to the encoded message (EM) buffer
  * @param  message  Block containing address of the message to encode
  * @param  mLen     Len of the message to be encoded (bytes)
- * @param  rng      random number generator to use
+ * @param  rng      random number generator rsa_pad_eme_pkcs_encodeto use
  * @return          CRYPTOLIB_SUCCESS when no error occurs
  */
-uint32_t rsa_pad_eme_pkcs_encode(uint32_t vce_id,
-                                 uint32_t k,
-                                 uint8_t* EM,
-                                 block_t message,
-                                 size_t mLen);
+uint32_t rsa_pad_eme_pkcs_encode(void *device,
+								 uint32_t k,
+								 uint8_t *EM,
+								 block_t *message,
+								 size_t mLen);
 
 /**
  * Decodes encoded message using PKCS. message will point to the decoded message in EM
@@ -74,13 +72,13 @@ uint32_t rsa_pad_eme_pkcs_encode(uint32_t vce_id,
  * @return          CRYPTOLIB_SUCCESS when no error occurs
  */
 uint32_t rsa_pad_eme_pkcs_decode(uint32_t k,
-                                 uint8_t* EM,
-                                 uint8_t** message,
-                                 size_t* mLen);
+								 uint8_t *EM,
+								 uint8_t **message,
+								 size_t *mLen);
 
 /**
  * Encode hash using PKCS
- * @param  vce_id    vce index
+ * @param  device    device pointer
  * @param  emLen     Length of encoded message (EM) buffer (RSA parameter length
  *                   in bytes)
  * @param  hash_type Hash function used for hashing \p hash (also used for the
@@ -89,16 +87,16 @@ uint32_t rsa_pad_eme_pkcs_decode(uint32_t k,
  * @param  hash      Input: Hash to encode
  * @return           CRYPTOLIB_SUCCESS if no error occurs
  */
-uint32_t rsa_pad_emsa_pkcs_encode(uint32_t vce_id,
-                                  uint32_t emLen,
-                                  hash_alg_t hash_type,
-                                  uint8_t* EM,
-                                  uint8_t* hash);
+uint32_t rsa_pad_emsa_pkcs_encode(void *device,
+								  uint32_t emLen,
+								  hash_alg_t hash_type,
+								  uint8_t *EM,
+								  uint8_t *hash);
 
 /**
  * Encode hash using PSS. This function uses a salt length equal to the hash
  * digest length.
- * @param  vce_id    vce index
+ * @param  device   device pointer
  * @param  emLen     Length of encoded message (EM) buffer (RSA parameter length
  *                   in bytes)
  * @param  hashType  Hash function used for hashing \p hash (also used for PKCS
@@ -111,17 +109,17 @@ uint32_t rsa_pad_emsa_pkcs_encode(uint32_t vce_id,
  * @param  rng       Random number generator to use
  * @return           CRYPTOLIB_SUCCESS if no error occurs
  */
-uint32_t rsa_pad_emsa_pss_encode(uint32_t vce_id,
-                                 uint32_t emLen,
-                                 hash_alg_t hashType,
-                                 uint8_t* EM,
-                                 uint8_t* hash,
-                                 uint32_t n0,
-                                 size_t sLen);
+uint32_t rsa_pad_emsa_pss_encode(void *device,
+								 uint32_t emLen,
+								 hash_alg_t hashType,
+								 uint8_t *EM,
+								 uint8_t *hash,
+								 uint32_t n0,
+								 size_t sLen);
 
 /**
  * Decode encoded message using PSS and compares hash to the decoded hash
- * @param  vce_id    vce index
+ * @param  device   device pointer
  * @param  emLen     Length of encoded message (EM) buffer (RSA parameter length
  *                   in bytes)
  * @param  hashType  Hash function used for hasing \p hash
@@ -132,13 +130,13 @@ uint32_t rsa_pad_emsa_pss_encode(uint32_t vce_id,
  *                   modulus size)
  * @return           CRYPTOLIB_SUCCESS if no error occurs and hash is valid
  */
-uint32_t rsa_pad_emsa_pss_decode(uint32_t vce_id,
-                                 uint32_t emLen,
-                                 hash_alg_t hashType,
-                                 uint8_t* EM,
-                                 uint8_t* hash,
-                                 uint32_t sLen,
-                                 uint32_t n0);
+uint32_t rsa_pad_emsa_pss_decode(void *device,
+								 uint32_t emLen,
+								 hash_alg_t hashType,
+								 uint8_t *EM,
+								 uint8_t *hash,
+								 uint32_t sLen,
+								 uint32_t n0);
 
 /**
  * Pads the hash of \p hashLen to \p EM of \p emLen. MSBs are set to 0.
@@ -149,9 +147,9 @@ uint32_t rsa_pad_emsa_pss_decode(uint32_t vce_id,
  * @param hash    Input to pad
  * @param hashLen Length of the input
  */
-void rsa_pad_zeros(uint8_t* EM,
-                   size_t emLen,
-                   uint8_t* hash,
-                   size_t hashLen);
+void rsa_pad_zeros(uint8_t *EM,
+				   size_t emLen,
+				   uint8_t *hash,
+				   size_t hashLen);
 
 #endif
