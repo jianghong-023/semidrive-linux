@@ -660,7 +660,6 @@ sdrv_gpio_get_pdata(struct device *dev, struct sdrv_gpio *gpio)
 	struct sdrv_port_property *pp;
 	int nports;
 	int i;
-	int gpio_count = 0;
 
 	nports = device_get_child_node_count(dev);
 	if (nports == 0)
@@ -699,7 +698,6 @@ sdrv_gpio_get_pdata(struct device *dev, struct sdrv_gpio *gpio)
 		}
 
 		pp->ngpio = pp->gpio_ranges[3];
-		gpio_count += pp->ngpio;
 
 		if (fwnode_property_read_bool(fwnode,
 						  "interrupt-controller")) {
@@ -710,18 +708,12 @@ sdrv_gpio_get_pdata(struct device *dev, struct sdrv_gpio *gpio)
 		}
 
 		pp->irq_shared	= false;
-		pp->gpio_base	= -1;
+		pp->gpio_base	= pp->gpio_ranges[2];
 
 		/*
 		 * dts "reg" is regsiter port index(0~4),
 		 */
 		i++;
-	}
-
-	for (i = 0; i < nports; i++) {
-		pp = &properties[i];
-		pp->gpio_base	= ARCH_NR_GPIOS - gpio_count;
-		gpio_count -= pp->ngpio;
 	}
 
 	return properties;
