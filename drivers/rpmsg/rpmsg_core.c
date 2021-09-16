@@ -412,9 +412,19 @@ static ssize_t modalias_show(struct device *dev,
 }
 static DEVICE_ATTR_RO(modalias);
 
+static ssize_t devtype_show(struct device *dev,
+			    struct device_attribute *attr, char *buf)
+{
+	struct rpmsg_device *rpdev = to_rpmsg_device(dev);
+
+	return sprintf(buf, RPMSG_DEVICE_MODALIAS_FMT "\n", rpdev->id.name);
+}
+static DEVICE_ATTR_RO(devtype);
+
 static struct attribute *rpmsg_dev_attrs[] = {
 	&dev_attr_name.attr,
 	&dev_attr_modalias.attr,
+	&dev_attr_devtype.attr,
 	&dev_attr_dst.attr,
 	&dev_attr_src.attr,
 	&dev_attr_announce.attr,

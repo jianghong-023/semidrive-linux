@@ -336,30 +336,8 @@ static void eth_xmit_work_handler(struct work_struct *work)
 	}
 }
 
-static ssize_t devtype_show(struct device *dev,
-			     struct device_attribute *attr, char *buf)
-{
-	struct net_device *ndev = to_net_dev(dev);
-	struct rpmsg_eth_device *eth;
-	struct rpmsg_device *rpdev;
-
-	eth = netdev_priv(ndev);
-	rpdev = eth->rpmsg_chnl;
-
-	return sprintf(buf, RPMSG_DEVICE_MODALIAS_FMT "\n", rpdev->id.name);
-}
-static DEVICE_ATTR_RO(devtype);
-
-
-static struct attribute *rpmsg_net_attrs[] = {
-	&dev_attr_devtype.attr,
-	NULL,
-};
-ATTRIBUTE_GROUPS(rpmsg_net);
-
 static struct device_type rpmsg_eth_type = {
 	.name = "rpmsg",
-	.groups = rpmsg_net_groups,
 };
 
 static void rpmsg_netdev_setup(struct net_device *ndev)
