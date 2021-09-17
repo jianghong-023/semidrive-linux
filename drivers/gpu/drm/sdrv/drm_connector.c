@@ -159,11 +159,11 @@ static int sdrv_connector_register(struct drm_device *drm,
 {
 	struct drm_encoder *encoder = &sdrv_conn->encoder;
 	struct drm_connector *connector = &sdrv_conn->connector;
-	struct device *dev = sdrv_conn->dev;
+	struct device_node *np = sdrv_conn->np;
 	int ret;
 
 	encoder->possible_crtcs = sdrv_drm_find_possible_crtcs(drm,
-			dev->of_node);
+			sdrv_conn->np);
 	if(!encoder->possible_crtcs)
 		return -EPROBE_DEFER;
 
@@ -171,14 +171,14 @@ static int sdrv_connector_register(struct drm_device *drm,
 	ret = drm_encoder_init(drm, encoder, &sdrv_encoder_funcs,
 			DRM_MODE_ENCODER_NONE, NULL);
 	if(ret) {
-		DRM_DEV_ERROR(dev, "Failed to initialize encoder with drm\n");
+		DRM_ERROR("Failed to initialize encoder with drm\n");
 		return ret;
 	}
 
 	if(sdrv_conn->bridge) {
 		ret = drm_bridge_attach(encoder, sdrv_conn->bridge, NULL);
 		if(ret < 0) {
-			DRM_DEV_ERROR(dev, "Failed to attach bridge\n");
+			DRM_ERROR("Failed to attach bridge\n");
 			goto err_encoder_cleanup;
 		}
 	} else {
@@ -220,7 +220,7 @@ static int sdrv_connector_bind(struct device *dev,
 	if(!sdrv_conn)
 		return -ENOMEM;
 
-	sdrv_conn->dev = dev;
+	sdrv_conn->np = np;
 	sdrv_conn->ops = match_data->ops;
 
 	if (!sdrv_conn->ops) {
