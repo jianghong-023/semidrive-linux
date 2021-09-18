@@ -17,7 +17,11 @@ override SUPPORT_BUFFER_SYNC := 1
 endif
 
 ifeq ($(CONFIG_PM_DEVFREQ),y)
+ifeq ($(CONFIG_DEVFREQ_GOV_USERSPACE),y)
 override SUPPORT_LINUX_DVFS := 1
+else ifeq ($(CONFIG_DEVFREQ_GOV_SIMPLE_ONDEMAND),y)
+override SUPPORT_LINUX_DVFS := 1
+endif
 endif
 
 override PVR_BUILD_TYPE := release
