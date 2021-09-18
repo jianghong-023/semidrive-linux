@@ -31,15 +31,15 @@ struct sdrv_conn_ops {
 };
 
 struct sdrv_connector {
-	struct device *dev;
+	struct device_node *np;
 	u32 connector_type;
-	struct drm_encoder encoder;
-	struct drm_connector connector;
-	struct drm_display_mode mode;
 	struct drm_panel *panel;
 	struct drm_bridge *bridge;
 	struct sdrv_conn_ops *ops;
 	void *priv;
+	struct drm_encoder encoder;
+	struct drm_connector connector;
+	struct drm_display_mode mode;
 };
 
 struct connector_type {
