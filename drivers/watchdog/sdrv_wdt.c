@@ -391,11 +391,10 @@ void sdrv_set_bootreason(enum reboot_mode reboot_mode, const char *cmd)
 		pr_err("boot reg no found from dts\n");
 	}
 }
-void sdrv_restart(enum reboot_mode reboot_mode, const char *cmd)
+void sdrv_restart_without_reason(void)
 {
 	struct sdrv_wdt_priv *sdrv_wdt = watchdog_get_drvdata(&sdrv_wtd_wdd);
 
-	sdrv_set_bootreason(reboot_mode, cmd);
 	if (!sdrv_wdt_is_running(sdrv_wdt)) {
 		/* run watchdog, and don't kick it */
 		arch_flush_dcache_all();
@@ -404,6 +403,11 @@ void sdrv_restart(enum reboot_mode reboot_mode, const char *cmd)
 		/* kick watchdog with an impossible delay */
 		sdrv_wtd_wdd.min_hw_heartbeat_ms =  0xffffffff;
 	}
+}
+void sdrv_restart(enum reboot_mode reboot_mode, const char *cmd)
+{
+	sdrv_set_bootreason(reboot_mode, cmd);
+	sdrv_restart_without_reason();
 }
 
 void sdrv_poweroff(void)

@@ -39,9 +39,11 @@
 #ifdef CONFIG_SDRV_WATCHDOG
 extern void sdrv_restart(enum reboot_mode reboot_mode, const char *cmd);
 extern void sdrv_set_bootreason(enum reboot_mode reboot_mode, const char *cmd);
+extern void sdrv_restart_without_reason(void);
 #else
 static void sdrv_restart(enum reboot_mode reboot_mode, const char *cmd) {}
 static void sdrv_set_bootreason(enum reboot_mode reboot_mode, const char *cmd) {}
+static void sdrv_restart_without_reason(void) {}
 #endif
 /*
  * While a 64-bit OS can make calls with SMC32 calling conventions, for some
@@ -166,9 +168,10 @@ void arm_smccc_native(unsigned long function_id,
 {
 	int cpunum = ((arg0>>8) & 0xff);
 	uint32_t value;
-	void __iomem *iobase;
+	void __iomem *iobase = NULL;
 	unsigned long pbootbase = arg1;
 
+	res->a0 = 0;
 	/*cpu on*/
 	if (function_id == 0xc4000003) {
 		unsigned long offsethigh, offsetlow;
@@ -195,11 +198,24 @@ void arm_smccc_native(unsigned long function_id,
 		rstgen_sec_module_rst(cpunum+21, 1);
 	} else if (function_id == 0x84000002) {/*cpu off*/
 		rstgen_sec_module_rst(cpunum+21, 0);
+	} else if (function_id == 0x84000000) { /* get version */
+		res->a0 = 0x00010000;
+	} else if (function_id == PSCI_0_2_FN_SYSTEM_RESET) { /* reboot */
+		sdrv_restart_without_reason();
+		while(1);
+	} else if (function_id == PSCI_1_0_FN_PSCI_FEATURES) { /* psci feature */
+		if(arg0 == PSCI_FN_NATIVE(1_0, SYSTEM_SUSPEND))
+			res->a0 = 0;
+		else {
+			pr_info("not support function id 0x%lx", arg0);
+			res->a0 = PSCI_RET_NOT_SUPPORTED;
+		}
 	} else{
-		pr_err("not implement current function 0x%lx\n", function_id);
+		pr_info("not implement current function 0x%lx\n", function_id);
+		res->a0 = PSCI_RET_NOT_SUPPORTED;
 	}
-	res->a0 = 0;
-	iounmap(iobase);
+	if (iobase)
+		iounmap(iobase);
 
 }
 static unsigned long __invoke_psci_fn_native(unsigned long function_id,
@@ -736,7 +752,7 @@ static int __init psci_0_2_init(struct device_node *np)
 	else
 		psci_ops.str_native = 0;
 
-	if (!of_address_to_resource(np, 0, &psci_ops.mem_to_safety))
+	if (psci_ops.str_native != 0 && of_address_to_resource(np, 0, &psci_ops.mem_to_safety))
 		pr_err("psci ioremap failed\n");
 
 	err = psci_probe();
