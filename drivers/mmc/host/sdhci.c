@@ -4328,7 +4328,7 @@ int __sdhci_add_host(struct sdhci_host *host)
 	if (!(mmc->caps & MMC_CAP_NONREMOVABLE)) {
 		host->pwr_gpio = devm_gpiod_get(mmc->parent, "pwr", GPIOD_OUT_LOW);
 		if (IS_ERR(host->pwr_gpio))
-			goto unled;
+			pr_err("SD pwr-gpio is NULL\n");
 	}
 
 	mmiowb();
