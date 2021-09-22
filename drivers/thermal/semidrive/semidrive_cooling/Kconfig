@@ -9,3 +9,12 @@ config SEMIDRIVE_CPUFREQ_COOLING
 	Say Y if you want to enable the cpufreq cooling device. and these cooling
 	device can be bound to thermal zone trip points. When a trip point reached,
 	the bound cooling device turns active to cool down the SoC.
+
+config SEMIDRIVE_CPUCORE_COOLING
+	tristate "semidrive cpucore cooling"
+	depends on HOTPLUG_CPU
+	depends on CPU_THERMAL
+	help
+	Say Y if you want to enable the cpucore cooling device. and these cooling
+	device can be bound to thermal zone trip points. When a trip point reached,
+	the bound cooling device turns active to cool down the SoC.
