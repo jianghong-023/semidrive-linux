@@ -2,15 +2,6 @@
 dtb-$(CONFIG_ARCH_SEMIDRIVE_X9) += x9_high_ref_native_linux.dtb
 dtb-$(CONFIG_ARCH_SEMIDRIVE_X9) += x9_high-plus_ref_native_ivi_serdes_8g_avm.dtb
 dtb-$(CONFIG_ARCH_SEMIDRIVE_X9) += x9_high-plus_ref_native_ivi_8g.dtb
-dtb-$(CONFIG_ARCH_SEMIDRIVE_X9) += x9_high-plus_refa04_native_ivi_serdes_8g.dtb
-dtb-$(CONFIG_ARCH_SEMIDRIVE_X9) += x9_high-plus_refa04_native_ivi_serdes_8g_avm.dtb
-dtb-$(CONFIG_ARCH_SEMIDRIVE_X9) += x9_high_refa04_native_ivi_serdes.dtb
-dtb-$(CONFIG_ARCH_SEMIDRIVE_X9) += x9_high_refa04_native_ivi_serdes_cockpit.dtb
-dtb-$(CONFIG_ARCH_SEMIDRIVE_X9) += x9_mid_refa04_native_ivi_serdes.dtb
-dtb-$(CONFIG_ARCH_SEMIDRIVE_X9) += x9_mid_refa04_native_ivi_serdes_avm.dtb
-dtb-$(CONFIG_ARCH_SEMIDRIVE_X9) += x9_ultra_refa04_native_ivi_a.dtb
-dtb-$(CONFIG_ARCH_SEMIDRIVE_X9) += x9_ultra_refa04_native_ivi_b.dtb
-dtb-$(CONFIG_ARCH_SEMIDRIVE_X9) += x9e_refa04_native_ivi_avm.dtb
 
 dtb-$(CONFIG_ARCH_SEMIDRIVE_X9) += x9_high-plus_ref_native_cluster_8g_bt.dtb
 dtb-$(CONFIG_ARCH_SEMIDRIVE_V9) += v9f_ref.dtb
@@ -47,7 +38,6 @@ dtb-$(CONFIG_ARCH_SEMIDRIVE_V9) += v9t_b_ref.dtb
 dtb-$(CONFIG_ARCH_SEMIDRIVE_X9) += x9e_ref_native_ivi_avm.dtb
 dtb-$(CONFIG_ARCH_SEMIDRIVE_X9) += x9e_ms_native_ivi_avm.dtb
 dtb-$(CONFIG_ARCH_SEMIDRIVE_X9) += x9e_ref_native_linux_avm.dtb
-dtb-$(CONFIG_ARCH_SEMIDRIVE_X9) += x9e_refa04_native_linux_avm.dtb
 dtb-$(CONFIG_ARCH_SEMIDRIVE_X9) += x9_high_ref_native_serdes_nobt.dtb
 dtb-$(CONFIG_ARCH_SEMIDRIVE_D9) += d9_lite_d9310_ref.dtb
 dtb-$(CONFIG_ARCH_SEMIDRIVE_D9) += d9_std_d9340_ref.dtb
