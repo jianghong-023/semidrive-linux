@@ -155,6 +155,7 @@ module_platform_driver(str_sync_driver);
 
 /*v power key*/
 static struct input_dev *str_power_key;
+static void __iomem *str_addr;
 
 static int str_power_key_resume(struct device *dev)
 {
@@ -164,9 +165,7 @@ static int str_power_key_resume(struct device *dev)
 	if (!str_power_key)
 		return 0;
 
-        base = ioremap(0x4AE00000, 0x1000);
-        value = readl(base);
-        iounmap(base);
+        value = readl(str_addr);
 
         if (value == 0x8765) {//str resume
                 input_report_key(str_power_key, KEY_POWER, 1);
@@ -178,6 +177,16 @@ static int str_power_key_resume(struct device *dev)
 
 static int str_power_key_probe(struct platform_device *pdev)
 {
+	struct resource *res;
+
+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+	if (!res)
+		return -ENOMEM;
+
+	str_addr = devm_ioremap_resource(&pdev->dev, res);
+	if (IS_ERR(str_addr))
+		return PTR_ERR(str_addr);
+
 	str_power_key = input_allocate_device();
 	if (str_power_key) {
         	str_power_key->name = "str-power-key";
