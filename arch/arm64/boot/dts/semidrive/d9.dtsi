@@ -1788,6 +1788,13 @@
 				#cooling-cells = <2>;
 				cluster_id = <0>;
 			};
+
+			cpucore_cluster0: cpucore_cluster0 {
+				compatible = "semidrive, cpucore-cooling";
+				status = "okay";
+				#cooling-cells = <2>;
+				cluster_id = <0>;
+			};
 		};
 
 		pvt_sensor: pvt_sensor@0x30880000{
@@ -1846,7 +1853,7 @@
 					bind2{
 						contribution = <0>;
 						trip = <&cpu_trip2>;
-						cooling-device = <&cpufreq_cluster0 THERMAL_NO_LIMIT 3>;
+						cooling-device = <&cpucore_cluster0 THERMAL_NO_LIMIT 3>;
 					};
 				};
 			};
