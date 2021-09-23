@@ -47,6 +47,16 @@ static const struct drm_connector_funcs sdrv_connector_funcs = {
 
 static int sdrv_connector_init(struct sdrv_connector *sdrv_conn)
 {
+	int ret;
+	if (!sdrv_conn->ops)
+		return -EINVAL;
+
+	ret = sdrv_conn->ops->init(sdrv_conn);
+	if (ret) {
+		DRM_ERROR("connector get resouce failed.\n");
+		return ret;
+	}
+
 	DRM_INFO("sdrv_connector_init init ok\n");
 	return 0;
 }
@@ -159,7 +169,6 @@ static int sdrv_connector_register(struct drm_device *drm,
 {
 	struct drm_encoder *encoder = &sdrv_conn->encoder;
 	struct drm_connector *connector = &sdrv_conn->connector;
-	struct device_node *np = sdrv_conn->np;
 	int ret;
 
 	encoder->possible_crtcs = sdrv_drm_find_possible_crtcs(drm,
@@ -227,12 +236,8 @@ static int sdrv_connector_bind(struct device *dev,
 		DRM_ERROR("sdrv_conn get ops failed.\n");
 		return -EINVAL;
 	}
-	ret = sdrv_conn->ops->init(sdrv_conn);
-	if (ret) {
-		DRM_ERROR("connector get resouce failed.\n");
-		return ret;
-	}
-
+	if (sdrv_connector_init(sdrv_conn))
+		return -ENODEV;
 	ret = drm_of_find_panel_or_bridge(np, 1, 0,
 			&sdrv_conn->panel, &sdrv_conn->bridge);
 	if(ret && ret != -ENODEV) {
