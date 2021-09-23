@@ -1740,10 +1740,12 @@ static int snd_afe_i2s_sc_probe(struct platform_device *pdev)
 	if (!ret) {
 		/* semidrive,full-duplex is 0 set to half duplex mode.  */
 		if (value == 0) {
-			regmap_exit(afe->regmap);
-			dev_err(&pdev->dev, "Don't suppport set to half duplex mode. Please set scr register in ssystem \n");
-			ret = -EINVAL;
-			goto err_disable;
+			/* D9 set half duplex mode */
+			afe->is_full_duplex = false;
+		//	regmap_exit(afe->regmap);
+		//	dev_err(&pdev->dev, "Don't suppport set to half duplex mode. Please set scr register in ssystem \n");
+		//	ret = -EINVAL;
+		//	goto err_disable;
 		}
 	}
 

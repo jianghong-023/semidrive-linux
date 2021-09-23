@@ -242,6 +242,7 @@
 //sch part u20(codec adc es7243)
 	dmas = <&dmac4 X9_DMA_SLV_ID_I2S_SC4_TX>, <&dmac4 X9_DMA_SLV_ID_I2S_SC4_RX>;
 	dma-names = "tx", "rx";
+	semidrive,full-duplex = <0>;
 	status = "okay";
 };
 
