@@ -76,12 +76,12 @@
  *  See BA414EP's datasheet for details.
  */
 typedef struct BA414EPRegs_t {
-    volatile uint32_t   PointerReg;              /* BASE_ADDR + 0x0000 */
-    volatile uint32_t   CommandReg;              /* BASE_ADDR + 0x0004 */
-    volatile uint32_t   ControlReg;              /* BASE_ADDR + 0x0008 */
-    volatile uint32_t   StatusReg;               /* BASE_ADDR + 0x000C */
-    volatile uint32_t   VersionReg;              /* BASE_ADDR + 0x0010 */
-    volatile uint32_t   TimerReg;                /* BASE_ADDR + 0x0014 */
+	volatile uint32_t   PointerReg;              /* BASE_ADDR + 0x0000 */
+	volatile uint32_t   CommandReg;              /* BASE_ADDR + 0x0004 */
+	volatile uint32_t   ControlReg;              /* BASE_ADDR + 0x0008 */
+	volatile uint32_t   StatusReg;               /* BASE_ADDR + 0x000C */
+	volatile uint32_t   VersionReg;              /* BASE_ADDR + 0x0010 */
+	volatile uint32_t   TimerReg;                /* BASE_ADDR + 0x0014 */
 } BA414EPRegs_t;
 
 /** @struct BA414EP_ucode_t
@@ -89,11 +89,11 @@ typedef struct BA414EPRegs_t {
  *  See BA414EP's datasheet for details.
  */
 typedef union BA414EP_ucode_t {
-    volatile uint16_t   content[4096];
-    struct ucode_info {
-        volatile uint16_t   pointers[128];
-        volatile uint16_t   ucodesize;
-    } info;
+	volatile uint16_t   content[4096];
+	struct ucode_info {
+		volatile uint16_t   pointers[128];
+		volatile uint16_t   ucodesize;
+	} info;
 } BA414EP_ucode_t;
 
 #define BA414EP_UCODE_MAX_LENGTH 4094  // ucode content: memory size (4096) - redundancy value size (2)
@@ -101,7 +101,7 @@ typedef union BA414EP_ucode_t {
 /**
  * @brief This function configures the BA414EP memory locations to use in the
  *        primitives arithmetic operations
- * @param vce_id      vce index
+ * @param device      device pointer
  * @param PtrA is the memory location of operand A
  *        (from ::BA414EP_MEMLOC_0 to ::BA414EP_MEMLOC_15)
  * @param PtrB is the memory location of operand B
@@ -111,55 +111,55 @@ typedef union BA414EP_ucode_t {
  * @param PtrN is the memory location of operand N
  *        (from ::BA414EP_MEMLOC_0 to ::BA414EP_MEMLOC_15)
  */
-void pke_set_config(void * device,
-                    uint32_t PtrA,
-                    uint32_t PtrB,
-                    uint32_t PtrC,
-                    uint32_t PtrN);
+void pke_set_config(void *device,
+					uint32_t PtrA,
+					uint32_t PtrB,
+					uint32_t PtrC,
+					uint32_t PtrN);
 
 /**
  * @brief This function configure the BA414EP to issue one PK operation.
  *
- * @param vce_id      vce index
+ * @param device      device pointer
  * @param op          The PK operation to issue. Should be one of \c BA414EP_OPTYPE_* family
  * @param operandsize the operands size in bytes (up to 8KB + 64B in RSA + counter-measures)
  * @param swap        swap the bytes on AHB/AXI4 interface (endianness conversion).
  *                    Should be ::BA414EP_BIGEND or ::BA414EP_LITTLEEND
  * @param curve_flags enable accelerator for specific curve modulus
  */
-void pke_set_command(void * device,
-                     uint32_t op,
-                     uint32_t operandsize,
-                     uint32_t swap,
-                     uint32_t curve_flags);
+void pke_set_command(void *device,
+					 uint32_t op,
+					 uint32_t operandsize,
+					 uint32_t swap,
+					 uint32_t curve_flags);
 
-void pke_set_dst_param(void * device,
-                       uint32_t operandsize,
-                       uint32_t operandsel,
-                       addr_t dst_addr,
-                       ce_addr_type_t dst_type);
+void pke_set_dst_param(void *device,
+					   uint32_t operandsize,
+					   uint32_t operandsel,
+					   addr_t dst_addr,
+					   ce_addr_type_t dst_type);
 
 /**
  * @brief Function is used to start the PK, wait for completion,
  *        read and return the status register value
- * @param vce_id      vce index
+ * @param device      device pointer
  * @return the contents of the status register as uint32_t.
  */
-uint32_t pke_start_wait_status(void * device);
+uint32_t pke_start_wait_status(void *device);
 
 /**
  * Copy the BA414EP ECC curve parameters to CryptoRAM
- * @param vce_id      vce index
+ * @param device      device pointer
  * @param curve      ecc curve to copy to the cryptoRAM (See ::sx_ecc_curve_t.params)
  * @param size       Size of an element of the curve expressed in bytes
  * @param byte_swap  1 if byte_swap enabled in BA414EP (for AHB/AXI4 endianness), 0 otherwise
  * @param gen        1 if we want to load the generator from the curve parameters
  */
-void pke_load_curve(void * device,
-                    block_t* curve,
-                    uint32_t size,
-                    uint32_t byte_swap,
-                    uint32_t gen);
+void pke_load_curve(void *device,
+					block_t *curve,
+					uint32_t size,
+					uint32_t byte_swap,
+					uint32_t gen);
 
 /**
  * @brief Compute \p out = \p in mod N.
@@ -168,7 +168,7 @@ void pke_load_curve(void * device,
  * for further PK operations.
  *
  * \warning N must be already loaded in \p nloc
- * @param vce_id      vce index
+ * @param device      device pointer
  * @param outloc      memory location to place \p out
  * @param nloc        memory location for modulo N
  * @param size        size of \p in expressed in bytes
@@ -177,13 +177,13 @@ void pke_load_curve(void * device,
  * @param curve_flags enable accelerator for specific curve modulus
   @return CRYPTOLIB_SUCCESS if successful
  */
-uint32_t pke_load_and_modN(void * device,
-                           uint8_t outloc,
-                           uint8_t nloc,
-                           uint32_t size,
-                           block_t* in,
-                           block_t* out,
-                           uint32_t curve_flags);
+uint32_t pke_load_and_modN(void *device,
+						   uint8_t outloc,
+						   uint8_t nloc,
+						   uint32_t size,
+						   block_t *in,
+						   block_t *out,
+						   uint32_t curve_flags);
 
 #if PK_CM_ENABLED
 /**

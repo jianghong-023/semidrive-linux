@@ -30,14 +30,14 @@
 * @return  CRYPTOLIB_SUCCESS if no error was encountered
 */
 uint32_t srp_host_gen_pub(uint32_t vce_id,
-                          hash_alg_t hash_alg,
-                          block_t N,
-                          block_t g,
-                          block_t v,
-                          block_t B,
-                          block_t b,
-                          uint32_t SRP6a,
-                          uint32_t size);
+						  hash_alg_t hash_alg,
+						  block_t N,
+						  block_t g,
+						  block_t v,
+						  block_t B,
+						  block_t b,
+						  uint32_t SRP6a,
+						  uint32_t size);
 
 /**
 * Generation of session key (by the host/server)
@@ -53,14 +53,14 @@ uint32_t srp_host_gen_pub(uint32_t vce_id,
 * @return  CRYPTOLIB_SUCCESS if no error was encountered
 */
 uint32_t srp_host_gen_key(uint32_t vce_id,
-                          hash_alg_t hash_alg,
-                          block_t N,
-                          block_t A,
-                          block_t v,
-                          block_t b,
-                          block_t B,
-                          block_t K,
-                          uint32_t size);
+						  hash_alg_t hash_alg,
+						  block_t N,
+						  block_t A,
+						  block_t v,
+						  block_t b,
+						  block_t B,
+						  block_t K,
+						  uint32_t size);
 
 /**
 * Generation of session key (by the user/client)
@@ -79,16 +79,16 @@ uint32_t srp_host_gen_key(uint32_t vce_id,
 * @return  CRYPTOLIB_SUCCESS if no error
 */
 uint32_t srp_user_gen_key(uint32_t vce_id,
-                          hash_alg_t hash_alg,
-                          block_t N,
-                          block_t g,
-                          block_t A,
-                          block_t B,
-                          block_t usrpwd,
-                          block_t s,
-                          block_t a,
-                          block_t K,
-                          uint32_t SRP6a,
-                          uint32_t size);
+						  hash_alg_t hash_alg,
+						  block_t N,
+						  block_t g,
+						  block_t A,
+						  block_t B,
+						  block_t usrpwd,
+						  block_t s,
+						  block_t a,
+						  block_t K,
+						  uint32_t SRP6a,
+						  uint32_t size);
 
 #endif

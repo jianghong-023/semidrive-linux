@@ -15,8 +15,8 @@
 #include "cryptlib.h"
 
 /* crypto hw padding constant for first operation */
-#define SHA_PADDING		64
-#define SHA_PADDING_MASK	(SHA_PADDING - 1)
+#define SHA_PADDING     64
+#define SHA_PADDING_MASK    (SHA_PADDING - 1)
 
 static LIST_HEAD(ahash_algs);
 
@@ -45,7 +45,7 @@ static const u64 std_iv_sha512[SHA512_DIGEST_SIZE / sizeof(u64)] = {
 };
 
 static int semidrive_ahash_async_req_handle(
-		struct crypto_async_request *async_req)
+	struct crypto_async_request *async_req)
 {
 	struct ahash_request *req = ahash_request_cast(async_req);
 	struct semidrive_sha_reqctx *rctx = ahash_request_ctx(req);
@@ -67,105 +67,116 @@ static int semidrive_ahash_async_req_handle(
 	if (IS_SHA_HMAC(flags)) {
 		rctx->authkey = ctx->authkey;
 		rctx->authklen = 128;//SD_SHA_HMAC_KEY_SIZE;
-	} else if (IS_CMAC(flags)) {
+	}
+	else if (IS_CMAC(flags)) {
 		rctx->authkey = ctx->authkey;
 		rctx->authklen = 128;//AES_KEYSIZE_128;
 	}
 
 	rctx->src_nents = sg_nents_for_len(req->src, req->nbytes);
+
 	if (rctx->src_nents < 0) {
 		dev_err(sdce->dev, "Invalid numbers of src SG.\n");
 		return rctx->src_nents;
 	}
 
 	ret = dma_map_sg(sdce->dev, req->src, rctx->src_nents, DMA_TO_DEVICE);
-	if (ret < 0)
+
+	if (ret < 0) {
 		return ret;
+	}
 
 	//maybe this exchange can be removed
 	switch (rctx->flags) {
-	/*case SD_HASH_MD5:
-		hash_type = ALG_MD5;
-		break;
-	*/
-	case SD_HASH_SHA1:
-		hash_type = ALG_SHA1;
-		break;
-	case SD_HASH_SHA224:
-		hash_type = ALG_SHA224;
-		break;
-	case SD_HASH_SHA256:
-		hash_type = ALG_SHA256;
-		break;
-	case SD_HASH_SHA384:
-		hash_type = ALG_SHA384;
-		break;
-	case SD_HASH_SHA512:
-		hash_type = ALG_SHA512;
-		break;
-	case SD_HASH_SM3:
-		hash_type = ALG_SM3;
-		break;
-	default:
-		hash_type = ALG_SHA256;
+		/*case SD_HASH_MD5:
+		    hash_type = ALG_MD5;
+		    break;
+		*/
+		case SD_HASH_SHA1:
+			hash_type = ALG_SHA1;
+			break;
+
+		case SD_HASH_SHA224:
+			hash_type = ALG_SHA224;
+			break;
+
+		case SD_HASH_SHA256:
+			hash_type = ALG_SHA256;
+			break;
+
+		case SD_HASH_SHA384:
+			hash_type = ALG_SHA384;
+			break;
+
+		case SD_HASH_SHA512:
+			hash_type = ALG_SHA512;
+			break;
+
+		case SD_HASH_SM3:
+			hash_type = ALG_SM3;
+			break;
+
+		default:
+			hash_type = ALG_SHA256;
 	}
 
 	//not align part of last update or none
+	block_t rctx_tmpbuf = BLOCK_T_CONV(rctx->tmpbuf, rctx->buflen, EXT_MEM);
+	block_t rctx_digest = BLOCK_T_CONV((u8 *)rctx->digest, digestsize, EXT_MEM);
+
 	if (rctx->last_blk) {
 		if (rctx->nbytes_orig == 0) {
-			ret = hash_finish_blk(sdce, hash_type, false,
-				&(block_t)BLOCK_T_CONV(rctx->tmpbuf,
-					rctx->buflen, EXT_MEM),
-				&(block_t)BLOCK_T_CONV((u8 *)rctx->digest,
-					digestsize, EXT_MEM), rctx->count);
-		} else {
+			ret = hash_finish_blk(sdce, hash_type, false, &rctx_tmpbuf, &rctx_digest, rctx->count);
+		}
+		else {
 			input_buff = kzalloc(
-				rctx->nbytes_orig + CACHE_LINE + rctx->buflen,
-				GFP_KERNEL);
+							 rctx->nbytes_orig + CACHE_LINE + rctx->buflen,
+							 GFP_KERNEL);
+
 			if (!input_buff) {
 				pr_err("alloc fail line : %d\n", __LINE__);
 				return -ENOMEM;
 			}
 
 			phy_addr = _paddr(input_buff);
+
 			if (phy_addr & (CACHE_LINE - 1)) {
 				phy_offset = CACHE_LINE
-					- (phy_addr & (CACHE_LINE - 1));
+							 - (phy_addr & (CACHE_LINE - 1));
 			}
 
 			for (i = 0; i < rctx->src_nents; i++) {
 				memcpy(input_buff + phy_offset + cpy_offset,
-					sg_virt(&rctx->src_orig[i]),
-					(rctx->src_orig[i]).length);
+					   sg_virt(&rctx->src_orig[i]),
+					   (rctx->src_orig[i]).length);
 				cpy_offset += (rctx->src_orig[i]).length;
 			}
 
 			if (rctx->buflen) {
 				memcpy(input_buff + phy_offset + cpy_offset,
-					rctx->tmpbuf, rctx->buflen);
+					   rctx->tmpbuf, rctx->buflen);
 			}
 
-			ret = hash_finish_blk(sdce, hash_type, false,
-				&(block_t)BLOCK_T_CONV(
-					(u8 *)(input_buff + phy_offset),
-					rctx->nbytes_orig + rctx->buflen,
-					EXT_MEM),
-				&(block_t)BLOCK_T_CONV(rctx->digest,
-					digestsize, EXT_MEM), rctx->count);
+			block_t block_tmp1 = BLOCK_T_CONV((u8 *)(input_buff + phy_offset), rctx->nbytes_orig + rctx->buflen, EXT_MEM);
+			block_t block_tmp2 = BLOCK_T_CONV(rctx->digest, digestsize, EXT_MEM);
+			ret = hash_finish_blk(sdce, hash_type, false, &block_tmp1, &block_tmp2, rctx->count);
 		}
 
 		memcpy(req->result, rctx->digest, digestsize);
 
 		sdce->async_req_done(tmpl->sdce, ret);
-	} else {
+	}
+	else {
 		input_buff = kzalloc(
-			rctx->nbytes_orig + CACHE_LINE, GFP_KERNEL);
+						 rctx->nbytes_orig + CACHE_LINE, GFP_KERNEL);
+
 		if (!input_buff) {
 			pr_err("alloc fail, line : %d", __LINE__);
 			return -ENOMEM;
 		}
 
 		phy_addr = _paddr(input_buff);
+
 		if (phy_addr & (CACHE_LINE - 1)) {
 			phy_offset = CACHE_LINE - (phy_addr & (CACHE_LINE - 1));
 		}
@@ -177,15 +188,13 @@ static int semidrive_ahash_async_req_handle(
 
 		for (i = 0; i < rctx->src_nents; i++) {
 			memcpy(input_buff + phy_offset + cpy_offset,
-						sg_virt(&rctx->src_orig[i]),
-						(rctx->src_orig[i]).length);
+				   sg_virt(&rctx->src_orig[i]),
+				   (rctx->src_orig[i]).length);
 			cpy_offset += (rctx->src_orig[i]).length;
 		}
 
-
-		ret = hash_update_blk(sdce, hash_type, first_part,
-			&(block_t)BLOCK_T_CONV((u8 *)(input_buff + phy_offset),
-				rctx->nbytes_orig - rctx->buflen, EXT_MEM));
+		block_t block_tmp3 = BLOCK_T_CONV((u8 *)(input_buff + phy_offset), rctx->nbytes_orig - rctx->buflen, EXT_MEM);
+		ret = hash_update_blk(sdce, hash_type, first_part, &block_tmp3);
 
 		sdce->async_req_done(tmpl->sdce, ret);
 	}
@@ -217,32 +226,35 @@ static int semidrive_ahash_export(struct ahash_request *req, void *out)
 	unsigned long flags = rctx->flags;
 	unsigned int digestsize = crypto_ahash_digestsize(ahash);
 	unsigned int blocksize =
-			crypto_tfm_alg_blocksize(crypto_ahash_tfm(ahash));
+		crypto_tfm_alg_blocksize(crypto_ahash_tfm(ahash));
 
 	if (IS_SHA1(flags) || IS_SHA1_HMAC(flags)) {
 		struct sha1_state *out_state = out;
 
 		out_state->count = rctx->count;
 		semidrive_cpu_to_be32p_array((__be32 *)out_state->state,
-				       rctx->digest, digestsize);
+									 rctx->digest, digestsize);
 		memcpy(out_state->buffer, rctx->buf, blocksize);
-	} else if (IS_SHA256(flags) || IS_SHA256_HMAC(flags) \
-			|| IS_SHA224(flags) || IS_SHA224_HMAC(flags)) {
+	}
+	else if (IS_SHA256(flags) || IS_SHA256_HMAC(flags) \
+			 || IS_SHA224(flags) || IS_SHA224_HMAC(flags)) {
 		struct sha256_state *out_state = out;
 
 		out_state->count = rctx->count;
 		semidrive_cpu_to_be32p_array((__be32 *)out_state->state,
-				       rctx->digest, digestsize);
+									 rctx->digest, digestsize);
 		memcpy(out_state->buf, rctx->buf, blocksize);
-	} else if (IS_SHA512(flags) || IS_SHA512_HMAC(flags)
-			|| IS_SHA384(flags) || IS_SHA384_HMAC(flags)) {
+	}
+	else if (IS_SHA512(flags) || IS_SHA512_HMAC(flags)
+			 || IS_SHA384(flags) || IS_SHA384_HMAC(flags)) {
 		struct sha512_state *out_state = out;
 
 		//out_state->count = rctx->count;
 		semidrive_cpu_to_be32p_array((__be32 *)out_state->state,
-				       rctx->digest, digestsize);
+									 rctx->digest, digestsize);
 		memcpy(out_state->buf, rctx->buf, blocksize);
-	} else {
+	}
+	else {
 		return -EINVAL;
 	}
 
@@ -264,16 +276,19 @@ static int semidrive_import_common_sha256(struct ahash_request *req,
 
 	if (in_count <= blocksize) {
 		rctx->first_blk = 1;
-	} else {
+	}
+	else {
 		rctx->first_blk = 0;
-		if (hmac)
+
+		if (hmac) {
 			count += SHA_PADDING;
+		}
 	}
 
 	rctx->byte_count[0] = (__force __be32)(count & ~SHA_PADDING_MASK);
 	rctx->byte_count[1] = (__force __be32)(count >> 32);
 	semidrive_cpu_to_be32p_array((__be32 *)rctx->digest, (const u8 *)state,
-			       digestsize);
+								 digestsize);
 	rctx->buflen = (unsigned int)(in_count & (blocksize - 1));
 
 	return 0;
@@ -295,16 +310,19 @@ static int semidrive_import_common_sha512(struct ahash_request *req,
 
 	if (count <= blocksize) {
 		rctx->first_blk = 1;
-	} else {
+	}
+	else {
 		rctx->first_blk = 0;
-		if (hmac)
+
+		if (hmac) {
 			count += SHA_PADDING;
+		}
 	}
 
 	rctx->byte_count[0] = (__force __be32)(count & ~SHA_PADDING_MASK);
 	rctx->byte_count[1] = (__force __be32)(count >> 32);
 	semidrive_cpu_to_be32p_array((__be32 *)rctx->digest, (const u8 *)state,
-			       digestsize);
+								 digestsize);
 	rctx->buflen = (unsigned int)(in_count[0] & (blocksize - 1));
 
 	return 0;
@@ -321,19 +339,21 @@ static int semidrive_ahash_import(struct ahash_request *req, const void *in)
 		const struct sha1_state *state = in;
 
 		ret = semidrive_import_common_sha256(req, state->count,
-				state->state, state->buffer, hmac);
-	} else if (IS_SHA256(flags) || IS_SHA256_HMAC(flags)
-			|| IS_SHA224(flags) || IS_SHA224_HMAC(flags)) {
+											 state->state, state->buffer, hmac);
+	}
+	else if (IS_SHA256(flags) || IS_SHA256_HMAC(flags)
+			 || IS_SHA224(flags) || IS_SHA224_HMAC(flags)) {
 		const struct sha256_state *state = in;
 
 		ret = semidrive_import_common_sha256(req, state->count,
-				state->state, state->buf, hmac);
-	} else if (IS_SHA512(flags) || IS_SHA512_HMAC(flags)
-			|| IS_SHA384(flags) || IS_SHA384_HMAC(flags)) {
+											 state->state, state->buf, hmac);
+	}
+	else if (IS_SHA512(flags) || IS_SHA512_HMAC(flags)
+			 || IS_SHA384(flags) || IS_SHA384_HMAC(flags)) {
 		const struct sha512_state *state = in;
 
 		ret = semidrive_import_common_sha512(req, state->count,
-				state->state, state->buf, hmac);
+											 state->state, state->buf, hmac);
 	}
 
 	return ret;
@@ -359,7 +379,7 @@ static int semidrive_ahash_update(struct ahash_request *req)
 
 	if (total <= blocksize) {
 		scatterwalk_map_and_copy(rctx->buf + rctx->buflen, req->src,
-					 0, req->nbytes, 0);
+								 0, req->nbytes, 0);
 		rctx->buflen += req->nbytes;
 		return 0;
 	}
@@ -372,15 +392,17 @@ static int semidrive_ahash_update(struct ahash_request *req)
 	 * if we have data from previous update copy them on buffer. The old
 	 * data will be combined with current request bytes.
 	 */
-	if (rctx->buflen)
+	if (rctx->buflen) {
 		memcpy(rctx->tmpbuf, rctx->buf, rctx->buflen);
+	}
 
 	/* calculate how many bytes will be hashed later */
 	hash_later = total % blocksize;
+
 	if (hash_later) {
 		unsigned int src_offset = req->nbytes - hash_later;
 		scatterwalk_map_and_copy(rctx->buf, req->src, src_offset,
-					 hash_later, 0);
+								 hash_later, 0);
 	}
 
 	/* here nbytes is multiple of blocksize */
@@ -390,15 +412,18 @@ static int semidrive_ahash_update(struct ahash_request *req)
 	sg = sg_last = req->src;
 
 	while (len < nbytes && sg) {
-		if (len + sg_dma_len(sg) > nbytes)
+		if (len + sg_dma_len(sg) > nbytes) {
 			break;
+		}
+
 		len += sg_dma_len(sg);
 		sg_last = sg;
 		sg = sg_next(sg);
 	}
 
-	if (!sg_last)
+	if (!sg_last) {
 		return -EINVAL;
+	}
 
 	sg_mark_end(sg_last);
 
@@ -443,8 +468,10 @@ static int semidrive_ahash_digest(struct ahash_request *req)
 	int ret;
 
 	ret = semidrive_ahash_init(req);
-	if (ret)
+
+	if (ret) {
 		return ret;
+	}
 
 	rctx->src_orig = req->src;
 	rctx->nbytes_orig = req->nbytes;
@@ -460,21 +487,22 @@ struct semidrive_ahash_result {
 };
 
 static void semidrive_digest_complete(
-		struct crypto_async_request *req, int error)
+	struct crypto_async_request *req, int error)
 {
 	struct semidrive_ahash_result *result = req->data;
 
-	if (error == -EINPROGRESS)
+	if (error == -EINPROGRESS) {
 		return;
+	}
 
 	result->error = error;
 	complete(&result->completion);
 }
 
 static int semidrive_ahash_hmac_setkey(struct crypto_ahash *tfm,
-			const u8 *key, unsigned int keylen)
+									   const u8 *key, unsigned int keylen)
 {
-    return 0;
+	return 0;
 
 	/*
 	unsigned int digestsize = crypto_ahash_digestsize(tfm);
@@ -492,37 +520,37 @@ static int semidrive_ahash_hmac_setkey(struct crypto_ahash *tfm,
 	memset(ctx->authkey, 0, sizeof(ctx->authkey));
 
 	if (keylen <= blocksize) {
-		memcpy(ctx->authkey, key, keylen);
-		return 0;
+	    memcpy(ctx->authkey, key, keylen);
+	    return 0;
 	}
 
 	if (digestsize == SHA1_DIGEST_SIZE)
-		alg_name = "sha1-semidriver";
+	    alg_name = "sha1-semidriver";
 	else if (digestsize == SHA256_DIGEST_SIZE)
-		alg_name = "sha256-semidrive";
+	    alg_name = "sha256-semidrive";
 	else
-		return -EINVAL;
+	    return -EINVAL;
 
 	ahash_tfm = crypto_alloc_ahash(alg_name, CRYPTO_ALG_TYPE_AHASH,
-				       CRYPTO_ALG_TYPE_AHASH_MASK);
+	                   CRYPTO_ALG_TYPE_AHASH_MASK);
 	if (IS_ERR(ahash_tfm))
-		return PTR_ERR(ahash_tfm);
+	    return PTR_ERR(ahash_tfm);
 
 	req = ahash_request_alloc(ahash_tfm, GFP_KERNEL);
 	if (!req) {
-		ret = -ENOMEM;
-		goto err_free_ahash;
+	    ret = -ENOMEM;
+	    goto err_free_ahash;
 	}
 
 	init_completion(&result.completion);
 	ahash_request_set_callback(req, CRYPTO_TFM_REQ_MAY_BACKLOG,
-				   semidrive_digest_complete, &result);
+	               semidrive_digest_complete, &result);
 	crypto_ahash_clear_flags(ahash_tfm, ~0);
 
 	buf = kzalloc(keylen + sd_MAX_ALIGN_SIZE, GFP_KERNEL);
 	if (!buf) {
-		ret = -ENOMEM;
-		goto err_free_req;
+	    ret = -ENOMEM;
+	    goto err_free_req;
 	}
 
 	memcpy(buf, key, keylen);
@@ -531,18 +559,18 @@ static int semidrive_ahash_hmac_setkey(struct crypto_ahash *tfm,
 
 	ret = crypto_ahash_digest(req);
 	if (ret == -EINPROGRESS || ret == -EBUSY) {
-		ret = wait_for_completion_interruptible(&result.completion);
-		if (!ret)
-			ret = result.error;
+	    ret = wait_for_completion_interruptible(&result.completion);
+	    if (!ret)
+	        ret = result.error;
 	}
 
 	if (ret)
-		crypto_ahash_set_flags(tfm, CRYPTO_TFM_RES_BAD_KEY_LEN);
+	    crypto_ahash_set_flags(tfm, CRYPTO_TFM_RES_BAD_KEY_LEN);
 
 	kfree(buf);
-err_free_req:
+	err_free_req:
 	ahash_request_free(req);
-err_free_ahash:
+	err_free_ahash:
 	crypto_free_ahash(ahash_tfm);
 	return ret;
 	*/
@@ -571,118 +599,118 @@ struct semidrive_ahash_def {
 
 static const struct semidrive_ahash_def ahash_def[] = {
 	/*{
-		.flags		= SD_HASH_MD5,
-		.name		= "md5",
-		.drv_name	= "md5-sdce",
-		.digestsize	= MD5_DIGEST_SIZE,
-		.blocksize	= MD5_BLOCK_SIZE,
-		.statesize	= sizeof(struct sha1_state),
-		.std_iv		= std_iv_sha1,
+	    .flags      = SD_HASH_MD5,
+	    .name       = "md5",
+	    .drv_name   = "md5-sdce",
+	    .digestsize = MD5_DIGEST_SIZE,
+	    .blocksize  = MD5_BLOCK_SIZE,
+	    .statesize  = sizeof(struct sha1_state),
+	    .std_iv     = std_iv_sha1,
 	},
 	*/
 	{
-		.flags		= SD_HASH_SHA1,
-		.name		= "sha1",
-		.drv_name	= "sha1-sdce",
-		.digestsize	= SHA1_DIGEST_SIZE,
-		.blocksize	= SHA1_BLOCK_SIZE,
-		.statesize	= sizeof(struct sha1_state),
-		//.std_iv		= std_iv_sha1,
+		.flags      = SD_HASH_SHA1,
+		.name       = "sha1",
+		.drv_name   = "sha1-sdce",
+		.digestsize = SHA1_DIGEST_SIZE,
+		.blocksize  = SHA1_BLOCK_SIZE,
+		.statesize  = sizeof(struct sha1_state),
+		//.std_iv       = std_iv_sha1,
 	},
 	{
-		.flags		= SD_HASH_SHA224,
-		.name		= "sha224",
-		.drv_name	= "sha224-sdce",
-		.digestsize	= SHA224_DIGEST_SIZE,
-		.blocksize	= SHA224_BLOCK_SIZE,
-		.statesize	= sizeof(struct sha256_state),
-		//.std_iv		= std_iv_sha224,
+		.flags      = SD_HASH_SHA224,
+		.name       = "sha224",
+		.drv_name   = "sha224-sdce",
+		.digestsize = SHA224_DIGEST_SIZE,
+		.blocksize  = SHA224_BLOCK_SIZE,
+		.statesize  = sizeof(struct sha256_state),
+		//.std_iv       = std_iv_sha224,
 	},
 	{
-		.flags		= SD_HASH_SHA256,
-		.name		= "sha256",
-		.drv_name	= "sha256-sdce",
-		.digestsize	= SHA256_DIGEST_SIZE,
-		.blocksize	= SHA256_BLOCK_SIZE,
-		.statesize	= sizeof(struct sha256_state),
-		//.std_iv		= std_iv_sha256,
+		.flags      = SD_HASH_SHA256,
+		.name       = "sha256",
+		.drv_name   = "sha256-sdce",
+		.digestsize = SHA256_DIGEST_SIZE,
+		.blocksize  = SHA256_BLOCK_SIZE,
+		.statesize  = sizeof(struct sha256_state),
+		//.std_iv       = std_iv_sha256,
 	},
 	{
-		.flags		= SD_HASH_SHA384,
-		.name		= "sha384",
-		.drv_name	= "sha384-sdce",
-		.digestsize	= SHA384_DIGEST_SIZE,
-		.blocksize	= SHA384_BLOCK_SIZE,
-		.statesize	= sizeof(struct sha512_state),
-		//.std_iv		= std_iv_sha384,
+		.flags      = SD_HASH_SHA384,
+		.name       = "sha384",
+		.drv_name   = "sha384-sdce",
+		.digestsize = SHA384_DIGEST_SIZE,
+		.blocksize  = SHA384_BLOCK_SIZE,
+		.statesize  = sizeof(struct sha512_state),
+		//.std_iv       = std_iv_sha384,
 	},
 	{
-		.flags		= SD_HASH_SHA512,
-		.name		= "sha512",
-		.drv_name	= "sha512-sdce",
-		.digestsize	= SHA512_DIGEST_SIZE,
-		.blocksize	= SHA512_BLOCK_SIZE,
-		.statesize	= sizeof(struct sha512_state),
-		//.std_iv		= std_iv_sha512,
+		.flags      = SD_HASH_SHA512,
+		.name       = "sha512",
+		.drv_name   = "sha512-sdce",
+		.digestsize = SHA512_DIGEST_SIZE,
+		.blocksize  = SHA512_BLOCK_SIZE,
+		.statesize  = sizeof(struct sha512_state),
+		//.std_iv       = std_iv_sha512,
 	},
 	{
-		.flags		= SD_HASH_SM3,
-		.name		= "sm3",
-		.drv_name	= "sm3-sdce",
-		.digestsize	= SHA256_DIGEST_SIZE,
-		.blocksize	= SHA256_BLOCK_SIZE,
-		.statesize	= sizeof(struct sha256_state),
-		//.std_iv		= std_iv_sha256,
+		.flags      = SD_HASH_SM3,
+		.name       = "sm3",
+		.drv_name   = "sm3-sdce",
+		.digestsize = SHA256_DIGEST_SIZE,
+		.blocksize  = SHA256_BLOCK_SIZE,
+		.statesize  = sizeof(struct sha256_state),
+		//.std_iv       = std_iv_sha256,
 	},
 	{
-		.flags		= SD_HASH_SHA1_HMAC,
-		.name		= "hmac(sha1)",
-		.drv_name	= "hmac-sha1-sdce",
-		.digestsize	= SHA1_DIGEST_SIZE,
-		.blocksize	= SHA1_BLOCK_SIZE,
-		.statesize	= sizeof(struct sha1_state),
-		//.std_iv		= std_iv_sha1,
+		.flags      = SD_HASH_SHA1_HMAC,
+		.name       = "hmac(sha1)",
+		.drv_name   = "hmac-sha1-sdce",
+		.digestsize = SHA1_DIGEST_SIZE,
+		.blocksize  = SHA1_BLOCK_SIZE,
+		.statesize  = sizeof(struct sha1_state),
+		//.std_iv       = std_iv_sha1,
 	},
 	{
-		.flags		= SD_HASH_SHA224_HMAC,
-		.name		= "hmac(sha224)",
-		.drv_name	= "hmac-sha224-sdce",
-		.digestsize	= SHA224_DIGEST_SIZE,
-		.blocksize	= SHA224_BLOCK_SIZE,
-		.statesize	= sizeof(struct sha256_state),
-		//.std_iv		= std_iv_sha224,
+		.flags      = SD_HASH_SHA224_HMAC,
+		.name       = "hmac(sha224)",
+		.drv_name   = "hmac-sha224-sdce",
+		.digestsize = SHA224_DIGEST_SIZE,
+		.blocksize  = SHA224_BLOCK_SIZE,
+		.statesize  = sizeof(struct sha256_state),
+		//.std_iv       = std_iv_sha224,
 	},
 	{
-		.flags		= SD_HASH_SHA256_HMAC,
-		.name		= "hmac(sha256)",
-		.drv_name	= "hmac-sha256-sdce",
-		.digestsize	= SHA256_DIGEST_SIZE,
-		.blocksize	= SHA256_BLOCK_SIZE,
-		.statesize	= sizeof(struct sha256_state),
-		//.std_iv		= std_iv_sha256,
+		.flags      = SD_HASH_SHA256_HMAC,
+		.name       = "hmac(sha256)",
+		.drv_name   = "hmac-sha256-sdce",
+		.digestsize = SHA256_DIGEST_SIZE,
+		.blocksize  = SHA256_BLOCK_SIZE,
+		.statesize  = sizeof(struct sha256_state),
+		//.std_iv       = std_iv_sha256,
 	},
 	{
-		.flags		= SD_HASH_SHA384_HMAC,
-		.name		= "hmac(sha384)",
-		.drv_name	= "hmac-sha384-sdce",
-		.digestsize	= SHA384_DIGEST_SIZE,
-		.blocksize	= SHA384_BLOCK_SIZE,
-		.statesize	= sizeof(struct sha512_state),
-		//.std_iv		= std_iv_sha384,
+		.flags      = SD_HASH_SHA384_HMAC,
+		.name       = "hmac(sha384)",
+		.drv_name   = "hmac-sha384-sdce",
+		.digestsize = SHA384_DIGEST_SIZE,
+		.blocksize  = SHA384_BLOCK_SIZE,
+		.statesize  = sizeof(struct sha512_state),
+		//.std_iv       = std_iv_sha384,
 	},
 	{
-		.flags		= SD_HASH_SHA512_HMAC,
-		.name		= "hmac(sha512)",
-		.drv_name	= "hmac-sha512-sdce",
-		.digestsize	= SHA512_DIGEST_SIZE,
-		.blocksize	= SHA512_BLOCK_SIZE,
-		.statesize	= sizeof(struct sha512_state),
-		//.std_iv		= std_iv_sha512,
+		.flags      = SD_HASH_SHA512_HMAC,
+		.name       = "hmac(sha512)",
+		.drv_name   = "hmac-sha512-sdce",
+		.digestsize = SHA512_DIGEST_SIZE,
+		.blocksize  = SHA512_BLOCK_SIZE,
+		.statesize  = sizeof(struct sha512_state),
+		//.std_iv       = std_iv_sha512,
 	},
 };
 
 static int semidrive_ahash_register_one(const struct semidrive_ahash_def *def,
-				  struct crypto_dev *sdce)
+										struct crypto_dev *sdce)
 {
 	struct semidrive_ce_alg_template *tmpl;
 	struct ahash_alg *alg;
@@ -690,8 +718,10 @@ static int semidrive_ahash_register_one(const struct semidrive_ahash_def *def,
 	int ret;
 
 	tmpl = kzalloc(sizeof(*tmpl), GFP_KERNEL);
-	if (!tmpl)
+
+	if (!tmpl) {
 		return -ENOMEM;
+	}
 
 	//tmpl->std_iv = def->std_iv;
 
@@ -702,8 +732,11 @@ static int semidrive_ahash_register_one(const struct semidrive_ahash_def *def,
 	alg->digest = semidrive_ahash_digest;
 	alg->export = semidrive_ahash_export;
 	alg->import = semidrive_ahash_import;
-	if (IS_SHA_HMAC(def->flags))
+
+	if (IS_SHA_HMAC(def->flags)) {
 		alg->setkey = semidrive_ahash_hmac_setkey;
+	}
+
 	alg->halg.digestsize = def->digestsize;
 	alg->halg.statesize = def->statesize;
 
@@ -719,7 +752,7 @@ static int semidrive_ahash_register_one(const struct semidrive_ahash_def *def,
 
 	snprintf(base->cra_name, CRYPTO_MAX_ALG_NAME, "%s", def->name);
 	snprintf(base->cra_driver_name, CRYPTO_MAX_ALG_NAME, "%s",
-		 def->drv_name);
+			 def->drv_name);
 
 	INIT_LIST_HEAD(&tmpl->entry);
 	tmpl->crypto_alg_type = CRYPTO_ALG_TYPE_AHASH;
@@ -727,6 +760,7 @@ static int semidrive_ahash_register_one(const struct semidrive_ahash_def *def,
 	tmpl->sdce = sdce;
 
 	ret = crypto_register_ahash(alg);
+
 	if (ret) {
 		kfree(tmpl);
 		dev_err(sdce->dev, "%s registration failed\n", base->cra_name);
@@ -755,8 +789,10 @@ static int semidrive_ahash_register(struct crypto_dev *sdce)
 
 	for (i = 0; i < ARRAY_SIZE(ahash_def); i++) {
 		ret = semidrive_ahash_register_one(&ahash_def[i], sdce);
-		if (ret)
+
+		if (ret) {
 			goto err;
+		}
 	}
 
 	return 0;

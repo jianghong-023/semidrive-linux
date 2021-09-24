@@ -13,53 +13,53 @@
 #include "ce.h"
 
 /* cipher algorithms */
-#define SD_ALG_DES			BIT(0)
-#define SD_ALG_3DES			BIT(1)
-#define SD_ALG_AES			BIT(2)
+#define SD_ALG_DES              BIT(0)
+#define SD_ALG_3DES             BIT(1)
+#define SD_ALG_AES              BIT(2)
 
 /* hash and hmac algorithms */
-#define SD_HASH_MD5				BIT(3)
-#define SD_HASH_SHA1			BIT(4)
-#define SD_HASH_SHA224			BIT(5)
-#define SD_HASH_SHA256			BIT(6)
-#define SD_HASH_SHA384			BIT(7)
-#define SD_HASH_SHA512			BIT(8)
-#define SD_HASH_SM3				BIT(9)
-#define SD_HASH_SHA1_HMAC		BIT(10)
-#define SD_HASH_SHA224_HMAC		BIT(11)
-#define SD_HASH_SHA256_HMAC		BIT(12)
-#define SD_HASH_SHA384_HMAC		BIT(13)
-#define SD_HASH_SHA512_HMAC		BIT(14)
-#define SD_HASH_AES_CMAC		BIT(15)
+#define SD_HASH_MD5             BIT(3)
+#define SD_HASH_SHA1            BIT(4)
+#define SD_HASH_SHA224          BIT(5)
+#define SD_HASH_SHA256          BIT(6)
+#define SD_HASH_SHA384          BIT(7)
+#define SD_HASH_SHA512          BIT(8)
+#define SD_HASH_SM3             BIT(9)
+#define SD_HASH_SHA1_HMAC       BIT(10)
+#define SD_HASH_SHA224_HMAC     BIT(11)
+#define SD_HASH_SHA256_HMAC     BIT(12)
+#define SD_HASH_SHA384_HMAC     BIT(13)
+#define SD_HASH_SHA512_HMAC     BIT(14)
+#define SD_HASH_AES_CMAC        BIT(15)
 
 /* cipher modes */
-#define SD_MODE_CBC			BIT(16)
-#define SD_MODE_ECB			BIT(17)
-#define SD_MODE_CTR			BIT(18)
-#define SD_MODE_XTS			BIT(19)
-#define SD_MODE_CCM			BIT(20)
-#define SD_MODE_MASK			GENMASK(12, 8)
+#define SD_MODE_CBC             BIT(16)
+#define SD_MODE_ECB             BIT(17)
+#define SD_MODE_CTR             BIT(18)
+#define SD_MODE_XTS             BIT(19)
+#define SD_MODE_CCM             BIT(20)
+#define SD_MODE_MASK            GENMASK(12, 8)
 
-#define IS_MD5(flags)			(flags & SD_HASH_MD5)
-#define IS_SHA1(flags)			(flags & SD_HASH_SHA1)
-#define IS_SHA224(flags)		(flags & SD_HASH_SHA224)
-#define IS_SHA256(flags)		(flags & SD_HASH_SHA256)
-#define IS_SHA384(flags)		(flags & SD_HASH_SHA384)
-#define IS_SHA512(flags)		(flags & SD_HASH_SHA512)
-#define IS_SHA1_HMAC(flags)		(flags & SD_HASH_SHA1_HMAC)
-#define IS_SHA224_HMAC(flags)	(flags & SD_HASH_SHA224_HMAC)
-#define IS_SHA256_HMAC(flags)	(flags & SD_HASH_SHA256_HMAC)
-#define IS_SHA384_HMAC(flags)	(flags & SD_HASH_SHA384_HMAC)
-#define IS_SHA512_HMAC(flags)	(flags & SD_HASH_SHA512_HMAC)
-#define IS_SHA_HMAC(flags)		\
-		(IS_SHA1_HMAC(flags) || IS_SHA256_HMAC(flags) \
-		|| IS_SHA224_HMAC(flags) || IS_SHA512_HMAC(flags) \
-		|| IS_SHA384_HMAC(flags))
-#define IS_CMAC(flags)			(flags & SD_HASH_AES_CMAC)
+#define IS_MD5(flags)           (flags & SD_HASH_MD5)
+#define IS_SHA1(flags)          (flags & SD_HASH_SHA1)
+#define IS_SHA224(flags)        (flags & SD_HASH_SHA224)
+#define IS_SHA256(flags)        (flags & SD_HASH_SHA256)
+#define IS_SHA384(flags)        (flags & SD_HASH_SHA384)
+#define IS_SHA512(flags)        (flags & SD_HASH_SHA512)
+#define IS_SHA1_HMAC(flags)     (flags & SD_HASH_SHA1_HMAC)
+#define IS_SHA224_HMAC(flags)   (flags & SD_HASH_SHA224_HMAC)
+#define IS_SHA256_HMAC(flags)   (flags & SD_HASH_SHA256_HMAC)
+#define IS_SHA384_HMAC(flags)   (flags & SD_HASH_SHA384_HMAC)
+#define IS_SHA512_HMAC(flags)   (flags & SD_HASH_SHA512_HMAC)
+#define IS_SHA_HMAC(flags)      \
+        (IS_SHA1_HMAC(flags) || IS_SHA256_HMAC(flags) \
+        || IS_SHA224_HMAC(flags) || IS_SHA512_HMAC(flags) \
+        || IS_SHA384_HMAC(flags))
+#define IS_CMAC(flags)          (flags & SD_HASH_AES_CMAC)
 
 /* cipher encryption/decryption operations */
-#define SD_ENCRYPT			BIT(21)
-#define SD_DECRYPT			BIT(22)
+#define SD_ENCRYPT              BIT(21)
+#define SD_DECRYPT              BIT(22)
 
 struct semidrive_ce_device {
 	u32 ce_id;

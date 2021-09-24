@@ -54,9 +54,9 @@
  */
 
 static int
-hash_n_crypt(struct crypto_dev* crypto, struct csession *ses_ptr, struct crypt_op *cop,
-		struct scatterlist *src_sg, struct scatterlist *dst_sg,
-		uint32_t len)
+hash_n_crypt(struct crypto_dev *crypto, struct csession *ses_ptr, struct crypt_op *cop,
+			 struct scatterlist *src_sg, struct scatterlist *dst_sg,
+			 uint32_t len)
 {
 	int ret;
 
@@ -66,33 +66,42 @@ hash_n_crypt(struct crypto_dev* crypto, struct csession *ses_ptr, struct crypt_o
 	if (cop->op == COP_ENCRYPT) {
 		if (ses_ptr->hdata.init != 0) {
 			ret = cryptodev_hash_update(crypto, &ses_ptr->hdata,
-							src_sg, len);
-			if (unlikely(ret))
+										src_sg, len);
+
+			if (unlikely(ret)) {
 				goto out_err;
+			}
 		}
+
 		if (ses_ptr->cdata.init != 0) {
 			ret = cryptodev_cipher_encrypt(&ses_ptr->cdata,
-							src_sg, dst_sg, len);
+										   src_sg, dst_sg, len);
 
-			if (unlikely(ret))
+			if (unlikely(ret)) {
 				goto out_err;
+			}
 		}
-	} else {
+	}
+	else {
 		if (ses_ptr->cdata.init != 0) {
 			ret = cryptodev_cipher_decrypt(&ses_ptr->cdata,
-							src_sg, dst_sg, len);
+										   src_sg, dst_sg, len);
 
-			if (unlikely(ret))
+			if (unlikely(ret)) {
 				goto out_err;
+			}
 		}
 
 		if (ses_ptr->hdata.init != 0) {
 			ret = cryptodev_hash_update(crypto, &ses_ptr->hdata,
-								dst_sg, len);
-			if (unlikely(ret))
+										dst_sg, len);
+
+			if (unlikely(ret)) {
 				goto out_err;
+			}
 		}
 	}
+
 	return 0;
 out_err:
 	pr_err("CryptoAPI failure: %d", ret);
@@ -102,7 +111,7 @@ out_err:
 /* This is the main crypto function - feed it with plaintext
    and get a ciphertext (or vice versa :-) */
 static int
-__crypto_run_std(struct crypto_dev* crypto, struct csession *ses_ptr, struct crypt_op *cop)
+__crypto_run_std(struct crypto_dev *crypto, struct csession *ses_ptr, struct crypt_op *cop)
 {
 	char *data;
 	char __user *src, *dst;
@@ -127,7 +136,7 @@ __crypto_run_std(struct crypto_dev* crypto, struct csession *ses_ptr, struct cry
 		size_t current_len = nbytes > bufsize ? bufsize : nbytes;
 
 		if (unlikely(copy_from_user(data, src, current_len))) {
-		        pr_err("Error copying %zu bytes from user address %p.", current_len, src);
+			pr_err("Error copying %zu bytes from user address %p.", current_len, src);
 			ret = -EFAULT;
 			break;
 		}
@@ -137,13 +146,13 @@ __crypto_run_std(struct crypto_dev* crypto, struct csession *ses_ptr, struct cry
 		ret = hash_n_crypt(crypto, ses_ptr, cop, &sg, &sg, current_len);
 
 		if (unlikely(ret)) {
-		        pr_err("hash_n_crypt failed.");
+			pr_err("hash_n_crypt failed.");
 			break;
 		}
 
 		if (ses_ptr->cdata.init != 0) {
 			if (unlikely(copy_to_user(dst, data, current_len))) {
-			        pr_err("could not copy to user.");
+				pr_err("could not copy to user.");
 				ret = -EFAULT;
 				break;
 			}
@@ -165,9 +174,9 @@ __crypto_run_zc(struct csession *ses_ptr, struct kernel_crypt_op *kcop)
 	struct scatterlist *src_sg, *dst_sg;
 	struct crypt_op *cop = &kcop->cop;
 	int ret = 0;
-
 	ret = get_userbuf(ses_ptr, cop->src, cop->len, cop->dst, cop->len,
-	                  kcop->task, kcop->mm, &src_sg, &dst_sg);
+					  kcop->task, kcop->mm, &src_sg, &dst_sg);
+
 	if (unlikely(ret)) {
 		pr_err("Error getting user pages. Falling back to non zero copy.");
 		return __crypto_run_std(NULL, ses_ptr, cop);
@@ -179,7 +188,7 @@ __crypto_run_zc(struct csession *ses_ptr, struct kernel_crypt_op *kcop)
 	return ret;
 }
 
-int crypto_run(struct crypto_dev* crypto, struct fcrypt *fcr, struct kernel_crypt_op *kcop)
+int crypto_run(struct crypto_dev *crypto, struct fcrypt *fcr, struct kernel_crypt_op *kcop)
 {
 	struct csession *ses_ptr;
 	struct crypt_op *cop = &kcop->cop;
@@ -192,6 +201,7 @@ int crypto_run(struct crypto_dev* crypto, struct fcrypt *fcr, struct kernel_cryp
 
 	/* this also enters ses_ptr->sem */
 	ses_ptr = crypto_get_session_by_sid(fcr, cop->ses);
+
 	if (unlikely(!ses_ptr)) {
 		pr_err("invalid session ID=0x%08X", cop->ses);
 		return -EINVAL;
@@ -199,6 +209,7 @@ int crypto_run(struct crypto_dev* crypto, struct fcrypt *fcr, struct kernel_cryp
 
 	if (ses_ptr->hdata.init != 0 && (cop->flags == 0 || cop->flags & COP_FLAG_RESET)) {
 		ret = cryptodev_hash_reset(&ses_ptr->hdata);
+
 		if (unlikely(ret)) {
 			pr_err("error in cryptodev_hash_reset()");
 			goto out_unlock;
@@ -210,26 +221,26 @@ int crypto_run(struct crypto_dev* crypto, struct fcrypt *fcr, struct kernel_cryp
 
 		if (unlikely(cop->len % blocksize)) {
 			pr_err("data size (%u) isn't a multiple of block size (%u)",
-				cop->len, blocksize);
+				   cop->len, blocksize);
 			ret = -EINVAL;
 			goto out_unlock;
 		}
 
 		cryptodev_cipher_set_iv(&ses_ptr->cdata, kcop->iv,
-				min(ses_ptr->cdata.ivsize, kcop->ivlen));
+								min(ses_ptr->cdata.ivsize, kcop->ivlen));
 	}
 
 	if (likely(cop->len)) {
 		if (!(cop->flags & COP_FLAG_NO_ZC)) {
 			if (unlikely(ses_ptr->alignmask && !IS_ALIGNED((unsigned long)cop->src, ses_ptr->alignmask + 1))) {
 				pr_err("source address %p is not %d byte aligned - disabling zero copy",
-						cop->src, ses_ptr->alignmask + 1);
+					   cop->src, ses_ptr->alignmask + 1);
 				cop->flags |= COP_FLAG_NO_ZC;
 			}
 
 			if (unlikely(ses_ptr->alignmask && !IS_ALIGNED((unsigned long)cop->dst, ses_ptr->alignmask + 1))) {
 				pr_err("destination address %p is not %d byte aligned - disabling zero copy",
-						cop->dst, ses_ptr->alignmask + 1);
+					   cop->dst, ses_ptr->alignmask + 1);
 				cop->flags |= COP_FLAG_NO_ZC;
 			}
 		}
@@ -238,26 +249,31 @@ int crypto_run(struct crypto_dev* crypto, struct fcrypt *fcr, struct kernel_cryp
 			pr_err("COP_FLAG_NO_ZC");
 			ret = __crypto_run_std(crypto, ses_ptr, &kcop->cop);
 		}
-		else
+		else {
 			ret = __crypto_run_zc(ses_ptr, kcop);
-		if (unlikely(ret))
+		}
+
+		if (unlikely(ret)) {
 			goto out_unlock;
+		}
 	}
 
 	if (ses_ptr->cdata.init != 0) {
 		cryptodev_cipher_get_iv(&ses_ptr->cdata, kcop->iv,
-				min(ses_ptr->cdata.ivsize, kcop->ivlen));
+								min(ses_ptr->cdata.ivsize, kcop->ivlen));
 	}
 
 	if (ses_ptr->hdata.init != 0 &&
-		((cop->flags & COP_FLAG_FINAL) ||
-		   (!(cop->flags & COP_FLAG_UPDATE) || cop->len == 0))) {
+			((cop->flags & COP_FLAG_FINAL) ||
+			 (!(cop->flags & COP_FLAG_UPDATE) || cop->len == 0))) {
 
 		ret = cryptodev_hash_final(crypto, &ses_ptr->hdata, kcop->hash_output);
+
 		if (unlikely(ret)) {
 			pr_err("CryptoAPI failure: %d", ret);
 			goto out_unlock;
 		}
+
 		kcop->digestsize = ses_ptr->hdata.digestsize;
 	}
 

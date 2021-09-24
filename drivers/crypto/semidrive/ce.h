@@ -18,8 +18,10 @@
 #include <linux/miscdevice.h>
 #include <linux/spinlock_types.h>
 #include <linux/dma-mapping.h>
+#include <linux/gfp.h>
 #include <crypto/algapi.h>
 #include <linux/interrupt.h>
+#include <crypto/cryptodev.h>
 
 //TODO: need consider ce count in domain
 #if CE_IN_SAFETY_DOMAIN
@@ -56,36 +58,98 @@ typedef uintptr_t addr_t;
 #define _paddr(va)      __pa(va)
 #define _ioaddr(offset)     (offset)
 
-#define BLOCK_T_CONV(array, length, addr_type) { (uint8_t *) (array), (uint32_t) (length), addr_type}
-
-#define ROUNDUP(a, b) (((a) + ((b)-1)) & ~((b)-1))
 /**
  Enumeration of data/iv/key/context address type
 */
 typedef enum ce_addr_type_t {
-    SRAM_PUB = 0,
-    SRAM_SEC = 1,
-    KEY_INT = 2,
-    EXT_MEM = 3,
-    PKE_INTERNAL = 4
+	SRAM_PUB = 0,
+	SRAM_SEC = 1,
+	KEY_INT = 2,
+	EXT_MEM = 3,
+	PKE_INTERNAL = 4
 } ce_addr_type_t;
 
-typedef struct block_t {
-    uint8_t* addr;   /* Start address of the data (FIFO or contiguous memory) */
-    uint32_t len;    /* Length of data expressed in bytes */
-    ce_addr_type_t addr_type; /* address type */
+typedef struct block {
+	uint8_t *addr;   /* Start address of the data (FIFO or contiguous memory) */
+	uint32_t len;    /* Length of data expressed in bytes */
+	ce_addr_type_t addr_type; /* address type */
 } block_t;
 
+#define BLOCK_T_CONV(array, length, addr_type) ((block_t){(uint8_t *) (array), (uint32_t) (length), (ce_addr_type_t)addr_type})
+
+//static inline block_t BLOCK_T_CONV(uint8_t * (array), uint32_t length,ce_addr_type_t addr_type)
+// {
+//     block_t_temp.addr = array;
+//     block_t_temp.len = length;
+//     block_t_temp.addr_type = addr_type;
+//     return block_t_temp;
+// }
+
+static inline block_t block_t_convert(const volatile void *array, uint32_t length, ce_addr_type_t addr_type)
+{
+#if defined __cplusplus
+	//'compound literals' are not valid in C++
+	block_t  blk = BLOCK_T_CONV(array, length, addr_type);
+	return blk;
+#else
+	//'compound literal' (used below) is valid in C99
+	return (block_t)BLOCK_T_CONV(array, length, addr_type);
+#endif
+}
+
+#define ROUNDUP(a, b) (((a) + ((b)-1)) & ~((b)-1))
+
+
+
 struct mem_node {
-    size_t size;
-    size_t is_used;
-    uint8_t *ptr;
+	size_t size;
+	size_t is_used;
+	uint8_t *ptr;
+};
+
+
+struct kernel_crypt_op {
+	struct crypt_op cop;
+
+	int ivlen;
+	__u8 iv[EALG_MAX_BLOCK_LEN];
+
+	int digestsize;
+	uint8_t hash_output[AALG_MAX_RESULT_LEN];
+
+	struct task_struct *task;
+	struct mm_struct *mm;
+};
+
+struct todo_list_item {
+	struct list_head __hook;
+	struct kernel_crypt_op kcop;
+	int result;
+};
+
+struct fcrypt {
+	struct list_head list;
+	struct mutex sem;
+};
+
+struct locked_list {
+	struct list_head list;
+	struct mutex lock;
+};
+
+struct crypt_priv {
+	struct fcrypt fcrypt;
+	struct locked_list free, todo, done;
+	int itemcount;
+	struct work_struct cryptask;
+	wait_queue_head_t user_waiter;
 };
 
 struct crypto_dev {
 	struct device *dev;
 	char name_buff[32];
 	int ce_id;
+	// struct mutex lock;
 	/*struct mutex*/spinlock_t lock;
 	struct miscdevice miscdev;
 	wait_queue_head_t cehashwaitq;
@@ -97,19 +161,21 @@ struct crypto_dev {
 	void __iomem *base;
 	void __iomem *sram_base;
 
+	struct crypt_priv *pcr;
 	struct crypto_queue queue;
 	struct tasklet_struct queue_task;
 	struct tasklet_struct done_tasklet;
 	struct crypto_async_request *req;
 	int result;
 	int (*async_req_enqueue)(struct crypto_dev *sdce,
-				struct crypto_async_request *req);
+							 struct crypto_async_request *req);
 	void (*async_req_done)(struct crypto_dev *sdce, int ret);
 };
 
+
 typedef struct ec_key {
-    block_t pub_key;
-    block_t priv_key;
+	block_t pub_key;
+	block_t priv_key;
 } ec_key_t;
 
 extern  bool g_ce_inited;
@@ -118,8 +184,8 @@ extern volatile uint32_t g_int_flag;
 typedef unsigned long spin_lock_saved_state_t;
 typedef unsigned long spin_lock_save_flags_t;
 
-struct mem_node * ce_malloc(size_t size);
-void ce_free(struct mem_node * mem_node);
+struct mem_node *ce_malloc(size_t size);
+void ce_free(struct mem_node *mem_node);
 void of_set_sys_cnt_ce(int i);
 uint32_t of_get_sys_cnt_ce(void);
 
@@ -129,11 +195,13 @@ addr_t addr_switch_to_ce(uint32_t vce_id, ce_addr_type_t addr_type_s, addr_t add
 int32_t ce_init(uint32_t vce_id);
 int32_t ce_globle_init(void);
 
-void printf_binary(const char* info, const void* content, uint32_t content_len);
+void printf_binary(const char *info, const void *content, uint32_t content_len);
 
 void clean_cache(addr_t start, uint32_t size);
 void flush_cache(addr_t start, uint32_t size);
-void clean_cache_block(block_t* data, uint32_t ce_id);
-void invalidate_cache_block(block_t* data, uint32_t ce_id);
+void clean_cache_block(block_t *data, uint32_t ce_id);
+void invalidate_cache_block(block_t *data, uint32_t ce_id);
 
+uint32_t ce_inheap_init(void);
+void ce_inheap_free(void);
 #endif

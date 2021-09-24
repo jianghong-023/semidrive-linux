@@ -13,8 +13,8 @@
 
 /** Curve to be used by the EdDSA algorithms */
 typedef enum eddsa_curve {
-    SX_ED25519, /**< Ed25519 curve */
-    SX_ED448    /**< Ed448 curve */
+	SX_ED25519, /**< Ed25519 curve */
+	SX_ED448    /**< Ed448 curve */
 } eddsa_curve_t;
 
 /** @brief Ed448 max context size in bytes */
@@ -39,10 +39,10 @@ typedef enum eddsa_curve {
  * @return  CRYPTOLIB_SUCCESS if no error
  */
 uint32_t eddsa_generate_pubkey(
-    uint32_t vce_id,
-    eddsa_curve_t curve,
-    block_t sk,
-    block_t pk);
+	uint32_t vce_id,
+	eddsa_curve_t curve,
+	block_t sk,
+	block_t pk);
 
 /**
  * @brief Generate an EdDSA signature of a message
@@ -56,12 +56,12 @@ uint32_t eddsa_generate_pubkey(
  * @return  CRYPTOLIB_SUCCESS if no error
  */
 uint32_t eddsa_generate_signature(
-    uint32_t vce_id,
-    eddsa_curve_t curve,
-    block_t k,
-    block_t r,
-    block_t s,
-    block_t sig);
+	uint32_t vce_id,
+	eddsa_curve_t curve,
+	block_t k,
+	block_t r,
+	block_t s,
+	block_t sig);
 
 /**
  * @brief Verifies a given signature corresponds to a given message
@@ -75,11 +75,11 @@ uint32_t eddsa_generate_signature(
  *         CRYPTOLIB_INVALID_SIGN_ERR if signature verification failed
 */
 uint32_t eddsa_verify_signature(
-    uint32_t vce_id,
-    eddsa_curve_t curve,
-    block_t k,
-    block_t pk_y,
-    block_t r_y,
-    block_t sig);
+	uint32_t vce_id,
+	eddsa_curve_t curve,
+	block_t k,
+	block_t pk_y,
+	block_t r_y,
+	block_t sig);
 
 #endif

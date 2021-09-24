@@ -10,17 +10,17 @@
 #include "sx_pke_conf.h"
 
 typedef struct sx_ecc_curve_t {
-    /**< points to predefined curve params
-       formatted as {q, n, G<SUB>x</SUB>, G<SUB>y</SUB>, a, b} and
-       represented in big number array of uint8 (big endian).
-       The fileds are:
-       - q, the modulus (or the reduction polynomial for ECC Weierstrass binary)
-       - n, the order of the curve
-       - G<SUB>x</SUB>, G<SUB>y</SUB>, the x and y coordinates of the generator
-       - a, b (or d for Edwards curve), the coefficients defining the ECC curve*/
-    block_t  params;
-    uint32_t pk_flags; /**< required flags for the PK engine*/
-    uint32_t bytesize; /**< size expressed in bytes */
+	/**< points to predefined curve params
+	   formatted as {q, n, G<SUB>x</SUB>, G<SUB>y</SUB>, a, b} and
+	   represented in big number array of uint8 (big endian).
+	   The fileds are:
+	   - q, the modulus (or the reduction polynomial for ECC Weierstrass binary)
+	   - n, the order of the curve
+	   - G<SUB>x</SUB>, G<SUB>y</SUB>, the x and y coordinates of the generator
+	   - a, b (or d for Edwards curve), the coefficients defining the ECC curve*/
+	block_t  params;
+	uint32_t pk_flags; /**< required flags for the PK engine*/
+	uint32_t bytesize; /**< size expressed in bytes */
 } sx_ecc_curve_t;
 
 extern const sx_ecc_curve_t sx_ecc_curve_p192;
@@ -49,6 +49,6 @@ extern const sx_ecc_curve_t sx_ecc_curve_curve192_wrongQ;
 
 extern const sx_ecc_curve_t sx_ecc_curve_p256_iptest;
 
-const void * get_curve_value_by_nid(int nid);
+const void *get_curve_value_by_nid(int nid);
 
 #endif

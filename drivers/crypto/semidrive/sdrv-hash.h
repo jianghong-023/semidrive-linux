@@ -14,10 +14,10 @@
 #include "sx_hash.h"
 #include "crypto.h"
 
-#define SD_SHA_MAX_BLOCKSIZE		SHA512_BLOCKSIZE
-#define SD_SHA_MAX_DIGESTSIZE		SHA512_DIGESTSIZE
-#define MD5_DIGEST_SIZE			MD5_DIGESTSIZE
-#define MD5_BLOCK_SIZE			MD5_BLOCKSIZE
+#define SD_SHA_MAX_BLOCKSIZE        SHA512_BLOCKSIZE
+#define SD_SHA_MAX_DIGESTSIZE       SHA512_DIGESTSIZE
+#define MD5_DIGEST_SIZE         MD5_DIGESTSIZE
+#define MD5_BLOCK_SIZE          MD5_BLOCKSIZE
 
 struct semidrive_sha_ctx {
 	u8 authkey[SD_SHA_MAX_BLOCKSIZE];
@@ -62,11 +62,11 @@ struct semidrive_sha_reqctx {
 };
 
 static inline struct semidrive_ce_alg_template *to_ahash_tmpl(
-		struct crypto_tfm *tfm)
+	struct crypto_tfm *tfm)
 {
 	struct crypto_ahash *ahash = __crypto_ahash_cast(tfm);
 	struct ahash_alg *alg = container_of(crypto_hash_alg_common(ahash),
-					     struct ahash_alg, halg);
+										 struct ahash_alg, halg);
 
 	return container_of(alg, struct semidrive_ce_alg_template, alg.ahash);
 }
