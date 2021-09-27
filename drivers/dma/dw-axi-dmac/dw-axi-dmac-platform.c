@@ -1993,14 +1993,14 @@ static int dw_probe(struct platform_device *pdev)
 	if (ret < 0)
 		goto err_pm_disable;
 
-	axi_dma_hw_init(chip);
-
 	pm_runtime_put(chip->dev);
 
 	// ret = dmaenginem_async_device_register(&dw->dma);
 	ret = dma_async_device_register(&dw->dma);
 	if (ret)
 		goto err_dma_register;
+
+	axi_dma_hw_init(chip);
 
 	dev_info(chip->dev, "DesignWare AXI DMA Controller, %d channels\n",
 		 dw->hdata->nr_channels);
