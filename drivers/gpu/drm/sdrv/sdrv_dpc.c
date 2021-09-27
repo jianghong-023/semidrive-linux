@@ -25,67 +25,6 @@ extern const struct dpc_operation dp_rpcall_ops;
 struct class *display_class;
 struct kunlun_crtc *kcrtc_primary = NULL;
 
-#define CONFIG_RECOVERY_ENABLED
-#if 0
-		display: display@0 {
-			compatible = "semdrive,display-subsystem";
-			sdriv,crtc = <&crtc0 &crtc1>;
-			status = "disabled";
-		};
-
-		dp1: dp1@30440000 {
-			compatible = "sdrv,dp";
-			reg = <>;
-			interrupts = <0 DP1_IRQ 4>;
-			status = "disabled";
-			mlc-select = <0>;
-			sdrv,ip = "dp-r0p1";
-		};
-
-		dc1: dc1@30db0000 {
-			compatible = "sdrv,dc";
-			reg = <>;
-			interrupts = <0 DC1_IRQ 4>;
-			status = "disabled";
-			sdrv,ip = "dc-r0p1";
-			crtc0_out: port {
-				crtc0_out_interface: endpoint@0 {
-					remote-endpoint = <&parallel_in_crtc0>;
-				};
-			};
-		};
-
-		dp2: dp2@30460000 {
-			compatible = "sdrv,dp";
-			reg = <>;
-			interrupts = <0 DP2_IRQ 4>;
-			status = "disabled";
-			sdrv,ip = "dp-r0p1";
-		};
-
-		dc2: dc2@30dc0000 {
-			compatible = "sdrv,dc";
-			reg = <>;
-			interrupts = <0 DC2_IRQ 4>;
-			status = "disabled";
-			sdrv,ip = "dc-r0p1";
-
-
-		};
-
-		crtc0: crtc0@30440000 {
-			compatible = "semidrive,sdrv-crtc";
-			dpc-master = <&dp1 &dc1>;
-			dpc-slave = <&dp2 &dc2>;
-			display-mode = <3>; //1 single mode, 2: duplicate mode, 3: combine mode
-
-			crtc0_out: port {
-				crtc0_out_interface: endpoint@0 {
-					remote-endpoint = <&parallel_in_crtc0>;
-				};
-			};
-		};
-#endif
 
 
 static int dp_enable = 1;
