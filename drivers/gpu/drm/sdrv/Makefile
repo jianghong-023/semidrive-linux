@@ -54,7 +54,6 @@ drm-crtc-objs += \
   sdrv_plane.o \
   sdrv_rpcall.o \
   dp_dummy.o \
-  dp_op.o \
   dp_rpcall.o
 
 obj-$(CONFIG_DRM_SEMIDRIVE) += drm-crtc.o drm_fbdev.o

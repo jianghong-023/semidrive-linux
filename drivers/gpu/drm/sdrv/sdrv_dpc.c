@@ -21,7 +21,6 @@ extern const struct dpc_operation dc_r0p1_ops;
 extern const struct dpc_operation dp_r0p1_ops;
 extern const struct dpc_operation dp_dummy_ops;
 extern const struct dpc_operation dp_rpcall_ops;
-extern const struct dpc_operation dp_op_ops;
 
 struct class *display_class;
 struct kunlun_crtc *kcrtc_primary = NULL;
@@ -1384,7 +1383,6 @@ struct sdrv_dpc_data dpc_data[] = {
 	{.version = "dp-r0p1", .ops = &dp_r0p1_ops},
 	{.version = "dp-dummy", .ops = &dp_dummy_ops},
 	{.version = "dp-rpcall", .ops = &dp_rpcall_ops},
-	{.version = "dp-op", .ops = &dp_op_ops},
 	{},
 };
 
