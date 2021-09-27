@@ -60,6 +60,7 @@ static void hash_run(void *device, hash_reg_config_t *reg_config)
 	writel(value, (((struct crypto_dev *)device)->base + REG_HASH_SRC_ADDR_CE_(vce_id)));
 
 	value = reg_value(reg_config->src_type, 0, CE_HASH_SRC_TYPE_SHIFT, CE_HASH_SRC_TYPE_MASK);
+	value = reg_value(_paddr((void *)(addr_t)reg_config->src_addr) >> 32, value, CE_HASH_SRC_ADDR_H_SHIFT, CE_HASH_SRC_ADDR_H_MASK);
 	//pr_info("value = %x reg= 0x%x\n", value, REG_HASH_SRC_ADDR_H_CE_(vce_id));
 	writel(value, (((struct crypto_dev *)device)->base + REG_HASH_SRC_ADDR_H_CE_(vce_id)));
 

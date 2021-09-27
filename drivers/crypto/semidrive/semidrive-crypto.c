@@ -336,7 +336,10 @@ static int crypto_create_session(struct fcrypt *fcr, struct session_op *sop)
 			hash_name = "sha512";
 			hmac_mode = 0;
 			break;
-
+		case CRYPTO_SM3:
+			hash_name = "sm3";
+			hmac_mode = 0;
+			break;
 		default:
 			pr_err("bad mac: %d", sop->mac);
 			return -EINVAL;
@@ -993,7 +996,7 @@ uint32_t sd_rsa_encrypt(struct file *filp, unsigned long arg)
 	result.len = cipher.len;
 
 	ret = rsa_encrypt_blk((void *)crypto,
-						  rsa_pad_types, &message, &key_n, &key_e, &result, hashType);
+		  rsa_pad_types, &message, &key_n, &key_e, &result, hashType, true);
 
 	if (ret < 0) {
 		ce_inheap_free();
@@ -1151,9 +1154,9 @@ uint32_t sd_rsa_decrypt(struct file *filp, unsigned long arg)
 	result.addr_type = addr_type;
 	result.len = rsa_msg.rsa_keypair.n_len;
 	ret = rsa_decrypt_blk((void *)crypto, rsa_pad_types, &cipher,
-						  &key_n, &key_d, &result, &result.len, hashType);
+		  &key_n, &key_d, &result, &result.len, hashType, true);
 
-	if (ret < 0)  {
+	if (ret < 0) {
 		pr_err("%s: rsa_decrypt_blk  failed (%d)\n", __func__, ret);
 		ce_inheap_free();
 		return ret;
@@ -1495,7 +1498,7 @@ uint32_t sd_rsa_signature_generation(struct file *filp, unsigned long arg)
 	result.addr_type = addr_type;
 	result.len = RSA_len;
 	ret = rsa_signature_generation_blk((void *)crypto, hashType, rsa_pad_types, &message,
-									   &result, &key_n, &key_d, 0);
+							   &result, &key_n, &key_d, 0, true);
 
 	if (ret < 0) {
 		pr_err("%s: rsa_signature_generation_blk  failed (%d)\n", __func__, ret);
@@ -1658,7 +1661,7 @@ uint32_t sd_rsa_signature_verification(struct file *filp, unsigned long arg)
 	result.addr_type = addr_type;
 	result.len = RSA_len;
 	ret = rsa_signature_verification_blk((void *)crypto, hashType, rsa_pad_types, &message,
-										 &key_n, &key_e, &signature, 0);
+							 &key_n, &key_e, &signature, 0, true);
 
 	if (ret < 0) {
 		pr_err("%s: rsa_signature_verification_blk  failed (%d)\n", __func__, ret);
@@ -2118,6 +2121,7 @@ static long crypto_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 	struct session_op sop;
 	uint32_t ses;
 	struct kernel_crypt_op kcop;
+	struct crypt_asym asym;
 	struct fcrypt *fcr;
 	struct crypt_priv *pcr = crypto->pcr;
 	fcr = &pcr->fcrypt;
@@ -2303,7 +2307,42 @@ static long crypto_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 					    return kcaop_to_user(&kcaop, fcr, (void __user *)arg);
 					*/
 					return 1;
-			}
+				case CIOCASYMFEAT:
+					ses = 0;
+
+					if (ret = crypto_has_alg("pkc(rsa)", 0, 0)) {
+						pr_info("enable pkc(rsa)\n");
+						ses = CRF_MOD_EXP_CRT |	CRF_MOD_EXP;
+					}
+					else {
+						pr_err("crypto_has_alg ret: %d\n", ret);
+					}
+
+					if (crypto_has_alg("pkc(dh)", 0, 0))
+						ses |= CRF_DH_COMPUTE_KEY;
+
+					return put_user(ses, p);
+
+				case CIOCKEY:
+					if(copy_from_user(&asym, (void*)arg, sizeof(asym))) {
+						pr_err("%s(CIOCKEY) - bad copy\n", __FUNCTION__);
+						ret = EFAULT;
+						return ret;
+					}
+
+					ret = cryptodev_pke(crypto, &asym);
+					if (unlikely(err)) {
+						pr_err("Error in cryptodev_pke\n");
+						return ret;
+					}
+
+					if(copy_to_user((void*)arg, &asym, sizeof(asym))) {
+						pr_err("%s(CIOCGKEY) - bad return copy\n", __FUNCTION__);
+						ret = EFAULT;
+					}
+
+					break;
+				}
 
 			break;
 
@@ -2457,8 +2496,9 @@ static int crypto_release(struct inode *inode, struct file *filp)
 	return 0;
 }
 static const struct semidrive_alg_ops *sd_alg_ops[] = {
-
+	&ablkcipher_ops,
 	&ahash_ops,
+	&akcipher_ops,
 };
 
 static void semidrive_unregister_algs(struct crypto_dev *sdce)
@@ -2689,9 +2729,6 @@ static int semidrive_crypto_probe(struct platform_device *pdev)
 									dev_name(&pdev->dev), crypto_inst);
 
 	writel(0x1f, (crypto_inst->base + REG_INTCLR_CE_(crypto_inst->ce_id)));
-	pr_err("crypto_inst->base is %x\n", crypto_inst->base);
-	pr_err("crypto_inst->ce_id is %x\n", crypto_inst->ce_id);
-	pr_err("addr is %x\n", (crypto_inst->base + REG_INTCLR_CE_(crypto_inst->ce_id)));
 	//writel(0xe, (crypto_inst->base +REG_INTEN_CE_(ce_id))); //disable dma/pke intrrupt
 	writel(0x0, (crypto_inst->base + REG_INTEN_CE_(crypto_inst->ce_id))); //disable all intrrupt
 

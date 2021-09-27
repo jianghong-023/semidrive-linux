@@ -3,17 +3,13 @@
 * All rights reserved.
 *
 */
-
-#include <stddef.h>
-#include <string.h>
-#include <kernel/thread.h>
-//#include <platform/interrupts.h>
-
+#include <linux/kernel.h>
 #include "ce_reg.h"
 #include "ce.h"
 #include "sx_cipher.h"
 #include "sram_conf.h"
 #include "sx_errors.h"
+#include "sx_dma.h"
 
 #define LOCAL_TRACE 0 //close local trace 1->0
 
@@ -192,7 +188,7 @@ static uint32_t sx_aes_validate_input(aes_mode_t dir,
 }
 
 uint32_t aes_blk(aes_fct_t aes_fct,
-				 uint32_t vce_id,
+				 void* device,
 				 aes_mode_t mode,
 				 aes_ctx_t ctx,
 				 uint32_t header_len,
@@ -203,13 +199,15 @@ uint32_t aes_blk(aes_fct_t aes_fct,
 				 block_t iv,
 				 block_t ctx_ptr,
 				 block_t data_in,
-				 block_t data_out)
+				 block_t * data_out)
 {
 	uint32_t value;
 	uint32_t key_size_conf;
 
+	uint32_t vce_id = ((struct crypto_dev *)device)->ce_id;
+
 	/* Step 0: input validation */
-	uint32_t ret = sx_aes_validate_input(mode, aes_fct, ctx, key, xtskey, iv, ctx_ptr, data_in, data_out, header_len);
+	uint32_t ret = sx_aes_validate_input(mode, aes_fct, ctx, key, xtskey, iv, ctx_ptr, data_in, *data_out, header_len);
 
 	if (ret) {
 		return ret;
@@ -217,11 +215,17 @@ uint32_t aes_blk(aes_fct_t aes_fct,
 
 	/* config header_len/key/src/dst/iv/context registers */
 	value = reg_value(header_len, 0, CE_CIPHER_HEADER_LEN_SHIFT, CE_CIPHER_HEADER_LEN_MASK);
-	LTRACEF("value = %d reg= 0x%x\n", value, REG_CIPHER_HEADER_LEN_CE_(vce_id));
-	writel(value, _ioaddr(REG_CIPHER_HEADER_LEN_CE_(vce_id)));
+	writel(value, (((struct crypto_dev *)device)->base + REG_CIPHER_HEADER_LEN_CE_(vce_id)));
 
 	if (EXT_MEM == key.addr_type) {
-		value = reg_value(_paddr((void *)key.addr), 0, CE_CIPHER_KEY_ADDR_SHIFT, CE_CIPHER_KEY_ADDR_MASK);
+		//copy and set to sec-sram
+		ret = memcpy_blk_cache(device, &BLOCK_T_CONV(CE2_SRAM_SEC_AES_KEY_ADDR_OFFSET,
+			key.len, SRAM_SEC), &key, key.len, true, false);
+		if (ret) {
+				return CRYPTOLIB_INVALID_PARAM_KEY;
+		}
+
+		value = reg_value(CE2_SRAM_SEC_AES_KEY_ADDR_OFFSET, 0, CE_CIPHER_KEY_ADDR_SHIFT, CE_CIPHER_KEY_ADDR_MASK);
 	}
 	else {
 		value = reg_value((addr_t)key.addr, 0, CE_CIPHER_KEY_ADDR_SHIFT, CE_CIPHER_KEY_ADDR_MASK);
@@ -229,68 +233,83 @@ uint32_t aes_blk(aes_fct_t aes_fct,
 
 	if (FCT_XTS == aes_fct) {
 		if (EXT_MEM == xtskey.addr_type) {
-			value = reg_value((_paddr((void *)xtskey.addr)), value, CE_CIPHER_KEY2_ADDR_SHIFT, CE_CIPHER_KEY2_ADDR_MASK);
+			//copy and set to sec-sram
+			ret = memcpy_blk_cache(device, &BLOCK_T_CONV(CE2_SRAM_SEC_AES_XKEY_ADDR_OFFSET,
+				 xtskey.len, SRAM_SEC), &xtskey, xtskey.len, true, false);
+			if (ret) {
+				return CRYPTOLIB_INVALID_PARAM_KEY;
+			}
+			value = reg_value(CE2_SRAM_SEC_AES_XKEY_ADDR_OFFSET, value, CE_CIPHER_KEY2_ADDR_SHIFT, CE_CIPHER_KEY2_ADDR_MASK);
 		}
 		else {
 			value = reg_value((addr_t)xtskey.addr, value, CE_CIPHER_KEY2_ADDR_SHIFT, CE_CIPHER_KEY2_ADDR_MASK);
 		}
 	}
 
-	LTRACEF("value = %d reg= 0x%x\n", value, (REG_CIPHER_KEY_ADDR_CE_(vce_id)));
-	writel(value, _ioaddr(REG_CIPHER_KEY_ADDR_CE_(vce_id)));
-
-	LTRACEF("data_in.addr = %p addr_type= 0x%x\n", data_in.addr, data_in.addr_type);
+	writel(value, (((struct crypto_dev *)device)->base + REG_CIPHER_KEY_ADDR_CE_(vce_id)));
 
 	if (EXT_MEM == data_in.addr_type) {
-		value = reg_value(addr_switch_to_ce(vce_id, data_in.addr_type, (_paddr((void *)data_in.addr))), 0, CE_CIPHER_SRC_ADDR_SHIFT, CE_CIPHER_SRC_ADDR_MASK0);
+		value = reg_value(_paddr((void *)data_in.addr), 0, CE_CIPHER_SRC_ADDR_SHIFT, CE_CIPHER_SRC_ADDR_MASK0);
 	}
 	else {
 		value = reg_value((addr_t)data_in.addr, 0, CE_CIPHER_SRC_ADDR_SHIFT, CE_CIPHER_SRC_ADDR_MASK0);
 	}
 
-	LTRACEF("value = %x reg= 0x%x\n", value, (REG_CIPHER_SRC_ADDR_CE_(vce_id)));
-	writel(value, _ioaddr(REG_CIPHER_SRC_ADDR_CE_(vce_id)));
+	writel(value, (((struct crypto_dev *)device)->base + REG_CIPHER_SRC_ADDR_CE_(vce_id)));
 
 	value = reg_value(switch_addr_type(data_in.addr_type), 0, CE_CIPHER_SRC_TYPE_SHIFT, CE_CIPHER_SRC_TYPE_MASK);
-	LTRACEF("value = %x reg= 0x%x\n", value, REG_CIPHER_SRC_ADDR_H_CE_(vce_id));
-	writel(value, _ioaddr(REG_CIPHER_SRC_ADDR_H_CE_(vce_id)));
+	value = reg_value(_paddr((void *)data_in.addr) >> 32, value, CE_CIPHER_SRC_ADDR_H_SHIFT, CE_CIPHER_SRC_ADDR_H_MASK);
+	writel(value, (((struct crypto_dev *)device)->base + REG_CIPHER_SRC_ADDR_H_CE_(vce_id)));
 
-	if (EXT_MEM == data_out.addr_type) {
-		value = reg_value(addr_switch_to_ce(vce_id, data_out.addr_type, (_paddr((void *)data_out.addr))), 0, CE_CIPHER_DST_ADDR_SHIFT, CE_CIPHER_DST_ADDR_MASK);
+	if (EXT_MEM == data_out->addr_type) {
+		value = reg_value(_paddr((void *)data_out->addr), 0, CE_CIPHER_DST_ADDR_SHIFT, CE_CIPHER_DST_ADDR_MASK);
 	}
 	else {
-		value = reg_value((addr_t)data_out.addr, 0, CE_CIPHER_DST_ADDR_SHIFT, CE_CIPHER_DST_ADDR_MASK);
+		value = reg_value((addr_t)data_out->addr, 0, CE_CIPHER_DST_ADDR_SHIFT, CE_CIPHER_DST_ADDR_MASK);
 	}
 
-	LTRACEF("value = %x reg= 0x%x\n", value, REG_CIPHER_DST_ADDR_CE_(vce_id));
-	writel(value, _ioaddr(REG_CIPHER_DST_ADDR_CE_(vce_id)));
+	writel(value, (((struct crypto_dev *)device)->base + REG_CIPHER_DST_ADDR_CE_(vce_id)));
 
-	value = reg_value(switch_addr_type(data_out.addr_type), 0, CE_CIPHER_DST_TYPE_SHIFT, CE_CIPHER_DST_TYPE_MASK);
-	LTRACEF("value = %x reg= 0x%x\n", value, REG_CIPHER_DST_ADDR_H_CE_(vce_id));
-	writel(value, _ioaddr(REG_CIPHER_DST_ADDR_H_CE_(vce_id)));
+	value = reg_value(switch_addr_type(data_out->addr_type), 0, CE_CIPHER_DST_TYPE_SHIFT, CE_CIPHER_DST_TYPE_MASK);
+	value = reg_value(_paddr((void *)data_out->addr) >> 32, value, CE_CIPHER_DST_ADDR_H_SHIFT, CE_CIPHER_DST_ADDR_H_MASK);
+	writel(value, (((struct crypto_dev *)device)->base + REG_CIPHER_DST_ADDR_H_CE_(vce_id)));
 
 	if (EXT_MEM == ctx_ptr.addr_type) {
-		value = reg_value((_paddr((void *)ctx_ptr.addr)), 0, CE_CIPHER_CONTEXT_ADDR_SHIFT, CE_CIPHER_CONTEXT_ADDR_MASK);
+		//copy and set to sec-sram
+		if (0 != ctx_ptr.len) {
+			ret = memcpy_blk_cache(device, &BLOCK_T_CONV(CE2_SRAM_SEC_AES_CTX_ADDR_OFFSET,
+				 ctx_ptr.len, SRAM_SEC), &ctx_ptr, ctx_ptr.len, true, false);
+			if (ret) {
+				return CRYPTOLIB_INVALID_PARAM_KEY;
+			}
+		}
+
+		value = reg_value(CE2_SRAM_SEC_AES_CTX_ADDR_OFFSET, 0, CE_CIPHER_CONTEXT_ADDR_SHIFT, CE_CIPHER_CONTEXT_ADDR_MASK);
 	}
 	else {
 		value = reg_value((addr_t)ctx_ptr.addr, 0, CE_CIPHER_CONTEXT_ADDR_SHIFT, CE_CIPHER_CONTEXT_ADDR_MASK);
 	}
 
 	if (FCT_ECB != aes_fct) {
-		if (EXT_MEM == iv.addr_type) {
-			value = reg_value((_paddr((void *)iv.addr)), value, CE_CIPHER_IV_ADDR_SHIFT, CE_CIPHER_IV_ADDR_MASK);
+		if ((EXT_MEM == iv.addr_type) && (0 != iv.len)){
+			//copy and set to sec-sram
+			ret = memcpy_blk_cache(device, &BLOCK_T_CONV(CE2_SRAM_SEC_AES_IV_ADDR_OFFSET,
+				 iv.len, SRAM_SEC), &iv, iv.len, true, false);
+			if (ret) {
+			    return CRYPTOLIB_INVALID_PARAM_KEY;
+			}
+
+			value = reg_value(CE2_SRAM_SEC_AES_IV_ADDR_OFFSET, value, CE_CIPHER_IV_ADDR_SHIFT, CE_CIPHER_IV_ADDR_MASK);
 		}
 		else {
 			value = reg_value((addr_t)iv.addr, value, CE_CIPHER_IV_ADDR_SHIFT, CE_CIPHER_IV_ADDR_MASK);
 		}
 	}
 
-	LTRACEF("value = %x reg= 0x%x\n", value, (REG_CIPHER_IV_CONTEXT_ADDR_CE_(vce_id)));
-	writel(value, _ioaddr(REG_CIPHER_IV_CONTEXT_ADDR_CE_(vce_id)));
+	writel(value, (((struct crypto_dev *)device)->base + REG_CIPHER_IV_CONTEXT_ADDR_CE_(vce_id)));
 
 	value = reg_value(data_in.len, 0, CE_CIPHER_PAYLOAD_LEN_SHIFT, CE_CIPHER_PAYLOAD_LEN_MASK);
-	LTRACEF("value = %x reg= 0x%x\n", value, (REG_CIPHER_PAYLOAD_LEN_CE_(vce_id)));
-	writel(value, _ioaddr(REG_CIPHER_PAYLOAD_LEN_CE_(vce_id)));
+	writel(value, (((struct crypto_dev *)device)->base + REG_CIPHER_PAYLOAD_LEN_CE_(vce_id)));
 
 	/* config control register */
 	value = reg_value(header_save, 0, CE_CIPHER_CTRL_HEADER_SAVE_SHIFT, CE_CIPHER_CTRL_HEADER_SAVE_MASK);
@@ -299,7 +318,13 @@ uint32_t aes_blk(aes_fct_t aes_fct,
 		value = reg_value(xtskey.addr_type, value, CE_CIPHER_CTRL_KEY2TYPE_SHIFT, CE_CIPHER_CTRL_KEY2TYPE_MASK);
 	}
 
-	value = reg_value(key.addr_type, value, CE_CIPHER_CTRL_KEYTYPE_SHIFT, CE_CIPHER_CTRL_KEYTYPE_MASK);
+	if (EXT_MEM == key.addr_type) {
+		value = reg_value(SRAM_SEC, value, CE_CIPHER_CTRL_KEYTYPE_SHIFT, CE_CIPHER_CTRL_KEYTYPE_MASK);
+	}
+	else {
+		value = reg_value(key.addr_type, value, CE_CIPHER_CTRL_KEYTYPE_SHIFT, CE_CIPHER_CTRL_KEYTYPE_MASK);
+	}
+
 	value = reg_value(1 << aes_fct, value, CE_CIPHER_CTRL_AESMODE_SHIFT, CE_CIPHER_CTRL_AESMODE_MASK);
 
 	if (CTX_BEGIN == ctx || CTX_MIDDLE == ctx) {
@@ -332,7 +357,6 @@ uint32_t aes_blk(aes_fct_t aes_fct,
 	value = reg_value(key_size_conf, value, CE_CIPHER_CTRL_KEYSIZE_SHIFT, CE_CIPHER_CTRL_KEYSIZE_MASK);
 	value = reg_value(mode, value, CE_CIPHER_CTRL_CIPHERMODE_SHIFT, CE_CIPHER_CTRL_CIPHERMODE_MASK);
 	value = reg_value(1, value, CE_CIPHER_CTRL_GO_SHIFT, CE_CIPHER_CTRL_GO_MASK);
-	LTRACEF("value = %x reg= 0x%x\n", value, REG_CIPHER_CTRL_CE_(vce_id));
 
 	//clean cache to assure memory is fresh
 	clean_cache_block(&key, vce_id);
@@ -342,18 +366,17 @@ uint32_t aes_blk(aes_fct_t aes_fct,
 	data_in.len = data_in.len + header_len;
 	clean_cache_block(&data_in, vce_id);
 
-	invalidate_cache_block(&data_out, vce_id);
+	invalidate_cache_block(data_out, vce_id);
 
-	writel(value, _ioaddr(REG_CIPHER_CTRL_CE_(vce_id)));
+	writel(value, (((struct crypto_dev *)device)->base + REG_CIPHER_CTRL_CE_(vce_id)));
 
-#if WAIT_PK_WITH_REGISTER_POLLING
+#if 1 //WAIT_PK_WITH_REGISTER_POLLING
 	uint32_t i = 0;
 
-	while (readl(_ioaddr(REG_STAT_CE_(vce_id))) & 0x4) {
+	while (readl((((struct crypto_dev *)device)->base + REG_STAT_CE_(vce_id))) & 0x4) {
 		i++;
 
 		if (i > 5) {
-			LTRACEF("CE_(%d) is busy, alg :0x%x\n", vce_id, mode);
 			i = 0;
 		}
 	}
@@ -361,19 +384,16 @@ uint32_t aes_blk(aes_fct_t aes_fct,
 #else
 	//wait interrupt
 	event_wait(&g_ce_signal[vce_id]);
-	LTRACEF("wait interrupt in cipher end\n");
 #endif
 
-	uint32_t value_state = readl(_ioaddr(REG_ERRSTAT_CE_(vce_id))) & 0x3F00;
+	uint32_t value_state = readl((((struct crypto_dev *)device)->base + REG_ERRSTAT_CE_(vce_id))) & 0x3F00;
 
 	if (0 != value_state) {
-		LTRACEF("CE_(%d) state: %d, error: 0x%x, control value: 0x%x\n", vce_id, (readl(_ioaddr(REG_STAT_CE_(vce_id))) & 0x4), value_state, value);
-
 		//clear err status
 		value_state = reg_value(1, 0xFFFFFFFF, CE_CIPHER_INTEGRITY_ERROR_INTSTAT_SHIFT, CE_CIPHER_INTEGRITY_ERROR_INTSTAT_MASK);
-		writel(value_state, _ioaddr(REG_INTCLR_CE_(vce_id)));
+		writel(value_state, (((struct crypto_dev *)device)->base + REG_INTCLR_CE_(vce_id)));
 		value_state = reg_value(0, 0xFFFFFFFF, CE_CIPHER_INTEGRITY_ERROR_INTSTAT_SHIFT, CE_CIPHER_INTEGRITY_ERROR_INTSTAT_MASK);
-		writel(value_state, _ioaddr(REG_INTCLR_CE_(vce_id)));
+		writel(value_state, (((struct crypto_dev *)device)->base + REG_INTCLR_CE_(vce_id)));
 	}
 
 	return CRYPTOLIB_SUCCESS;

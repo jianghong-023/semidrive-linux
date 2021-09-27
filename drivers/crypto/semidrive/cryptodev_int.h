@@ -100,6 +100,7 @@ int kcaop_to_user(struct kernel_crypt_auth_op *kcaop,
 				  struct fcrypt *fcr, void __user *arg);
 int crypto_auth_run(struct fcrypt *fcr, struct kernel_crypt_auth_op *kcaop);
 int crypto_run(struct crypto_dev *crypto, struct fcrypt *fcr, struct kernel_crypt_op *kcop);
+int cryptodev_pke(struct crypto_dev* crypto, struct crypt_asym *asym_data);
 
 /* other internal structs */
 struct csession {

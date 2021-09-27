@@ -44,10 +44,14 @@
 #include <crypto/cryptodev.h>
 #include <crypto/scatterwalk.h>
 #include <linux/scatterlist.h>
+#include <linux/version.h>
+#include <crypto/cryptodev.h>
+#include <crypto/internal/akcipher.h>
+
 #include "cryptodev_int.h"
 #include "zc.h"
 #include "cryptlib.h"
-#include <linux/version.h>
+#include "sdrv-rsa.h"
 
 /* This file contains the traditional operations of encryption
  * and hashing of /dev/crypto.
@@ -279,5 +283,74 @@ int crypto_run(struct crypto_dev *crypto, struct fcrypt *fcr, struct kernel_cryp
 
 out_unlock:
 	crypto_put_session(ses_ptr);
+	return ret;
+}
+
+int cryptodev_pke(struct crypto_dev *crypto, struct crypt_asym *asym_data)
+{
+	int ret = EINVAL;
+	int in, out, size, i;
+	u8 *key = NULL;
+	//struct crypto_akcipher *tfm = NULL;
+
+	//tfm = crypto_alloc_akcipher("pkc(rsa)", 0, 0);
+	//if (unlikely(IS_ERR(tfm))) {
+	//	pr_err("Failed to load cipher %s\n", "pkc(rsa)");
+	//	ret = -ENOMEM;
+	//	return ret;
+	//}
+
+	//struct semidrive_rsa_ctx *ctx = akcipher_tfm_ctx(tfm);
+
+	struct semidrive_rsa_ctx *ctx = kzalloc(sizeof(*ctx), GFP_KERNEL);
+	if (!ctx) {
+		ret = -ENOMEM;
+		goto error;
+	}
+
+	switch (asym_data->asym_op) {
+	case ASYM_ENC:
+	case ASYM_VERIFY:
+		ret = copy_from_user(ctx->n, asym_data->n, asym_data->rsa_size);
+		if (unlikely(ret)) {
+			pr_err("cpy n fail.\n");
+			goto error;
+		}
+		ret = copy_from_user(ctx->e, asym_data->e, asym_data->e_len);
+		if (unlikely(ret)) {
+			pr_err("cpy e fail.\n");
+			goto error;
+		}
+
+		break;
+	case ASYM_DEC:
+	case ASYM_SIGN:
+		ret = copy_from_user(ctx->n, asym_data->n, asym_data->rsa_size);
+		if (unlikely(ret)) {
+			pr_err("cpy n fail.\n");
+			goto error;
+		}
+
+		ret = copy_from_user(ctx->d, asym_data->d, asym_data->rsa_size);
+		if (unlikely(ret)) {
+			pr_err("cpy e fail.\n");
+			goto error;
+		}
+
+		break;
+	default:
+		ret = EINVAL;
+		goto error;
+	}
+
+	ret = __semidrive_rsa_op(crypto, NULL, asym_data, ctx);
+	if (unlikely(ret)) {
+		pr_err("__semidrive_rsa_enc fail.\n");
+		goto error;
+	}
+
+error:
+	kfree(ctx);
+	//crypto_free_akcipher(tfm);
 	return ret;
 }

@@ -55,7 +55,7 @@ uint32_t get_rsa_key(void *device,
 * @param public_expo   Public exponent
 * @param result        Result buffer
 * @param hashType      Hash type used in OAEP padding type
-* @param rng           The random number generator to use
+* @param be_param      n/public_expo is big_endian
 * @return CRYPTOLIB_SUCCESS if successful
 */
 
@@ -65,7 +65,8 @@ uint32_t rsa_encrypt_blk(void *device,
 						 block_t *n,
 						 block_t *public_expo,
 						 block_t *result,
-						 hash_alg_t hashType);
+						 hash_alg_t hashType,
+						 bool be_param);
 
 /**
 * @brief RSA decryption (block_t as parameters)
@@ -78,6 +79,7 @@ uint32_t rsa_encrypt_blk(void *device,
 * @param result          Result buffer
 * @param msg_len         Pointer to the message length (for padded messages)
 * @param hashType        Hash type used in OAEP padding type
+* @param be_param        n/private_key is big_endian
 * @return CRYPTOLIB_SUCCESS if successful
 */
 uint32_t rsa_decrypt_blk(void *device,
@@ -87,7 +89,8 @@ uint32_t rsa_decrypt_blk(void *device,
 						 block_t *private_key,
 						 block_t *result,
 						 uint32_t *msg_len,
-						 hash_alg_t hashType);
+						 hash_alg_t hashType,
+						 bool be_param);
 /**
 * @brief RSA crt decryption (block_t as parameters)
 * @param device          device pointer
@@ -100,6 +103,7 @@ uint32_t rsa_decrypt_blk(void *device,
 * @param result          Result buffer
 * @param msg_len         Pointer to the message length (for padded messages)
 * @param hashType        Hash type used in OAEP padding type
+* @param be_param        n/private_key is big_endian
 * @return CRYPTOLIB_SUCCESS if successful
 */
 uint32_t rsa_crt_decrypt_blk(void *device,
@@ -133,8 +137,7 @@ uint32_t rsa_crt_decrypt_blk(void *device,
 *                     is the (first) CRT coefficient
 * @param crt          If equal to 1, uses CRT parameters
 * @param salt_length  Expected length of the salt used in PSS padding_type
-* @param rng          Random number generator to use for the OAEP and PKCS
-*                     padding
+* @param be_param     n/private_key is big_endian
 * @return CRYPTOLIB_SUCCESS if successful
 */
 uint32_t rsa_signature_generation_blk(void *device,
@@ -144,7 +147,8 @@ uint32_t rsa_signature_generation_blk(void *device,
 									  block_t *result,
 									  block_t *n,
 									  block_t *private_key,
-									  uint32_t salt_length);
+									  uint32_t salt_length,
+									  bool be_param);
 
 /**
  * @brief RSA Signature verification (on block_t)
@@ -157,6 +161,7 @@ uint32_t rsa_signature_generation_blk(void *device,
  * @param public_expo    e, the RSA public exponent
  * @param signature      Pointer to signature
  * @param salt_length    Expected length of the salt used in PSS padding_type
+ * @param be_param       n/public_expo is big_endian
  * @return CRYPTOLIB_SUCCESS if successful
  */
 uint32_t rsa_signature_verification_blk(void *device,
@@ -166,7 +171,8 @@ uint32_t rsa_signature_verification_blk(void *device,
 										block_t *n,
 										block_t *public_expo,
 										block_t *signature,
-										uint32_t salt_length);
+										uint32_t salt_length,
+									  	bool be_param);
 
 
 /**
