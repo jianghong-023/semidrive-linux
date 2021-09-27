@@ -1284,6 +1284,26 @@
 			status = "disabled";
 		};
 
+		dcf_property:dcf_property@0 {
+			compatible = "dcf,property";
+			status = "disabled";
+		};
+
+		dcf_vircan0:dcf_vircan@0 {
+			compatible = "dcf,vircan0";
+			status = "disabled";
+		};
+
+		dcf_vircan1:dcf_vircan@1 {
+			compatible = "dcf,vircan1";
+			status = "disabled";
+		};
+
+		dcf_virnet: rpmsg-net {
+			compatible = "sd,rpmsg-netdev";
+			status     = "disabled";
+		};
+
 		g2d: g2d@30c90000 {
 			compatible = "semidrive,g2d";
 			reg = <0x00 0x30c90000 0x00 0x10000>;

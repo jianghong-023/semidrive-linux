@@ -156,6 +156,7 @@
 };
 
 &ipcc3 {
+	rpmsg-mtu  = <1024>;
 	status = "okay";
 };
 
@@ -164,6 +165,11 @@
 };
 
 &dcf_vircan1 {
+	status = "okay";
+};
+
+&dcf_virnet {
+	rpmsg-dev  = <&ipcc3 61 0xFFFFFFFF>;
 	status = "okay";
 };
 

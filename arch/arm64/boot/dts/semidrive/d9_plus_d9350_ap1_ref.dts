@@ -153,7 +153,7 @@
 
 	leds {
 		compatible = "gpio-leds";
-
+		status = "okay";
 		led0: heartbeat {
 			label = "heartbeat";
 			gpios = <&port4a 4 GPIO_ACTIVE_LOW> ;//sch-part-D6<->gpio_a4
@@ -219,6 +219,22 @@
 			press-threshold-microvolt = <86400000>;
 		};
 	};
+
+	semidrive_bl0: panel0-backlight {
+		compatible = "sd,rpmsg-bl"; /*"sd,rpmsg-bl" for rpmsg; "pwm-backlight" for native*/
+		bl_screen-id = /bits/ 32 <1>;
+		//pwms = <&pwm4 PWM_CH0 PWM_FREQUENCY PWM_POLARITY_INVERSED>;
+		brightness-levels = <0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16
+							 17 18 19 20 21 22 23 24 25 26 27 28 29 30
+							 31 32 33 34 35 36 37 38 39 40 41 42 43 44
+							 45 46 47 48 49 50 51 52 53 54 55 56 57 58
+							 59 60 61 62 63 64 65 66 67 68 69 70 71 72
+							 73 74 75 76 77 78 79 80 81 82 83 84 85 86
+							 87 88 89 90 91 92 93 94 95 96 97 98 99 100>;
+		default-brightness-level = <70>;
+		status = "okay";
+	};
+
 };
 
 &dmac4 {
@@ -261,8 +277,7 @@
 &csi0 {
 	mbus-type = "mipi-csi2";
 	pclk-sample = <1>;
-	status = "disabled";
-	sync = <1>;
+	status = "okay";
 
 	ports {
 		csi0_stream0: port@0 {
@@ -304,13 +319,12 @@
 };
 
 &csimipi0 {
-	status = "disabled";
+	status = "okay";
 	lanerate = <72000000>;
 	hsa = <10>;
 	hbp = <20>;
 	hsd = <0x60>;
 	output-type = <0x1e>;
-	sync = <1>;
 
 	ports {
 		#address-cells = <1>;
@@ -407,7 +421,6 @@
 		reg = <0x32>;
 	};
 };
-
 &i2c4 {
 	status = "okay";
 	ksz9896c:ksz9896c@5f {
@@ -417,7 +430,7 @@
 		//gpios = <&port4d 28 GPIO_ACTIVE_LOW> ;//sch-part-J8<->gpio_H2 io124 Y7
 
 		reg = <0x5f>;
-	};	
+	};
 };
 
 &i2c5 {
@@ -439,22 +452,15 @@
 
 &i2c8 {
 //sch part U3(N4)
-	status = "disabled";
+	status = "okay";
 
-	poc_mcsi0deser: poc@0x28 {
-		compatible = "max2008x,deser0_poc";
-		reg = <0x28>;
-	};
-
-	mcsi0deser:mcsi0deser@7F {
-		compatible = "sdrv,mcsi0_deser";
-		reg = <0x7F>;
-		pwdn-gpios = <&cam_gpio 2 0>;
-		sync = <1>;
-		addr_20086 = /bits/ 16 <0x28>;
-		addr_96705 = /bits/ 16 <0x40>;
-		addr_0101 = /bits/ 16 <0x5d>;
-
+	mcsi0deser:mcsi0deser@31 {
+		compatible = "nextchip,n4";
+		reg = <0x31>;
+		sync = <0>;
+		pwdn-gpios = <&port4d 27 GPIO_ACTIVE_HIGH>;//index(123) gpio h1
+		rst-gpios = <&port4c 15 GPIO_ACTIVE_HIGH>;//index(79) gpio D15
+		//semidrive,poc = <&i2c9>;
 		ports {
 			port@0 {
 				#address-cells = <1>;
@@ -489,13 +495,6 @@
 				};
 			};
 		};
-	};
-
-	cam_gpio: gpio@20 {
-		compatible = "ti,tca6408";
-		reg = <0x20>;
-		#gpio-cells = <2>;
-		gpio-controller;
 	};
 };
 
@@ -716,11 +715,11 @@
 };
 
 &g2d {
-	status = "disabled";
+	status = "okay";
 };
 
 &parallel0 {
-	status = "disabled";
+	status = "okay";
 };
 
 &dtimings0 {
@@ -728,16 +727,16 @@
 };
 
 &ptimings0 {
-	status = "disabled";
+	status = "okay";
 };
 
 &dc1 {
-	status = "disabled";
+	status = "okay";
 };
 
 &crtc0 {
 	dpc-master = <&dc1>;
-	status = "disabled";
+	status = "okay";
 /*
 	crtc0_out: port {
 		crtc0_out_interface: endpoint@0 {
@@ -754,14 +753,14 @@
 		#address-cells = <1>;
 		#size-cells = <0>;
 		reg = <0>;
-		status = "disabled";
+		status = "okay";
 		semidrive,lcd-attached = "lcd_hsd123_serdes_mipi_1920x720";
 	};
 };
 
 &display {
 	sdriv,crtc = <&crtc0>;
-	status = "disabled";
+	status = "okay";
 };
 
 &pinctrl {
