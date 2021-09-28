@@ -396,9 +396,13 @@ void call_dummy_vsync(void) {
 		d = dummy_datas[i];
 		kcrtc = d->dpc->crtc;
 		if (d->vsync_enabled) {
+#if CONFIG_RECOVERY_ENABLED
 			kcrtc->evt_update = true;
 			wake_up_interruptible_all(&kcrtc->wait_queue);
 			drm_crtc_handle_vblank(&kcrtc->base);
+#else
+			kunlun_crtc_handle_vblank(kcrtc);
+#endif
 		}
 	}
 }
