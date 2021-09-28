@@ -1368,7 +1368,7 @@ static int vpu_suspend(struct platform_device *pdev,
     unsigned long timeout = jiffies + HZ;   /* vpu wait timeout to 1sec */
     int product_code;
 
-    pr_info("[VPUDRV] vpu_suspend\n");
+    pr_info("[VPUDRV] coda vpu_suspend\n");
     vpu_clk_enable(s_vpu_clk);
 
     if (s_vpu_open_ref_count > 0) {
@@ -1408,49 +1408,46 @@ static int vpu_resume(struct platform_device *pdev)
     unsigned long timeout = jiffies + HZ;   /* vpu wait timeout to 1sec */
     int product_code;
 
-    pr_info("[VPUDRV] vpu_resume\n");
+    pr_info("[VPUDRV] coda vpu_resume\n");
     vpu_clk_enable(s_vpu_clk);
 
     if (s_bit_firmware_info.size == 0) {
         pr_err("[VPUDRV-ERR] vpu have no init \n");
         goto DONE_WAKEUP;
     }
+    if (s_vpu_open_ref_count > 0) {
+        product_code = ReadVpuRegister(VPU_PRODUCT_CODE_REGISTER);
 
-    product_code = ReadVpuRegister(VPU_PRODUCT_CODE_REGISTER);
+        if (PRODUCT_CODE_CODA988(product_code)) {
+            WriteVpuRegister(BIT_CODE_RUN, 0);
+            /*---- LOAD BOOT CODE*/
+            for (i = 0; i < 512; i++) {
+                val = s_bit_firmware_info.bit_code[i];
+                WriteVpuRegister(BIT_CODE_DOWN, ((i << 16) | val));
+            }
 
-    if (PRODUCT_CODE_CODA988(product_code)) {
-        WriteVpuRegister(BIT_CODE_RUN, 0);
-        /*---- LOAD BOOT CODE*/
-        for (i = 0; i < 512; i++) {
-            val = s_bit_firmware_info.bit_code[i];
-            WriteVpuRegister(BIT_CODE_DOWN, ((i << 16) | val));
+            for (i = 0 ; i < 64 ; i++)
+                WriteVpuRegister(BIT_BASE + (0x100 + (i * 4)), s_vpu_reg_store[i]);
+
+            WriteVpuRegister(BIT_BUSY_FLAG, 1);
+            WriteVpuRegister(BIT_CODE_RESET, 1);
+            WriteVpuRegister(BIT_CODE_RUN, 1);
+
+            while (ReadVpuRegister(BIT_BUSY_FLAG)) {
+                if (time_after(jiffies, timeout))
+                    goto DONE_WAKEUP;
+            }
+
         }
-
-        for (i = 0 ; i < 64 ; i++)
-            WriteVpuRegister(BIT_BASE + (0x100 + (i * 4)), s_vpu_reg_store[i]);
-
-        WriteVpuRegister(BIT_BUSY_FLAG, 1);
-        WriteVpuRegister(BIT_CODE_RESET, 1);
-        WriteVpuRegister(BIT_CODE_RUN, 1);
-
-        while (ReadVpuRegister(BIT_BUSY_FLAG)) {
-            if (time_after(jiffies, timeout))
-                goto DONE_WAKEUP;
+        else {
+            pr_err("[VPUDRV-ERR] Unknown product id : %08x\n", product_code);
+            goto DONE_WAKEUP;
         }
-
     }
-    else {
-        pr_err("[VPUDRV-ERR] Unknown product id : %08x\n", product_code);
-        goto DONE_WAKEUP;
-    }
-
-    if (s_vpu_open_ref_count == 0)
-        vpu_clk_disable(s_vpu_clk);
 
 DONE_WAKEUP:
-
-    if (s_vpu_open_ref_count > 0)
-        vpu_clk_enable(s_vpu_clk);
+    if (s_vpu_open_ref_count == 0)
+        vpu_clk_disable(s_vpu_clk);
 
     return 0;
 }
@@ -1655,8 +1652,6 @@ static int vpu_clk_enable(struct clk *clk)
 {
     int err_code = 0;
 #ifdef  VPU_SUPPORT_CLOCK_CONTROL
-
-
     if (!(clk == NULL
             || IS_ERR(clk))) {
 
@@ -1683,8 +1678,6 @@ static int vpu_clk_enable(struct clk *clk)
 static void vpu_clk_disable(struct clk *clk)
 {
 #ifdef VPU_SUPPORT_CLOCK_CONTROL
-
-
         if (!(clk == NULL
                 || IS_ERR(clk))) {
 
@@ -1692,7 +1685,6 @@ static void vpu_clk_disable(struct clk *clk)
             clk_unprepare(clk);
             clk_reference--;
         }
-
 #else
     /*do nothing */
 

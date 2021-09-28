@@ -1460,7 +1460,7 @@ static int vpu_suspend(struct platform_device *pdev,
     unsigned long timeout = jiffies + HZ;   /* vpu wait timeout to 1sec */
     int product_code;
 
-    pr_info("[VPUDRV] vpu_suspend\n");
+    pr_info("[VPUDRV] wave vpu_suspend\n");
 
     vpu_clk_enable(s_vpu_clk);
 
@@ -1469,7 +1469,6 @@ static int vpu_suspend(struct platform_device *pdev,
             pr_err("[VPUDRV-ERR] vpu have no init \n");
             goto DONE_SUSPEND;
         }
-
         product_code = ReadVpuRegister(VPU_PRODUCT_CODE_REGISTER);
 
         if (PRODUCT_CODE_WAVE412(product_code)) {
@@ -1511,6 +1510,8 @@ DONE_SUSPEND:
     return -EAGAIN;
 
 }
+
+
 static int vpu_resume(struct platform_device *pdev)
 {
     unsigned long timeout = jiffies + HZ;   /* vpu wait timeout to 1sec */
@@ -1521,7 +1522,7 @@ static int vpu_resume(struct platform_device *pdev)
     int          regVal;
     u32         hwOption  = 0;
 
-    pr_info("[VPUDRV] vpu_resume\n");
+    pr_info("[VPUDRV] wave vpu_resume\n");
 
     vpu_clk_enable(s_vpu_clk);
 
@@ -1530,81 +1531,79 @@ static int vpu_resume(struct platform_device *pdev)
         goto DONE_WAKEUP;
     }
 
-    product_code = ReadVpuRegister(VPU_PRODUCT_CODE_REGISTER);
+    if (s_vpu_open_ref_count > 0) {
+        product_code = ReadVpuRegister(VPU_PRODUCT_CODE_REGISTER);
 
-    if (PRODUCT_CODE_WAVE412(product_code)) {
-        code_base = s_common_memory.phys_addr;
-        /* ALIGN TO 4KB */
-        code_size = (W4_MAX_CODE_BUF_SIZE & ~0xfff);
+        if (PRODUCT_CODE_WAVE412(product_code)) {
+            code_base = s_common_memory.phys_addr;
+            /* ALIGN TO 4KB */
+            code_size = (W4_MAX_CODE_BUF_SIZE & ~0xfff);
 
-        if (code_size < s_bit_firmware_info.size * 2) {
-            goto DONE_WAKEUP;
-        }
-
-        regVal = 0;
-        WriteVpuRegister(W4_PO_CONF, regVal);
-
-        /* Reset All blocks */
-        regVal = 0x7ffffff;
-        WriteVpuRegister(W4_VPU_RESET_REQ, regVal); /*Reset All blocks*/
-
-        /* Waiting reset done */
-        while (ReadVpuRegister(W4_VPU_RESET_STATUS)) {
-            if (time_after(jiffies, timeout))
+            if (code_size < s_bit_firmware_info.size * 2) {
                 goto DONE_WAKEUP;
-        }
+            }
 
-        WriteVpuRegister(W4_VPU_RESET_REQ, 0);
+            regVal = 0;
+            WriteVpuRegister(W4_PO_CONF, regVal);
 
-        /* remap page size */
-        remap_size = (code_size >> 12) & 0x1ff;
-        regVal = 0x80000000 | (W4_REMAP_CODE_INDEX << 12) | (0 << 16) |
-                 (1 << 11) | remap_size;
-        WriteVpuRegister(W4_VPU_REMAP_CTRL,  regVal);
-        WriteVpuRegister(W4_VPU_REMAP_VADDR,
-                         0x00000000);    /* DO NOT CHANGE! */
-        WriteVpuRegister(W4_VPU_REMAP_PADDR,    code_base);
-        WriteVpuRegister(W4_ADDR_CODE_BASE,  code_base);
-        WriteVpuRegister(W4_CODE_SIZE,        code_size);
-        WriteVpuRegister(W4_CODE_PARAM,      0);
-        WriteVpuRegister(W4_INIT_VPU_TIME_OUT_CNT,   timeout);
+            /* Reset All blocks */
+            regVal = 0x7ffffff;
+            WriteVpuRegister(W4_VPU_RESET_REQ, regVal); /*Reset All blocks*/
 
-        WriteVpuRegister(W4_HW_OPTION, hwOption);
+            /* Waiting reset done */
+            while (ReadVpuRegister(W4_VPU_RESET_STATUS)) {
+                if (time_after(jiffies, timeout))
+                    goto DONE_WAKEUP;
+            }
 
-        /* Interrupt */
-        regVal  = (1 << W4_INT_DEC_PIC_HDR);
-        regVal |= (1 << W4_INT_DEC_PIC);
-        regVal |= (1 << W4_INT_QUERY_DEC);
-        //regVal |= (1 << W4_INT_SLEEP_VPU);
-        regVal |= (1 << W4_INT_BSBUF_EMPTY);
+            WriteVpuRegister(W4_VPU_RESET_REQ, 0);
 
-        WriteVpuRegister(W4_VPU_VINT_ENABLE,  regVal);
+            /* remap page size */
+            remap_size = (code_size >> 12) & 0x1ff;
+            regVal = 0x80000000 | (W4_REMAP_CODE_INDEX << 12) | (0 << 16) |
+                     (1 << 11) | remap_size;
+            WriteVpuRegister(W4_VPU_REMAP_CTRL,  regVal);
+            WriteVpuRegister(W4_VPU_REMAP_VADDR,
+                             0x00000000);    /* DO NOT CHANGE! */
+            WriteVpuRegister(W4_VPU_REMAP_PADDR,    code_base);
+            WriteVpuRegister(W4_ADDR_CODE_BASE,  code_base);
+            WriteVpuRegister(W4_CODE_SIZE,        code_size);
+            WriteVpuRegister(W4_CODE_PARAM,      0);
+            WriteVpuRegister(W4_INIT_VPU_TIME_OUT_CNT,   timeout);
 
-        Wave4BitIssueCommand(W4_CMD_INIT_VPU);
-        WriteVpuRegister(W4_VPU_REMAP_CORE_START, 1);
+            WriteVpuRegister(W4_HW_OPTION, hwOption);
 
-        while (ReadVpuRegister(W4_VPU_BUSY_STATUS)) {
-            if (time_after(jiffies, timeout))
+            /* Interrupt */
+            regVal  = (1 << W4_INT_DEC_PIC_HDR);
+            regVal |= (1 << W4_INT_DEC_PIC);
+            regVal |= (1 << W4_INT_QUERY_DEC);
+            //regVal |= (1 << W4_INT_SLEEP_VPU);
+            regVal |= (1 << W4_INT_BSBUF_EMPTY);
+
+            WriteVpuRegister(W4_VPU_VINT_ENABLE,  regVal);
+            Wave4BitIssueCommand(W4_CMD_INIT_VPU);
+            WriteVpuRegister(W4_VPU_REMAP_CORE_START, 1);
+
+            while (ReadVpuRegister(W4_VPU_BUSY_STATUS)) {
+                if (time_after(jiffies, timeout))
+                    goto DONE_WAKEUP;
+            }
+
+            if (ReadVpuRegister(W4_RET_SUCCESS) == 0) {
+                pr_err("WAKEUP_VPU failed [0x%x]",
+                        ReadVpuRegister(W4_RET_FAIL_REASON));
                 goto DONE_WAKEUP;
+            }
         }
-
-        if (ReadVpuRegister(W4_RET_SUCCESS) == 0) {
-            pr_info("WAKEUP_VPU failed [0x%x]",
-                    ReadVpuRegister(W4_RET_FAIL_REASON));
+        else {
+            pr_err("[VPUDRV] Unknown product id : %08x\n", product_code);
             goto DONE_WAKEUP;
         }
     }
-    else {
-        pr_err("[VPUDRV] Unknown product id : %08x\n", product_code);
-        goto DONE_WAKEUP;
-    }
-
-    if (s_vpu_open_ref_count == 0)
-        vpu_clk_disable(s_vpu_clk);
 
 DONE_WAKEUP:
 
-    if (s_vpu_open_ref_count > 0)
+    if (s_vpu_open_ref_count == 0)
         vpu_clk_enable(s_vpu_clk);
 
     return 0;
@@ -1857,7 +1856,6 @@ static int vpu_clk_enable(struct vpuwave_clk *clk)
 static void vpu_clk_disable(struct vpuwave_clk *clk)
 {
 #ifdef VPU_SUPPORT_CLOCK_CONTROL
-
     if (clk) {
         if (!(clk->core_clk == NULL
                 || IS_ERR(clk->core_clk)
