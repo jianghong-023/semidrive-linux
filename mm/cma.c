@@ -36,6 +36,7 @@
 #include <linux/highmem.h>
 #include <linux/io.h>
 #include <trace/events/cma.h>
+#include <linux/psi.h>
 
 #if defined(CONFIG_GK20A_PCI)
 #include <linux/buffer_head.h>
@@ -412,6 +413,8 @@ struct page *cma_alloc(struct cma *cma, size_t count, unsigned int align,
 	unsigned long bitmap_maxno, bitmap_no, bitmap_count;
 	struct page *page = NULL;
 	int ret = -ENOMEM;
+	//TODO
+	unsigned long pflags;
 
 	if (!cma || !cma->count)
 		return NULL;
@@ -429,6 +432,8 @@ struct page *cma_alloc(struct cma *cma, size_t count, unsigned int align,
 
 	if (bitmap_count > bitmap_maxno)
 		return NULL;
+	//psi
+	psi_memstall_enter(&pflags);
 
 	for (;;) {
 		mutex_lock(&cma->lock);
@@ -474,7 +479,8 @@ struct page *cma_alloc(struct cma *cma, size_t count, unsigned int align,
 			__func__, count, ret);
 		cma_debug_show_areas(cma);
 	}
-
+	//psi
+	psi_memstall_leave(&pflags);
 	pr_debug("%s(): returned %p\n", __func__, page);
 	return page;
 }
