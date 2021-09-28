@@ -9,6 +9,7 @@
 #ifndef _CRYPTO_H
 #define _CRYPTO_H
 #include <crypto/hash.h>
+#include <crypto/akcipher.h>
 
 #include "ce.h"
 
@@ -38,6 +39,10 @@
 #define SD_MODE_CTR             BIT(18)
 #define SD_MODE_XTS             BIT(19)
 #define SD_MODE_CCM             BIT(20)
+#define SD_MODE_GCM             BIT(21)
+#define SD_MODE_CFB             BIT(22)
+#define SD_MODE_OFB             BIT(23)
+#define SD_MODE_CMAC            BIT(24)
 #define SD_MODE_MASK            GENMASK(12, 8)
 
 #define IS_MD5(flags)           (flags & SD_HASH_MD5)
@@ -56,10 +61,11 @@
         || IS_SHA224_HMAC(flags) || IS_SHA512_HMAC(flags) \
         || IS_SHA384_HMAC(flags))
 #define IS_CMAC(flags)          (flags & SD_HASH_AES_CMAC)
+#define IS_AES(flags)           (flags & SD_ALG_AES)
 
 /* cipher encryption/decryption operations */
-#define SD_ENCRYPT              BIT(21)
-#define SD_DECRYPT              BIT(22)
+#define SD_ENCRYPT              BIT(30)
+#define SD_DECRYPT              BIT(31)
 
 struct semidrive_ce_device {
 	u32 ce_id;
@@ -76,6 +82,7 @@ struct semidrive_ce_alg_template {
 	union {
 		struct crypto_alg crypto;
 		struct ahash_alg ahash;
+		struct akcipher_alg rsa;
 	} alg;
 	struct crypto_dev *sdce;
 };
@@ -95,5 +102,7 @@ struct semidrive_alg_ops {
 };
 
 extern const struct semidrive_alg_ops ahash_ops;
+extern const struct semidrive_alg_ops ablkcipher_ops;
+extern const struct semidrive_alg_ops akcipher_ops;
 
 #endif //_CRYPTO_H

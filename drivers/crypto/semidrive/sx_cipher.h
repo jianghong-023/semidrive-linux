@@ -7,7 +7,6 @@
 #ifndef SX_CIPHER_H
 #define SX_CIPHER_H
 
-#include <stdint.h>
 #include "ce.h"
 
 /** @brief Size for IV in GCM mode */
@@ -89,7 +88,7 @@ typedef enum aes_ctx_t {
  *         not match input tag (i.e. message corruption)
  */
 uint32_t aes_blk(aes_fct_t aes_fct,
-				 uint32_t ce_id,
+				 void* device,
 				 aes_mode_t mode,
 				 aes_ctx_t ctx,
 				 uint32_t header_len,
@@ -100,6 +99,6 @@ uint32_t aes_blk(aes_fct_t aes_fct,
 				 block_t iv,
 				 block_t ctx_ptr,
 				 block_t data_in,
-				 block_t data_out);
+				 block_t *data_out);
 
 #endif

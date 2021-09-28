@@ -29,7 +29,8 @@ uint32_t rsa_encrypt_blk(void *device,
 						 block_t *n,
 						 block_t *public_expo,
 						 block_t *result,
-						 hash_alg_t hashType)
+						 hash_alg_t hashType,
+						 bool be_param)
 {
 	uint8_t *msg_padding;
 	uint8_t *addr;
@@ -47,11 +48,33 @@ uint32_t rsa_encrypt_blk(void *device,
 
 	// Set command to enable byte-swap
 	pke_set_command(device, BA414EP_OPTYPE_RSA_ENC, size, BA414EP_LITTLEEND, BA414EP_SELCUR_NO_ACCELERATOR);
-	// Location 0 -> Modulus N
-	status = mem2CryptoRAM_rev(device, n, size, BA414EP_MEMLOC_0, true);
+	if (be_param) {
+		// Location 0 -> Modulus N
+		status = mem2CryptoRAM_rev(device, n, size, BA414EP_MEMLOC_0, true);
+
+		if (status) {
+			pr_err("status : 0x%lx\n", status);
+			return status;
+		}
+
+		// Location 8 -> Public exponent
+		status = mem2CryptoRAM_rev(device, public_expo, size, BA414EP_MEMLOC_8, true);
+	}
+	else {
+		// Location 0 -> Modulus N
+		status = mem2CryptoRAM(device, n, size, BA414EP_MEMLOC_0, true);
+
+		if (status) {
+			pr_err("status : 0x%lx\n", status);
+			return status;
+		}
+
+		// Location 8 -> Public exponent
+		status = mem2CryptoRAM(device, public_expo, size, BA414EP_MEMLOC_8, true);
+	}
 
 	if (status) {
-		pr_err("status : 0x%lx\n", status);
+		pr_err("%s, %d, status is %d\n", __func__, __LINE__, status);
 		return status;
 	}
 
@@ -73,7 +96,7 @@ uint32_t rsa_encrypt_blk(void *device,
 			return status;
 		}
 
-		block_temp = BLOCK_T_CONV(msg_padding, n->len, 0);
+		block_temp = BLOCK_T_CONV(msg_padding, n->len, EXT_MEM);
 		status = mem2CryptoRAM_rev(device, &block_temp, size, BA414EP_MEMLOC_5, true);
 
 		if (status) {
@@ -91,7 +114,7 @@ uint32_t rsa_encrypt_blk(void *device,
 			return status;
 		}
 
-		block_temp = BLOCK_T_CONV(msg_padding, n->len, 0);
+		block_temp = BLOCK_T_CONV(msg_padding, n->len, EXT_MEM);
 		status = mem2CryptoRAM_rev(device, &block_temp, size, BA414EP_MEMLOC_5, true);
 
 		if (status) {
@@ -106,14 +129,6 @@ uint32_t rsa_encrypt_blk(void *device,
 			ce_free(mem_n);
 			return status;
 		}
-	}
-
-	// Location 8 -> Public exponent
-	status = mem2CryptoRAM_rev(device, public_expo, size, BA414EP_MEMLOC_8, true);
-
-	if (status) {
-		ce_free(mem_n);
-		return status;
 	}
 
 	/* RSA encryption */
@@ -165,7 +180,8 @@ uint32_t rsa_decrypt_blk(void *device,
 						 block_t *private_key,
 						 block_t *result,
 						 uint32_t *msg_len,
-						 hash_alg_t hashType)
+						 hash_alg_t hashType,
+						 bool be_param)
 {
 	uint32_t error = 0;
 	uint32_t size = n->len;
@@ -180,31 +196,45 @@ uint32_t rsa_decrypt_blk(void *device,
 
 	pke_set_command(device, BA414EP_OPTYPE_RSA_DEC, size, BA414EP_LITTLEEND, BA414EP_SELCUR_NO_ACCELERATOR);
 
-	// Location 0 -> Modulus N
-	error = mem2CryptoRAM_rev(device, n, size, BA414EP_MEMLOC_0, true);
+	if (be_param) {
+		// Location 0 -> Modulus N
+		error = mem2CryptoRAM_rev(device, n, size, BA414EP_MEMLOC_0, true);
+
+		if (error) {
+			pr_err("n addr: 0x%lx\n", (addr_t)n->addr);
+			return error;
+		}
+
+		private_key->len = n->len;
+		// Location 6 -> Private key
+		error = mem2CryptoRAM_rev(device, private_key, size, BA414EP_MEMLOC_6, true);
+	}
+	else {
+		// Location 0 -> Modulus N
+		error = mem2CryptoRAM(device, n, size, BA414EP_MEMLOC_0, true);
+
+		if (error) {
+			pr_err("n addr: 0x%lx\n", (addr_t)n->addr);
+			return error;
+		}
+
+		private_key->len = n->len;
+		// Location 6 -> Private key
+		error = mem2CryptoRAM(device, private_key, size, BA414EP_MEMLOC_6, true);
+	}
 
 	if (error) {
-		pr_err("n addr: 0x%lx\n", (addr_t)n->addr);
+		pr_err("%s, %d, status is %d\n", __func__, __LINE__, status);
 		return error;
 	}
 
 	error = mem2CryptoRAM_rev(device, cipher, size, BA414EP_MEMLOC_4, true);
+	error |= pke_start_wait_status(device);
 
 	if (error) {
 		pr_err("src addr: 0x%lx\n", (addr_t)cipher->addr);
 		return error;
 	}
-
-	private_key->len = n->len;
-	// Location 6 -> Private key
-	mem2CryptoRAM_rev(device, private_key, size, BA414EP_MEMLOC_6, true);
-	error |= pke_start_wait_status(device);
-
-	if (error) {
-		return error;
-	}
-
-	CryptoRAM2mem_rev(device, result, result->len, BA414EP_MEMLOC_5, true);
 
 	if (padding_type != ESEC_RSA_PADDING_NONE) {
 		uint8_t *msg_padding;
@@ -219,7 +249,7 @@ uint32_t rsa_decrypt_blk(void *device,
 			return CRYPTOLIB_PK_N_NOTVALID;
 		}
 
-		memcpy(msg_padding, result->addr, result->len);
+		CryptoRAM2mem_rev(device, &BLOCK_T_CONV(msg_padding, n->len, EXT_MEM), n->len, BA414EP_MEMLOC_5, true);
 
 		if (padding_type == ESEC_RSA_PADDING_OAEP) {
 			error |= rsa_pad_eme_oaep_decode(device, n->len, hashType, msg_padding, &addr, (size_t *)msg_len);
@@ -233,6 +263,7 @@ uint32_t rsa_decrypt_blk(void *device,
 		ce_free(mem_n);
 	}
 	else {
+		CryptoRAM2mem_rev(device, result, result->len, BA414EP_MEMLOC_5, true);
 		*msg_len = n->len;
 	}
 
@@ -381,7 +412,8 @@ uint32_t rsa_signature_generation_blk(void *device,
 									  block_t *result,
 									  block_t *n,
 									  block_t *private_key,
-									  uint32_t salt_length)
+									  uint32_t salt_length,
+									  bool be_param)
 {
 	uint32_t error = 0;
 	uint32_t size = n->len;
@@ -459,20 +491,38 @@ uint32_t rsa_signature_generation_blk(void *device,
 	// Set command to enable byte-swap
 	pke_set_command(device, BA414EP_OPTYPE_RSA_SIGN_GEN, size, BA414EP_LITTLEEND, BA414EP_SELCUR_NO_ACCELERATOR);
 
-	// Location 0 -> N
-	error = mem2CryptoRAM_rev(device, n, size, BA414EP_MEMLOC_0, true);
+	if (be_param) {
+		// Location 0 -> N
+		error = mem2CryptoRAM_rev(device, n, size, BA414EP_MEMLOC_0, true);
 
-	if (error) {
-		pr_err("n->addr addr: 0x%lx\n", (addr_t)n->addr);
-		ce_free(mem_n);
-		ce_free(mem_n_1);
-		return error;
+		if (error) {
+			pr_err("n->addr addr: 0x%lx\n", (addr_t)n->addr);
+			ce_free(mem_n);
+			ce_free(mem_n_1);
+			return error;
+		}
+
+		private_key->len = n->len;
+
+		// Location 6 -> Private key
+		error = mem2CryptoRAM_rev(device, private_key, size, BA414EP_MEMLOC_6, true);
 	}
+	else {
+		// Location 0 -> N
+		error = mem2CryptoRAM(device, n, size, BA414EP_MEMLOC_0, true);
 
-	private_key->len = n->len;
+		if (error) {
+			pr_err("n->addr addr: 0x%lx\n", (addr_t)n->addr);
+			ce_free(mem_n);
+			ce_free(mem_n_1);
+			return error;
+		}
 
-	// Location 6 -> Private key
-	error = mem2CryptoRAM_rev(device, private_key, size, BA414EP_MEMLOC_6, true);
+		private_key->len = n->len;
+
+		// Location 6 -> Private key
+		error = mem2CryptoRAM(device, private_key, size, BA414EP_MEMLOC_6, true);
+	}
 
 	if (error) {
 		pr_err("private_key addr: 0x%lx\n", (addr_t)private_key->addr);
@@ -521,7 +571,8 @@ uint32_t rsa_signature_verification_blk(void *device,
 										block_t *n,
 										block_t *public_expo,
 										block_t *signature,
-										uint32_t salt_length)
+										uint32_t salt_length,
+										bool be_param)
 {
 	uint32_t error;
 	uint32_t size = n->len;
@@ -591,18 +642,34 @@ uint32_t rsa_signature_verification_blk(void *device,
 		pke_set_command(device, BA414EP_OPTYPE_RSA_ENC, size, BA414EP_LITTLEEND, BA414EP_SELCUR_NO_ACCELERATOR);
 	}
 
-	// Location 0 -> Modulus N
-	error = mem2CryptoRAM_rev(device, n, size, BA414EP_MEMLOC_0, true);
+	if (be_param) {
+		// Location 0 -> Modulus N
+		error = mem2CryptoRAM_rev(device, n, size, BA414EP_MEMLOC_0, true);
 
-	if (error) {
-		pr_err("n addr: 0x%lx\n", (addr_t)n->addr);
-		ce_free(mem_n);
-		ce_free(mem_n_1);
-		return error;
+		if (error) {
+			pr_err("n addr: 0x%lx\n", (addr_t)n->addr);
+			ce_free(mem_n);
+			ce_free(mem_n_1);
+			return error;
+		}
+
+		// Location 8 -> Public exponent
+		error = mem2CryptoRAM_rev(device, public_expo, size, BA414EP_MEMLOC_8, true);
 	}
+	else {
+		// Location 0 -> Modulus N
+		error = mem2CryptoRAM(device, n, size, BA414EP_MEMLOC_0, true);
 
-	// Location 8 -> Public exponent
-	error = mem2CryptoRAM_rev(device, public_expo, size, BA414EP_MEMLOC_8, true);
+		if (error) {
+			pr_err("n addr: 0x%lx\n", (addr_t)n->addr);
+			ce_free(mem_n);
+			ce_free(mem_n_1);
+			return error;
+		}
+
+		// Location 8 -> Public exponent
+		error = mem2CryptoRAM(device, public_expo, size, BA414EP_MEMLOC_8, true);
+	}
 
 	if (error) {
 		pr_err("public_expo addr: 0x%lx\n", (addr_t)public_expo->addr);

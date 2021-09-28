@@ -50,6 +50,7 @@ enum cryptodev_crypto_op_t {
 	CRYPTO_SHA2_256,
 	CRYPTO_SHA2_384,
 	CRYPTO_SHA2_512,
+	CRYPTO_SM3,
 	CRYPTO_SHA2_224_HMAC,
 	CRYPTO_TLS11_AES_CBC_HMAC_SHA1,
 	CRYPTO_TLS12_AES_CBC_HMAC_SHA256,
@@ -256,6 +257,33 @@ enum cryptodev_crk_op_t {
 	CRK_DSA_VERIFY = 3,
 	CRK_DH_COMPUTE_KEY = 4,
 	CRK_ALGORITHM_ALL
+};
+
+enum cryptodev_asym_op_t {
+	ASYM_ENC = 0,
+	ASYM_DEC = 1,
+	ASYM_SIGN = 2,
+	ASYM_VERIFY = 3,
+	ASYM_ALGORITHM_ALL
+};
+
+struct crypt_asym {
+	enum cryptodev_asym_op_t	asym_op;
+	int rsa_size;
+	int padding;
+	int digest_type;
+	void *n;
+	void *e;
+	void *d;
+	void *p;
+	void *q;
+	int e_len;
+	int src_len;
+	int dst_len;
+	__u8	__user *src;	/* source data */
+	__u8	__user *dst;	/* pointer to output data */
+	int * sign_len;
+	int be_param;
 };
 
 /* input of CIOCCPHASH

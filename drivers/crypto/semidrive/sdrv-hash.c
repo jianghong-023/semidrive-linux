@@ -80,12 +80,6 @@ static int semidrive_ahash_async_req_handle(
 		return rctx->src_nents;
 	}
 
-	ret = dma_map_sg(sdce->dev, req->src, rctx->src_nents, DMA_TO_DEVICE);
-
-	if (ret < 0) {
-		return ret;
-	}
-
 	//maybe this exchange can be removed
 	switch (rctx->flags) {
 		/*case SD_HASH_MD5:
