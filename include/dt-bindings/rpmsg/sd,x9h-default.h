@@ -11,7 +11,7 @@
 #define __SDRV_SHM_X9H_DEFAULT_H__
 
 /*
- * the MEMBASE is defined in image_cf.h of related project.
+ * the MEMBASE is defined in image_cfg.h of related project.
  * <dt-bindings/memmap/x9_high/projects/[prj]/image_cfg.h>
  */
 #define RPMSG_MEM_CONV(addr)	(addr+0x10000000)
