@@ -497,7 +497,7 @@ static void __exit rpmsg_net_exit(void)
 	unregister_rpmsg_driver(&rpmsg_net_driver);
 }
 
-late_initcall(rpmsg_net_init);
+module_init(rpmsg_net_init);
 module_exit(rpmsg_net_exit);
 
 MODULE_AUTHOR("Semidrive Semiconductor");

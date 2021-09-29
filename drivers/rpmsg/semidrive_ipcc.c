@@ -42,6 +42,10 @@
 /* DEBUG purpose */
 #define CONFIG_IPCC_DUMP_HEX	(0)
 
+#define RPMSG_IPCC_DOWN_INTERVAL	msecs_to_jiffies(2000)
+#define RPMSG_IPCC_SYNC_INTERVAL	msecs_to_jiffies(100)
+#define RPMSG_IPCC_SYNA_FALLBACK	msecs_to_jiffies(200)
+
 struct rpmsg_ipcc_hdr {
 	sd_msghdr_t mboxhdr;
 	u32 src;
@@ -71,6 +75,16 @@ struct rpmsg_ipcc_device {
 	struct mbox_chan *mbox;
 	struct rpmsg_endpoint *ns_ept;
 	struct delayed_work ns_work;
+
+#define RPMSG_IPCC_LINK_DOWN		(0)
+#define RPMSG_IPCC_LINK_SYNC		(1)
+#define RPMSG_IPCC_LINK_SYNA		(2)
+#define RPMSG_IPCC_LINK_UP		(3)
+#define RPMSG_IPCC_LINK_ERRSTATE	(4)
+	int link_status; /* for medium link establish and destroy */
+#define RPMSG_IPCC_LINK_RETRY_NUM	(10)
+	int link_retry;  /* retry counter before give up */
+
 	struct rpmsg_endpoint *echo_ept;
 	struct work_struct rx_work;
 	struct idr endpoints;
@@ -128,6 +142,8 @@ static const struct rpmsg_endpoint_ops rpmsg_ipcc_endpoint_ops = {
 
 static LIST_HEAD(ipcc_cons);
 static DEFINE_MUTEX(con_mutex);
+
+uint32_t semidrive_get_syscntr(void);
 
 static int ipcc_has_feature(struct rpmsg_ipcc_device *vrp, int feature)
 {
@@ -643,7 +659,7 @@ static int rpmsg_ipcc_rx(struct rpmsg_ipcc_device *vrp,
 	return 0;
 }
 
-static void __ns_announce_delayed(struct work_struct *work)
+static void _init_ns_announce_delayed(struct work_struct *work)
 {
 	struct delayed_work *dwork = to_delayed_work(work);
 	struct rpmsg_ipcc_device *vrp = container_of(dwork, struct rpmsg_ipcc_device,
@@ -653,15 +669,30 @@ static void __ns_announce_delayed(struct work_struct *work)
 	struct device *tmp;
 	int ret;
 
+	if (vrp->link_status == RPMSG_IPCC_LINK_UP) {
+		dev_info(vrp->dev, "confirm link up\n");
+		return;
+	}
+
+	if (vrp->link_status == RPMSG_IPCC_LINK_SYNA) {
+		vrp->link_status = RPMSG_IPCC_LINK_UP;
+		dev_info(vrp->dev, "fallback link up\n");
+		return;
+	}
+
 	strncpy(nsm.name, "ipcc-echo", RPMSG_NAME_SIZE);
 	nsm.addr = RPMSG_ECHO_ADDR;
 	nsm.flags = RPMSG_NS_CREATE;
 	ret = __send_offchannel_raw(vrp, RPMSG_ECHO_ADDR, RPMSG_NS_ADDR, &nsm, sizeof(nsm), true);
 	if (ret) {
 		dev_warn(vrp->dev, "failed to announce %d, retry\n", ret);
-		schedule_delayed_work(&vrp->ns_work, msecs_to_jiffies(2000));
+		schedule_delayed_work(&vrp->ns_work, RPMSG_IPCC_DOWN_INTERVAL);
 		return;
 	}
+
+	vrp->link_status = RPMSG_IPCC_LINK_SYNC;
+	vrp->link_retry++;
+	dev_info(vrp->dev, "[%u] link sync c:%d\n", semidrive_get_syscntr(), vrp->link_retry);
 
 	/* make sure p2p rpmsg channel is created
 	 * announce ns shake hand
@@ -672,12 +703,21 @@ static void __ns_announce_delayed(struct work_struct *work)
 	tmp = rpmsg_find_device(vrp->dev, &chinfo);
 	if (tmp) {
 		put_device(tmp);
-		dev_info(vrp->dev, "announce ns completely\n");
+
+		dev_info(vrp->dev, "[%u] link %d -> SYNA \n", semidrive_get_syscntr(), vrp->link_status);
+		vrp->link_status = RPMSG_IPCC_LINK_SYNA;
+
+		/* wait a moment for nsm comming */
+		schedule_delayed_work(&vrp->ns_work, RPMSG_IPCC_SYNA_FALLBACK);
+		vrp->link_retry = 0;	/* reset retry counter */
 		return;
 	}
 
-	schedule_delayed_work(&vrp->ns_work, msecs_to_jiffies(100));
-	dev_info(vrp->dev, "announce ns in progress\n");
+	if (vrp->link_retry < RPMSG_IPCC_LINK_RETRY_NUM)
+		schedule_delayed_work(&vrp->ns_work, RPMSG_IPCC_SYNC_INTERVAL);
+	else
+		dev_err(vrp->dev, "[%u] link fail after retry %d\n", semidrive_get_syscntr(), vrp->link_retry);
+
 }
 
 static void __rx_work_handler(struct work_struct *work)
@@ -760,6 +800,22 @@ static void __mbox_tx_done(struct mbox_client *client, void *mssg, int r)
 	wake_up_interruptible(&vrp->sendq);
 }
 
+static int rpmsg_ipcc_recover_announce(struct device *dev, void *data)
+{
+	struct rpmsg_device *rpdev = container_of(dev, struct rpmsg_device, dev);
+
+	return rpmsg_ipcc_announce_create(rpdev);
+}
+
+/* This is called when link with remote peer is reset for eg. reboot */
+static void rpmsg_ipcc_device_recovery(struct rpmsg_ipcc_device *vrp)
+{
+
+	schedule_delayed_work(&vrp->ns_work, 0);
+
+	device_for_each_child(vrp->dev, NULL, rpmsg_ipcc_recover_announce);
+}
+
 /* invoked when a name service announcement arrives */
 static int rpmsg_ipcc_ns_cb(struct rpmsg_device *rpdev, void *data, int len,
 		       void *priv, u32 src)
@@ -797,7 +853,7 @@ static int rpmsg_ipcc_ns_cb(struct rpmsg_device *rpdev, void *data, int len,
 	/* don't trust the remote processor for null terminating the name */
 	msg->name[RPMSG_NAME_SIZE - 1] = '\0';
 
-	dev_info(dev, "%sing channel %s addr 0x%x\n",
+	dev_info(dev, "nsm in, %sing %s addr 0x%x\n",
 		 msg->flags & RPMSG_NS_DESTROY ? "destroy" : "creat",
 		 msg->name, msg->addr);
 
@@ -810,22 +866,73 @@ static int rpmsg_ipcc_ns_cb(struct rpmsg_device *rpdev, void *data, int len,
 		if (ret)
 			dev_err(dev, "rpmsg_destroy_channel failed: %d\n", ret);
 	} else {
-		newch = rpmsg_create_channel(vrp, &chinfo);
-		if (!newch)
-			dev_err(dev, "rpmsg_create_channel failed\n");
+		struct device *tmp;
+
+		tmp = rpmsg_find_device(dev, &chinfo);
+		if (!tmp) {
+			newch = rpmsg_create_channel(vrp, &chinfo);
+			if (!newch)
+				dev_err(dev, "rpmsg_create_channel failed\n");
+		} else {
+			/* decrement the matched device's refcount back */
+			put_device(tmp);
+		}
+
+		/* ignore if it's not a echo_endpoint create nsm */
+		if (msg->addr != RPMSG_ECHO_ADDR) {
+			return 0;
+		}
+
+		switch(vrp->link_status) {
+		case RPMSG_IPCC_LINK_DOWN:
+			/*
+			 * This rare case happens when current OS boot later
+			 * than remote OS and first nsm is not scheduled yet.
+			 */
+			dev_warn(dev, "receive nsm in link down, reply\n");
+			schedule_delayed_work(&vrp->ns_work, 0);
+			break;
+
+		case RPMSG_IPCC_LINK_SYNC:
+			/*
+			 * Nothing to do, wait for next delayed nsm annouce
+			 */
+			break;
+
+		case RPMSG_IPCC_LINK_SYNA:
+			dev_info(dev, "[%u] link SYNA -> up\n", semidrive_get_syscntr());
+			vrp->link_status = RPMSG_IPCC_LINK_UP;
+			break;
+
+		case RPMSG_IPCC_LINK_UP:
+			/*
+			 * This is an exception, peer likely reboot
+			 */
+			dev_warn(dev, "nsm after linkup, peer maybe reboot\n");
+			vrp->link_status = RPMSG_IPCC_LINK_DOWN;
+			rpmsg_ipcc_device_recovery(vrp);
+
+			break;
+
+		default:
+			dev_err(dev, "wrong link status %d\n", vrp->link_status);
+			break;
+		}
 	}
 
 	return 0;
 }
 
 struct rpmsg_device *
-rpmsg_ipcc_request_channel(struct platform_device *client, int index, const char *dev_name)
+rpmsg_ipcc_request_channel(struct platform_device *client, int index)
 {
 	struct rpmsg_channel_info chinfo;
 	struct rpmsg_ipcc_device *vrp;
 	struct rpmsg_device *rpmsg_dev = NULL;
 	struct of_phandle_args spec;
+	const char *dev_name;
 	u32 src, dst;
+	int ret;
 
 	mutex_lock(&con_mutex);
 
@@ -833,11 +940,18 @@ rpmsg_ipcc_request_channel(struct platform_device *client, int index, const char
 				       "#rpmsg-cells", index, &spec)) {
 		dev_info(&client->dev, "%s: can't parse \"rpmsg-dev\" property\n", __func__);
 		mutex_unlock(&con_mutex);
-		return ERR_PTR(-ENODEV);
+		return NULL;
 	}
+
+	ret = device_property_read_string(&client->dev, "name", &dev_name);
+	if (ret < 0)
+		return NULL;
 
 	list_for_each_entry(vrp, &ipcc_cons, node)
 		if (vrp->dev->of_node == spec.np) {
+			if (vrp->link_status != RPMSG_IPCC_LINK_UP)
+				break;
+
 			src = spec.args[0];
 			dst = spec.args[1];
 			dev_info(vrp->dev, "Creating device %s addr 0x%x->0x%x\n", dev_name, src, dst);
@@ -922,8 +1036,9 @@ static int rpmsg_ipcc_probe(struct platform_device *pdev)
 	mutex_init(&vrp->tx_lock);
 	init_waitqueue_head(&vrp->sendq);
 	INIT_WORK(&vrp->rx_work, __rx_work_handler);
-	INIT_DELAYED_WORK(&vrp->ns_work, __ns_announce_delayed);
+	INIT_DELAYED_WORK(&vrp->ns_work, _init_ns_announce_delayed);
 	vrp->rproc = -1;	/* This is not used */
+	vrp->link_status = RPMSG_IPCC_LINK_DOWN;
 
 	spin_lock_init(&vrp->queue_lock);
 	skb_queue_head_init(&vrp->queue);

@@ -25,19 +25,50 @@
 #include <linux/rpmsg.h>
 
 struct rpmsg_device *
-rpmsg_ipcc_request_channel(struct platform_device *client, int index, const char *dev_name);
+rpmsg_ipcc_request_channel(struct platform_device *client, int index);
+
+struct dcf_virnet {
+	struct platform_device *pdev;
+	struct delayed_work delayed_work;
+	struct rpmsg_device *rpdev;
+};
+
+static void request_channel_delayed_work(struct work_struct *work)
+{
+	struct delayed_work *dwork = to_delayed_work(work);
+	struct dcf_virnet *vn = container_of(dwork, struct dcf_virnet,
+	                    delayed_work);
+	struct platform_device *pdev = vn->pdev;
+
+	if (vn->rpdev)
+		return;
+
+	vn->rpdev = rpmsg_ipcc_request_channel(pdev, 0);
+	if (!vn->rpdev) {
+		dev_warn(&pdev->dev, "not ready to request, delayed\n");
+		schedule_delayed_work(&vn->delayed_work, msecs_to_jiffies(100));
+		return;
+	}
+}
 
 static int dcf_virnet_probe(struct platform_device *pdev)
 {
-	struct rpmsg_device *newch;
-	const char *dev_name;
-	int ret = 0;
+	struct dcf_virnet *vn;
 
-	ret = device_property_read_string(&pdev->dev, "name", &dev_name);
-	if (ret < 0)
-		return ret;
+	vn = kzalloc(sizeof(struct dcf_virnet), GFP_KERNEL);
+	if (!vn) {
+		dev_err(&pdev->dev, "no memory to probe\n");
+		return -ENOMEM;
+	}
 
-	newch = rpmsg_ipcc_request_channel(pdev, 0, dev_name);
+	vn->pdev = pdev;
+	INIT_DELAYED_WORK(&vn->delayed_work, request_channel_delayed_work);
+
+	vn->rpdev = rpmsg_ipcc_request_channel(pdev, 0);
+	if (!vn->rpdev) {
+		dev_warn(&pdev->dev, "not ready to request, delayed\n");
+		schedule_delayed_work(&vn->delayed_work, msecs_to_jiffies(100));
+	}
 
 	return 0;
 }
