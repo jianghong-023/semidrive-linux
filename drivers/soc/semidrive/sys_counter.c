@@ -74,7 +74,7 @@ static int __init semidrive_syscntr_init(void)
 
 	return ret;
 }
-module_init(semidrive_syscntr_init);
+arch_initcall(semidrive_syscntr_init);
 
 static void __exit semidrive_syscntr_fini(void)
 {
