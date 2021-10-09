@@ -7,6 +7,7 @@ dtb-$(CONFIG_ARCH_SEMIDRIVE_X9) += x9_high-plus_ref_native_cluster_8g_bt.dtb
 dtb-$(CONFIG_ARCH_SEMIDRIVE_V9) += v9f_ref.dtb
 dtb-$(CONFIG_ARCH_SEMIDRIVE_G9) += g9x_ref.dtb
 dtb-$(CONFIG_ARCH_SEMIDRIVE_G9) += g9x_ii4_ref.dtb
+dtb-$(CONFIG_ARCH_SEMIDRIVE_G9) += g9q_ref.dtb
 dtb-$(CONFIG_ARCH_SEMIDRIVE_X9) += x9_high_ref_native_cluster_serdes.dtb
 dtb-$(CONFIG_ARCH_SEMIDRIVE_X9) += x9_high_ref_native_ivi_serdes.dtb
 dtb-$(CONFIG_ARCH_SEMIDRIVE_X9) += x9_high_icl02_native_ivi.dtb
