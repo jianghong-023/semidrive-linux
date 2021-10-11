@@ -106,10 +106,8 @@
 	};
 
 	chosen {
-		bootargs = "root=/dev/ram0 rootfstype=ramfs highres=1  earlycon loglevel=4 console=ttyS0,115200n8 androidboot.mode=normal androidboot.selinux=permissive androidboot.debuggable=1 androidboot.dm_verity=disable androidboot.vdsp=disable init=/init fbcon=map:1 psplash=false";
+		bootargs = "skip_initramfs noinitrd root=/dev/mmcblk0p25 rootfstype=ext4 highres=1 rootwait rw init=/sbin/init earlycon loglevel=4 console=ttyS0,115200n8 consoleblank=0 androidboot.mode=normal androidboot.selinux=permissive androidboot.debuggable=1 androidboot.hardware=d9plus_ref buildvariant=userdebug androidboot.dm_verity=disable androidboot.vdsp=disable fbcon=map:1 psplash=false";
 		stdout-path = "serial0";
-		linux,initrd-start = <AP1_BOARD_RAMDISK_MEMBASE>;
-		linux,initrd-end   = <AP1_BOARD_RAMDISK_MEMSIZE>;
 	};
 
 	vdd_12: fixed-vdd_12 {
@@ -878,6 +876,7 @@
 };
 
 &ipcc4 {
+	rpmsg-mtu  = <1024>;
 	status = "okay";
 };
 

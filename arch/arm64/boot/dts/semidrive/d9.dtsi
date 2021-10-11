@@ -1259,21 +1259,50 @@
 			status = "disabled";
 		};
 
+		rpmsg3: rpmsg@3 {
+			compatible = "sd,rpmsg-vq,rp_ap";
+			mboxes = <&mbox 0x19 0x1903>;
+			status = "disabled";
+		};
+
+		rpmsg4: rpmsg@4 {
+			compatible = "sd,rpmsg-vq,rp_ap";
+			mboxes = <&mbox 0x19 0x1904>;
+			status = "disabled";
+		};
+
 		ipcc0: ipcc@0 {
 			compatible = "sd,rpmsg-ipcc";
 			mboxes = <&mbox 0x33 0x3300>;
+			#rpmsg-cells = <2>;
 			status = "disabled";
 		};
 
 		ipcc1: ipcc@1 {
 			compatible = "sd,rpmsg-ipcc";
 			mboxes = <&mbox 0x34 0x3401>;
+			#rpmsg-cells = <2>;
 			status = "disabled";
 		};
 
 		ipcc2: ipcc@2 {
 			compatible = "sd,rpmsg-ipcc";
 			mboxes = <&mbox 0x38 0x3802>;
+			#rpmsg-cells = <2>;
+			status = "disabled";
+		};
+
+		ipcc3: ipcc@3 {
+			compatible = "sd,rpmsg-ipcc";
+			mboxes = <&mbox 0x39 0x3903>;
+			#rpmsg-cells = <2>;
+			status = "disabled";
+		};
+
+		ipcc4: ipcc@4 {
+			compatible = "sd,rpmsg-ipcc";
+			mboxes = <&mbox 0x39 0x3904>;
+			#rpmsg-cells = <2>;
 			status = "disabled";
 		};
 
