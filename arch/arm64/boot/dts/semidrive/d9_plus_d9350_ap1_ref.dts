@@ -1007,3 +1007,8 @@
 &pvt_sensor {
 	status = "okay";
 };
+
+&str_sync {
+	host = <1>;
+	status = "okay";
+};

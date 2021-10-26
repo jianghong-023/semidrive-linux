@@ -227,3 +227,12 @@
 	wdt,auto-run = "false";
 	status = "okay";
 };
+
+&psci {
+	str-native = <1>;
+	reg = <0x0 (SAF_AP2_MEMBASE+0x10000000+0x100000) 0x0 0x1000>;
+};
+
+&str_sync {
+	status = "okay";
+};

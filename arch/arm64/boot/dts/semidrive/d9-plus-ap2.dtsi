@@ -20,5 +20,11 @@
 			mboxes = <&mbox 0x39 0x3903>;
 			status = "disabled";
 		};
+
+		str_sync: str_sync {
+			compatible = "sd,str-sync";
+			mboxes = <&mbox 0x49 0x4903>;
+			status = "disabled";
+		};
 	};
 };
