@@ -563,7 +563,6 @@ static void axi_chan_block_xfer_start(struct axi_dma_chan *chan,
 		return;
 	}
 
-	axi_dma_enable(chan->chip);
 	switch (chan->direction) {
 
 	case DMA_MEM_TO_MEM:
@@ -946,7 +945,7 @@ static void axi_chan_blocks_xfer_complete(struct axi_dma_chan *chan)
 	unsigned long flags;
 	spin_lock_irqsave(&chan->vc.lock, flags);
 	if (unlikely(axi_chan_is_hw_enable(chan))) {
-		dev_err(chan2dev(chan),
+		dev_info(chan2dev(chan),
 			"WARNNING: %s caught DWAXIDMAC_IRQ_DMA_TRF, but channel not "
 			"idle!\n",
 			axi_chan_name(chan));
@@ -974,8 +973,8 @@ static void axi_chan_one_block_xfer_complete(struct axi_dma_chan *chan)
 	struct axi_dma_desc *axi_desc;
 
 	if (unlikely(!axi_chan_is_hw_enable(chan))) {
-		dev_err(chan2dev(chan),
-			"BUG: %s caught DWAXIDMAC_IRQ_DMA_BLK, but channel "
+		dev_info(chan2dev(chan),
+			"WARNNING: %s caught DWAXIDMAC_IRQ_DMA_BLK, but channel "
 			"already disable!\n",
 			axi_chan_name(chan));
 		return;
@@ -1004,9 +1003,10 @@ static irqreturn_t dw_axi_dma_interrupt(int irq, void *dev_id)
 	struct axi_dma_chip *chip = dev_id;
 	struct dw_axi_dma *dw = chip->dw;
 	struct axi_dma_chan *chan;
-
 	u32 status, i;
+	unsigned long flags;
 
+	spin_lock(&chip->dev_lock);
 	/* Disable DMAC inerrupts. We'll enable them after processing chanels */
 	axi_dma_irq_disable(chip);
 
@@ -1028,7 +1028,7 @@ static irqreturn_t dw_axi_dma_interrupt(int irq, void *dev_id)
 
 	/* Re-enable interrupts */
 	axi_dma_irq_enable(chip);
-
+	spin_unlock(&chip->dev_lock);
 	return IRQ_HANDLED;
 }
 
@@ -1037,29 +1037,10 @@ static int dma_chan_terminate_all(struct dma_chan *dchan)
 	struct axi_dma_chan *chan = dchan_to_axi_dma_chan(dchan);
 	unsigned long flags;
 	int delaycount = 0;
-	//struct axi_dma_desc *axi_desc;
+
 	LIST_HEAD(head);
-	axi_chan_disable(chan);
-
-	while(axi_chan_is_hw_enable(chan)){
-		//usleep_range(80,120);
-		udelay(100);
-		delaycount++;
-		if (delaycount > 3000)
-		{
-			dev_info(chan2dev(chan),"%s :BUG is non-idle after disabled and delay 300ms!!!\n",
-			axi_chan_name(chan));
-			BUG_ON(axi_chan_is_hw_enable(chan));
-			break;
-		}
-	}
-	if(delaycount > 10){
-		dev_info(chan2dev(chan),"%s :BUG is non-idle after disabled and delay %d00!\n",
-		axi_chan_name(chan),delaycount);
-	}
-
 	spin_lock_irqsave(&chan->vc.lock, flags);
-
+	axi_chan_disable(chan);
 	//axi_desc = chan->desc;
 	chan->desc = NULL;
 
@@ -1071,12 +1052,12 @@ static int dma_chan_terminate_all(struct dma_chan *dchan)
 	 * As vchan_dma_desc_free_list can access to desc_allocated list
 	 * we need to call it in vc.lock context. it will put axi desc
 	 */
-	vchan_dma_desc_free_list(&chan->vc, &head);
 
+	vchan_dma_desc_free_list(&chan->vc, &head);
 	spin_unlock_irqrestore(&chan->vc.lock, flags);
 
-	dev_vdbg(dchan2dev(dchan), "terminated: %s\n", axi_chan_name(chan));
 
+	dev_vdbg(dchan2dev(dchan), "terminated: %s\n", axi_chan_name(chan));
 	return 0;
 }
 
@@ -1140,8 +1121,11 @@ static int dma_chan_resume(struct dma_chan *dchan)
 
 static int axi_dma_suspend(struct axi_dma_chip *chip)
 {
+	unsigned long flags;
+	spin_lock_irqsave(&chip->dev_lock,flags);
 	axi_dma_irq_disable(chip);
 	axi_dma_disable(chip);
+	spin_unlock_irqrestore(&chip->dev_lock,flags);
 
 	clk_disable_unprepare(chip->core_clk);
 	clk_disable_unprepare(chip->cfgr_clk);
@@ -1152,6 +1136,7 @@ static int axi_dma_suspend(struct axi_dma_chip *chip)
 static int axi_dma_resume(struct axi_dma_chip *chip)
 {
 	int ret;
+	unsigned long flags;
 
 	ret = clk_prepare_enable(chip->cfgr_clk);
 	if (ret < 0)
@@ -1160,10 +1145,10 @@ static int axi_dma_resume(struct axi_dma_chip *chip)
 	ret = clk_prepare_enable(chip->core_clk);
 	if (ret < 0)
 		return ret;
-
+	spin_lock_irqsave(&chip->dev_lock,flags);
 	axi_dma_enable(chip);
 	axi_dma_irq_enable(chip);
-
+	spin_unlock_irqrestore(&chip->dev_lock,flags);
 	return 0;
 }
 
@@ -1281,7 +1266,7 @@ static int dma_chan_config(struct dma_chan *dchan,
 	/* Restore slave id if it is allocated by of dma*/
 	if (chan->fix_slave_id == true) {
 		sc->slave_id = slave_id;
-		printk(KERN_DEBUG "DW AXI DMAC"
+		printk(KERN_DEBUG "DW AXI DMAC "
 				  "%s slave id: %d \n",
 		       __FUNCTION__, sc->slave_id);
 	}
@@ -2001,7 +1986,7 @@ static int dw_probe(struct platform_device *pdev)
 		goto err_dma_register;
 
 	axi_dma_hw_init(chip);
-
+	spin_lock_init(&chip->dev_lock);
 	dev_info(chip->dev, "DesignWare AXI DMA Controller, %d channels\n",
 		 dw->hdata->nr_channels);
 
@@ -2029,17 +2014,19 @@ static int dw_remove(struct platform_device *pdev)
 	struct dw_axi_dma *dw = chip->dw;
 	struct axi_dma_chan *chan, *_chan;
 	u32 i;
+	unsigned long flags;
 
 	/* Enable clk before accessing to registers */
 	clk_prepare_enable(chip->cfgr_clk);
 	clk_prepare_enable(chip->core_clk);
 	axi_dma_irq_disable(chip);
+	spin_lock_irqsave(&chip->dev_lock,flags);
 	for (i = 0; i < dw->hdata->nr_channels; i++) {
 		axi_chan_disable(&chip->dw->chan[i]);
 		axi_chan_irq_disable(&chip->dw->chan[i], DWAXIDMAC_IRQ_ALL);
 	}
 	axi_dma_disable(chip);
-
+	spin_unlock_irqrestore(&chip->dev_lock,flags);
 	pm_runtime_disable(chip->dev);
 	axi_dma_suspend(chip);
 

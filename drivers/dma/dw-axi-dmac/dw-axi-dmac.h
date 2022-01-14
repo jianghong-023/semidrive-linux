@@ -94,6 +94,8 @@ struct axi_dma_chip {
 	struct clk *core_clk;
 	struct clk *cfgr_clk;
 	struct dw_axi_dma *dw;
+	/*add a spinlock for driver*/
+	spinlock_t   dev_lock;
 };
 
 /* LLI == Linked List Item */
