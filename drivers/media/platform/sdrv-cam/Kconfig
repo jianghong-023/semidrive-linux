@@ -51,3 +51,8 @@ config VIDEO_SEMIDRIVE_DESERS_ADAPTIVE
 config POWER_POC_DRIVER
 	tristate "deser poc driver"
 	depends on VIDEO_SEMIDRIVE
+
+config VIDEO_SEMIDRIVE_NEXTCHIP_TP2850
+	tristate "tp tp2850 for Semidrive"
+	depends on VIDEO_SEMIDRIVE
+
