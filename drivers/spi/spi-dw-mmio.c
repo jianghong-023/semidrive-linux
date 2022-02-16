@@ -54,6 +54,8 @@ static int dw_spi_mmio_probe(struct platform_device *pdev)
 		return PTR_ERR(dws->regs);
 	}
 
+	dws->paddr = mem->start;
+
 	dws->irq = platform_get_irq(pdev, 0);
 	if (dws->irq < 0) {
 		dev_err(&pdev->dev, "no irq resource?\n");
@@ -78,6 +80,10 @@ static int dw_spi_mmio_probe(struct platform_device *pdev)
 	device_property_read_u32(&pdev->dev, "num-cs", &num_cs);
 
 	dws->num_cs = num_cs;
+
+	if (device_property_read_u32(&pdev->dev, "enable_dma",
+				     &dws->enable_dma) != 0)
+		dws->enable_dma = 0;
 
 	if (!device_property_read_u32(&pdev->dev, "sdrv,scr_opmode", &scr_opmode))
 		dws->scr_opmode = scr_opmode;

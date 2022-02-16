@@ -13,7 +13,6 @@
  * more details.
  */
 
-#include <linux/dma-mapping.h>
 #include <linux/interrupt.h>
 #include <linux/module.h>
 #include <linux/highmem.h>
@@ -37,7 +36,6 @@ struct chip_data {
 
 	u8 poll_mode;		/* 1 means use poll mode */
 
-	u8 enable_dma;
 	u16 clk_div;		/* baud rate divider */
 	u32 speed_hz;		/* baud rate */
 	void (*cs_control)(u32 command);
@@ -280,6 +278,131 @@ static int poll_transfer(struct dw_spi *dws)
 	return 0;
 }
 
+static inline void wait_for_idle(struct dw_spi *dws)
+{
+	unsigned long timeout = jiffies + msecs_to_jiffies(5);
+
+	do {
+		if (!(readl_relaxed(dws->regs + DW_SPI_SR) & SR_BUSY))
+			return;
+	} while (!time_after(jiffies, timeout));
+
+	pr_info("spi controller is in busy state!\n");
+}
+
+static void dw_spi_dma_rxcb(void *data)
+{
+	unsigned long flags;
+	struct dw_spi *dws = data;
+
+	spin_lock_irqsave(&dws->lock, flags);
+
+	dws->state &= ~RXBUSY;
+	if (!(dws->state & TXBUSY)) {
+		spi_enable_chip(dws, 0);
+		spi_finalize_current_transfer(dws->master);
+	}
+
+	spin_unlock_irqrestore(&dws->lock, flags);
+}
+
+static void dw_spi_dma_txcb(void *data)
+{
+	unsigned long flags;
+	struct dw_spi *dws = data;
+
+	/* Wait until the FIFO data completely. */
+	wait_for_idle(dws);
+
+	spin_lock_irqsave(&dws->lock, flags);
+
+	dws->state &= ~TXBUSY;
+	if (!(dws->state & RXBUSY)) {
+		spi_enable_chip(dws, 0);
+		spi_finalize_current_transfer(dws->master);
+	}
+
+	spin_unlock_irqrestore(&dws->lock, flags);
+}
+
+static int dw_spi_prepare_dma(struct dw_spi *dws)
+{
+	unsigned long flags;
+	struct dma_slave_config rxconf, txconf;
+	struct dma_async_tx_descriptor *rxdesc, *txdesc;
+
+	spin_lock_irqsave(&dws->lock, flags);
+	dws->state &= ~RXBUSY;
+	dws->state &= ~TXBUSY;
+	spin_unlock_irqrestore(&dws->lock, flags);
+
+	rxdesc = NULL;
+	if (dws->rx) {
+		rxconf.direction = dws->dma_rx.direction;
+		rxconf.src_addr = dws->dma_rx.addr;
+		rxconf.src_addr_width = dws->n_bytes;
+		if (dws->dma_caps.max_burst > 4)
+			rxconf.src_maxburst = 4;
+		else
+			rxconf.src_maxburst = 1;
+		dmaengine_slave_config(dws->dma_rx.ch, &rxconf);
+
+		rxdesc = dmaengine_prep_slave_sg(
+				dws->dma_rx.ch,
+				dws->rx_sg.sgl, dws->rx_sg.nents,
+				dws->dma_rx.direction, DMA_PREP_INTERRUPT);
+		if (!rxdesc)
+			return -EINVAL;
+
+		rxdesc->callback = dw_spi_dma_rxcb;
+		rxdesc->callback_param = dws;
+	}
+
+	txdesc = NULL;
+	if (dws->tx) {
+		txconf.direction = dws->dma_tx.direction;
+		txconf.dst_addr = dws->dma_tx.addr;
+		txconf.dst_addr_width = dws->n_bytes;
+		if (dws->dma_caps.max_burst > 4)
+			txconf.dst_maxburst = 4;
+		else
+			txconf.dst_maxburst = 1;
+		dmaengine_slave_config(dws->dma_tx.ch, &txconf);
+
+		txdesc = dmaengine_prep_slave_sg(
+				dws->dma_tx.ch,
+				dws->tx_sg.sgl, dws->tx_sg.nents,
+				dws->dma_tx.direction, DMA_PREP_INTERRUPT);
+		if (!txdesc) {
+			if (rxdesc)
+				dmaengine_terminate_sync(dws->dma_rx.ch);
+			return -EINVAL;
+		}
+
+		txdesc->callback = dw_spi_dma_txcb;
+		txdesc->callback_param = dws;
+	}
+
+	/* rx must be started before tx due to spi instinct */
+	if (rxdesc) {
+		spin_lock_irqsave(&dws->lock, flags);
+		dws->state |= RXBUSY;
+		spin_unlock_irqrestore(&dws->lock, flags);
+		dmaengine_submit(rxdesc);
+		dma_async_issue_pending(dws->dma_rx.ch);
+	}
+
+	if (txdesc) {
+		spin_lock_irqsave(&dws->lock, flags);
+		dws->state |= TXBUSY;
+		spin_unlock_irqrestore(&dws->lock, flags);
+		dmaengine_submit(txdesc);
+		dma_async_issue_pending(dws->dma_tx.ch);
+	}
+
+	return 0;
+}
+
 static int dw_spi_transfer_one(struct spi_master *master,
 		struct spi_device *spi, struct spi_transfer *transfer)
 {
@@ -288,15 +411,19 @@ static int dw_spi_transfer_one(struct spi_master *master,
 	u8 imask = 0;
 	u16 txlevel = 0;
 	u32 cr0;
+	u32 dmacr = 0;
 	int ret;
-
-	dws->dma_mapped = 0;
 
 	dws->tx = (void *)transfer->tx_buf;
 	dws->tx_end = dws->tx + transfer->len;
 	dws->rx = transfer->rx_buf;
 	dws->rx_end = dws->rx + transfer->len;
 	dws->len = transfer->len;
+
+	if (dws->enable_dma) {
+		dws->tx_sg = transfer->tx_sg;
+		dws->rx_sg = transfer->rx_sg;
+	}
 
 	spi_enable_chip(dws, 0);
 
@@ -310,12 +437,11 @@ static int dw_spi_transfer_one(struct spi_master *master,
 		dws->current_freq = transfer->speed_hz;
 		spi_set_clk(dws, chip->clk_div);
 	}
+
 	if (transfer->bits_per_word == 8) {
 		dws->n_bytes = 1;
-		dws->dma_width = 1;
 	} else if (transfer->bits_per_word == 16) {
 		dws->n_bytes = 2;
-		dws->dma_width = 2;
 	} else {
 		return -EINVAL;
 	}
@@ -343,22 +469,27 @@ static int dw_spi_transfer_one(struct spi_master *master,
 
 	dw_writel(dws, DW_SPI_CTRL0, cr0);
 
-	/* Check if current transfer is a DMA transaction */
-	if (master->can_dma && master->can_dma(master, spi, transfer))
-		dws->dma_mapped = master->cur_msg_mapped;
+	if (dws->enable_dma) {
+		if (dws->tx)
+			dmacr |= SPI_DMA_TDMAE;
+		if (dws->rx)
+			dmacr |= SPI_DMA_RDMAE;
+
+		dw_writel(dws, DW_SPI_DMATDLR, 0);
+		dw_writel(dws, DW_SPI_DMARDLR, 0);
+		dw_writel(dws, DW_SPI_DMACR, dmacr);
+	}
 
 	/* For poll mode just disable all interrupts */
 	spi_mask_intr(dws, 0xff);
 
-	/*
-	 * Interrupt mode
-	 * we only need set the TXEI IRQ, as TX/RX always happen syncronizely
-	 */
-	if (dws->dma_mapped) {
-		ret = dws->dma_ops->dma_setup(dws, transfer);
-		if (ret < 0) {
+	if (dws->enable_dma) {
+		if (chip->tmode == SPI_TMOD_RO) {
+			ret = dw_spi_prepare_dma(dws);
 			spi_enable_chip(dws, 1);
-			return ret;
+		} else {
+			spi_enable_chip(dws, 1);
+			ret = dw_spi_prepare_dma(dws);
 		}
 	} else if (!chip->poll_mode) {
 		txlevel = min_t(u16, dws->fifo_len / 2, dws->len / dws->n_bytes);
@@ -370,14 +501,8 @@ static int dw_spi_transfer_one(struct spi_master *master,
 		spi_umask_intr(dws, imask);
 
 		dws->transfer_handler = interrupt_transfer;
-	}
 
-	spi_enable_chip(dws, 1);
-
-	if (dws->dma_mapped) {
-		ret = dws->dma_ops->dma_transfer(dws, transfer);
-		if (ret < 0)
-			return ret;
+		spi_enable_chip(dws, 1);
 	}
 
 	if (chip->poll_mode)
@@ -390,9 +515,6 @@ static void dw_spi_handle_err(struct spi_master *master,
 		struct spi_message *msg)
 {
 	struct dw_spi *dws = spi_master_get_devdata(master);
-
-	if (dws->dma_mapped)
-		dws->dma_ops->dma_stop(dws);
 
 	spi_reset_chip(dws);
 }
@@ -472,6 +594,12 @@ static void spi_hw_init(struct device *dev, struct dw_spi *dws)
 	}
 }
 
+static bool dw_spi_can_dma(struct spi_master *master,
+			   struct spi_device *spi, struct spi_transfer *xfer)
+{
+	return true;
+}
+
 int dw_spi_add_host(struct device *dev, struct dw_spi *dws)
 {
 	struct spi_master *master;
@@ -486,8 +614,6 @@ int dw_spi_add_host(struct device *dev, struct dw_spi *dws)
 
 	dws->master = master;
 	dws->type = SSI_MOTO_SPI;
-	dws->dma_inited = 0;
-	dws->dma_addr = (dma_addr_t)(dws->paddr + DW_SPI_DR);
 
 	ret = request_irq(dws->irq, dw_spi_irq, IRQF_SHARED, dev_name(dev),
 			  master);
@@ -495,6 +621,8 @@ int dw_spi_add_host(struct device *dev, struct dw_spi *dws)
 		dev_err(dev, "can not get IRQ\n");
 		goto err_free_master;
 	}
+
+	spin_lock_init(&dws->lock);
 
 	master->mode_bits = SPI_CPOL | SPI_CPHA | SPI_LOOP;
 	master->bits_per_word_mask = SPI_BPW_MASK(8) | SPI_BPW_MASK(16);
@@ -516,13 +644,31 @@ int dw_spi_add_host(struct device *dev, struct dw_spi *dws)
 	if (dws->scr_opmode)
 		sdrv_scr_set(SCR_SEC, dws->scr_opmode, 0);
 
-	if (dws->dma_ops && dws->dma_ops->dma_init) {
-		ret = dws->dma_ops->dma_init(dws);
-		if (ret) {
-			dev_warn(dev, "DMA init failed\n");
-			dws->dma_inited = 0;
-		} else {
-			master->can_dma = dws->dma_ops->can_dma;
+	if (dws->enable_dma) {
+		dws->dma_tx.ch = dma_request_chan(dev, "tx");
+		if (IS_ERR(dws->dma_tx.ch)) {
+			dev_err(dev, "Failed to request TX DMA channel\n");
+			dws->dma_tx.ch = NULL;
+			goto err_free_irq;
+		}
+
+		dws->dma_rx.ch = dma_request_chan(dev, "rx");
+		if (IS_ERR(dws->dma_rx.ch)) {
+			dev_err(dev, "Failed to request RX DMA channel\n");
+			dws->dma_rx.ch = NULL;
+			goto err_free_dma_tx;
+		}
+
+		if (dws->dma_tx.ch && dws->dma_rx.ch) {
+			dma_get_slave_caps(dws->dma_rx.ch, &dws->dma_caps);
+			dws->dma_tx.addr = (dma_addr_t)(dws->paddr + DW_SPI_DR);
+			dws->dma_rx.addr = (dma_addr_t)(dws->paddr + DW_SPI_DR);
+			dws->dma_tx.direction = DMA_MEM_TO_DEV;
+			dws->dma_rx.direction = DMA_DEV_TO_MEM;
+
+			master->can_dma = dw_spi_can_dma;
+			master->dma_tx = dws->dma_tx.ch;
+			master->dma_rx = dws->dma_rx.ch;
 		}
 	}
 
@@ -530,17 +676,21 @@ int dw_spi_add_host(struct device *dev, struct dw_spi *dws)
 	ret = devm_spi_register_master(dev, master);
 	if (ret) {
 		dev_err(&master->dev, "problem registering spi master\n");
-		goto err_dma_exit;
+		goto err_free_dma_rx;
 	}
 
 	dw_spi_debugfs_init(dws);
 	return 0;
 
-err_dma_exit:
-	if (dws->dma_ops && dws->dma_ops->dma_exit)
-		dws->dma_ops->dma_exit(dws);
-	spi_enable_chip(dws, 0);
+	if (dws->enable_dma) {
+err_free_dma_rx:
+		dma_release_channel(dws->dma_rx.ch);
+err_free_dma_tx:
+		dma_release_channel(dws->dma_tx.ch);
+ err_free_irq:
 	free_irq(dws->irq, master);
+}
+
 err_free_master:
 	spi_master_put(master);
 	return ret;
@@ -551,8 +701,12 @@ void dw_spi_remove_host(struct dw_spi *dws)
 {
 	dw_spi_debugfs_remove(dws);
 
-	if (dws->dma_ops && dws->dma_ops->dma_exit)
-		dws->dma_ops->dma_exit(dws);
+	if (dws->enable_dma) {
+		if (dws->dma_tx.ch)
+			dma_release_channel(dws->dma_tx.ch);
+		if (dws->dma_rx.ch)
+			dma_release_channel(dws->dma_rx.ch);
+	}
 
 	spi_shutdown_chip(dws);
 

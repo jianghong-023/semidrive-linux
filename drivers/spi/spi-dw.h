@@ -3,6 +3,7 @@
 #define DW_SPI_HEADER_H
 
 #include <linux/io.h>
+#include <linux/dmaengine.h>
 #include <linux/scatterlist.h>
 #include <linux/gpio.h>
 
@@ -84,29 +85,30 @@
 /* TX RX interrupt level threshold, max can be 256 */
 #define SPI_INT_THRESHOLD		32
 
+#define RXBUSY				(1 << 0)
+#define TXBUSY				(1 << 1)
+
 enum dw_ssi_type {
 	SSI_MOTO_SPI = 0,
 	SSI_TI_SSP,
 	SSI_NS_MICROWIRE,
 };
 
-struct dw_spi;
-struct dw_spi_dma_ops {
-	int (*dma_init)(struct dw_spi *dws);
-	void (*dma_exit)(struct dw_spi *dws);
-	int (*dma_setup)(struct dw_spi *dws, struct spi_transfer *xfer);
-	bool (*can_dma)(struct spi_master *master, struct spi_device *spi,
-			struct spi_transfer *xfer);
-	int (*dma_transfer)(struct dw_spi *dws, struct spi_transfer *xfer);
-	void (*dma_stop)(struct dw_spi *dws);
+struct dw_spi_dma_data {
+	struct dma_chan *ch;
+	enum dma_transfer_direction direction;
+	dma_addr_t addr;
 };
 
+struct dw_spi;
+
 struct dw_spi {
+	struct device		*dev;
 	struct spi_master	*master;
 	enum dw_ssi_type	type;
 
 	void __iomem		*regs;
-	unsigned long		paddr;
+	u64			paddr;
 	int			irq;
 	u32			fifo_len;	/* depth of the FIFO buffer */
 	u32			max_freq;	/* max bus freq supported */
@@ -122,21 +124,21 @@ struct dw_spi {
 	void			*tx_end;
 	void			*rx;
 	void			*rx_end;
-	int			dma_mapped;
 	u8			n_bytes;	/* current is a 1/2 bytes op */
 	u32			dma_width;
 	irqreturn_t		(*transfer_handler)(struct dw_spi *dws);
 	u32			current_freq;	/* frequency in hz */
 
-	/* DMA info */
-	int			dma_inited;
-	struct dma_chan		*txchan;
-	struct dma_chan		*rxchan;
-	unsigned long		dma_chan_busy;
-	dma_addr_t		dma_addr; /* phy address of the Data register */
-	const struct dw_spi_dma_ops *dma_ops;
-	void			*dma_tx;
-	void			*dma_rx;
+	u32 state;
+	spinlock_t lock;
+
+	u32 enable_dma;
+	u32 use_dma;
+	struct sg_table tx_sg;
+	struct sg_table rx_sg;
+	struct dw_spi_dma_data dma_rx;
+	struct dw_spi_dma_data dma_tx;
+	struct dma_slave_caps dma_caps;
 
 	/* Bus interface info */
 	void			*priv;

@@ -568,6 +568,8 @@
 
 &spi5 {
 //sch core part U1502(IS62WVS5128GBL)
+	dmas = <&dmac4 X9_DMA_SLV_ID_SPI6_TX>, <&dmac4 X9_DMA_SLV_ID_SPI6_RX>;
+	dma-names = "tx", "rx";
 	status = "okay";
 	spi_is62w@0 {
 		compatible = "iram,is62w-spi-0";
