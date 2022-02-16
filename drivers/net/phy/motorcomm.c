@@ -228,6 +228,20 @@ static int yt8521_config_init(struct phy_device *phydev)
 	ret = ytphy_write_ext(phydev, 0xc, val);
 	if (ret < 0)
 		return ret;
+	/* enable RX delay */
+	val = ytphy_read_ext(phydev, 0xa001);
+
+	if(0 == val&0x100){
+		ret = ytphy_write_ext(phydev, 0xa001, val|0x100);
+		if (ret < 0)
+		return ret;
+	}
+	/* config TX delay */
+	val = ytphy_read_ext(phydev, 0xa003);
+
+	ret =  ytphy_write_ext(phydev, 0xa003, 0x1f);
+	if (ret < 0)
+		return ret;
 
 	return ret;
 }
