@@ -123,7 +123,7 @@ err_free_object:
 static const struct drm_fb_helper_funcs kunlun_fb_helper_funcs = {
 	.fb_probe = kunlun_drm_fbdev_create,
 };
-
+#ifdef CONFIG_DRM_FBDEV_EMULATION
 int kunlun_drm_fbdev_init(struct drm_device *drm)
 {
 	struct kunlun_drm_data *kdrm = drm->dev_private;
@@ -183,3 +183,4 @@ void kunlun_drm_fbdev_fini(struct drm_device *drm)
 
 	kfree(helper);
 }
+#endif
