@@ -71,7 +71,7 @@
 		linux,cma {
 			compatible = "shared-dma-pool";
 			reusable;
-			size = <0x0 0x10000000>; /* 1024MB */
+			size = <0x0 0x10000000>; /* 256MB */
 			/* 4GB maximum in case of 32-bit only capable devices */
 			alloc-ranges = <0x0 0x0 0x0 0xffffffff>;
 			linux,cma-default;
