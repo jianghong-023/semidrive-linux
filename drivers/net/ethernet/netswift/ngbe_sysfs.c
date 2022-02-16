@@ -129,6 +129,9 @@ static int ngbe_add_hwmon_attr(struct ngbe_adapter *adapter, int type)
 	ngbe_attr->dev_attr.store = NULL;
 	ngbe_attr->dev_attr.attr.mode = S_IRUGO;
 	ngbe_attr->dev_attr.attr.name = ngbe_attr->name;
+#ifdef CONFIG_DEBUG_LOCK_ALLOC
+	ngbe_attr->dev_attr.attr.ignore_lockdep = true;
+#endif
 
 	rc = device_create_file(pci_dev_to_dev(adapter->pdev),
 				&ngbe_attr->dev_attr);
