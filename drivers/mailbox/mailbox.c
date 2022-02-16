@@ -150,7 +150,8 @@ static enum hrtimer_restart txdone_hrtimer(struct hrtimer *hrtimer)
 
 	spin_lock_irqsave(&mbox->hrt_lock, flags);
 	if (resched || mbox->hrt_state == HRT_RESCHEDULE) {
-		hrtimer_forward_now(hrtimer, ms_to_ktime(mbox->txpoll_period));
+		/* convert to 8*txpoll_period in mirosecond */
+		hrtimer_forward_now(hrtimer, ns_to_ktime(mbox->txpoll_period*8000));
 		mbox->hrt_state = HRT_SCHEDULED;
 		ret = HRTIMER_RESTART;
 	} else {

@@ -114,7 +114,8 @@ struct sd_rpmsg_vq_info {
 static u64 sd_rpmsg_get_features(struct virtio_device *vdev)
 {
 	/* VIRTIO_RPMSG_F_NS has been made private */
-	return 1 << 0;
+	/* VIRTIO_RPMSG_F_ECHO */
+	return (1 << 0) | (1 << 1);
 }
 
 static int sd_rpmsg_finalize_features(struct virtio_device *vdev)

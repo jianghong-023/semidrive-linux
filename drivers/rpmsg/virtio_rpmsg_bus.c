@@ -34,6 +34,7 @@
 #include <linux/rpmsg.h>
 #include <linux/mutex.h>
 #include <linux/of_device.h>
+#include <linux/soc/semidrive/ipcc.h>
 
 #include "rpmsg_internal.h"
 
@@ -76,10 +77,12 @@ struct virtproc_info {
 	wait_queue_head_t sendq;
 	atomic_t sleepers;
 	struct rpmsg_endpoint *ns_ept;
+	struct rpmsg_endpoint *echo_ept; /* Add for echo test */
 };
 
 /* The feature bitmap for virtio rpmsg */
 #define VIRTIO_RPMSG_F_NS	0 /* RP supports name service notifications */
+#define VIRTIO_RPMSG_F_ECHO	1 /* RP supports echo test */
 
 #include <linux/rpmsg/rpmsg_proto.h>
 
@@ -154,6 +157,9 @@ struct virtio_rpmsg_channel {
 
 /* Address 53 is reserved for advertising remote services */
 #define RPMSG_NS_ADDR			(53)
+
+/* Address 30 is reserved for echo services */
+#define RPMSG_ECHO_ADDR			(30)
 
 static void virtio_rpmsg_destroy_ept(struct rpmsg_endpoint *ept);
 static int virtio_rpmsg_send(struct rpmsg_endpoint *ept, void *data, int len);
@@ -544,13 +550,12 @@ static void rpmsg_downref_sleepers(struct virtproc_info *vrp)
  *
  * Returns 0 on success and an appropriate error value on failure.
  */
-static int rpmsg_send_offchannel_raw(struct rpmsg_device *rpdev,
+
+static int __send_offchannel_raw(struct virtproc_info *vrp,
 				     u32 src, u32 dst,
 				     void *data, int len, bool wait)
 {
-	struct virtio_rpmsg_channel *vch = to_virtio_rpmsg_channel(rpdev);
-	struct virtproc_info *vrp = vch->vrp;
-	struct device *dev = &rpdev->dev;
+	struct device *dev = &vrp->vdev->dev;
 	struct scatterlist sg;
 	struct rpmsg_hdr *msg;
 	int err;
@@ -640,6 +645,16 @@ static int rpmsg_send_offchannel_raw(struct rpmsg_device *rpdev,
 out:
 	mutex_unlock(&vrp->tx_lock);
 	return err;
+}
+
+static int rpmsg_send_offchannel_raw(struct rpmsg_device *rpdev,
+				     u32 src, u32 dst,
+				     void *data, int len, bool wait)
+{
+	struct virtio_rpmsg_channel *vch = to_virtio_rpmsg_channel(rpdev);
+	struct virtproc_info *vrp = vch->vrp;
+
+	return __send_offchannel_raw(vrp, src, dst, data, len, wait);
 }
 
 static int virtio_rpmsg_send(struct rpmsg_endpoint *ept, void *data, int len)
@@ -748,7 +763,8 @@ static int rpmsg_recv_single(struct virtproc_info *vrp, struct device *dev,
 		/* farewell, ept, we don't need you anymore */
 		kref_put(&ept->refcount, __ept_release);
 	} else
-		dev_warn(dev, "msg received with no recipient\n");
+		dev_warn(dev, "msg (%d->%d) received with no recipient\n",
+					msg->src, msg->dst);
 
 	/* publish the real size of the buffer */
 	rpmsg_sg_init(&sg, msg, vrp->buf_size);
@@ -871,6 +887,47 @@ static int rpmsg_ns_cb(struct rpmsg_device *rpdev, void *data, int len,
 	return 0;
 }
 
+/* invoked when a echo request arrives */
+static int rpmsg_echo_cb(struct rpmsg_device *rpdev, void *data, int len,
+		       void *priv, u32 src)
+{
+	struct dcf_message *msg = data;
+	struct virtproc_info *vrp = priv;
+	struct device *dev = &vrp->vdev->dev;
+	int err = 0;
+
+	dev_dbg(dev, "%s in\n", __func__);
+	if (len == 0) {
+		dev_err(dev, "malformed echo msg (%d)\n", len);
+		return -EINVAL;
+	}
+
+	if (rpdev) {
+		dev_err(dev, "anomaly: echo ept has an rpdev handle\n");
+		return -EINVAL;
+	}
+
+	switch (msg->msg_type) {
+	case COMM_MSG_CCM_ECHO:
+		err = __send_offchannel_raw(vrp, RPMSG_ECHO_ADDR, src, data, len, true);
+		if (err)
+			dev_err(dev, "failed to echo service %d\n", err);
+
+		break;
+	case COMM_MSG_CCM_ACK:
+		err = __send_offchannel_raw(vrp, RPMSG_ECHO_ADDR, src, "ACK", 4, true);
+		if (err)
+			dev_err(dev, "failed to echo service %d\n", err);
+
+		break;
+	default:
+		/* No more action, just drop the packet */
+		break;
+	}
+
+	return 0;
+}
+
 static int rpmsg_probe(struct virtio_device *vdev)
 {
 	vq_callback_t *vq_cbs[] = { rpmsg_recv_done, rpmsg_xmit_done };
@@ -969,6 +1026,18 @@ static int rpmsg_probe(struct virtio_device *vdev)
 		}
 	}
 
+	/* if supported by the remote processor, enable the echo service */
+	if (virtio_has_feature(vdev, VIRTIO_RPMSG_F_ECHO)) {
+		/* a dedicated endpoint handles the echo msgs */
+		vrp->echo_ept = __rpmsg_create_ept(vrp, NULL, rpmsg_echo_cb,
+						vrp, RPMSG_ECHO_ADDR);
+		if (!vrp->echo_ept) {
+			dev_err(&vdev->dev, "failed to create the echo ept\n");
+			err = -ENOMEM;
+			goto free_coherent;
+		}
+	}
+
 	/*
 	 * Prepare to kick but don't notify yet - we can't do this before
 	 * device is ready.
@@ -1039,6 +1108,7 @@ static struct virtio_device_id id_table[] = {
 
 static unsigned int features[] = {
 	VIRTIO_RPMSG_F_NS,
+	VIRTIO_RPMSG_F_ECHO,
 };
 
 static struct virtio_driver virtio_ipc_driver = {

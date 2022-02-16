@@ -999,6 +999,11 @@ static int rpmsg_ipcc_echo_cb(struct rpmsg_device *rpdev, void *data, int len,
 
 		break;
 	case COMM_MSG_CCM_ACK:
+		err = __send_offchannel_raw(vrp, RPMSG_ECHO_ADDR, src, "ACK", 4, true);
+		if (err)
+			dev_err(dev, "failed to echo service %d\n", err);
+
+		break;
 	default:
 		/* No more action, just drop the packet */
 		break;

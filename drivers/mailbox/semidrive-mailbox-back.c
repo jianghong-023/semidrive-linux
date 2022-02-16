@@ -60,6 +60,7 @@ struct mbox_back_channel {
 	atomic_t write;
 	atomic_t io;
 	atomic_t release;
+	atomic_t connected;
 
 	struct mbox_ioworker ioworker;
 };
@@ -310,6 +311,10 @@ void mbox_back_received_data(sd_msghdr_t *data, int remote_proc, int src, int de
 	chan = be->channel;
 
 	BUG_ON(!chan);
+
+	/* the backend channel is disconnected */
+	if (!atomic_read(&chan->connected))
+		return;
 
 	size = sizeof(struct mbox_data_head) + msg->dat_len;
 	rx_buf = kmalloc(size, GFP_ATOMIC);
@@ -627,6 +632,8 @@ out:
 
 static int mbox_backend_connect(struct xenbus_device *xbdev)
 {
+	struct mbox_backend *be = dev_get_drvdata(&xbdev->dev);
+	struct mbox_back_channel *chan = be->channel;
 	unsigned int val;
 	grant_ref_t ring_ref;
 	unsigned int evtchn;
@@ -682,6 +689,9 @@ static int mbox_backend_connect(struct xenbus_device *xbdev)
 		goto fail;
 	}
 
+	/* indicate the backend channel is active for receiving data */
+	atomic_set(&chan->connected, 1);
+
 	return 0;
 
 fail:
@@ -694,6 +704,8 @@ static void mbox_backend_disconnect(struct xenbus_device *xbdev)
 	struct mbox_back_channel *chan = be->channel;
 
 	if (chan) {
+		/* indicate the backend channel is inactive */
+		atomic_set(&chan->connected, 0);
 		if (chan->io_irq) {
 			disable_irq(chan->io_irq);
 			unbind_from_irqhandler(chan->io_irq, chan);

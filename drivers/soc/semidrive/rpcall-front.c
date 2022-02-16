@@ -610,6 +610,10 @@ static int __read_ring(struct pvcalls_data_intf *intf,
 	masked_prod = pvcalls_mask(prod, array_size);
 	masked_cons = pvcalls_mask(cons, array_size);
 
+	/* the array size is 4096*8 */
+	if (size < (array_size/2) && error == -EOVERFLOW)
+		intf->in_error = 0;
+
 	if (size == 0)
 		return error ?: size;
 
