@@ -695,7 +695,13 @@
 &vpu2 {
 	resets = <&rstgen RSTGEN_MODULE_VPU2>;
 	reset-names = "vpu-reset";
-	status = "disabled";
+	status = "okay";
+};
+
+&jpu {
+	resets = <&rstgen RSTGEN_MODULE_MJPEG>;
+	reset-names = "jpu-reset";
+	status = "okay";
 };
 
 &gpu1 {
@@ -919,6 +925,7 @@
 &rstgen {
 	reg = <0x0 0x38467000 0x0 0x1000>,	/* vpu1 */
 		<0x0 0x38468000 0x0 0x1000>,	/* vpu2 */
+		<0x0 0x38469000 0x0 0x1000>,	/* mjpeg */
 		<0x0 0x38490000 0x0 0x1000>,	/* gpu1 core */
 		<0x0 0x38491000 0x0 0x1000>,	/* gpu1 ss */
 		<0x0 0x38461000 0x0 0x1000>,	/* GIC4 */
@@ -934,6 +941,7 @@
 	rstgen_resource = <
 		RSTGEN_MODULE_VPU1
 		RSTGEN_MODULE_VPU2
+		RSTGEN_MODULE_MJPEG
 		RSTGEN_MODULE_GPU1_CORE
 		RSTGEN_MODULE_GPU1_SS
 		RSTGEN_MODULE_GIC4

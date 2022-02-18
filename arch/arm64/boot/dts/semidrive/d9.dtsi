@@ -985,11 +985,26 @@
 			reg = <0x0 0x31430000 0x0 0x4000>,
 				  <0x0 0xD00000   0x0 0x2A000>;
 			reg-names = "register", "inter_sram";
+			vpu2,sram = <&sram>;
+			sram-index = <0>; /* index to sram3 */
 			clocks = <&VPU_BUS_0_VPU2>;
 			clock-names = "core-clk";
 			clock-frequency = <666000000>;
 			interrupts = <0 168 4>;
 			sdrv,scr_signal = <SCR_SEC__vpu2_i_linebuffer_cfg_1_0>;
+			status = "disabled";
+		};
+
+		jpu:codaj12@31420000 {
+			compatible = "semidrive,codaj12";
+			#address-cells = <2>;
+			#size-cells = <2>;
+			reg = <0x0 0x31420000 0x0 0x1000>;
+			reg-names = "register";
+			clocks = <&VPU_BUS_0_MJPEG>,<&MJPEG_0>;
+			clock-names = "core-aclk","core-cclk";
+			clock-frequency = <666000000>,<532800000>;
+			interrupts = <0 169 4>;
 			status = "disabled";
 		};
 
