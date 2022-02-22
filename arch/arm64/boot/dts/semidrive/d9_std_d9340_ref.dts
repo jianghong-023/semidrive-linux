@@ -695,13 +695,13 @@
 &vpu2 {
 	resets = <&rstgen RSTGEN_MODULE_VPU2>;
 	reset-names = "vpu-reset";
-	status = "okay";
+	status = "disabled";
 };
 
 &jpu {
 	resets = <&rstgen RSTGEN_MODULE_MJPEG>;
 	reset-names = "jpu-reset";
-	status = "okay";
+	status = "disabled";
 };
 
 &gpu1 {
