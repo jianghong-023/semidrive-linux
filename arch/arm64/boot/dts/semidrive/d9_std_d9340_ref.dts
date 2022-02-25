@@ -695,21 +695,21 @@
 &vpu2 {
 	resets = <&rstgen RSTGEN_MODULE_VPU2>;
 	reset-names = "vpu-reset";
-	status = "disabled";
+	status = "okay";
 };
 
 &jpu {
 	resets = <&rstgen RSTGEN_MODULE_MJPEG>;
 	reset-names = "jpu-reset";
-	status = "disabled";
+	status = "okay";
 };
 
 &gpu1 {
-	status = "disabled";
+	status = "okay";
 };
 
 &clk_gpu2 {
-	status = "disabled";
+	status = "okay";
 };
 &vdsp {
 	reg = <0x0 VDSP_SHARE_MEMBASE 0x0 0x1000>, /* DSP command queue */
