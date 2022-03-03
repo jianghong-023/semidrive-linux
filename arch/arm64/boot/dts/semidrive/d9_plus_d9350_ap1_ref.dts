@@ -48,7 +48,7 @@
 		device_type = "memory";
 		reg = <HIGH32(AP1_KERNEL_MEMBASE-0x80000) LOW32(AP1_KERNEL_MEMBASE-0x80000) HIGH32(AP1_KERNEL_MEMSIZE) LOW32(AP1_KERNEL_MEMSIZE) \
 		       HIGH32(AP1_2ND_MEMBASE) LOW32(AP1_2ND_MEMBASE) HIGH32(AP1_2ND_MEMSIZE) LOW32(AP1_2ND_MEMSIZE) \
-			   0x0 (VDSP_MEMBASE+0x4000) 0x0 (VDSP_SHARE_MEMSIZE + VDSP_MEMSIZE -0x4000)>;
+			   0x0 (VDSP_SHARE_MEMSIZE+0x4000) 0x0 (VDSP_SHARE_MEMSIZE -0x4000)>;
 	};
 
 	reserved-memory {
@@ -684,13 +684,13 @@
 &vpu2 {
 	resets = <&rstgen RSTGEN_MODULE_VPU2>;
 	reset-names = "vpu-reset";
-	status = "disabled";
+	status = "okay";
 };
 
 &jpu {
 	resets = <&rstgen RSTGEN_MODULE_MJPEG>;
 	reset-names = "jpu-reset";
-	status = "disabled";
+	status = "okay";
 };
 
 &gpu1 {
