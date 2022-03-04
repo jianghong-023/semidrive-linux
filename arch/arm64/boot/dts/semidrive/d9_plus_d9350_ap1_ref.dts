@@ -303,9 +303,9 @@
 };
 
 &csi2 {
-	mbus-type = "parallel";
+	mbus-type = "bt656";
 	pclk-sample = <0>;
-	status = "disabled";
+	status = "okay";
 
 	ports {
 		csi2_stream0: port@0 {
@@ -385,7 +385,7 @@
 };
 
 &csiparallel0 {
-	status = "disabled";
+	status = "okay";
 	#address-cells = <1>;
 	#size-cells = <0>;
 
@@ -394,7 +394,7 @@
 		#size-cells = <0>;
 		reg = <0>;
 		csiparallel0_in: endpoint@0 {
-			remote-endpoint = <&dvpdeser_to_parallel>;
+			remote-endpoint = <&tp2850_to_parallel>;
 		};
 
 		csiparallel0_out: endpoint@1 {
@@ -442,7 +442,20 @@
 
 &i2c6 {
 //sch part U5(tp2850)
-	status = "disabled";
+	status = "okay";
+	dvp_tp2850:dvp_tp2850@44 {
+		compatible = "tp,tp2850";
+		reg = <0x44>;
+		sync = <0>;
+		//pwdn-gpios = <&port4d 27 GPIO_ACTIVE_HIGH>;//index(123) gpio h1
+		rst-gpios = <&port4c 19 GPIO_ACTIVE_HIGH>;//index(79) gpio D15
+		//semidrive,poc = <&i2c9>;
+		port {
+			tp2850_to_parallel:endpoint {
+				remote-endpoint = <&csiparallel0_in>;
+			};
+		};
+	};
 };
 
 &i2c7 {
