@@ -316,6 +316,10 @@ enum drm_mode_subconnector {
 #define DRM_MODE_CONNECTOR_VIRTUAL      15
 #define DRM_MODE_CONNECTOR_DSI		16
 #define DRM_MODE_CONNECTOR_DPI		17
+#define DRM_MODE_CONNECTOR_RESERVED1		18
+#define DRM_MODE_CONNECTOR_RESERVED2		19
+#define DRM_MODE_CONNECTOR_CAST_AP		20
+#define DRM_MODE_CONNECTOR_CAST_SIDE		21
 
 struct drm_mode_get_connector {
 
